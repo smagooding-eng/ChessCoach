@@ -199,7 +199,7 @@ export function ContentStudio() {
     } catch { setScanBusy("Couldn't read that photo."); }
   };
   // Promos
-  const [promoT, setPromoT] = useState<'versus' | 'challenge' | 'live'>('live');
+  const [promoT, setPromoT] = useState<'versus' | 'challenge' | 'live' | 'tour'>('tour');
   const [promo, setPromo] = useState<StudioPromo>({
     template: 'versus', hook: 'Stop paying to review your chess games 🛑', rival: 'Chess.com',
     rows: [
@@ -213,6 +213,7 @@ export function ContentStudio() {
   });
   const challengePromo: StudioPromo = { template: 'challenge', hook: 'Your friend thinks they are better than you 😤', rival: '', rows: [], closer: 'Settle it on chessscout.net' };
   const [challenge, setChallenge] = useState<StudioPromo>(challengePromo);
+  const [tourPromo, setTourPromo] = useState<StudioPromo>({ template: 'tour', hook: 'Everything you can do on ChessScout ⚡', rival: '', rows: [], closer: 'All in one app. Free to start.' });
   const [livePromo, setLivePromo] = useState<StudioPromo>({ template: 'live', hook: 'Need a chess game right now? ⚡', rival: '', rows: [], closer: 'Play live chess free. Every game reviewed.' });
   // Puzzles
   const [puzzles, setPuzzles] = useState<StudioPuzzle[] | null>(null);
@@ -394,7 +395,7 @@ export function ContentStudio() {
         {picking ? 'Cancel compilation' : '🎬 Make a compilation'}
       </button>
       <div className="order-1 inline-flex flex-wrap rounded-xl bg-white/5 p-1">
-        {([['moments', 'Game moments'], ['reviews', 'Games'], ['puzzles', 'Puzzles'], ['traps', 'Trap lessons'], ['kids', 'Kids & beginners'], ['scout', 'Opponent scout'], ['scan', 'Scan position'], ['analyzer', 'Analyzer games'], ['openings', 'Openings'], ['promo', 'Promos']] as const).map(([k, t]) => (
+        {([['moments', 'Game moments'], ['reviews', 'Game reviews'], ['puzzles', 'Puzzles'], ['traps', 'Trap lessons'], ['kids', 'Kids & beginners'], ['scout', 'Opponent scout'], ['scan', 'Scan position'], ['analyzer', 'Analyzer games'], ['openings', 'Openings'], ['promo', 'Promos']] as const).map(([k, t]) => (
           <button key={k} onClick={() => setView(k)} className="rounded-lg px-3.5 py-1.5 text-[13px] font-black" style={{ background: view === k ? '#81B64C' : 'transparent', color: view === k ? '#fff' : '#C9CFCD' }}>{t}</button>
         ))}
       </div>
@@ -641,11 +642,23 @@ export function ContentStudio() {
         )}
       </>) : view === 'promo' ? (<>
         <div className="mb-3 inline-flex rounded-xl bg-white/5 p-1">
-          {([['live', 'Live play ⚡'], ['versus', 'ChessScout vs …'], ['challenge', 'Challenge your friends']] as const).map(([k, t]) => (
+          {([['tour', 'App tour 🧭'], ['live', 'Live play ⚡'], ['versus', 'ChessScout vs …'], ['challenge', 'Challenge your friends']] as const).map(([k, t]) => (
             <button key={k} onClick={() => setPromoT(k)} className="rounded-lg px-3.5 py-1.5 text-[13px] font-black" style={{ background: promoT === k ? '#81B64C' : 'transparent', color: promoT === k ? '#fff' : '#C9CFCD' }}>{t}</button>
           ))}
         </div>
-        {promoT === 'live' ? (
+        {promoT === 'tour' ? (
+          <div className="max-w-2xl space-y-2 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
+            <div className="flex flex-wrap gap-1.5">
+              {['Everything you can do on ChessScout ⚡', 'One chess app that does all of this 🤯', 'Stop using 5 chess apps. Use one. ♟️', 'Every chess tool you need, free to start 🧰'].map((h) => (
+                <button key={h} onClick={() => setTourPromo((p) => ({ ...p, hook: h }))} className="rounded-full bg-white/[.07] px-2.5 py-1 text-[12px] font-bold text-white hover:bg-white/15">{h}</button>
+              ))}
+            </div>
+            <label className="block text-[12px] text-white/60">Hook<input value={tourPromo.hook} onChange={(e) => setTourPromo({ ...tourPromo, hook: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[14px] font-bold text-white ring-1 ring-white/10" /></label>
+            <label className="block text-[12px] text-white/60">Closing line<input value={tourPromo.closer} onChange={(e) => setTourPromo({ ...tourPromo, closer: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[13px] text-white ring-1 ring-white/10" /></label>
+            <p className="text-[12px] text-white/55">A card for each part of the app (live games, Play on Lichess, daily games, bots, free game reviews, Opponent Scout, puzzles, openings, board scan, Chess for Kids, live broadcasts), with the Opera Game playing between them, then all of them on one end card.</p>
+            <button onClick={() => setOpen({ kind: 'promo', promo: tourPromo })} className="rounded-lg bg-[#81B64C] px-4 py-2 text-[13px] font-black text-white">🎬 Make the clip</button>
+          </div>
+        ) : promoT === 'live' ? (
           <div className="max-w-2xl space-y-2 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
             <div className="flex flex-wrap gap-1.5">
               {['Need a chess game right now? ⚡', 'Bored? Play a real game of chess in seconds ♟️', 'Your next opponent is waiting 👀', '5 minutes. 1 game. Free review after. ⏱️', 'This is what a time scramble feels like 😰'].map((h) => (
@@ -782,6 +795,11 @@ export function ContentStudio() {
                           : rv.moments === 0 && <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-black uppercase text-white/50">not scanned yet</span>}
                         {rv.chesscomGameId && <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white/50">#{rv.chesscomGameId}</span>}
                       </div>
+                      {rv.reviewed !== false && !picking && (
+                        <span role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); setOpen({ kind: 'review', review: rv, showcase: true }); }}
+                          onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); setOpen({ kind: 'review', review: rv, showcase: true }); } }}
+                          className="mt-2 block rounded-lg bg-[#81B64C] px-2 py-1.5 text-center text-[11.5px] font-black text-white hover:brightness-110">🎬 Review showcase</span>
+                      )}
                       {reviewing?.id === rv.id && reviewing.error && <p className="mt-1 text-[11px] font-semibold text-[#F0605D]">{reviewing.error}</p>}
                     </div>
                   </button>
