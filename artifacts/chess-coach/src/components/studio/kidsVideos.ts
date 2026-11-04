@@ -182,11 +182,12 @@ const hookSay = (w: World, l: Level) => l.kind === 'collect' ? `Can your kid hel
   : l.kind === 'check' ? 'Can your kid find the check? Let\'s play!' : 'Can your kid find checkmate in one move? Let\'s play!';
 
 function bookends(w: World, hook: string, say: string, sub: string, body: KidsScene[], firstItems: BoardItem[]): KidsScene[] {
-  return [
+  const all: KidsScene[] = [
     { card: 'title', say, show: hook, items: firstItems, buddy: w.piece, sfx: 'whoosh', ms: 1800 },
     ...body,
     { card: 'end', say: SITE_SAY, show: 'Play free at chessscout.net/kids 🎮', items: body[body.length - 1]?.items ?? firstItems, buddy: w.piece, mood: 'wow', sfx: 'chime' },
-  ].map((s) => ({ ...s, chip: s.chip ?? (s.card ? undefined : sub) }));
+  ];
+  return all.map((s) => ({ ...s, chip: s.chip ?? (s.card ? undefined : sub) }));
 }
 
 export function kidsScript(v: KidsVideo): KidsScript | null {
