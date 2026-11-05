@@ -666,7 +666,7 @@ export function ContentStudio() {
             </div>
             <label className="block text-[12px] text-white/60">Hook<input value={tourPromo.hook} onChange={(e) => setTourPromo({ ...tourPromo, hook: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[14px] font-bold text-white ring-1 ring-white/10" /></label>
             <label className="block text-[12px] text-white/60">Closing line<input value={tourPromo.closer} onChange={(e) => setTourPromo({ ...tourPromo, closer: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[13px] text-white ring-1 ring-white/10" /></label>
-            <p className="text-[12px] text-white/55">A card for each part of the app (live games, Play on Lichess, daily games with ChessScout or Lichess players, move alerts, bots, free game reviews, Opponent Scout, puzzles, openings, board scan, Chess for Kids, live broadcasts), with the Opera Game playing between them, then all of them on one end card.</p>
+            <p className="text-[12px] text-white/55">A card for each part of the app (play online from 5 minutes to 7 days a move, Play on Lichess, move alerts, bots, free game reviews, Opponent Scout, puzzles, openings, board scan, Chess for Kids, live broadcasts), with the Opera Game playing between them, then all of them on one end card.</p>
             <button onClick={() => setOpen({ kind: 'promo', promo: tourPromo })} className="rounded-lg bg-[#81B64C] px-4 py-2 text-[13px] font-black text-white">🎬 Make the clip</button>
           </div>
         ) : promoT === 'live' ? (
@@ -711,7 +711,7 @@ export function ContentStudio() {
             </div>
             <label className="block text-[12px] text-white/60">Hook<input value={challenge.hook} onChange={(e) => setChallenge({ ...challenge, hook: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[14px] font-bold text-white ring-1 ring-white/10" /></label>
             <label className="block text-[12px] text-white/60">Closing line<input value={challenge.closer} onChange={(e) => setChallenge({ ...challenge, closer: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[13px] text-white ring-1 ring-white/10" /></label>
-            <p className="text-[12px] text-white/55">The clip plays a classic game with ticking clocks, then shows live games (5 min, 5|3, 10 min, 15 min), daily games (1, 3 or 7 days a move) and a challenge link.</p>
+            <p className="text-[12px] text-white/55">The clip plays a classic game with ticking clocks, then shows every clock on the one Play screen (5 minutes up to 7 days a move) and a challenge link.</p>
             <button onClick={() => setOpen({ kind: 'promo', promo: challenge })} className="rounded-lg bg-[#81B64C] px-4 py-2 text-[13px] font-black text-white">🎬 Make the clip</button>
           </div>
         )}

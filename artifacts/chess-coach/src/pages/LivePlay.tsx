@@ -5,7 +5,7 @@ import { useLiveRatings } from '@/hooks/use-live-ratings';
 import { LiveGame } from '@/pages/LiveGame';
 import { Link, useLocation } from 'wouter';
 import { lichessAuth, connectLichess, syncLichessAuth } from '@/lib/lichessBoard';
-import { Loader2, Swords, Zap, Clock, X, Trophy, Sparkles, Award, History, ChevronRight, Users, CalendarDays, Bot } from 'lucide-react';
+import { Loader2, Swords, Zap, Clock, X, History, ChevronRight, Users, CalendarDays, Bot } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
 import { ShareLink } from '@/components/play/ShareLink';
@@ -15,13 +15,16 @@ import { SeekGoneCard, SeekJoiningCard, takeSeekParams, type SeekInfo } from '@/
 import { TournamentsCard } from '@/components/play/Tournaments';
 import { DailyGames } from '@/pages/DailyGames';
 import { useSocialUnread } from '@/lib/social';
-import { useChallengeInbox, ChallengeRequestsCard, ChallengeInvitesCard, SentRequestsCard, OutgoingChallengesCard, OpenLinksCard, createOpenLink } from '@/components/play/OpenChallenges';
+import { useChallengeInbox, ChallengesPanel, OpenLinksCard, createOpenLink } from '@/components/play/OpenChallenges';
 
 const TC_OPTIONS = [
   { id: 'blitz_5_0',  label: '5 min',  sub: 'Blitz', icon: Zap },
   { id: 'blitz_5_3',  label: '5 | 3',  sub: 'Blitz', icon: Zap },
   { id: 'rapid_10_0', label: '10 min', sub: 'Rapid', icon: Clock },
   { id: 'rapid_15_0', label: '15 min', sub: 'Rapid', icon: Clock },
+];
+const DAILY_OPTIONS = [
+  { id: 'corr_1d', label: '1 day' }, { id: 'corr_3d', label: '3 days' }, { id: 'corr_7d', label: '7 days' },
 ];
 
 type Hosted = { code: string; url: string; label: string };
@@ -36,13 +39,12 @@ const readTab = (): OnlineTab | null => {
   try { const t = new URLSearchParams(window.location.search).get('tab'); return t === 'daily' || t === 'live' ? t : null; } catch { return null; }
 };
 
-/** Play Online: live games and daily games in one place (tabs). /daily opens the Daily tab. */
+/** Play Online: live and daily games on one screen (the clocks run from 5 minutes to 7 days a move). */
 export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
-  const [tab, setTabState] = useState<OnlineTab>(() => readTab() ?? initialTab ?? 'live');
-  const setTab = (t: OnlineTab) => {
-    setTabState(t);
-    try { const u = new URL(window.location.href); u.searchParams.set('tab', t); window.history.replaceState(null, '', u.pathname + u.search); } catch { /* ignore */ }
-  };
+  // Live and daily are one screen now; /daily (and ?tab=daily) scroll to your daily games.
+  const tab: OnlineTab = 'live';
+  const dailyRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if ((readTab() ?? initialTab) === 'daily') setTimeout(() => dailyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 600); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const live = useLivePlay();
   const [, navigate] = useLocation();
   const [lichess, setLichess] = useState(lichessAuth);
@@ -56,8 +58,26 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
   // Start looking here; with Lichess connected (and a clock it allows) the server holds its bot back.
   const queueFor = (tc: string, m: LiveMode) => live.enterQueue(tc, m, { noAutoBot: !!lichessAuth() && !!LICHESS_CLOCK[tc] });
   const { data: ratingsData, refetch } = useLiveRatings();
+  const dailyRating = ratingsData?.ratings?.daily;
   const [mode, setMode] = useState<LiveMode>('casual');
   const [friendTc, setFriendTc] = useState('blitz_5_0');
+  const friendDaily = friendTc.startsWith('corr_');
+  const [dailyLink, setDailyLink] = useState<string | null>(null);
+  // Daily games, started from the same clocks.
+  const [dailyBusy, setDailyBusy] = useState(false);
+  const [dailyNote, setDailyNote] = useState<string | null>(null);
+  const startDaily = async (tc: string) => {
+    setDailyBusy(true); setDailyNote(null);
+    try {
+      const r = await apiFetch('/api/correspondence/create', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ timeControl: tc, mode }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'Could not start a daily game');
+      if (d.status === 'matched' && d.game) { navigate(`/daily/${d.game.id}`); return; }
+      setDailyNote(`Looking for a daily opponent (${DAILY_OPTIONS.find((o) => o.id === tc)?.label} a move). We'll notify you when someone's found; it's in your daily games below.`);
+      window.dispatchEvent(new Event('cs:daily-update'));
+    } catch (e) { setDailyNote(`!${e instanceof Error ? e.message : 'Could not start a daily game'}`); }
+    finally { setDailyBusy(false); }
+  };
   const [friendColor, setFriendColor] = useState<'random' | 'white' | 'black'>('random');
   const [hosted, setHosted] = useState<Hosted | null>(null);
   const [creating, setCreating] = useState(false);
@@ -143,10 +163,12 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
     try {
       const r = await apiFetch('/api/challenges', {
         method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind: 'live', timeControl: friendTc, mode, color: friendColor }),
+        body: JSON.stringify({ kind: friendDaily ? 'daily' : 'live', timeControl: friendTc, mode, color: friendColor }),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Could not create the link');
+      // Daily: just a link to send (the game starts when they accept); live: wait here for them.
+      if (friendDaily) { setDailyLink(`${window.location.origin}/challenge/${d.challenge.code}`); announceChallengeSent(); return; }
       setHosted({ code: d.challenge.code, url: `${window.location.origin}/challenge/${d.challenge.code}`, label: d.challenge.timeControlLabel });
       announceChallengeSent();
     } catch (e) {
@@ -155,7 +177,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
   };
   const makeOpenLink = async () => {
     setCreatingOpen(true);
-    try { await createOpenLink('live', friendTc, mode, friendColor); }
+    try { await createOpenLink(friendDaily ? 'daily' : 'live', friendTc, mode, friendColor); }
     catch (e) { alert(e instanceof Error ? e.message : 'Could not create the link'); }
     finally { setCreatingOpen(false); }
   };
@@ -167,7 +189,6 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
   const waitedMs = live.queuedAt ? now - live.queuedAt : 0;
   const showBotOffer = live.status === 'queued' && waitedMs >= live.botOfferMs;
   const queuedLabel = live.queuedTc === 'any' ? 'Any clock' : TC_OPTIONS.find(t => t.id === live.queuedTc)?.label;
-  const dailyR = ratingsData?.ratings?.daily;
 
   return (
     <div className="mx-auto max-w-[760px] space-y-4 p-4 md:p-0 pb-24">
@@ -195,12 +216,12 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
       </div>
 
       {live.status !== 'queued' && (
-        <div className="grid grid-cols-2 gap-2">
-          <Link href="/lichess" className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] font-extrabold" style={ghostBtn}>
-            <span className="text-[17px] leading-none">♞</span><span className="min-w-0"><span className="block">Play on Lichess</span><span className="block truncate text-[11px] font-semibold" style={{ color: PT.muted }}>{lichess ? `as ${lichess.username}` : 'Real opponents, any time'}</span></span>
+        <div className="flex gap-2">
+          <Link href="/lichess" className="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[10px] px-2.5 py-2 text-[12.5px] font-extrabold" style={ghostBtn}>
+            <span className="text-[15px] leading-none">♞</span><span className="truncate">{lichess ? `Lichess · ${lichess.username}` : 'Play on Lichess'}</span>
           </Link>
-          <Link href="/watch" className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] font-extrabold" style={ghostBtn}>
-            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: '#FF5058' }} /><span className="min-w-0"><span className="block">Watch live</span><span className="block truncate text-[11px] font-semibold" style={{ color: PT.muted }}>Top events, move by move</span></span>
+          <Link href="/watch" className="inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-[10px] px-2.5 py-2 text-[12.5px] font-extrabold" style={ghostBtn}>
+            <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: '#FF5058' }} /><span className="truncate">Watch top events</span>
           </Link>
         </div>
       )}
@@ -282,94 +303,73 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
         </div>
       ) : (
         <>
-          <ChallengeRequestsCard requests={inbox.requests} onAcceptLive={(code) => live.approveRequest(code)} onChanged={() => { void inbox.reload(); }} />
-          <ChallengeInvitesCard invites={inbox.invites} onChanged={() => { void inbox.reload(); }} />
-          <SentRequestsCard sent={inbox.sent} onChanged={() => { void inbox.reload(); }} />
-          <OutgoingChallengesCard outgoing={inbox.outgoing} kind="live" onChanged={() => { void inbox.reload(); }} />
+          <ChallengesPanel inbox={inbox} onAcceptLive={(code) => live.approveRequest(code)} />
 
-          {/* Live | Daily */}
-          <div className="grid grid-cols-2 gap-1 rounded-[14px] p-1" style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${PT.border}` }}>
-            {([['live', 'Live', Zap, '5 to 15 minutes'], ['daily', 'Daily', CalendarDays, '1, 3 or 7 days a move']] as const).map(([id, label, Icon, sub]) => {
-              const on = tab === id;
-              return (
-                <button key={id} onClick={() => setTab(id)} aria-pressed={on}
-                  className="flex items-center justify-center gap-2 rounded-[10px] px-3 py-2.5 text-left transition-colors"
-                  style={on ? { background: PT.greenSoft, boxShadow: `inset 0 0 0 1.5px ${PT.green}` } : undefined}>
-                  <Icon size={18} style={{ color: on ? PT.green : PT.muted }} />
-                  <span className="min-w-0">
-                    <b className="block text-[14px] font-extrabold" style={{ color: on ? PT.text : PT.muted }}>{label}</b>
-                    <span className="block truncate text-[11px]" style={{ color: PT.muted }}>{sub}</span>
-                  </span>
-                </button>
-              );
-            })}
+          {/* Casual | Ranked, for every clock below */}
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[12px]" style={{ color: PT.muted }}>{mode === 'casual' ? 'Casual: no rating change' : 'Ranked: your rating for that clock moves'}</p>
+            <div className="inline-flex shrink-0 rounded-[12px] p-1" style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${PT.border}` }}>
+              {(['casual', 'ranked'] as LiveMode[]).map(m => (
+                <button key={m} onClick={() => setMode(m)} aria-pressed={mode === m}
+                  className="rounded-[9px] px-2.5 py-1.5 text-[12px] font-extrabold capitalize"
+                  style={mode === m ? greenBtn : { color: PT.muted }}>{m}</button>
+              ))}
+            </div>
           </div>
 
-          {tab === 'daily' ? <DailyGames embedded /> : <>
-          {/* Quick play: pick a clock, get matched. */}
-          <section className="p-4" style={cardStyle}>
-            <div className="mb-1 flex items-center justify-between gap-3">
-              <h2 className="text-[16px] font-extrabold" style={{ color: PT.text }}>Quick play</h2>
-              <div className="inline-flex rounded-[10px] p-0.5" style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${PT.border}` }}>
-                {(['casual', 'ranked'] as LiveMode[]).map(m => (
-                  <button key={m} onClick={() => setMode(m)} aria-pressed={mode === m}
-                    className="inline-flex items-center gap-1 rounded-[8px] px-2.5 py-1.5 text-[11.5px] font-extrabold capitalize"
-                    style={mode === m ? greenBtn : { color: PT.muted }}>
-                    {m === 'casual' ? <Sparkles className="w-3 h-3" /> : <Award className="w-3 h-3" />}{m}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <p className="mb-3 text-[12px]" style={{ color: PT.muted }}>
-              {mode === 'casual' ? 'Casual: no rating change.' : 'Ranked: your rating for that clock goes up or down.'} Tap a clock to find an opponent.
-            </p>
-            <LivePulse className="mb-3" />
+          <>
+          {/* Quick play: one tap to play anyone, or pick a clock. */}
+          <section className="space-y-2.5 p-3" style={cardStyle}>
+            <LivePulse />
             {/* Play anyone: one pool across every clock, so you're matched as fast as possible. */}
             <button
               disabled={live.status === 'connecting' || live.status === 'disconnected'}
               onClick={() => queueFor('any', mode)}
-              className="mb-2 flex w-full items-center gap-3 rounded-[14px] p-3.5 text-left transition-transform active:scale-[0.99] disabled:opacity-50"
-              style={{ background: 'linear-gradient(180deg, #8FC25A, #81B64C)', boxShadow: '0 3px 0 #5F8F36', color: '#FFFFFF' }}>
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px]" style={{ background: 'rgba(255,255,255,.2)' }}>
-                <Swords className="w-5 h-5" />
-              </span>
+              className="flex w-full items-center gap-2.5 rounded-[12px] px-3.5 py-3 text-left transition-transform active:scale-[0.99] disabled:opacity-50"
+              style={{ background: 'linear-gradient(180deg, #8FC25A, #81B64C)', boxShadow: '0 2px 0 #5F8F36', color: '#FFFFFF' }}>
+              <Swords className="h-5 w-5 shrink-0" />
               <span className="min-w-0 flex-1">
-                <b className="block text-[17px] font-black leading-tight">Play anyone</b>
-                <span className="block text-[12px] font-semibold opacity-90">Fastest match: any clock from 5 to 15 minutes</span>
+                <b className="block text-[16px] font-black leading-tight">Play anyone</b>
+                <span className="block text-[11.5px] font-semibold opacity-90">Fastest match · any clock, 5 to 15 min · {mode}</span>
               </span>
               <ChevronRight className="h-5 w-5 shrink-0" />
             </button>
-            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+            <div className="grid grid-cols-4 gap-1.5">
               {TC_OPTIONS.map(opt => {
                 const r = ratingsData?.ratings[opt.id];
                 return (
                   <button key={opt.id}
                     disabled={live.status === 'connecting' || live.status === 'disconnected'}
                     onClick={() => queueFor(opt.id, mode)}
-                    className="flex items-center gap-3 rounded-[14px] p-3 text-left transition-transform active:scale-[0.98] disabled:opacity-50"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${PT.border}` }}>
-                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px]" style={{ background: '#81B64C', color: '#FFFFFF' }}>
-                      <opt.icon className="w-5 h-5" />
-                    </span>
-                    <span className="min-w-0">
-                      <b className="block text-[17px] font-black leading-tight" style={{ color: PT.text }}>{opt.label}</b>
-                      <span className="block text-[11.5px]" style={{ color: PT.muted }}>
-                        {opt.sub} · {r && r.gamesPlayed > 0 ? `${r.rating}${r.isProvisional ? '?' : ''}` : 'unrated'}
-                      </span>
-                    </span>
+                    className="rounded-[10px] px-1 py-2 text-center transition-transform active:scale-[0.97] disabled:opacity-50"
+                    style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${PT.border}` }}>
+                    <b className="block text-[14.5px] font-black leading-tight" style={{ color: PT.text }}>{opt.label}</b>
+                    <span className="block text-[10.5px] font-semibold" style={{ color: PT.muted }}>{r && r.gamesPlayed > 0 ? `${r.rating}${r.isProvisional ? '?' : ''}` : opt.sub}</span>
                   </button>
                 );
               })}
             </div>
+            {/* Daily: one move a day (or 3, or 7); we notify you when it's your turn. */}
+            <div className="grid grid-cols-3 gap-1.5">
+              {DAILY_OPTIONS.map(opt => (
+                <button key={opt.id} disabled={dailyBusy} onClick={() => void startDaily(opt.id)}
+                  className="rounded-[10px] px-1 py-2 text-center transition-transform active:scale-[0.97] disabled:opacity-50"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${PT.border}` }}>
+                  <b className="block text-[14.5px] font-black leading-tight" style={{ color: PT.text }}>{opt.label}</b>
+                  <span className="block text-[10.5px] font-semibold" style={{ color: PT.muted }}>a move{dailyRating && dailyRating.gamesPlayed > 0 ? ` · ${dailyRating.rating}${dailyRating.isProvisional ? '?' : ''}` : ''}</span>
+                </button>
+              ))}
+            </div>
+            {dailyNote && <p className="text-[12px]" style={{ color: dailyNote.startsWith('!') ? PT.red : PT.green }}>{dailyNote.replace(/^!/, '')}</p>}
           </section>
 
           {/* Play a friend: closed until you want it. */}
           <section className="overflow-hidden" style={cardStyle}>
-            <button onClick={() => setFriendOpen(o => !o)} aria-expanded={friendOpen} className="flex w-full items-center gap-3 p-4 text-left">
-              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px]" style={{ background: '#81B64C', color: '#FFFFFF' }}><Users size={19} /></span>
+            <button onClick={() => setFriendOpen(o => !o)} aria-expanded={friendOpen} className="flex w-full items-center gap-2.5 px-3.5 py-3 text-left">
+              <Users size={17} className="shrink-0" style={{ color: PT.green }} />
               <span className="min-w-0 flex-1">
-                <b className="block text-[15px] font-extrabold" style={{ color: PT.text }}>Play a friend</b>
-                <span className="block text-[12px]" style={{ color: PT.muted }}>Send a link; the game starts when they accept</span>
+                <b className="block text-[14px] font-extrabold" style={{ color: PT.text }}>Play a friend</b>
+                <span className="block truncate text-[11.5px]" style={{ color: PT.muted }}>Send a link, or challenge a friend from Friends</span>
               </span>
               <ChevronRight size={18} style={{ color: PT.muted, transform: friendOpen ? 'rotate(90deg)' : undefined, transition: 'transform .15s' }} />
             </button>
@@ -378,7 +378,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
                 <div className="pt-3">
                   <p className="mb-1.5 text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: PT.muted }}>Clock</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {TC_OPTIONS.map(o => (
+                    {[...TC_OPTIONS, ...DAILY_OPTIONS.map((d) => ({ ...d, label: `${d.label} a move` }))].map(o => (
                       <button key={o.id} onClick={() => setFriendTc(o.id)} className="rounded-lg px-3 py-1.5 text-[12.5px] font-bold"
                         style={friendTc === o.id ? greenBtn : ghostBtn}>{o.label}</button>
                     ))}
@@ -401,6 +401,12 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
                     {creatingOpen ? 'Creating…' : 'Open link'}
                   </button>
                 </div>
+                {dailyLink && friendDaily && (
+                  <div className="space-y-2 rounded-xl p-3" style={{ background: 'rgba(0,0,0,.2)' }}>
+                    <p className="text-[12.5px]" style={{ color: PT.text }}>Send this link. The daily game starts as soon as your friend accepts; we'll notify you.</p>
+                    <ShareLink url={dailyLink} text="Play a daily game with me on ChessScout" />
+                  </div>
+                )}
                 <p className="text-[11.5px]" style={{ color: PT.muted }}>
                   {mode === 'ranked' ? 'Ranked' : 'Casual'} game. <b style={{ color: PT.text }}>Open link:</b> post it anywhere; anyone can challenge you and you choose who to play.
                 </p>
@@ -408,9 +414,11 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
             )}
           </section>
           <OpenLinksCard links={inbox.links} kind="live" onChanged={() => { void inbox.reload(); }} />
+          <OpenLinksCard links={inbox.links} kind="daily" onChanged={() => { void inbox.reload(); }} />
+          <div ref={dailyRef} className="space-y-3 empty:hidden"><DailyGames embedded listOnly /></div>
 
           <TournamentsCard />
-          </>}
+          </>
         </>
       )}
 
@@ -422,21 +430,6 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
       {live.status === 'connecting' && <p className="text-xs" style={{ color: PT.muted }}>Connecting…</p>}
       {live.status === 'disconnected' && <p className="text-xs" style={{ color: '#ea9733' }}>Reconnecting…</p>}
 
-      {/* Your ratings, one compact row */}
-      <section className="flex items-center gap-3 overflow-x-auto px-4 py-3" style={cardStyle}>
-        <span className="inline-flex shrink-0 items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: PT.muted }}>
-          <Trophy className="w-3.5 h-3.5" style={{ color: PT.gold }} /> Ratings
-        </span>
-        {[...TC_OPTIONS.map(o => ({ id: o.id, label: o.label })), { id: 'daily', label: 'Daily' }].map(opt => {
-          const r = opt.id === 'daily' ? dailyR : ratingsData?.ratings[opt.id];
-          return (
-            <span key={opt.id} className="shrink-0 rounded-[10px] px-2.5 py-1.5 text-center" style={{ background: 'rgba(0,0,0,0.2)' }} title={`${r?.gamesPlayed ?? 0} games`}>
-              <span className="block text-[10px] font-bold" style={{ color: PT.muted }}>{opt.label}</span>
-              <b className="block text-[14px] font-black leading-tight" style={{ color: PT.text }}>{r && r.gamesPlayed > 0 ? `${r.rating}${r.isProvisional ? '?' : ''}` : '—'}</b>
-            </span>
-          );
-        })}
-      </section>
     </div>
   );
 }

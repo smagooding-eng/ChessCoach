@@ -387,10 +387,9 @@ function scanClip(fen: string, line: string[], photo?: string): Clip {
 }
 // App tour: what ChessScout does, one card each (only things the app really does).
 const TOUR: { emo: string; title: string; line: string; say: string }[] = [
-  { emo: '⚡', title: 'Live games', line: '5 min, 5 | 3, 10 min or 15 min', say: 'Play live: five, ten or fifteen minutes.' },
+  { emo: '⚡', title: 'Play online', line: '5 minutes to 7 days a move, all on one screen', say: 'Play online, from five-minute games to one move a day, all on one screen.' },
   { emo: '♞', title: 'Play on Lichess', line: 'Nobody free? Play a real Lichess player, right here', say: 'Nobody free? Play real Lichess players, right inside ChessScout.' },
-  { emo: '📅', title: 'Daily games', line: '1, 3 or 7 days a move, with ChessScout or Lichess players', say: 'Daily games, one move a day, with ChessScout or Lichess players.' },
-  { emo: '🔔', title: 'Never miss a move', line: "A notification when it's your turn", say: "And a heads-up whenever it's your move." },
+  { emo: '🔔', title: 'Never miss a move', line: "Daily games tell you when it's your turn", say: "And daily games tell you whenever it's your move." },
   { emo: '🤖', title: 'Practice bots', line: 'Every level, any time', say: 'Bots at every level, any time.' },
   { emo: '🧠', title: 'Every game reviewed', line: 'Accuracy, mistakes and the better move. Free', say: 'Every game reviewed free: your accuracy, your mistakes, and the better move.' },
   { emo: '🔍', title: 'Opponent Scout', line: 'Scout anyone on Chess.com or Lichess before you play', say: 'Scout your next opponent before you play them.' },
@@ -1069,7 +1068,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       // Moves play between the cards; the game finishes with mate before the end card.
       const cards: Frame[] = pr.template === 'versus'
         ? [...pr.rows.map((_, k) => ({ kind: 'promoCard' as const, fen: '', last: null, card: 'vs' as const, upTo: k + 1 })), { kind: 'promoCard', fen: '', last: null, card: 'switch' }]
-        : [{ kind: 'promoCard', fen: '', last: null, card: 'live' }, { kind: 'promoCard', fen: '', last: null, card: 'daily' }, { kind: 'promoCard', fen: '', last: null, card: 'link' }];
+        : [{ kind: 'promoCard', fen: '', last: null, card: 'live' }, { kind: 'promoCard', fen: '', last: null, card: 'link' }];
       const per = Math.max(1, Math.floor(plies.length / (cards.length + 1)));
       let p = 0;
       for (const c of cards) {
@@ -1752,8 +1751,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
         if (f.card === 'match') return stripEmoji(pr.hook);
         if (f.card === 'react') return null;
         if (f.card === 'review') return 'And the second it ends, your coach reviews the game. Free. Every mistake, and the better move.';
-        if (f.card === 'live' && pr.template === 'live') return `Five, ten or fifteen minutes. ${stripEmoji(pr.closer)}`;
-        if (f.card === 'live') return 'Play live games: five, ten or fifteen minutes.';
+        if (f.card === 'live' && pr.template === 'live') return `Five minutes up to seven days a move. ${stripEmoji(pr.closer)}`;
+        if (f.card === 'live') return 'Play online: five minutes, all the way up to one move a day.';
         if (f.card === 'daily') return "Or daily games: one move a day, and we'll tell you when it's your turn.";
         return `Send a friend a challenge link. ${stripEmoji(pr.closer)}`;
       }
@@ -2499,9 +2498,9 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                 );
                 if (frame.card === 'live') return (
                   <motion.div key="live" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={`${box} text-center`} style={{ fontSize: 'clamp(13px,2.3cqh,24px)' }}>
-                    <p className="font-black" style={{ fontSize: '1.4em' }}>⚡ Play live</p>
+                    <p className="font-black" style={{ fontSize: '1.4em' }}>⚡ Play online</p>
                     <div className="mt-[1.4cqh] grid grid-cols-2 gap-[1cqh]">
-                      {[['5 min', 'Blitz'], ['5 | 3', 'Blitz'], ['10 min', 'Rapid'], ['15 min', 'Rapid']].map(([t, k], n) => (
+                      {[['5 min', 'Blitz'], ['5 | 3', 'Blitz'], ['10 min', 'Rapid'], ['15 min', 'Rapid'], ['1 day', 'a move'], ['3 days', 'a move']].map(([t, k], n) => (
                         <motion.div key={t} initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.2 + n * 0.1, type: 'spring', stiffness: 380, damping: 16 }} className="rounded-[0.6em] bg-[#81B64C] py-[0.5em] font-black">
                           {t}<span className="block text-[0.7em] font-bold text-white/80">{k}</span>
                         </motion.div>

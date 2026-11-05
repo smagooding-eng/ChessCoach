@@ -54,8 +54,9 @@ export function dailyTimeLeft(g: DailyGameRow, serverOffsetMs: number): number {
 
 type QueueRow = { id: string; timeControl: string; mode: string; joinedAt: string };
 
-/** embedded: shown as the Daily tab of Play Online (no page title or challenge inbox, which Play Online shows). */
-export function DailyGames({ embedded = false }: { embedded?: boolean } = {}) {
+/** embedded: shown inside Play Online (no page title or challenge inbox, which Play Online shows).
+ *  listOnly: just your daily games and searches (Play Online has the clocks to start one). */
+export function DailyGames({ embedded = false, listOnly = false }: { embedded?: boolean; listOnly?: boolean } = {}) {
   const { authUser } = useUser();
   const me = authUser?.id;
   const [, navigate] = useLocation();
@@ -227,6 +228,7 @@ export function DailyGames({ embedded = false }: { embedded?: boolean } = {}) {
       {seek && (seekGone
         ? <SeekGoneCard seek={seek} kind="daily" onClose={() => setSeek(null)} />
         : <SeekJoiningCard seek={seek} />)}
+      {!listOnly && (<>
       <div className="flex items-start justify-between gap-3">
         <div>
           {!embedded && <h1 className="text-2xl md:text-3xl font-black" style={{ color: PT.text, letterSpacing: '-0.02em' }}>Daily Games</h1>}
@@ -291,6 +293,8 @@ export function DailyGames({ embedded = false }: { embedded?: boolean } = {}) {
         )}
         {error && <p className="text-[13px]" style={{ color: PT.red }}>{error}</p>}
       </section>
+      </>)}
+      {listOnly && (liNote || error) && <p className="text-[12.5px]" style={{ color: error ? PT.red : PT.green }}>{error || liNote}</p>}
 
       {queue.length > 0 && (
         <section className="overflow-hidden" style={cardStyle}>
@@ -314,9 +318,9 @@ export function DailyGames({ embedded = false }: { embedded?: boolean } = {}) {
         </section>
       )}
 
-      {loading ? (
+      {loading ? (listOnly ? null : (
         <div className="py-10 text-center"><Loader2 className="mx-auto animate-spin" style={{ color: PT.green }} /></div>
-      ) : (
+      )) : (
         <>
           {liGames.length > 0 && (
             <section className="overflow-hidden" style={cardStyle}>
@@ -340,7 +344,7 @@ export function DailyGames({ embedded = false }: { embedded?: boolean } = {}) {
           <Section title="Your move" list={myTurn} />
           <Section title="Waiting for opponent" list={theirTurn} />
           <Section title="Recently finished" list={finished} />
-          {games.length === 0 && finished.length === 0 && queue.length === 0 && (
+          {!listOnly && games.length === 0 && finished.length === 0 && queue.length === 0 && (
             <div className="px-6 py-10 text-center" style={cardStyle}>
               <Trophy size={30} className="mx-auto mb-2" style={{ color: PT.muted }} />
               <p className="text-[14px] font-bold" style={{ color: PT.text }}>No daily games yet</p>

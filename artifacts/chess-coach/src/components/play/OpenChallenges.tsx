@@ -251,18 +251,72 @@ export function OutgoingChallengesCard({ outgoing, kind, onChanged }: { outgoing
   );
 }
 
+/** Every challenge in one compact list: to answer (requests to your links, challenges to
+ *  you) and sent by you (your challenges and requests). Optionally one kind only. */
+export function ChallengesPanel({ inbox, kind, onAcceptLive }: { inbox: ReturnType<typeof useChallengeInbox>; kind?: 'live' | 'daily'; onAcceptLive?: (code: string) => void }) {
+  const [, navigate] = useLocation();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const k = <T extends ChallengeRow>(l: T[]) => (kind ? l.filter((c) => c.kind === kind) : l);
+  const requests = k(inbox.requests), invites = k(inbox.invites), sent = k(inbox.sent), outgoing = k(inbox.outgoing);
+  if (!requests.length && !invites.length && !sent.length && !outgoing.length) return null;
+  const done = () => { void inbox.reload(); };
+  const post = async (code: string, action: string) => { setBusy(code); await apiFetch(`/api/challenges/${code}/${action}`, { method: 'POST' }).catch(() => {}); setBusy(null); done(); };
+  const accept = async (r: ChallengeRow) => {
+    setError('');
+    if (r.kind === 'live') { if (onAcceptLive) onAcceptLive(r.code); else navigate(`/live?approve=${r.code}`); return; }
+    setBusy(r.code);
+    try {
+      const res = await apiFetch(`/api/challenges/${r.code}/approve`, { method: 'POST' });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Could not accept');
+      navigate(`/daily/${d.gameId}`);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not accept'); done(); } finally { setBusy(null); }
+  };
+  const row = (key: string, name: string, sub: string, subColor: string, actions: React.ReactNode, onOpen?: () => void) => (
+    <div key={key} className="flex items-center gap-2.5 px-3.5 py-2.5" style={{ borderTop: `1px solid ${PT.border}` }}>
+      <button onClick={onOpen} disabled={!onOpen} className="min-w-0 flex-1 text-left">
+        <b className="block truncate text-[13.5px] font-extrabold" style={{ color: PT.text }}>{name}</b>
+        <span className="block truncate text-[11.5px]" style={{ color: subColor }}>{sub}</span>
+      </button>
+      {actions}
+    </div>
+  );
+  const small = 'shrink-0 rounded-lg px-2.5 py-1.5 text-[12px] font-extrabold disabled:opacity-50';
+  const toAnswer = requests.length + invites.length;
+  return (
+    <section className="overflow-hidden" style={{ ...cardStyle, border: `1px solid ${toAnswer ? PT.greenLine : PT.border}` }}>
+      <h2 className="flex items-center gap-2 px-3.5 py-2.5 text-[14px] font-extrabold" style={{ color: PT.text }}>
+        <Swords size={15} style={{ color: PT.green }} /> Challenges
+        {toAnswer > 0 && <span className="rounded-full px-1.5 py-0.5 text-[10.5px] font-black" style={{ background: PT.green, color: PT.onGreen }}>{toAnswer} for you</span>}
+      </h2>
+      {requests.map((r) => row(r.code, r.requesterUsername ?? 'Someone', `Wants to play · ${r.kind === 'live' ? 'Live' : 'Daily'} · ${describe(r)}`, PT.muted, <>
+        <button onClick={() => void post(r.code, 'decline')} disabled={busy === r.code} aria-label="Decline" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg disabled:opacity-50" style={ghostBtn}><X size={15} /></button>
+        <button onClick={() => void accept(r)} disabled={busy === r.code} className={small} style={greenBtn}>Accept</button>
+      </>))}
+      {invites.map((c) => row(c.code, c.creatorUsername, `Challenged you · ${c.kind === 'live' ? 'Live' : 'Daily'} · ${describe(c)}`, PT.muted, <>
+        <button onClick={() => void post(c.code, 'dismiss')} aria-label="Dismiss" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg" style={ghostBtn}><X size={15} /></button>
+        <button onClick={() => navigate(`/challenge/${c.code}`)} className={small} style={greenBtn}>{c.open ? 'Challenge' : 'Play'}</button>
+      </>, () => navigate(`/challenge/${c.code}`)))}
+      {outgoing.map((c) => {
+        const ok = c.status === 'accepted' || c.status === 'started';
+        const go = () => { if (c.kind === 'daily' && c.gameId) navigate(`/daily/${c.gameId}`); else if (c.kind === 'live') navigate('/live'); };
+        return row(c.code, `You → ${c.targetUsername ?? 'them'}`, `${ok ? 'Accepted!' : c.status === 'declined' ? 'Declined' : c.status === 'expired' ? 'Expired' : 'Waiting for an answer'} · ${c.kind === 'live' ? 'Live' : 'Daily'} · ${describe(c)}`,
+          ok ? PT.green : c.status === 'declined' ? PT.red : PT.muted,
+          ok ? <button onClick={go} className={small} style={greenBtn}>Play</button> : c.status === 'open' ? <button onClick={() => void post(c.code, 'cancel')} className={small} style={ghostBtn}>Cancel</button> : null);
+      })}
+      {sent.map((c) => row(c.code, `You → ${c.creatorUsername}`, c.status === 'approved' ? 'Accepted! Tap to play' : `Waiting for an answer · ${c.kind === 'live' ? 'Live' : 'Daily'} · ${describe(c)}`,
+        c.status === 'approved' ? PT.green : PT.muted,
+        <button onClick={() => void post(c.code, 'withdraw')} className={small} style={ghostBtn}>Withdraw</button>,
+        () => navigate(c.kind === 'live' ? `/live?challenge=${c.code}` : `/challenge/${c.code}`)))}
+      {error && <p className="px-3.5 pb-2.5 text-[12px]" style={{ color: PT.red }}>{error}</p>}
+    </section>
+  );
+}
+
 /** Home / Play screens: requests to answer, challenges waiting for you, and
  *  requests you've sent. */
 export function ChallengeInbox({ className = '' }: { className?: string }) {
   const inbox = useChallengeInbox();
-  if (inbox.requests.length === 0 && inbox.invites.length === 0 && inbox.sent.length === 0 && inbox.outgoing.length === 0) return null;
-  const changed = () => { void inbox.reload(); };
-  return (
-    <div className={`space-y-5 ${className}`}>
-      <ChallengeRequestsCard requests={inbox.requests} onChanged={changed} />
-      <ChallengeInvitesCard invites={inbox.invites} onChanged={changed} />
-      <SentRequestsCard sent={inbox.sent} onChanged={changed} />
-      <OutgoingChallengesCard outgoing={inbox.outgoing} onChanged={changed} />
-    </div>
-  );
+  return <div className={`empty:hidden ${className}`}><ChallengesPanel inbox={inbox} /></div>;
 }
