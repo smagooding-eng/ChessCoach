@@ -386,13 +386,14 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
         }}
       />
 
+      {/* Confirm / Cancel floats here, right under the board and well away from the bottom menu. */}
+      <div ref={setConfirmEl} className="relative" />
       <MaterialStrip fen={game.fen} color={youAreWhite ? 'w' : 'b'} className="px-1" />
       <div className="relative">
         <PlayerStrip p={bottom} ms={bottomMs} active={bottomActive} isYou={true} awayMs={myAwayMs} />
         <ChatBubble chat={live.chat} side={color} />
       </div>
       <MoveBrowserBar browser={browser} yourTurn={isPlayerTurn} />
-      <div ref={setConfirmEl} className="relative" />
       {!opponentIsBot && (
         <ChatTray onSend={live.sendChat} disabled={!connected} muted={chatMuted} setMuted={setChatMuted} />
       )}

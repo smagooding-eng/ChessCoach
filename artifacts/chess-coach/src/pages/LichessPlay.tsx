@@ -313,10 +313,11 @@ export function LichessPlay() {
                   : <OverlayButton onClick={newGame}><RotateCcw size={15} /> New game</OverlayButton>}
               </>} />
           ) : undefined} />
+        {/* Confirm / Cancel floats here, right under the board and well away from the bottom menu. */}
+        <div ref={setConfirmEl} className="relative" />
         <MaterialStrip fen={pending?.fen ?? pos.chess.fen()} color={myColor} className="-mt-1 px-1" />
         <div className="relative">{row(myColor)}<ChatBubble chat={chat} side={myColor} /></div>
         <MoveBrowserBar browser={browser} yourTurn={myTurn} />
-        <div ref={setConfirmEl} className="relative" />
         {!full.white.aiLevel && !full.black.aiLevel && (
           <div className="space-y-1.5">
             <ChatTray onSend={(t) => {
