@@ -151,7 +151,10 @@ export function LichessPlay() {
   // Played from ChessScout: it goes under the ChessScout tab as well as Lichess, however it gets saved.
   useEffect(() => {
     if (!gameId || phase !== 'playing') return;
-    void apiFetch('/api/lichess/board/played', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gameId }) }).catch(() => {});
+    // Opened from a games list: already recorded if it started here (and not, if it started on lichess.org).
+    const from = gameId === gameParam ? params.get('from') : null;
+    if (from === 'list') return;
+    void apiFetch('/api/lichess/board/played', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gameId, source: from === 'live' ? 'handoff' : 'lichess' }) }).catch(() => {});
   }, [gameId, phase]);
 
   // The game itself.

@@ -76,7 +76,7 @@ export function ActiveGamesCard() {
   const liLabel = (g: LichessPlaying) => (isDaily(g) ? 'Lichess daily' : `Lichess ${g.speed ?? 'game'}`);
   // Lichess only lets outside boards play rapid, classical and daily games started elsewhere;
   // a bullet or blitz game started on lichess.org opens there.
-  const liHref = (g: LichessPlaying) => (/^(ultraBullet|bullet|blitz)$/.test(g.speed ?? '') ? `https://lichess.org/${g.gameId}` : `/lichess?game=${g.gameId}`);
+  const liHref = (g: LichessPlaying) => (/^(ultraBullet|bullet|blitz)$/.test(g.speed ?? '') ? `https://lichess.org/${g.gameId}` : `/lichess?game=${g.gameId}&from=list`);
   const chooseView = (v: View) => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* ignore */ } };
 
   const load = useCallback(async () => {

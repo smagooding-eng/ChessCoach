@@ -75,6 +75,8 @@ async function runSchemaMigrations() {
     // Lichess game ids started on ChessScout's board, recorded when the game starts, so the
     // game is marked whichever way it reaches their games (saved at the end or a Lichess sync).
     await db.execute(sql`CREATE TABLE IF NOT EXISTS lichess_cs_games (user_id varchar NOT NULL, game_id varchar(8) NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (user_id, game_id))`);
+    // How the game started: handoff (a ChessScout search that moved to Lichess), daily (a daily search that Lichess filled), lichess (Play on Lichess).
+    await db.execute(sql`ALTER TABLE lichess_cs_games ADD COLUMN IF NOT EXISTS source varchar(16)`);
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ`);
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_opt_out BOOLEAN NOT NULL DEFAULT false`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_page_views_user_time ON page_views(user_id, created_at DESC)`);

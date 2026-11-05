@@ -130,7 +130,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
       if (e.type !== 'gameStart' || isDaily(e.game)) return;
       if (statusRef.current !== 'queued') { void abortLichess(e.game.gameId); return; }
       ac.abort(); live.cancel();
-      navigate(`/lichess?game=${e.game.gameId}`);
+      navigate(`/lichess?game=${e.game.gameId}&from=live`);
     }, ac.signal).catch(() => {});
     void lichessSeek({ minutes: m, increment: inc, rated: live.queuedMode === 'ranked' }, ac.signal)
       .then((code) => { if (!ac.signal.aborted && code >= 400) setLiSearching(false); })

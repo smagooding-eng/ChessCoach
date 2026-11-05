@@ -67,6 +67,28 @@ function computeUserStatus(email: string | null, createdAt: string | Date, strip
 
 // The ChessScout bot on Lichess: games it has played (logged by lib/lichessBot.ts), its
 // all-time numbers from Lichess, and visits / signups that came from its link.
+// Games started on ChessScout that were played on Lichess (recorded by /lichess/board/played).
+router.get("/admin/lichess-play", requireAdmin, async (_req: Request, res: Response) => {
+  const rows = <T,>(r: unknown): T[] => (Array.isArray(r) ? r : ((r as { rows?: T[] })?.rows ?? [])) as T[];
+  try {
+    const [totals] = rows<Record<string, string | number | null>>(await db.execute(sql`
+      SELECT COUNT(*) AS all_games,
+        COUNT(*) FILTER (WHERE created_at >= now() - interval '1 day') AS day,
+        COUNT(*) FILTER (WHERE created_at >= now() - interval '7 days') AS week,
+        COUNT(*) FILTER (WHERE created_at >= now() - interval '30 days') AS month,
+        COUNT(*) FILTER (WHERE source = 'handoff') AS handoff,
+        COUNT(*) FILTER (WHERE source = 'daily') AS daily,
+        COUNT(*) FILTER (WHERE COALESCE(source, 'lichess') = 'lichess') AS direct,
+        COUNT(DISTINCT user_id) AS players,
+        MIN(created_at) AS since
+      FROM lichess_cs_games`));
+    const recent = rows(await db.execute(sql`
+      SELECT g.game_id, g.source, g.created_at, COALESCE(u.scout_username, u.lichess_username, u.email) AS player
+      FROM lichess_cs_games g LEFT JOIN users u ON u.id = g.user_id ORDER BY g.created_at DESC LIMIT 15`));
+    res.json({ totals: totals ?? null, recent });
+  } catch { res.json({ totals: null, recent: [] }); }
+});
+
 router.get("/admin/lichess-bot", requireAdmin, async (_req: Request, res: Response) => {
   const { lichessBotInfo } = await import("../lib/lichessBot");
   const info = lichessBotInfo();

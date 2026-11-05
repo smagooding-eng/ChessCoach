@@ -188,6 +188,7 @@ export function DailyGames({ embedded = false, listOnly = false }: { embedded?: 
     const stillQueued = queue.some((q) => q.timeControl === p.tc);
     if (newLichess) {
       clearDailyPair();
+      void apiFetch('/api/lichess/board/played', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gameId: newLichess.gameId, source: 'daily' }) }).catch(() => {});
       if (stillQueued) void apiFetch('/api/correspondence/cancel-queue', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ timeControl: p.tc, mode: p.mode }) }).then(() => load()).catch(() => {});
     } else if (!loading && !stillQueued && games.some((g) => g.timeControl === p.tc && new Date(g.startedAt).getTime() >= p.at - 5000)) {
       clearDailyPair();
@@ -343,7 +344,7 @@ export function DailyGames({ embedded = false, listOnly = false }: { embedded?: 
             <section className="overflow-hidden" style={cardStyle}>
               <h2 className="px-4 py-3 text-[13px] font-black uppercase tracking-[0.14em]" style={{ color: PT.muted }}>♞ On Lichess · {liGames.length}</h2>
               {[...liGames].sort((a, b) => Number(!isDaily(b)) - Number(!isDaily(a)) || Number(!!b.isMyTurn) - Number(!!a.isMyTurn)).map((g) => (
-                <LiLink key={g.gameId} href={/^(ultraBullet|bullet|blitz)$/.test(g.speed ?? '') ? `https://lichess.org/${g.gameId}` : `/lichess?game=${g.gameId}`} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}` }}>
+                <LiLink key={g.gameId} href={/^(ultraBullet|bullet|blitz)$/.test(g.speed ?? '') ? `https://lichess.org/${g.gameId}` : `/lichess?game=${g.gameId}&from=list`} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}` }}>
                   <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: g.color === 'white' ? '#f0ede8' : '#1b1b1b', border: '1px solid rgba(255,255,255,.35)' }} />
                   <span className="min-w-0 flex-1">
                     <b className="block truncate text-[14.5px] font-extrabold" style={{ color: PT.text }}>vs {g.opponent?.username ?? 'Opponent'}</b>

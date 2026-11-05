@@ -209,6 +209,54 @@ interface BotStats {
   recent: { game_id: string; opponent: string | null; opponent_rating: number | null; opponent_title: string | null; speed: string | null; rated: boolean; result: string | null; status: string | null; started_at: string }[];
   traffic: Record<string, string | number | null> | null;
 }
+// Games started on ChessScout and played on Lichess through ChessScout.
+function LichessPlayCard() {
+  const [d, setD] = useState<{ totals: Record<string, string | number | null> | null; recent: { game_id: string; source: string | null; created_at: string; player: string | null }[] } | null>(null);
+  const [err, setErr] = useState(false);
+  useEffect(() => { apiFetch('/api/admin/lichess-play', { credentials: 'include' }).then((r) => (r.ok ? r.json() : Promise.reject())).then(setD).catch(() => setErr(true)); }, []);
+  const n = (v: unknown) => Number(v ?? 0);
+  const tile = (label: string, value: React.ReactNode, sub?: string) => (
+    <div className="rounded-lg p-2.5" style={{ background: 'rgba(255,255,255,0.04)' }}>
+      <p className="text-[10px] font-black uppercase tracking-wide" style={{ color: TEXT_MUTED }}>{label}</p>
+      <p className="text-xl font-black leading-tight" style={{ color: TEXT_LIGHT }}>{value}</p>
+      {sub && <p className="text-[11px]" style={{ color: TEXT_MUTED }}>{sub}</p>}
+    </div>
+  );
+  const SRC: Record<string, string> = { handoff: 'moved from a ChessScout search', daily: 'daily search', lichess: 'Play on Lichess' };
+  const t = d?.totals;
+  return (
+    <div className="rounded-xl p-4 flex flex-col gap-3 sm:col-span-2 lg:col-span-3" style={{ background: BG_CARD, border: '1px solid rgba(255,255,255,0.05)' }}>
+      <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: TEXT_MUTED }}>♞ Games played on Lichess through ChessScout</p>
+      {err ? <p className="text-[12px]" style={{ color: TEXT_MUTED }}>Couldn't load these numbers.</p> : !d ? <p className="text-[12px]" style={{ color: TEXT_MUTED }}>Loading…</p> : !t || n(t.all_games) === 0 ? (
+        <p className="text-[12px]" style={{ color: TEXT_MUTED }}>None recorded yet. Games are counted from this update on.</p>
+      ) : (<>
+        <p className="text-[11px] font-bold" style={{ color: TEXT_MUTED }}>Counted since {new Date(String(t.since)).toLocaleDateString()} · {fmt(n(t.players))} different players</p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {tile('All', fmt(n(t.all_games)))}
+          {tile('Last 24 h', fmt(n(t.day)))}
+          {tile('Last 7 days', fmt(n(t.week)))}
+          {tile('Last 30 days', fmt(n(t.month)))}
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {tile('Moved to Lichess', fmt(n(t.handoff)), 'ChessScout search, nobody here')}
+          {tile('Daily', fmt(n(t.daily)), 'daily search Lichess filled')}
+          {tile('Play on Lichess', fmt(n(t.direct)), 'started there directly')}
+        </div>
+        {d.recent.length > 0 && (
+          <div className="max-h-56 overflow-y-auto rounded-lg" style={{ background: 'rgba(0,0,0,0.15)' }}>
+            {d.recent.map((g) => (
+              <a key={g.game_id + g.created_at} href={`https://lichess.org/${g.game_id}`} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 px-3 py-1.5 text-[12.5px]" style={{ borderTop: '1px solid rgba(255,255,255,0.04)', color: TEXT_LIGHT }}>
+                <span className="truncate">{(g.player ?? '?').split('@')[0]}</span>
+                <span className="shrink-0" style={{ color: TEXT_MUTED }}>{SRC[g.source ?? 'lichess'] ?? g.source} · {new Date(g.created_at).toLocaleString()}</span>
+              </a>
+            ))}
+          </div>
+        )}
+      </>)}
+    </div>
+  );
+}
+
 function LichessBotCard() {
   const [d, setD] = useState<BotStats | null>(null);
   const [err, setErr] = useState(false);
@@ -648,6 +696,7 @@ export function Admin() {
           />
           {stats.devices && <DevicesCard rows={stats.devices} />}
           <LichessBotCard />
+          <LichessPlayCard />
           {stats.bots && (
             <StatCard
               icon={BotIcon}
