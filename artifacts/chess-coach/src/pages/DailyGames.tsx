@@ -9,7 +9,7 @@ import { ShareLink } from '@/components/play/ShareLink';
 import { NotifyPrompt } from '@/components/play/NotifyPrompt';
 import { SeekGoneCard, SeekJoiningCard, takeSeekParams, type SeekInfo } from '@/components/play/SeekGoneCard';
 import { lichessAuth, syncLichessAuth, connectLichess, nowPlaying, isDaily, seekDaily, type LichessPlaying } from '@/lib/lichessBoard';
-import { useChallengeInbox, ChallengeRequestsCard, ChallengeInvitesCard, SentRequestsCard, OpenLinksCard, createOpenLink } from '@/components/play/OpenChallenges';
+import { useChallengeInbox, ChallengeRequestsCard, ChallengeInvitesCard, SentRequestsCard, OutgoingChallengesCard, OpenLinksCard, createOpenLink } from '@/components/play/OpenChallenges';
 
 export const DAILY_TC = [
   { id: 'corr_1d', label: '1 day' },
@@ -245,6 +245,7 @@ export function DailyGames({ embedded = false }: { embedded?: boolean } = {}) {
       {!embedded && <ChallengeRequestsCard requests={inbox.requests} onChanged={() => { void inbox.reload(); }} />}
       {!embedded && <ChallengeInvitesCard invites={inbox.invites} onChanged={() => { void inbox.reload(); }} />}
       {!embedded && <SentRequestsCard sent={inbox.sent} onChanged={() => { void inbox.reload(); }} />}
+      <OutgoingChallengesCard outgoing={inbox.outgoing} kind="daily" onChanged={() => { void inbox.reload(); }} />
       <OpenLinksCard links={inbox.links} kind="daily" onChanged={() => { void inbox.reload(); }} />
 
       {/* New game */}

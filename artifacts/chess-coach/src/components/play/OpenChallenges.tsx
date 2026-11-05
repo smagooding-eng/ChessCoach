@@ -21,6 +21,9 @@ export interface ChallengeRow {
   open: boolean;
   isRequest: boolean;
   requesterUsername: string | null;
+  /** Sent challenges: who it's for. */
+  targetUsername?: string | null;
+  gameId?: string | number | null;
 }
 
 const CHANGED = 'cs:challenges-changed';
@@ -44,13 +47,16 @@ export function useChallengeInbox() {
   const [requests, setRequests] = useState<ChallengeRow[]>([]);
   const [invites, setInvites] = useState<ChallengeRow[]>([]);
   const [sent, setSent] = useState<ChallengeRow[]>([]);
+  const [outgoing, setOutgoing] = useState<ChallengeRow[]>([]);
   const reload = useCallback(async () => {
-    const [m, q, inv, snt] = await Promise.all([
+    const [m, q, inv, snt, out] = await Promise.all([
       apiFetch('/api/challenges/mine').then(r => r.ok ? r.json() : null).catch(() => null),
       apiFetch('/api/challenges/requests').then(r => r.ok ? r.json() : null).catch(() => null),
       apiFetch('/api/challenges/invites').then(r => r.ok ? r.json() : null).catch(() => null),
       apiFetch('/api/challenges/sent').then(r => r.ok ? r.json() : null).catch(() => null),
+      apiFetch('/api/challenges/outgoing').then(r => r.ok ? r.json() : null).catch(() => null),
     ]);
+    if (out) setOutgoing((out.outgoing ?? []) as ChallengeRow[]);
     if (snt) setSent((snt.sent ?? []) as ChallengeRow[]);
     if (m) setLinks(((m.challenges ?? []) as ChallengeRow[]).filter(c => c.open));
     if (q) setRequests((q.requests ?? []) as ChallengeRow[]);
@@ -64,7 +70,7 @@ export function useChallengeInbox() {
     const t = setInterval(reload, 30_000);
     return () => { window.removeEventListener(CHANGED, on); window.removeEventListener('cs:notification', on); clearInterval(t); };
   }, [reload]);
-  return { links, requests, invites, sent, reload };
+  return { links, requests, invites, sent, outgoing, reload };
 }
 
 const describe = (c: ChallengeRow) =>
@@ -216,17 +222,47 @@ export function SentRequestsCard({ sent, onChanged }: { sent: ChallengeRow[]; on
   );
 }
 
+/** Challenges you sent straight to a player: waiting, accepted (tap to play) or declined; Cancel while waiting. */
+export function OutgoingChallengesCard({ outgoing, kind, onChanged }: { outgoing: ChallengeRow[]; kind?: 'live' | 'daily'; onChanged: () => void }) {
+  const [, navigate] = useLocation();
+  const list = kind ? outgoing.filter((c) => c.kind === kind) : outgoing;
+  if (list.length === 0) return null;
+  const cancel = async (code: string) => { await apiFetch(`/api/challenges/${code}/cancel`, { method: 'POST' }).catch(() => {}); onChanged(); };
+  return (
+    <section className="overflow-hidden" style={cardStyle}>
+      <h2 className="flex items-center gap-2 px-4 pb-2 pt-3.5 text-[15px] font-extrabold" style={{ color: PT.text }}><Swords size={17} style={{ color: PT.green }} /> Sent challenges</h2>
+      {list.map((c) => {
+        const done = c.status === 'accepted' || c.status === 'started';
+        const go = () => { if (c.kind === 'daily' && c.gameId) navigate(`/daily/${c.gameId}`); else if (c.kind === 'live') navigate('/live'); };
+        return (
+          <div key={c.code} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}` }}>
+            <span className="min-w-0 flex-1">
+              <b className="block truncate text-[14px] font-extrabold" style={{ color: PT.text }}>{c.targetUsername ?? 'Your challenge'}</b>
+              <span className="block text-[12px]" style={{ color: done ? PT.green : c.status === 'declined' ? PT.red : PT.muted }}>
+                {done ? 'Accepted!' : c.status === 'declined' ? 'Declined' : c.status === 'expired' ? 'Expired' : 'Waiting for them to answer'} · {c.kind === 'live' ? 'Live' : 'Daily'} · {describe(c)}
+              </span>
+            </span>
+            {done ? <button onClick={go} className="shrink-0 rounded-xl px-3.5 py-2.5 text-[13px] font-extrabold" style={greenBtn}>Play</button>
+              : c.status === 'open' ? <button onClick={() => cancel(c.code)} className="shrink-0 rounded-xl px-3 py-2 text-[12px] font-bold" style={ghostBtn}>Cancel</button> : null}
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 /** Home / Play screens: requests to answer, challenges waiting for you, and
  *  requests you've sent. */
 export function ChallengeInbox({ className = '' }: { className?: string }) {
   const inbox = useChallengeInbox();
-  if (inbox.requests.length === 0 && inbox.invites.length === 0 && inbox.sent.length === 0) return null;
+  if (inbox.requests.length === 0 && inbox.invites.length === 0 && inbox.sent.length === 0 && inbox.outgoing.length === 0) return null;
   const changed = () => { void inbox.reload(); };
   return (
     <div className={`space-y-5 ${className}`}>
       <ChallengeRequestsCard requests={inbox.requests} onChanged={changed} />
       <ChallengeInvitesCard invites={inbox.invites} onChanged={changed} />
       <SentRequestsCard sent={inbox.sent} onChanged={changed} />
+      <OutgoingChallengesCard outgoing={inbox.outgoing} onChanged={changed} />
     </div>
   );
 }

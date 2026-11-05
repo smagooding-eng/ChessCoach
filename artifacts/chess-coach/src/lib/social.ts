@@ -53,11 +53,13 @@ export const socialApi = {
   }>(await apiFetch(`/api/messages/${userId}${before ? `?before=${before}` : ''}`, { credentials: 'include' })),
   send: async (userId: string, payload: { body?: string; challengeCode?: string }) =>
     json<{ message: ChatMessage }>(await post(`/api/messages/${userId}`, payload)),
-  /** Live challenge sent straight into the chat (friend gets a notification). */
-  challenge: async (userId: string, timeControl: string, mode: 'casual' | 'ranked') => {
-    const ch = await json<{ challenge: { code: string } }>(await post('/api/challenges', { kind: 'live', timeControl, mode, color: 'random' }));
-    const sent = await socialApi.send(userId, { challengeCode: ch.challenge.code });
+  /** A challenge straight to one player: they get a "you've been challenged" notification,
+   *  it shows on their home and Play screens, and it's posted in your chat with them too. */
+  challenge: async (userId: string, timeControl: string, mode: 'casual' | 'ranked', kind: 'live' | 'daily' = 'live') => {
+    const ch = await json<{ challenge: { code: string } }>(await post('/api/challenges/direct', { kind, timeControl, mode, targetUserId: userId }));
+    const sent = await socialApi.send(userId, { challengeCode: ch.challenge.code }).catch(() => null);
     announceChallengeSent();
+    window.dispatchEvent(new Event('cs:challenges-changed'));
     return sent;
   },
 };

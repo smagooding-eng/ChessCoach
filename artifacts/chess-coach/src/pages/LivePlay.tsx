@@ -15,7 +15,7 @@ import { SeekGoneCard, SeekJoiningCard, takeSeekParams, type SeekInfo } from '@/
 import { TournamentsCard } from '@/components/play/Tournaments';
 import { DailyGames } from '@/pages/DailyGames';
 import { useSocialUnread } from '@/lib/social';
-import { useChallengeInbox, ChallengeRequestsCard, ChallengeInvitesCard, SentRequestsCard, OpenLinksCard, createOpenLink } from '@/components/play/OpenChallenges';
+import { useChallengeInbox, ChallengeRequestsCard, ChallengeInvitesCard, SentRequestsCard, OutgoingChallengesCard, OpenLinksCard, createOpenLink } from '@/components/play/OpenChallenges';
 
 const TC_OPTIONS = [
   { id: 'blitz_5_0',  label: '5 min',  sub: 'Blitz', icon: Zap },
@@ -285,6 +285,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
           <ChallengeRequestsCard requests={inbox.requests} onAcceptLive={(code) => live.approveRequest(code)} onChanged={() => { void inbox.reload(); }} />
           <ChallengeInvitesCard invites={inbox.invites} onChanged={() => { void inbox.reload(); }} />
           <SentRequestsCard sent={inbox.sent} onChanged={() => { void inbox.reload(); }} />
+          <OutgoingChallengesCard outgoing={inbox.outgoing} kind="live" onChanged={() => { void inbox.reload(); }} />
 
           {/* Live | Daily */}
           <div className="grid grid-cols-2 gap-1 rounded-[14px] p-1" style={{ background: 'rgba(0,0,0,0.3)', border: `1px solid ${PT.border}` }}>

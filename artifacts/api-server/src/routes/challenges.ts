@@ -147,6 +147,25 @@ router.post("/challenges/direct", requireAuth, async (req: Request, res: Respons
   }
 });
 
+// Challenges you sent straight to one player: waiting for them, or just answered.
+router.get("/challenges/outgoing", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const r = await db.execute(sql`
+      SELECT gc.code, MIN(COALESCE(NULLIF(u.first_name, ''), u.chesscom_username, u.lichess_username, 'them')) AS target
+      FROM game_challenges gc JOIN challenge_invites ci ON ci.code = gc.code LEFT JOIN users u ON u.id = ci.user_id
+      WHERE gc.creator_user_id = ${req.user!.id} AND gc.open = false AND gc.parent_code IS NULL
+        AND ((gc.status = 'open' AND gc.expires_at > now()) OR (gc.status IN ('accepted', 'started', 'declined') AND gc.created_at > now() - interval '30 minutes'))
+      GROUP BY gc.code ORDER BY MAX(gc.created_at) DESC LIMIT 10`);
+    const list = (Array.isArray(r) ? r : ((r as unknown as { rows?: unknown[] }).rows ?? [])) as { code: string; target: string }[];
+    if (!list.length) { res.json({ outgoing: [] }); return; }
+    const rows = await db.select().from(gameChallengesTable).where(inArray(gameChallengesTable.code, list.map((x) => x.code)));
+    const name = new Map(list.map((x) => [x.code, x.target]));
+    res.json({ outgoing: rows.map((ch) => ({ ...publicChallenge(ch), targetUsername: name.get(ch.code) ?? null })).sort((a, b) => list.findIndex((x) => x.code === a.code) - list.findIndex((x) => x.code === b.code)) });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to load", details: err.cause?.message ?? err.message });
+  }
+});
+
 router.get("/challenges/mine", requireAuth, async (req: Request, res: Response) => {
   try {
     const rows = await db.select().from(gameChallengesTable)

@@ -20,19 +20,22 @@ export function FriendAvatar({ src, name, status, size = 44 }: { src: string; na
   );
 }
 
-/** Pick a time control and send a live challenge into the chat. */
+const DAILY_TCS = [{ id: 'corr_1d', label: '1 day' }, { id: 'corr_3d', label: '3 days' }, { id: 'corr_7d', label: '7 days' }];
+
+/** Challenge one player: live or daily, a clock, casual or ranked. */
 export function ChallengeFriendSheet({ friend, onClose, onSent }: {
   friend: { userId: string; name: string };
   onClose: () => void;
   onSent?: () => void;
 }) {
+  const [kind, setKind] = useState<'live' | 'daily'>('live');
   const [tc, setTc] = useState('blitz_5_0');
   const [mode, setMode] = useState<'casual' | 'ranked'>('casual');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const send = async () => {
     setBusy(true); setErr(null);
-    try { await socialApi.challenge(friend.userId, tc, mode); onSent?.(); onClose(); }
+    try { await socialApi.challenge(friend.userId, tc, mode, kind); onSent?.(); onClose(); }
     catch (e) { setErr(e instanceof Error ? e.message : 'Could not send'); }
     finally { setBusy(false); }
   };
@@ -44,9 +47,14 @@ export function ChallengeFriendSheet({ friend, onClose, onSent }: {
           <h3 className="flex-1 text-[16px] font-black" style={{ color: PT.text }}>Challenge {friend.name}</h3>
           <button onClick={onClose} aria-label="Close" className="p-1" style={{ color: PT.muted }}><X size={18} /></button>
         </div>
-        <div className="grid grid-cols-4 gap-1.5">
-          {LIVE_TCS.map((o) => (
-            <button key={o.id} onClick={() => setTc(o.id)} className="rounded-lg py-2 text-[13px] font-bold" style={tc === o.id ? greenBtn : ghostBtn}>{o.label}</button>
+        <div className="grid grid-cols-2 gap-1.5 rounded-xl p-1" style={{ background: 'rgba(0,0,0,.25)' }}>
+          {([['live', 'Live game'], ['daily', 'Daily game']] as const).map(([k, t]) => (
+            <button key={k} onClick={() => { setKind(k); setTc(k === 'live' ? 'blitz_5_0' : 'corr_1d'); }} className="rounded-lg py-2 text-[13px] font-extrabold" style={kind === k ? greenBtn : { color: PT.muted }}>{t}</button>
+          ))}
+        </div>
+        <div className={`grid gap-1.5 ${kind === 'live' ? 'grid-cols-4' : 'grid-cols-3'}`}>
+          {(kind === 'live' ? LIVE_TCS : DAILY_TCS).map((o) => (
+            <button key={o.id} onClick={() => setTc(o.id)} className="rounded-lg py-2 text-[13px] font-bold" style={tc === o.id ? greenBtn : ghostBtn}>{o.label}{kind === 'daily' ? <span className="block text-[10.5px] font-semibold opacity-75">a move</span> : null}</button>
           ))}
         </div>
         <div className="grid grid-cols-2 gap-1.5">
@@ -56,7 +64,7 @@ export function ChallengeFriendSheet({ friend, onClose, onSent }: {
             </button>
           ))}
         </div>
-        <p className="text-[12px]" style={{ color: PT.muted }}>They get a notification and the challenge shows in your chat. The game starts when they accept; keep Live play open or we'll notify you.</p>
+        <p className="text-[12px]" style={{ color: PT.muted }}>{friend.name} gets a "you've been challenged" notification, and it shows on their home screen. {kind === 'live' ? "When they accept, we'll notify you and the game starts on Live play." : "When they accept, the game starts right away and we'll notify you."} You'll see it under <b>Sent challenges</b> until they answer.</p>
         {err && <p className="text-[12.5px] font-bold" style={{ color: PT.red }}>{err}</p>}
         <button onClick={send} disabled={busy} className="w-full rounded-xl py-3 text-[14px] font-extrabold disabled:opacity-60" style={greenBtn}>
           {busy ? 'Sending…' : 'Send challenge'}
