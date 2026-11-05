@@ -55,6 +55,8 @@ export function KnightTour({ opts: initial = KNIGHT_TOUR_DEFAULT, render = false
   const [opts, setOpts] = useState<KnightTourOpts>(initial);
   const [step, setStep] = useState(0); // squares landed on so far (1 = the starting square)
   const [phase, setPhase] = useState<Phase>('idle');
+  // Squares coloured so far: a square changes only once the knight has landed on it.
+  const [painted, setPainted] = useState(0);
   const [clean, setClean] = useState(false);
   const [blank, setBlank] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -69,14 +71,15 @@ export function KnightTour({ opts: initial = KNIGHT_TOUR_DEFAULT, render = false
     clear();
     try { const m = mus(); routeSoundsTo(m.unlock(), m.sfx); } catch { /* ignore */ }
     const dt = SPEEDS[opts.speed];
-    setPhase('tour'); setStep(1);
+    const hop = Math.min(320, dt - 40);
+    setPhase('tour'); setStep(1); setPainted(1);
     let t = 900; // a beat on the hook before the first jump
-    for (let k = 2; k <= 64; k++) { const n = k; later(t, () => { setStep(n); playMoveSound('move'); }); t += dt; }
+    for (let k = 2; k <= 64; k++) { const n = k; later(t, () => setStep(n)); later(t + hop, () => { setPainted(n); playMoveSound('move'); }); t += dt; }
     t += 500; later(t, () => setPhase('logo'));
     t += 2300; later(t, () => setPhase('site'));
     t += 3200; later(t, () => { setPhase('end'); onDone?.(); });
   };
-  const reset = () => { clear(); setPhase('idle'); setStep(0); };
+  const reset = () => { clear(); setPhase('idle'); setStep(0); setPainted(0); };
 
   // Clean view: 5 seconds of black (time to start a screen recording), then the clip.
   const enterClean = () => { reset(); setClean(true); setBlank(true); later(5000, () => { setBlank(false); play(); }); };
@@ -108,9 +111,9 @@ export function KnightTour({ opts: initial = KNIGHT_TOUR_DEFAULT, render = false
     } };
   }, [render]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const visited = KNIGHT_TOUR.slice(0, step);
+  const visited = KNIGHT_TOUR.slice(0, painted);
   const knightOn = phase === 'tour' || phase === 'idle' ? KNIGHT_TOUR[Math.max(0, step - 1)] : null;
-  const marks = useMemo(() => Object.fromEntries(visited.map((sq) => [sq, { text: '', color: 'transparent', tint: colorOf(sq) }])), [step]); // eslint-disable-line react-hooks/exhaustive-deps
+  const marks = useMemo(() => Object.fromEntries(visited.map((sq) => [sq, { text: '', color: 'transparent', tint: colorOf(sq) }])), [painted]); // eslint-disable-line react-hooks/exhaustive-deps
   const done = phase === 'logo' || phase === 'site' || phase === 'end';
 
   const frame = (
@@ -146,7 +149,7 @@ export function KnightTour({ opts: initial = KNIGHT_TOUR_DEFAULT, render = false
         </motion.div>
 
         <div className="absolute inset-x-0 bottom-[10cqh] text-center">
-          {phase === 'tour' && <p className="font-black tabular-nums" style={{ fontSize: '6cqw' }}><span style={{ color: GREEN }}>{step}</span> / 64</p>}
+          {phase === 'tour' && <p className="font-black tabular-nums" style={{ fontSize: '6cqw' }}><span style={{ color: GREEN }}>{painted}</span> / 64</p>}
           {(phase === 'site' || phase === 'end') && <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="font-bold" style={{ fontSize: '4.6cqw', color: '#cfd5cc' }}>Play, train and get your games reviewed free</motion.p>}
         </div>
       </>)}
