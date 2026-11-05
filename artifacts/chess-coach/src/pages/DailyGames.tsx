@@ -78,7 +78,7 @@ export function DailyGames({ embedded = false, listOnly = false }: { embedded?: 
   useEffect(() => { void syncLichessAuth().then((a) => { if (a) setLichess(a); }); }, []);
   useEffect(() => {
     if (!lichess) return;
-    const f = () => void nowPlaying().then((g) => setLiGames(g.filter(isDaily))).catch(() => {});
+    const f = () => void nowPlaying().then((g) => setLiGames(g)).catch(() => {});
     f(); const t = setInterval(f, dailyPair() ? 20_000 : 60_000);
     return () => clearInterval(t);
   }, [lichess]);
@@ -179,7 +179,7 @@ export function DailyGames({ embedded = false, listOnly = false }: { embedded?: 
   useEffect(() => {
     const p = dailyPair(); if (!p) return;
     if (Date.now() - p.at > 7 * 86400_000) { clearDailyPair(); return; }
-    const newLichess = liGames.find((g) => !p.known.includes(g.gameId));
+    const newLichess = liGames.filter(isDaily).find((g) => !p.known.includes(g.gameId));
     const stillQueued = queue.some((q) => q.timeControl === p.tc);
     if (newLichess) {
       clearDailyPair();
@@ -337,12 +337,12 @@ export function DailyGames({ embedded = false, listOnly = false }: { embedded?: 
           {liGames.length > 0 && (
             <section className="overflow-hidden" style={cardStyle}>
               <h2 className="px-4 py-3 text-[13px] font-black uppercase tracking-[0.14em]" style={{ color: PT.muted }}>♞ On Lichess · {liGames.length}</h2>
-              {[...liGames].sort((a, b) => Number(!!b.isMyTurn) - Number(!!a.isMyTurn)).map((g) => (
-                <Link key={g.gameId} href={`/lichess?game=${g.gameId}`} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}` }}>
+              {[...liGames].sort((a, b) => Number(!isDaily(b)) - Number(!isDaily(a)) || Number(!!b.isMyTurn) - Number(!!a.isMyTurn)).map((g) => (
+                <Link key={g.gameId} href={/^(ultraBullet|bullet|blitz)$/.test(g.speed ?? '') ? `https://lichess.org/${g.gameId}` : `/lichess?game=${g.gameId}`} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}` }}>
                   <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: g.color === 'white' ? '#f0ede8' : '#1b1b1b', border: '1px solid rgba(255,255,255,.35)' }} />
                   <span className="min-w-0 flex-1">
                     <b className="block truncate text-[14.5px] font-extrabold" style={{ color: PT.text }}>vs {g.opponent?.username ?? 'Opponent'}</b>
-                    <span className="block truncate text-[12px]" style={{ color: PT.muted }}>Lichess daily · {g.rated ? 'Rated' : 'Casual'}</span>
+                    <span className="block truncate text-[12px]" style={{ color: PT.muted }}>{isDaily(g) ? 'Lichess daily' : `Lichess ${g.speed ?? 'game'} · in progress`} · {g.rated ? 'Rated' : 'Casual'} · tap to play here</span>
                   </span>
                   <span className="shrink-0 text-right">
                     <span className="block text-[12px] font-extrabold" style={{ color: g.isMyTurn ? PT.green : PT.muted }}>{g.isMyTurn ? 'Your move' : 'Their move'}</span>

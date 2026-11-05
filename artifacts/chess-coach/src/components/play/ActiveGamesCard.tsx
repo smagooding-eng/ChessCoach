@@ -6,6 +6,7 @@ import { ThemedMiniBoard } from '@/components/ThemedMiniBoard';
 import { apiFetch } from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
 import { PT, cardStyle, formatLeft } from '@/lib/playTheme';
+import { lichessAuth, syncLichessAuth, nowPlaying, isDaily, type LichessPlaying } from '@/lib/lichessBoard';
 
 interface DailyRow {
   id: string; timeControl: string; whiteUserId: string; blackUserId: string;
@@ -57,6 +58,21 @@ export function ActiveGamesCard() {
   const [live, setLive] = useState<{ game: LiveActive; color: 'w' | 'b' } | null>(cached?.live ?? null);
   // List rows or a row of bigger boards you swipe through; remembered per device.
   const [view, setView] = useState<View>(readView);
+  // Games going on Lichess (started here or on lichess.org): tap one to play it on ChessScout.
+  const [li, setLi] = useState<LichessPlaying[]>([]);
+  useEffect(() => {
+    if (!me) return;
+    let alive = true;
+    const f = () => { if (lichessAuth()) void nowPlaying().then((g) => { if (alive) setLi(g); }).catch(() => {}); };
+    void syncLichessAuth().catch(() => null).then(f);
+    const t = setInterval(f, 30_000);
+    return () => { alive = false; clearInterval(t); };
+  }, [me]);
+  const liSorted = [...li].sort((a, b) => Number(!isDaily(b)) - Number(!isDaily(a)) || Number(!!b.isMyTurn) - Number(!!a.isMyTurn));
+  const liLabel = (g: LichessPlaying) => (isDaily(g) ? 'Lichess daily' : `Lichess ${g.speed ?? 'game'}`);
+  // Lichess only lets outside boards play rapid, classical and daily games started elsewhere;
+  // a bullet or blitz game started on lichess.org opens there.
+  const liHref = (g: LichessPlaying) => (/^(ultraBullet|bullet|blitz)$/.test(g.speed ?? '') ? `https://lichess.org/${g.gameId}` : `/lichess?game=${g.gameId}`);
   const chooseView = (v: View) => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* ignore */ } };
 
   const load = useCallback(async () => {
@@ -82,10 +98,10 @@ export function ActiveGamesCard() {
     return () => { window.removeEventListener('cs:daily-update', on); clearInterval(t); };
   }, [me, load]);
 
-  if (!me || (daily.length === 0 && !live)) return null;
+  if (!me || (daily.length === 0 && !live && li.length === 0)) return null;
 
   const sorted = [...daily].sort((a, b) => Number(b.turnUserId === me) - Number(a.turnUserId === me));
-  const myMoves = sorted.filter(g => g.turnUserId === me).length;
+  const myMoves = sorted.filter(g => g.turnUserId === me).length + li.filter((g) => g.isMyTurn).length;
 
   return (
     <section className="overflow-hidden lg:col-span-2" style={cardStyle}>
@@ -123,6 +139,20 @@ export function ActiveGamesCard() {
               </Link>
             );
           })()}
+          {liSorted.map((g) => (
+            <Link key={g.gameId} href={liHref(g)} className="w-[164px] shrink-0 snap-start rounded-2xl p-2"
+              style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${g.isMyTurn ? 'rgba(129,182,76,0.55)' : PT.border}` }}>
+              {g.fen ? <ThemedMiniBoard fen={g.fen} size={148} flipped={g.color === 'black'} /> : <span className="block h-[148px] w-[148px] rounded-md" style={{ background: 'rgba(255,255,255,0.05)' }} />}
+              <b className="mt-2 flex items-center gap-1.5 truncate text-[13px] font-extrabold" style={{ color: PT.text }}>
+                {!isDaily(g) && <span className="h-2 w-2 shrink-0 animate-pulse rounded-full" style={{ background: PT.red }} />}
+                <span className="truncate">{g.opponent?.username ?? 'Opponent'}</span>
+              </b>
+              <span className="flex items-baseline justify-between gap-1 text-[11.5px]">
+                <span className="font-extrabold" style={{ color: g.isMyTurn ? PT.green : PT.muted }}>{g.isMyTurn ? 'Your move' : 'Their move'}</span>
+                <span className="truncate" style={{ color: PT.muted }}>{liLabel(g)}</span>
+              </span>
+            </Link>
+          ))}
           {sorted.map(g => {
             const white = g.whiteUserId === me;
             const yours = g.turnUserId === me;
@@ -162,6 +192,23 @@ export function ActiveGamesCard() {
         </Link>
         );
       })()}
+      {view === 'list' && liSorted.map((g) => (
+        <Link key={g.gameId} href={liHref(g)} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}` }}>
+          {g.fen ? <ThemedMiniBoard fen={g.fen} size={56} flipped={g.color === 'black'} /> : <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: PT.green }} />}
+          <span className="min-w-0 flex-1">
+            <b className="flex items-center gap-1.5 truncate text-[14px] font-extrabold" style={{ color: PT.text }}>
+              {!isDaily(g) && <span className="h-2 w-2 shrink-0 animate-pulse rounded-full" style={{ background: PT.red }} />}
+              vs {g.opponent?.username ?? 'Opponent'}
+            </b>
+            <span className="block text-[12px]" style={{ color: PT.muted }}>{liLabel(g)} · {g.rated ? 'Rated' : 'Casual'}</span>
+          </span>
+          <span className="shrink-0 text-right">
+            <span className="block text-[12px] font-extrabold" style={{ color: g.isMyTurn ? PT.green : PT.muted }}>{g.isMyTurn ? 'Your move' : 'Their move'}</span>
+            {isDaily(g) && typeof g.secondsLeft === 'number' && <span className="block text-[11px]" style={{ color: g.secondsLeft < 3600 ? PT.red : PT.muted }}>{formatLeft(g.secondsLeft * 1000)}</span>}
+          </span>
+          <ChevronRight size={16} style={{ color: PT.muted }} />
+        </Link>
+      ))}
       {view === 'list' && sorted.map(g => {
         const white = g.whiteUserId === me;
         const yours = g.turnUserId === me;
