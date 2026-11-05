@@ -184,9 +184,27 @@ export async function nowPlaying(): Promise<LichessPlaying[]> {
 export const isDaily = (g: { speed?: string }) => g.speed === 'correspondence';
 
 /** A daily (correspondence) game on Lichess: posted in Lichess's lobby until someone takes it. */
-export async function seekDaily(days: 1 | 2 | 3 | 5 | 7 | 10 | 14, rated: boolean): Promise<{ ok: boolean; status: number }> {
+export async function seekDaily(days: 1 | 2 | 3 | 5 | 7 | 10 | 14, rated: boolean): Promise<{ ok: boolean; status: number; id?: string }> {
   const r = await call('/api/board/seek', { method: 'POST', body: new URLSearchParams({ rated: String(rated), days: String(days), variant: 'standard', color: 'random' }), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-  return { ok: r.ok, status: r.status };
+  const d = r.ok ? await r.json().catch(() => null) as { id?: string } | null : null;
+  return { ok: r.ok, status: r.status, id: d?.id };
+}
+/** Take a daily seek back off Lichess's lobby (best effort). */
+export const cancelDailySeek = (id: string) => call(`/api/board/seek/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => null);
+
+// A daily search on ChessScout and Lichess at once: whichever finds an opponent first
+// becomes the game, and the other search is taken back (see DailyGames' check).
+const PAIR_KEY = 'cs_daily_pair';
+export interface DailyPair { tc: string; mode: 'casual' | 'ranked'; seekId: string | null; at: number; known: string[] }
+export const dailyPair = (): DailyPair | null => { try { return JSON.parse(localStorage.getItem(PAIR_KEY) || 'null'); } catch { return null; } };
+export const clearDailyPair = () => { try { localStorage.removeItem(PAIR_KEY); } catch { /* ignore */ } };
+export async function alsoSeekDailyOnLichess(tc: string, mode: 'casual' | 'ranked'): Promise<void> {
+  if (!lichessAuth()) return;
+  const days = tc === 'corr_7d' ? 7 : tc === 'corr_3d' ? 3 : 1;
+  const known = (await nowPlaying().catch(() => [])).filter((g) => g.speed === 'correspondence').map((g) => g.gameId);
+  const r = await seekDaily(days, mode === 'ranked').catch(() => null);
+  if (!r?.ok) return;
+  try { localStorage.setItem(PAIR_KEY, JSON.stringify({ tc, mode, seekId: r.id ?? null, at: Date.now(), known } satisfies DailyPair)); } catch { /* ignore */ }
 }
 
 /** The finished game's PGN, from Lichess. */

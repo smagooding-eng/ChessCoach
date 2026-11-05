@@ -8,7 +8,7 @@ import { PT, cardStyle, greenBtn, ghostBtn, formatLeft } from '@/lib/playTheme';
 import { ShareLink } from '@/components/play/ShareLink';
 import { NotifyPrompt } from '@/components/play/NotifyPrompt';
 import { SeekGoneCard, SeekJoiningCard, takeSeekParams, type SeekInfo } from '@/components/play/SeekGoneCard';
-import { lichessAuth, syncLichessAuth, connectLichess, nowPlaying, isDaily, seekDaily, type LichessPlaying } from '@/lib/lichessBoard';
+import { lichessAuth, syncLichessAuth, connectLichess, nowPlaying, isDaily, seekDaily, dailyPair, clearDailyPair, cancelDailySeek, alsoSeekDailyOnLichess, type LichessPlaying } from '@/lib/lichessBoard';
 import { useChallengeInbox, ChallengeRequestsCard, ChallengeInvitesCard, SentRequestsCard, OutgoingChallengesCard, OpenLinksCard, createOpenLink } from '@/components/play/OpenChallenges';
 
 export const DAILY_TC = [
@@ -79,7 +79,7 @@ export function DailyGames({ embedded = false, listOnly = false }: { embedded?: 
   useEffect(() => {
     if (!lichess) return;
     const f = () => void nowPlaying().then((g) => setLiGames(g.filter(isDaily))).catch(() => {});
-    f(); const t = setInterval(f, 60_000);
+    f(); const t = setInterval(f, dailyPair() ? 20_000 : 60_000);
     return () => clearInterval(t);
   }, [lichess]);
   const daysOf = (t: string): 1 | 3 | 7 => (t === 'corr_7d' ? 7 : t === 'corr_3d' ? 3 : 1);
@@ -147,6 +147,7 @@ export function DailyGames({ embedded = false, listOnly = false }: { embedded?: 
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || 'Could not start a game');
       if (d.status === 'matched' && d.game) { navigate(`/daily/${d.game.id}`); return; }
+      await alsoSeekDailyOnLichess(tc, mode as 'casual' | 'ranked');
       await load();
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not start a game'); }
     finally { setBusy(false); }
@@ -174,7 +175,24 @@ export function DailyGames({ embedded = false, listOnly = false }: { embedded?: 
     finally { setBusy(false); }
   };
 
+  // A search running on both: the first to find an opponent wins, the other is taken back.
+  useEffect(() => {
+    const p = dailyPair(); if (!p) return;
+    if (Date.now() - p.at > 7 * 86400_000) { clearDailyPair(); return; }
+    const newLichess = liGames.find((g) => !p.known.includes(g.gameId));
+    const stillQueued = queue.some((q) => q.timeControl === p.tc);
+    if (newLichess) {
+      clearDailyPair();
+      if (stillQueued) void apiFetch('/api/correspondence/cancel-queue', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ timeControl: p.tc, mode: p.mode }) }).then(() => load()).catch(() => {});
+    } else if (!loading && !stillQueued && games.some((g) => g.timeControl === p.tc && new Date(g.startedAt).getTime() >= p.at - 5000)) {
+      clearDailyPair();
+      if (p.seekId) void cancelDailySeek(p.seekId);
+    }
+  }, [liGames, queue, games, loading]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const leave = async (q: QueueRow) => {
+    // Stopping the search stops it on Lichess too.
+    const p = dailyPair(); if (p && p.tc === q.timeControl) { clearDailyPair(); if (p.seekId) void cancelDailySeek(p.seekId); }
     await apiFetch('/api/correspondence/cancel-queue', {
       method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ timeControl: q.timeControl, mode: q.mode }),
@@ -304,14 +322,8 @@ export function DailyGames({ embedded = false, listOnly = false }: { embedded?: 
               <Loader2 size={16} className="animate-spin shrink-0" style={{ color: PT.green }} />
               <span className="min-w-0 flex-1 text-[13.5px]" style={{ color: PT.text }}>
                 {dailyTcLabel(q.timeControl)} · {q.mode === 'ranked' ? 'Ranked' : 'Casual'}
-                <span className="block text-[11.5px]" style={{ color: PT.muted }}>Waiting since {new Date(q.joinedAt).toLocaleString()} · we've told players with notifications on, and we'll notify you when matched</span>
+                <span className="block text-[11.5px]" style={{ color: PT.muted }}>Looking for an opponent since {new Date(q.joinedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}. We'll notify you when the game starts</span>
               </span>
-              {Date.now() - new Date(q.joinedAt).getTime() > 60_000 && (
-                <button onClick={() => { void leave(q).then(() => findOnLichess(q.timeControl, q.mode === 'ranked' ? 'ranked' : 'casual')); }} disabled={busy}
-                  className="shrink-0 rounded-lg px-2.5 py-1.5 text-[11.5px] font-extrabold disabled:opacity-60" style={greenBtn} title="Stop waiting here and play a Lichess player instead">
-                  ♞ Lichess player instead
-                </button>
-              )}
               <button onClick={() => leave(q)} className="shrink-0 rounded-lg p-2" style={ghostBtn} aria-label="Stop searching"><X size={15} /></button>
             </div>
           ))}

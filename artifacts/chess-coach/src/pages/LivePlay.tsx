@@ -4,7 +4,7 @@ import { useLivePlay, type LiveMode } from '@/hooks/use-live-play';
 import { useLiveRatings } from '@/hooks/use-live-ratings';
 import { LiveGame } from '@/pages/LiveGame';
 import { Link, useLocation } from 'wouter';
-import { lichessAuth, connectLichess, syncLichessAuth, seek as lichessSeek, streamEvents, isDaily, abort as abortLichess } from '@/lib/lichessBoard';
+import { lichessAuth, connectLichess, syncLichessAuth, seek as lichessSeek, streamEvents, isDaily, abort as abortLichess, alsoSeekDailyOnLichess } from '@/lib/lichessBoard';
 import { Loader2, Swords, Zap, Clock, X, History, ChevronRight, Users, CalendarDays, Bot } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
@@ -86,7 +86,9 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || 'Could not start a daily game');
       if (d.status === 'matched' && d.game) { navigate(`/daily/${d.game.id}`); return; }
-      setDailyNote(`Looking for a daily opponent (${DAILY_OPTIONS.find((o) => o.id === tc)?.label} a move). We'll notify you when someone's found; it's in your daily games below.`);
+      // Nobody waiting here: look on Lichess at the same time (whichever is quicker).
+      await alsoSeekDailyOnLichess(tc, mode);
+      setDailyNote(`Looking for an opponent (${DAILY_OPTIONS.find((o) => o.id === tc)?.label} a move). We'll notify you when the game starts.`);
       window.dispatchEvent(new Event('cs:daily-update'));
     } catch (e) { setDailyNote(`!${e instanceof Error ? e.message : 'Could not start a daily game'}`); }
     finally { setDailyBusy(false); }
@@ -269,7 +271,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
                 {queuedLabel} · {live.queuedMode === 'ranked' ? 'Ranked' : 'Casual'} · {Math.floor(waitedMs / 1000)}s
               </p>
               <p className="text-[12px] mt-1" style={{ color: PT.muted }}>
-                {liSearching ? 'Searching ChessScout and Lichess. Your game opens the moment someone is found.' : lichess && lichessClock ? 'Nobody here in a few seconds? We\'ll look on Lichess too.' : "We've let players with notifications on know you're looking."}
+                {liSearching || (lichess && lichessClock) ? 'Your game opens the moment someone is found.' : "We've let players with notifications on know you're looking."}
               </p>
             </div>
             <button onClick={live.cancel} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm" style={ghostBtn}>
