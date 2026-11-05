@@ -47,10 +47,37 @@ export function RenderReady({ id, name, shareText, className = '' }: { id: strin
   );
 }
 
+/** The latest videos made (14 days), with Download / Post for each finished one. */
+export function RecentRenders() {
+  const [list, setList] = useState<{ id: string; status: string; error: string | null; fileName: string | null; createdAt: string }[] | null>(null);
+  useEffect(() => {
+    const load = () => void apiFetch('/api/admin/studio/renders', { credentials: 'include' }).then((r) => (r.ok ? r.json() : null)).then((d) => d && setList(d.renders ?? [])).catch(() => {});
+    load(); const t = setInterval(load, 15_000);
+    return () => clearInterval(t);
+  }, []);
+  if (!list || !list.length) return null;
+  return (
+    <div className="mb-4 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
+      <p className="mb-2 text-[13px] font-black">🎬 Your videos <span className="font-bold text-white/45">· kept for 14 days</span></p>
+      <div className="space-y-2">
+        {list.map((r) => (
+          <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-black/20 px-2.5 py-2">
+            <span className="min-w-0 text-[12.5px]"><b className="block truncate">{(r.fileName ?? 'video').replace(/^chessscout-/, '').replace(/-/g, ' ')}</b><span className="text-white/50">{new Date(r.createdAt).toLocaleString()}</span></span>
+            {r.status === 'done' ? <RenderReady id={r.id} name={r.fileName ?? 'chessscout-clip'} />
+              : r.status === 'failed' ? <span className="text-[12px] font-bold text-[#F0605D]">Failed{r.error ? `: ${r.error}` : ''}</span>
+              : <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-white/70"><Loader2 size={13} className="animate-spin" />Being made…</span>}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function RenderMp4({ payload, name, shareText }: { payload: () => RenderPayload; name: string; shareText?: string }) {
   const [job, setJob] = useState<{ id: string; status: string; error?: string | null } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState(0);
+  const [starting, setStarting] = useState(false);
   const [, tick] = useState(0);
   useEffect(() => {
     if (!job || job.status === 'done' || job.status === 'failed') return;
@@ -61,19 +88,20 @@ export function RenderMp4({ payload, name, shareText }: { payload: () => RenderP
     return () => clearInterval(t);
   }, [job]);
   const start = async () => {
-    setErr(null);
+    if (starting) return;
+    setErr(null); setStarting(true);
     try {
       const r = await apiFetch('/api/admin/studio/render', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload(), fileName: name }) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok || !d.id) { setErr(d.error || "Couldn't start the video."); return; }
       setJob({ id: d.id, status: 'queued' }); setStartedAt(Date.now());
-    } catch { setErr("Couldn't start the video."); }
+    } catch { setErr("Couldn't start the video."); } finally { setStarting(false); }
   };
   const mins = startedAt ? Math.floor((Date.now() - startedAt) / 60_000) : 0;
   return (
     <div className="space-y-1.5">
       {!job || job.status === 'failed' ? (
-        <button onClick={() => void start()} className="inline-flex items-center gap-1.5 rounded-lg bg-[#81B64C] px-3 py-1.5 text-[12.5px] font-black text-white"><Film size={14} /> MP4 with sound</button>
+        <button onClick={() => void start()} disabled={starting} className="inline-flex items-center gap-1.5 rounded-lg bg-[#81B64C] px-3 py-1.5 text-[12.5px] font-black text-white disabled:opacity-60">{starting ? <Loader2 size={14} className="animate-spin" /> : <Film size={14} />} MP4 with sound</button>
       ) : job.status === 'done' ? (
         <RenderReady id={job.id} name={name} shareText={shareText} />
       ) : (

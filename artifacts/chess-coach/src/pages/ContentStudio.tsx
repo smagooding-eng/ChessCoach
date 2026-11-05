@@ -9,7 +9,7 @@ import { OPENING_MAP } from '@/components/studio/openingMap';
 import { StudioPlayer, themeLabel, type StudioMoment, type StudioTrap, type StudioSource, type StudioPuzzle, type StudioReview, type StudioScout, type StudioLesson, type StudioPromo } from '@/components/studio/StudioPlayer';
 import { Chess } from 'chess.js';
 import { KidsStudio } from '@/components/studio/KidsStudio';
-import { RenderReady } from '@/components/studio/RenderMp4';
+import { RenderReady, RecentRenders } from '@/components/studio/RenderMp4';
 import { KIDS_WORLDS, type KidsVideo } from '@/components/studio/kidsVideos';
 import { KidPiece } from '@/components/kids/KidsArt';
 
@@ -425,6 +425,7 @@ export function ContentStudio() {
         </div>
         {autoNote && <p className="mt-2 text-[12px] text-white/60">{autoNote}</p>}
       </div>
+      <RecentRenders />
       {readyRender && (
         <div className="mb-3 rounded-xl bg-[#81B64C]/15 p-3 ring-1 ring-[#81B64C]/50">
           <p className="mb-2 text-[14px] font-black">🎬 Your video is ready</p>

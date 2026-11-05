@@ -66,6 +66,15 @@ router.post("/admin/studio/render", requireAdmin, async (req: Request, res: Resp
   }
 });
 
+// The latest videos (for the "Your videos" list in the Studio).
+router.get("/admin/studio/renders", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    await ensureTable();
+    const rows = rowsOf<Row>(await db.execute(sql`SELECT id, status, error, file_name, created_at FROM studio_renders WHERE user_id = ${req.user!.id} AND created_at > now() - interval '14 days' ORDER BY created_at DESC LIMIT 12`));
+    res.json({ renders: rows.map((r) => ({ id: r.id, status: r.status, error: r.error, fileName: r.file_name, createdAt: r.created_at })) });
+  } catch { res.json({ renders: [] }); }
+});
+
 // The job (status for the app; the clip itself for the runner's page).
 router.get("/admin/studio/render/:id", requireAdmin, async (req: Request, res: Response) => {
   await ensureTable().catch(() => {});

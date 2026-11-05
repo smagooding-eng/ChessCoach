@@ -10,7 +10,18 @@ export function StudioRender() {
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get('job') || '';
-    apiFetch(`/api/admin/studio/render/${encodeURIComponent(id)}`, { credentials: 'include' }).then((r) => (r.ok ? r.json() : Promise.reject(new Error(`job ${r.status}`))))
+    // The server can be slow to answer (a cold start, or another video being made): try a few times.
+    const load = async (): Promise<unknown> => {
+      for (let k = 0; ; k++) {
+        try {
+          const r = await apiFetch(`/api/admin/studio/render/${encodeURIComponent(id)}`, { credentials: 'include' });
+          if (r.ok) return r.json();
+          if (r.status === 401 || r.status === 403 || r.status === 404) throw Object.assign(new Error(`job ${r.status}`), { final: true });
+        } catch (e) { if ((e as { final?: boolean }).final || k >= 5) throw e; }
+        await new Promise((res) => setTimeout(res, 4000 * (k + 1)));
+      }
+    };
+    load()
       .then((d: { payload: { source: StudioSource; queue?: StudioSource[]; title?: string; prefs?: unknown } }) => {
         // The creator's own settings (voice, music, look...), so the video matches what they saw.
         try { localStorage.setItem(PREF_KEY, JSON.stringify(d.payload.prefs ?? {})); } catch { /* ignore */ }
