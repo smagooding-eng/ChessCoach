@@ -207,6 +207,14 @@ export function LichessPlay() {
     try { const c = new Chess(pos.chess.fen()); const mv = c.move({ from: pm.from, to: pm.to, promotion: 'q' }); if (mv) void onMove(mv.san); } catch { /* no longer legal */ }
   }, [myTurn, st?.moves]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // New game: back to Play, searching ChessScout and Lichess together at the same clock
+  // (the game opens straight on the board, whichever finds someone first).
+  const newGame = () => {
+    const mins = full?.clock ? Math.round(full.clock.initial / 60000) : 10;
+    const tc = mins >= 15 ? 'rapid_15_0' : 'rapid_10_0';
+    navigate(`/live?play=${tc}&mode=${full?.rated ? 'ranked' : 'casual'}`);
+  };
+
   const oppOffersDraw = st && (myColor === 'w' ? st.bdraw : st.wdraw);
   const iOfferDraw = st && (myColor === 'w' ? st.wdraw : st.bdraw);
   const won = st?.winner ? (st.winner === 'white') === (myColor === 'w') : null;
@@ -296,7 +304,7 @@ export function LichessPlay() {
                 {saving === 'saved' && <OverlayButton primary onClick={() => navigate(savedId ? `/games/${savedId}` : '/games')}><Sparkles size={15} /> Review this game</OverlayButton>}
                 {full.speed === 'correspondence'
                   ? <OverlayButton onClick={() => navigate('/daily')}>Daily games</OverlayButton>
-                  : <OverlayButton onClick={() => void startSeek()}><RotateCcw size={15} /> New game</OverlayButton>}
+                  : <OverlayButton onClick={newGame}><RotateCcw size={15} /> New game</OverlayButton>}
               </>} />
           ) : undefined} />
         <MaterialStrip fen={pending?.fen ?? pos.chess.fen()} color={myColor} className="px-1" />
@@ -356,7 +364,7 @@ export function LichessPlay() {
             {saving === 'failed' && <button onClick={() => void saveGame()} className="w-full rounded-xl py-2.5 text-[13px] font-bold" style={ghostBtn}>Couldn't save it to your games. Try again</button>}
             {full.speed === 'correspondence'
               ? <Link href="/daily" className="block w-full rounded-xl py-3 text-[14px] font-extrabold" style={saving === 'saved' ? ghostBtn : greenBtn}>Daily games</Link>
-              : <button onClick={() => void startSeek()} className="w-full rounded-xl py-3 text-[14px] font-extrabold" style={saving === 'saved' ? ghostBtn : greenBtn}>New game</button>}
+              : <button onClick={newGame} className="w-full rounded-xl py-3 text-[14px] font-extrabold" style={saving === 'saved' ? ghostBtn : greenBtn}>New game</button>}
             <a href={LICHESS_TEAM_URL} target="_blank" rel="noreferrer" className="block pt-1 text-[12.5px] font-bold underline" style={{ color: PT.green }}>♞ Join the ChessScout team on Lichess</a>
             <NotifyPrompt id="aftergame" reason="Play daily games on Lichess? Turn on notifications and we'll tell you when it's your move." />
           </div>

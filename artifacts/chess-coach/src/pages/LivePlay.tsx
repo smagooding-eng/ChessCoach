@@ -57,6 +57,19 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
   }, []);
   // Start looking here; with Lichess connected (and a clock it allows) the server holds its bot back.
   const queueFor = (tc: string, m: LiveMode) => live.enterQueue(tc, m, { noAutoBot: !!lichessAuth() && !!LICHESS_CLOCK[tc] });
+  // /live?play=CLOCK&mode=casual|ranked (e.g. "New game" after a Lichess game): start searching straight away.
+  const autoPlay = useRef<{ tc: string; mode: LiveMode } | null>((() => {
+    try {
+      const q = new URLSearchParams(window.location.search); const tc = q.get('play');
+      return tc && /^(blitz|rapid)_\d+_\d+$|^any$/.test(tc) ? { tc, mode: q.get('mode') === 'ranked' ? 'ranked' : 'casual' } : null;
+    } catch { return null; }
+  })());
+  useEffect(() => {
+    if (!autoPlay.current || live.status !== 'idle') return;
+    const a = autoPlay.current; autoPlay.current = null;
+    try { const u = new URL(window.location.href); u.searchParams.delete('play'); u.searchParams.delete('mode'); window.history.replaceState(null, '', u.pathname + u.search); } catch { /* ignore */ }
+    setMode(a.mode); queueFor(a.tc, a.mode);
+  }, [live.status]); // eslint-disable-line react-hooks/exhaustive-deps
   const { data: ratingsData, refetch } = useLiveRatings();
   const dailyRating = ratingsData?.ratings?.daily;
   const [mode, setMode] = useState<LiveMode>('casual');
