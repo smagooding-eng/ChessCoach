@@ -535,18 +535,14 @@ export function ChessBoard({
     }
 
     if (showLegalMoves) {
+      // The dot (or capture ring) goes on top of whatever the square already shows,
+      // e.g. the last move's highlight, so a legal move is never hidden.
+      const under = (sq: string) => { const b = styles[sq]?.background; return b ? `, ${b}` : ''; };
       for (const sq of legalTargets) {
         if (legalMoveInfo.captures.has(sq)) {
-          styles[sq] = {
-            background: 'radial-gradient(circle, transparent 55%, rgba(100,180,255,0.55) 56%)',
-            borderRadius: '50%',
-            ...(styles[sq] || {}),
-          };
+          styles[sq] = { ...(styles[sq] || {}), background: `radial-gradient(circle, transparent 55%, rgba(100,180,255,0.55) 56%)${under(sq)}` };
         } else {
-          styles[sq] = {
-            background: 'radial-gradient(circle, rgba(100,180,255,0.55) 28%, transparent 30%)',
-            ...(styles[sq] || {}),
-          };
+          styles[sq] = { ...(styles[sq] || {}), background: `radial-gradient(circle, rgba(100,180,255,0.55) 28%, transparent 30%)${under(sq)}` };
         }
       }
     }
