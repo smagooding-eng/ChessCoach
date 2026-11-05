@@ -4,7 +4,7 @@ import { useLivePlay, type LiveMode } from '@/hooks/use-live-play';
 import { useLiveRatings } from '@/hooks/use-live-ratings';
 import { LiveGame } from '@/pages/LiveGame';
 import { Link, useLocation } from 'wouter';
-import { lichessAuth, connectLichess, syncLichessAuth } from '@/lib/lichessBoard';
+import { lichessAuth, connectLichess, syncLichessAuth, seek as lichessSeek, streamEvents, isDaily, abort as abortLichess } from '@/lib/lichessBoard';
 import { Loader2, Swords, Zap, Clock, X, History, ChevronRight, Users, CalendarDays, Bot } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
@@ -95,16 +95,33 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
     return () => clearInterval(id);
   }, [live.status]);
   const lichessClock = live.queuedTc ? LICHESS_CLOCK[live.queuedTc] : undefined;
-  // Nobody here after a few seconds: straight into a real Lichess game at the same clock.
+  // Nobody here after a few seconds: search Lichess too, from this same screen (no extra
+  // screen in between). The ChessScout search keeps going; whichever finds a game first wins,
+  // and a Lichess game opens straight on the board.
   const handedOff = useRef(false);
+  const liSearch = useRef<AbortController | null>(null);
+  const [liSearching, setLiSearching] = useState(false);
+  const statusRef = useRef(live.status); statusRef.current = live.status;
+  const stopLichessSearch = () => { liSearch.current?.abort(); liSearch.current = null; setLiSearching(false); };
   const waitedSoFar = live.queuedAt ? now - live.queuedAt : 0;
   useEffect(() => {
-    if (live.status !== 'queued') { handedOff.current = false; return; }
+    if (live.status !== 'queued') { handedOff.current = false; stopLichessSearch(); return; }
     if (handedOff.current || !lichess || !lichessClock || waitedSoFar < LICHESS_HANDOFF_MS) return;
     handedOff.current = true;
-    live.cancel();
-    navigate(`/lichess?seek=${encodeURIComponent(lichessClock)}&rated=${live.queuedMode === 'ranked' ? 1 : 0}&from=live`);
+    const ac = new AbortController(); liSearch.current = ac; setLiSearching(true);
+    const [m, inc] = lichessClock.split('+').map(Number);
+    // A game starting on Lichess: open it (unless ChessScout found someone in the same instant).
+    void streamEvents((e) => {
+      if (e.type !== 'gameStart' || isDaily(e.game)) return;
+      if (statusRef.current !== 'queued') { void abortLichess(e.game.gameId); return; }
+      ac.abort(); live.cancel();
+      navigate(`/lichess?game=${e.game.gameId}`);
+    }, ac.signal).catch(() => {});
+    void lichessSeek({ minutes: m, increment: inc, rated: live.queuedMode === 'ranked' }, ac.signal)
+      .then((code) => { if (!ac.signal.aborted && code >= 400) setLiSearching(false); })
+      .catch(() => { if (!ac.signal.aborted) setLiSearching(false); });
   }, [live.status, waitedSoFar, lichess, lichessClock]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => liSearch.current?.abort(), []);
 
   // /live?seek=USER -- tapped "<name> is looking for a game".
   const [seek, setSeek] = useState<SeekInfo | null>(null);
@@ -239,7 +256,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
                 {queuedLabel} · {live.queuedMode === 'ranked' ? 'Ranked' : 'Casual'} · {Math.floor(waitedMs / 1000)}s
               </p>
               <p className="text-[12px] mt-1" style={{ color: PT.muted }}>
-                {lichess && lichessClock ? 'Nobody here in a few seconds? We\'ll find you a real opponent on Lichess.' : "We've let players with notifications on know you're looking."}
+                {liSearching ? 'Searching ChessScout and Lichess. Your game opens the moment someone is found.' : lichess && lichessClock ? 'Nobody here in a few seconds? We\'ll look on Lichess too.' : "We've let players with notifications on know you're looking."}
               </p>
             </div>
             <button onClick={live.cancel} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm" style={ghostBtn}>
