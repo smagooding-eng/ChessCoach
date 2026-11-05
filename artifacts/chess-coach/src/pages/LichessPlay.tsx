@@ -68,6 +68,7 @@ export function LichessPlay() {
   // Not connected on this device yet: check the account's saved connection before offering Connect.
   const [checking, setChecking] = useState(() => !lichessAuth());
   const [error, setError] = useState<string | null>(null);
+  const [confirmEl, setConfirmEl] = useState<HTMLDivElement | null>(null);
   const [gameId, setGameId] = useState<string | null>(() => (gameParam && /^[A-Za-z0-9]{8}$/.test(gameParam) ? gameParam : null));
   const [full, setFull] = useState<LichessGameFull | null>(null);
   const [st, setSt] = useState<LichessState | null>(null);
@@ -147,6 +148,11 @@ export function LichessPlay() {
     setChat((c) => [...c.slice(-30), { id: ++chatId.current, from, text: text.slice(0, 140), at }]);
   };
   useEffect(() => { setChat([]); }, [gameId]);
+  // Played from ChessScout: it goes under the ChessScout tab as well as Lichess, however it gets saved.
+  useEffect(() => {
+    if (!gameId || phase !== 'playing') return;
+    void apiFetch('/api/lichess/board/played', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gameId }) }).catch(() => {});
+  }, [gameId, phase]);
 
   // The game itself.
   useEffect(() => {
@@ -289,7 +295,7 @@ export function LichessPlay() {
         <div className="relative">{row(top)}<ChatBubble chat={chat} side={top} muted={chatMuted} /></div>
         <MaterialStrip fen={pending?.fen ?? pos.chess.fen()} color={top} className="px-1" />
         <ChessBoard fen={browser.viewing && browser.fen ? browser.fen : pending?.fen ?? pos.chess.fen()} flipped={myColor === 'b'} lastMove={browser.viewing ? browser.lastMove : pending?.last ?? pos.last}
-          practiceMode={myTurn && !pending && !browser.viewing} expectedMoveSan={null} onMovePlayed={(san) => void onMove(san)}
+          practiceMode={myTurn && !pending && !browser.viewing} expectedMoveSan={null} onMovePlayed={(san) => void onMove(san)} confirmTarget={confirmEl}
           premoveMode={!myTurn && phase === 'playing' && !browser.viewing} premoveColor={myColor} premove={premove} onPremoveSet={(p) => setPremove(p)}
           sidePanel={full.clock ? {
             clocks: {
@@ -310,6 +316,7 @@ export function LichessPlay() {
         <MaterialStrip fen={pending?.fen ?? pos.chess.fen()} color={myColor} className="-mt-1 px-1" />
         <div className="relative">{row(myColor)}<ChatBubble chat={chat} side={myColor} /></div>
         <MoveBrowserBar browser={browser} yourTurn={myTurn} />
+        <div ref={setConfirmEl} className="relative" />
         {!full.white.aiLevel && !full.black.aiLevel && (
           <div className="space-y-1.5">
             <ChatTray onSend={(t) => {

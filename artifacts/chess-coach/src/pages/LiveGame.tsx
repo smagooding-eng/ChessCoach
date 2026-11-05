@@ -83,6 +83,7 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
   const { game, color, move, resign, premove, setPremove, offerDraw, acceptDraw, declineDraw, serverOffset, notice, offerRematch, declineRematch, connected } = live;
   const [, navigate] = useLocation();
   const [tick, setTick] = useState(0);
+  const [confirmEl, setConfirmEl] = useState<HTMLDivElement | null>(null);
   const [chatMuted, setChatMuted] = useChatMuted();
   // "Add as a friend" after a game against a person
   const [friendState, setFriendState] = useState<'idle' | 'sending' | 'sent'>('idle');
@@ -355,6 +356,7 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
         premoveColor={color}
         premove={premove}
         onPremoveSet={(p) => setPremove(p)}
+        confirmTarget={confirmEl}
         boardOverlay={finished && !browser.viewing ? (
           <GameOverOverlay
             gameKey={game.id}
@@ -389,10 +391,11 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
         <PlayerStrip p={bottom} ms={bottomMs} active={bottomActive} isYou={true} awayMs={myAwayMs} />
         <ChatBubble chat={live.chat} side={color} />
       </div>
+      <MoveBrowserBar browser={browser} yourTurn={isPlayerTurn} />
+      <div ref={setConfirmEl} className="relative" />
       {!opponentIsBot && (
         <ChatTray onSend={live.sendChat} disabled={!connected} muted={chatMuted} setMuted={setChatMuted} />
       )}
-      <MoveBrowserBar browser={browser} yourTurn={isPlayerTurn} />
       {/* Engine evaluation only after the game (during a game against a real
           person it would be an engine aid). Below the board, so it never moves it. */}
       {game.status === 'finished' && <EvalBar fen={game.fen} />}

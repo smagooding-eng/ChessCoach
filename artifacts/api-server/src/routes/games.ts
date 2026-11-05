@@ -437,7 +437,7 @@ router.get("/games", requireAuth, async (req, res): Promise<void> => {
   if (source === "bots") {
     conditions.push(sql`(${gamesTable.platform} = 'bot' OR ${gamesTable.whiteUsername} ILIKE 'ChessScout Bot%' OR ${gamesTable.blackUsername} ILIKE 'ChessScout Bot%' OR ${gamesTable.whiteUsername} ILIKE '% (Bot)' OR ${gamesTable.blackUsername} ILIKE '% (Bot)')`);
   } else if (source === "chessscout") {
-    conditions.push(sql`(${gamesTable.platform} = 'chessscout' OR via_chessscout = true)`);
+    conditions.push(sql`(${gamesTable.platform} = 'chessscout' OR via_chessscout = true OR (${gamesTable.platform} = 'lichess' AND ${gamesTable.lichessGameId} IN (SELECT game_id FROM lichess_cs_games WHERE user_id = ${req.user!.id})))`);
   } else if (source === "chesscom" || source === "lichess") {
     conditions.push(eq(gamesTable.platform, source));
   } else if (platform && (platform === "chesscom" || platform === "lichess" || platform === "chessscout")) {

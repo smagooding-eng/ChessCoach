@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect, Component, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { ClockPanel, ConfirmPad, CLOCK, type ClockFaceData } from '@/components/ClockPad';
 import { Chessboard, defaultPieces } from 'react-chessboard';
 import { Chess } from 'chess.js';
@@ -132,6 +133,8 @@ interface ChessBoardProps {
   /** Keep the confirm-bar's space under the board even when no move is
    *  staged, so the page doesn't shift every time it appears/disappears. */
   reserveConfirmSpace?: boolean;
+  /** Show the Confirm/Cancel pad in this element (e.g. under the move buttons) instead of under the board. It floats over what's below, so nothing moves. Undefined = under the board as before. */
+  confirmTarget?: HTMLElement | null;
   /** Desktop (lg+) layout: a chess-clock column on the right of the board
    *  holding both clocks and the Confirm / Cancel paddles, and a panel on the
    *  left for game messages (draw offers etc.). Phones keep the normal layout. */
@@ -171,6 +174,7 @@ export function ChessBoard({
   maxWidthOverride,
   suppressConfirmMoves = false,
   reserveConfirmSpace = false,
+  confirmTarget,
   boardOverlay,
   animationMs,
   moveFx,
@@ -694,10 +698,18 @@ export function ChessBoard({
         </div>
       )}
 
-      {!pendingMove && !promotionPending && reserveConfirmSpace && confirmMoves && !suppressConfirmMoves && (
+      {confirmTarget === undefined && !pendingMove && !promotionPending && reserveConfirmSpace && confirmMoves && !suppressConfirmMoves && (
         <div aria-hidden className={`mt-3 h-[68px] ${sidePanel ? 'lg:hidden' : ''}`} />
       )}
-      {pendingMove && (
+      {pendingMove && confirmTarget && createPortal(
+        <ConfirmPad
+          className={`absolute inset-x-0 top-0 z-30 ${sidePanel ? 'lg:hidden' : ''}`}
+          onConfirm={confirmPendingMove}
+          onCancel={cancelPendingMove}
+          busy={confirming}
+          time={sidePanel?.clocks?.bottom.text}
+        />, confirmTarget)}
+      {pendingMove && confirmTarget === undefined && (
         // Confirm Move: dark Cancel strip + a big green clock you tap to play
         // the move (shows your time when the game has a clock).
         <ConfirmPad

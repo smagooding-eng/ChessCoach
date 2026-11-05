@@ -102,6 +102,17 @@ router.post("/lichess/board/token", requireAuth, async (req: Request, res: Respo
   } catch { res.status(500).json({ error: "Couldn't save it" }); }
 });
 
+// A Lichess game started on ChessScout's board: list it under ChessScout as well as Lichess.
+router.post("/lichess/board/played", requireAuth, async (req: Request, res: Response) => {
+  const gameId = typeof req.body?.gameId === "string" ? req.body.gameId.trim() : "";
+  if (!/^[A-Za-z0-9]{8}$/.test(gameId)) { res.status(400).json({ error: "Bad game" }); return; }
+  try {
+    await db.execute(sql`INSERT INTO lichess_cs_games (user_id, game_id) VALUES (${req.user!.id}, ${gameId}) ON CONFLICT DO NOTHING`);
+    await db.execute(sql`UPDATE games SET via_chessscout = true WHERE user_id = ${req.user!.id} AND lichess_game_id = ${gameId}`);
+  } catch { /* ignore */ }
+  res.json({ ok: true });
+});
+
 router.delete("/lichess/board/token", requireAuth, async (req: Request, res: Response) => {
   try {
     await ensureTable();
