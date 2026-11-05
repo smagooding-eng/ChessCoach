@@ -9,6 +9,7 @@ import { OPENING_MAP } from '@/components/studio/openingMap';
 import { StudioPlayer, themeLabel, type StudioMoment, type StudioTrap, type StudioSource, type StudioPuzzle, type StudioReview, type StudioScout, type StudioLesson, type StudioPromo } from '@/components/studio/StudioPlayer';
 import { Chess } from 'chess.js';
 import { KidsStudio } from '@/components/studio/KidsStudio';
+import { RenderReady } from '@/components/studio/RenderMp4';
 import { KIDS_WORLDS, type KidsVideo } from '@/components/studio/kidsVideos';
 import { KidPiece } from '@/components/kids/KidsArt';
 
@@ -133,6 +134,8 @@ export function ContentStudio() {
   }, [view, openings]);
   // Kids & beginners: the Beginner Path / Chess for Kids lessons
   const [kidsVid, setKidsVid] = useState<KidsVideo | null>(null);
+  // Opened from a "your video is ready" notification (?render=ID).
+  const [readyRender] = useState(() => { const r = new URLSearchParams(window.location.search).get('render'); return r && /^[a-f0-9]{16}$/.test(r) ? r : null; });
   const [courses, setCourses] = useState<{ id: number; title: string; description: string; icon: string; lessons: StudioLesson[] }[] | null>(null);
   useEffect(() => {
     if (view !== 'kids' || courses) return;
@@ -422,6 +425,12 @@ export function ContentStudio() {
         </div>
         {autoNote && <p className="mt-2 text-[12px] text-white/60">{autoNote}</p>}
       </div>
+      {readyRender && (
+        <div className="mb-3 rounded-xl bg-[#81B64C]/15 p-3 ring-1 ring-[#81B64C]/50">
+          <p className="mb-2 text-[14px] font-black">🎬 Your video is ready</p>
+          <RenderReady id={readyRender} name={`chessscout-${readyRender}`} />
+        </div>
+      )}
       {picking && <p className="mb-3 text-[12.5px] text-[#E8B447]">Tap moments, reviews, puzzles or traps (you can mix tabs) in the order you want them (they count down #{Math.max(picked.length, 1)} to #1), then play them as one clip.</p>}
 
       {view === 'kids' ? (<>

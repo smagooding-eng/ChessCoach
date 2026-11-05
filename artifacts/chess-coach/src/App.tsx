@@ -361,6 +361,8 @@ const PScanPosition  = () => <ProtectedRoute component={ScanPosition} />;
 const PExplorer      = () => <ProtectedRoute component={Explorer} />;
 const PAdmin         = () => <ProtectedRoute component={Admin} />;
 const PContentStudio = () => <ProtectedRoute component={ContentStudio} />;
+const StudioRender = lazyRetry(() => import("@/pages/StudioRender").then(m => ({ default: m.StudioRender })));
+const PStudioRender = () => <ProtectedRoute component={StudioRender} />;
 const PWelcome       = () => <ProtectedRoute component={Welcome} skipWelcomeRedirect />;
 
 function getVisitorId(): string {
@@ -636,6 +638,7 @@ function Router() {
       <Route path="/scan"             component={PScanPosition} />
       <Route path="/explore"          component={PExplorer} />
       <Route path="/admin/studio"     component={PContentStudio} />
+      <Route path="/studio-render"    component={PStudioRender} />
       <Route path="/admin"            component={PAdmin} />
       <Route path="/subscription"    component={PSubscription} />
       <Route path="/profile"          component={PProfile} />

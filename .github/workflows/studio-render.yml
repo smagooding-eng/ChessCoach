@@ -1,0 +1,76 @@
+name: Studio video (MP4 with sound)
+
+# Started by the API (POST /admin/studio/render) when the "MP4 with sound" button is
+# tapped in the Content Studio. Records the clip in a headless browser, joins picture
+# and sound with ffmpeg, and attaches the MP4 to the "studio-renders" release, where
+# the app downloads it from. Old videos (over 14 days) are cleaned up each run.
+on:
+  workflow_dispatch:
+    inputs:
+      job: { description: 'Render job id', required: true }
+      secret: { description: 'Job secret', required: true }
+      token: { description: 'Short-lived sign-in for the recording browser', required: true }
+
+permissions:
+  contents: write
+
+concurrency:
+  group: studio-render-${{ github.event.inputs.job }}
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Hide the secrets in the log
+        run: |
+          echo "::add-mask::${{ github.event.inputs.secret }}"
+          echo "::add-mask::${{ github.event.inputs.token }}"
+      - uses: actions/checkout@v4
+        with: { sparse-checkout: scripts }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Install Playwright and ffmpeg
+        run: |
+          mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i playwright@1.47.2 >/dev/null
+          npx playwright install --with-deps chromium
+          which ffmpeg || (sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg)
+      - name: Record the video
+        env:
+          JOB: ${{ github.event.inputs.job }}
+          SECRET: ${{ github.event.inputs.secret }}
+          TOKEN: ${{ github.event.inputs.token }}
+          OUT: /tmp/render
+        run: |
+          cp scripts/studio-render.mjs /tmp/pw/studio-render.mjs
+          node /tmp/pw/studio-render.mjs
+      - name: Upload it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB: ${{ github.event.inputs.job }}
+          SECRET: ${{ github.event.inputs.secret }}
+        run: |
+          set -e
+          gh release view studio-renders >/dev/null 2>&1 || gh release create studio-renders --title "Studio videos" --notes "MP4s made by the Content Studio. Cleaned up after 14 days." --prerelease
+          cp /tmp/render/video.mp4 "/tmp/render/render-$JOB.mp4"
+          gh release upload studio-renders "/tmp/render/render-$JOB.mp4" --clobber
+          ASSET=$(gh api "repos/${{ github.repository }}/releases/tags/studio-renders" --jq ".assets[] | select(.name==\"render-$JOB.mp4\") | .id")
+          curl -sS -X POST "https://chesscoach-api-kbf8.onrender.com/api/studio/render/$JOB/report" -H 'Content-Type: application/json' \
+            -d "{\"secret\":\"$SECRET\",\"status\":\"done\",\"assetId\":$ASSET}"
+      - name: Tell the app it failed
+        if: failure()
+        env:
+          JOB: ${{ github.event.inputs.job }}
+          SECRET: ${{ github.event.inputs.secret }}
+        run: |
+          curl -sS -X POST "https://chesscoach-api-kbf8.onrender.com/api/studio/render/$JOB/report" -H 'Content-Type: application/json' \
+            -d "{\"secret\":\"$SECRET\",\"status\":\"failed\",\"error\":\"The video maker hit a problem. Try again.\"}" || true
+      - name: Clean up old videos
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CUTOFF=$(date -u -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ)
+          gh api "repos/${{ github.repository }}/releases/tags/studio-renders" --jq ".assets[] | select(.created_at < \"$CUTOFF\") | .id" 2>/dev/null | while read -r id; do
+            gh api -X DELETE "repos/${{ github.repository }}/releases/assets/$id" || true
+          done

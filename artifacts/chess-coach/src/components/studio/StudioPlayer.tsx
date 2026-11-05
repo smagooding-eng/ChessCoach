@@ -9,6 +9,7 @@ import { apiFetch } from '@/lib/api';
 import { normalizeFen } from '@/lib/utils';
 import { StudioBadge, Medallion, Rays, CountdownRing, EvalSwing, rankColor, shade } from './StudioBadge';
 import { StudioSplash } from './StudioSplash';
+import { RenderMp4 } from './RenderMp4';
 import { StudioMusic, MUSIC_STYLES, bpmOf, type MusicStyle } from './studioMusic';
 import { OPENING_MAP, mapTree, type MapEpisode } from './openingMap';
 
@@ -186,7 +187,7 @@ function assignIds(frames: Frame[], prefix: string): string[] {
 const TEXT_STICKERS = ['BRILLIANT!!', 'BLUNDER??', 'WAIT FOR IT…', 'NO WAY', 'GG', 'FIND THE MOVE', 'TRAP!', 'MATE', 'PAUSE NOW', 'COMMENT YOUR MOVE'];
 
 // ── Preferences that carry over between clips (this browser only) ─────────
-const PREF_KEY = 'cs_studio_prefs_v1';
+export const PREF_KEY = 'cs_studio_prefs_v1';
 const DEFAULT_PREFS = {
   before: 8, after: 5, speed: 1.2, guess: true, remix: true, captions: true, effects: true, arrow: true, sound: true, watermark: true,
   bg: 'green', betterLine: true, guessRating: false, outro: true, progress: true, intro: true, safeArea: true, showNames: false,
@@ -774,7 +775,9 @@ const srcLabel = (x: StudioSource): string => (x.kind === 'map' ? `Family Tree �
   : x.kind === 'review' ? `Review · ${x.review.white ?? 'White'} vs ${x.review.black ?? 'Black'}` : `${x.moment.san} · ${x.moment.opening ?? `game ${x.moment.gameId}`}`);
 type ClipLook = BoardLook | 'remix' | 'mine';
 
-export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNext, onPrev }: {
+export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNext, onPrev, render = false }: {
+  /** Being recorded to an MP4 by the video maker (pages/StudioRender.tsx): no controls, plays when told. */
+  render?: boolean;
   source: StudioSource;
   /** A ready-made compilation title (auto Top 5); otherwise the remembered one. */
   title?: string;
@@ -908,6 +911,14 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       const chunks: Blob[] = [];
       rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
       rec.onstop = () => {
+        if (renderRef.current) {
+          const ended = Date.now();
+          const blob = new Blob(chunks, { type: type || 'audio/webm' });
+          const fr = new FileReader();
+          fr.onload = () => { const w = window as unknown as { __studioRender?: Record<string, unknown> }; w.__studioRender = { ...(w.__studioRender ?? {}), audio: String(fr.result).split(',')[1] ?? '', ext: type.includes('mp4') ? 'm4a' : 'webm', endedAt: ended, done: true }; };
+          fr.readAsDataURL(blob);
+          return;
+        }
         if (!chunks.length) return;
         const blob = new Blob(chunks, { type: type || 'audio/webm' });
         setSoundtrack((old) => { if (old) URL.revokeObjectURL(old.url); return { url: URL.createObjectURL(blob), ext: type.includes('mp4') ? 'm4a' : 'webm' }; });
@@ -917,6 +928,9 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     } catch { /* recording audio isn't supported here */ }
   };
   const stopSoundtrack = () => { if (trackRec.current?.state === 'recording') trackRec.current.stop(); trackRec.current = null; };
+  // ── The video maker (render mode) ──
+  const renderRef = useRef(render); renderRef.current = render;
+  const renderStarted = useRef(false);
   const startBlank = () => {
     startSoundtrack();
     setExitHint(0); setPlaying(false); setBlank(true); blankDone.current = false;
@@ -1821,6 +1835,17 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const [waitVoice, setWaitVoice] = useState(false);
   useEffect(() => { if (playing && !voiceReady) { setPlaying(false); setWaitVoice(true); } }, [playing, voiceReady]);
   useEffect(() => { if (waitVoice && voiceReady) { setWaitVoice(false); setPlaying(true); } }, [waitVoice, voiceReady]);
+  // Render mode: ready once the clip and its whole voiceover are loaded; done a beat after the last frame.
+  useEffect(() => {
+    if (!render) return;
+    const w = window as unknown as { __studioRender?: Record<string, unknown> };
+    if (w.__studioRender) w.__studioRender.ready = !!clip && frames.length > 0 && (!prefs.voice || !voicePrep || voicePrep.done >= voicePrep.total);
+  }, [render, clip, frames.length, voicePrep, prefs.voice]);
+  useEffect(() => {
+    if (!render || !renderStarted.current || playing || waitVoice || i < frames.length - 1 || !isLast) return;
+    const t = setTimeout(() => { if (renderStarted.current) { renderStarted.current = false; stopSoundtrack(); } }, 1200);
+    return () => clearTimeout(t);
+  }, [render, playing, waitVoice, i, frames.length, isLast]); // eslint-disable-line react-hooks/exhaustive-deps
   const voiceAudio = useRef<HTMLAudioElement | null>(null);
   useEffect(() => { if (!playing) { voiceAudio.current?.pause(); if ('speechSynthesis' in window) window.speechSynthesis.cancel(); } }, [playing]);
   useEffect(() => {
@@ -1851,6 +1876,18 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     setI(0); setPlaying(true);
   };
   const restartRef = useRef(restart); restartRef.current = restart;
+  useEffect(() => {
+    if (!render) return;
+    const w = window as unknown as { __studioRender?: Record<string, unknown> };
+    w.__studioRender = { ...(w.__studioRender ?? {}), ready: false, done: false, start: () => {
+      try { const m = mus(); routeSoundsTo(m.unlock(), m.sfx); } catch { /* ignore */ }
+      setClean(true); setBlank(false);
+      startSoundtrack();
+      renderStarted.current = true;
+      (w.__studioRender as Record<string, unknown>).startedAt = Date.now();
+      restartRef.current();
+    } };
+  }, [render]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Compilation clips: remove, reorder, jump, per-clip look ────────────
   const removeClip = (k: number) => {
@@ -3270,6 +3307,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               {recording ? <Square size={14} /> : <Video size={14} />}{recording ? 'Stop recording' : 'Record clip'}
             </button>
             <button onClick={enterClean} className={ctl}><EyeOff size={14} className="mr-1 inline" />Clean view</button>
+            <RenderMp4 name={clip?.fileBase ?? 'chessscout-clip'} shareText={postText}
+              payload={() => ({ source: isComp && queue ? queue[0] : current, queue: isComp ? queue : undefined, title: isComp ? compTitle : undefined, prefs })} />
             <button onClick={() => set('leadIn', prefs.leadIn === 'scene' ? 'black' : 'scene')} className={ctl} title="What shows for the 5 seconds before a clean-view clip starts">Lead-in: {prefs.leadIn === 'scene' ? 'first scene' : 'black'}</button>
             {soundtrack && (
               <a href={soundtrack.url} download={`${clip?.fileBase ?? 'chessscout-clip'}-soundtrack.${soundtrack.ext}`} className={ctl} style={{ background: '#81B64C' }}>
