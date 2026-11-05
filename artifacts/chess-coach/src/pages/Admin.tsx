@@ -209,54 +209,6 @@ interface BotStats {
   recent: { game_id: string; opponent: string | null; opponent_rating: number | null; opponent_title: string | null; speed: string | null; rated: boolean; result: string | null; status: string | null; started_at: string }[];
   traffic: Record<string, string | number | null> | null;
 }
-// Games started on ChessScout and played on Lichess through ChessScout.
-function LichessPlayCard() {
-  const [d, setD] = useState<{ totals: Record<string, string | number | null> | null; recent: { game_id: string; source: string | null; created_at: string; player: string | null }[] } | null>(null);
-  const [err, setErr] = useState(false);
-  useEffect(() => { apiFetch('/api/admin/lichess-play', { credentials: 'include' }).then((r) => (r.ok ? r.json() : Promise.reject())).then(setD).catch(() => setErr(true)); }, []);
-  const n = (v: unknown) => Number(v ?? 0);
-  const tile = (label: string, value: React.ReactNode, sub?: string) => (
-    <div className="rounded-lg p-2.5" style={{ background: 'rgba(255,255,255,0.04)' }}>
-      <p className="text-[10px] font-black uppercase tracking-wide" style={{ color: TEXT_MUTED }}>{label}</p>
-      <p className="text-xl font-black leading-tight" style={{ color: TEXT_LIGHT }}>{value}</p>
-      {sub && <p className="text-[11px]" style={{ color: TEXT_MUTED }}>{sub}</p>}
-    </div>
-  );
-  const SRC: Record<string, string> = { handoff: 'moved from a ChessScout search', daily: 'daily search', lichess: 'Play on Lichess' };
-  const t = d?.totals;
-  return (
-    <div className="rounded-xl p-4 flex flex-col gap-3 sm:col-span-2 lg:col-span-3" style={{ background: BG_CARD, border: '1px solid rgba(255,255,255,0.05)' }}>
-      <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: TEXT_MUTED }}>♞ Games played on Lichess through ChessScout</p>
-      {err ? <p className="text-[12px]" style={{ color: TEXT_MUTED }}>Couldn't load these numbers.</p> : !d ? <p className="text-[12px]" style={{ color: TEXT_MUTED }}>Loading…</p> : !t || n(t.all_games) === 0 ? (
-        <p className="text-[12px]" style={{ color: TEXT_MUTED }}>None recorded yet. Games are counted from this update on.</p>
-      ) : (<>
-        <p className="text-[11px] font-bold" style={{ color: TEXT_MUTED }}>Counted since {new Date(String(t.since)).toLocaleDateString()} · {fmt(n(t.players))} different players</p>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {tile('All', fmt(n(t.all_games)))}
-          {tile('Last 24 h', fmt(n(t.day)))}
-          {tile('Last 7 days', fmt(n(t.week)))}
-          {tile('Last 30 days', fmt(n(t.month)))}
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          {tile('Moved to Lichess', fmt(n(t.handoff)), 'ChessScout search, nobody here')}
-          {tile('Daily', fmt(n(t.daily)), 'daily search Lichess filled')}
-          {tile('Play on Lichess', fmt(n(t.direct)), 'started there directly')}
-        </div>
-        {d.recent.length > 0 && (
-          <div className="max-h-56 overflow-y-auto rounded-lg" style={{ background: 'rgba(0,0,0,0.15)' }}>
-            {d.recent.map((g) => (
-              <a key={g.game_id + g.created_at} href={`https://lichess.org/${g.game_id}`} target="_blank" rel="noreferrer" className="flex items-center justify-between gap-2 px-3 py-1.5 text-[12.5px]" style={{ borderTop: '1px solid rgba(255,255,255,0.04)', color: TEXT_LIGHT }}>
-                <span className="truncate">{(g.player ?? '?').split('@')[0]}</span>
-                <span className="shrink-0" style={{ color: TEXT_MUTED }}>{SRC[g.source ?? 'lichess'] ?? g.source} · {new Date(g.created_at).toLocaleString()}</span>
-              </a>
-            ))}
-          </div>
-        )}
-      </>)}
-    </div>
-  );
-}
-
 function LichessBotCard() {
   const [d, setD] = useState<BotStats | null>(null);
   const [err, setErr] = useState(false);
@@ -696,7 +648,6 @@ export function Admin() {
           />
           {stats.devices && <DevicesCard rows={stats.devices} />}
           <LichessBotCard />
-          <LichessPlayCard />
           {stats.bots && (
             <StatCard
               icon={BotIcon}
@@ -2400,7 +2351,7 @@ function DashboardRedesignTogglePanel() {
 // ── Games played (live and daily) ─────────────────────────────────────────
 type GameWindows = { today: number; yesterday: number; week: number; d30: number; d90: number; all: number };
 function GamesPlayedPanel() {
-  const [data, setData] = useState<{ live: GameWindows; livePeople: GameWindows; daily: GameWindows } | null>(null);
+  const [data, setData] = useState<{ live: GameWindows; livePeople: GameWindows; daily: GameWindows; lichessLive?: GameWindows; lichessMoved?: GameWindows; lichessDaily?: GameWindows } | null>(null);
   const [error, setError] = useState('');
   const [win, setWin] = useState<keyof GameWindows>('week');
   const load = useCallback(() => {
@@ -2416,7 +2367,11 @@ function GamesPlayedPanel() {
     ['Live games', 'All finished live games, including vs bots', data?.live],
     ['Live vs people', 'Both players were real users', data?.livePeople],
     ['Daily games', 'Finished daily (correspondence) games', data?.daily],
+    ['Live on Lichess', 'Started on ChessScout, played on Lichess through ChessScout', data?.lichessLive],
+    ['↳ moved from a search', 'Searched on ChessScout, nobody free, went to Lichess', data?.lichessMoved],
+    ['Daily on Lichess', 'A daily search that Lichess filled', data?.lichessDaily],
   ];
+  const plain = (l: string) => l === 'Daily games' || l.includes('Lichess') || l.startsWith('↳');
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-border/40 bg-card overflow-hidden">
       <div className="px-5 py-3 border-b border-border/30 flex items-center gap-2">
@@ -2439,7 +2394,7 @@ function GamesPlayedPanel() {
                   <td className="py-2.5 pr-2"><p className="font-bold">{label}</p><p className="text-[11px] text-muted-foreground">{sub}</p></td>
                   {cols.map(([k]) => (
                     <td key={k} className="py-2.5 px-2 text-right font-mono font-bold tabular-nums">
-                      {label === 'Daily games'
+                      {plain(label)
                         ? (w ? (w[k] ?? 0).toLocaleString() : '…')
                         : <button onClick={() => setWin(k)} className={`underline-offset-2 hover:underline ${win === k ? 'underline' : ''}`}>{w ? (w[k] ?? 0).toLocaleString() : '…'}</button>}
                     </td>
@@ -2449,7 +2404,7 @@ function GamesPlayedPanel() {
             </tbody>
           </table>
         )}
-        <p className="text-[11px] text-muted-foreground mt-2">Days run midnight to midnight US Eastern; the week starts Monday. Counted when the game finished. Tap a live-games number to see who played.</p>
+        <p className="text-[11px] text-muted-foreground mt-2">Days run midnight to midnight US Eastern; the week starts Monday. Counted when the game finished (Lichess rows: when it started). Tap a live-games number to see who played.</p>
         <LiveGamePlayers windowKey={win} onWindow={setWin} labels={cols} />
       </div>
     </motion.div>

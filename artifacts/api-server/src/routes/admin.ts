@@ -206,7 +206,13 @@ router.get("/admin/game-stats", requireAdmin, async (_req: Request, res: Respons
     const people = await db.execute(sql`SELECT ${windows("finished_at")} FROM live_games WHERE white_persona_id IS NULL AND black_persona_id IS NULL AND ${notOwner}`);
     const daily = await db.execute(sql`SELECT ${windows("finished_at")} FROM correspondence_games WHERE status = 'finished' AND finished_at IS NOT NULL AND ${notOwner}`);
     const row = (r: { rows: unknown[] }) => (r.rows[0] ?? {}) as Record<string, number>;
-    res.json({ live: row(live), livePeople: row(people), daily: row(daily) });
+    // Started on ChessScout and played on Lichess (counted when the game started).
+    const liNotOwner = sql`user_id NOT IN (SELECT id FROM analytics_excluded_users)`;
+    const empty = { rows: [{}] } as { rows: unknown[] };
+    const liLive = await db.execute(sql`SELECT ${windows("created_at")} FROM lichess_cs_games WHERE COALESCE(source, 'lichess') <> 'daily' AND ${liNotOwner}`).catch(() => empty) as { rows: unknown[] };
+    const liMoved = await db.execute(sql`SELECT ${windows("created_at")} FROM lichess_cs_games WHERE source = 'handoff' AND ${liNotOwner}`).catch(() => empty) as { rows: unknown[] };
+    const liDaily = await db.execute(sql`SELECT ${windows("created_at")} FROM lichess_cs_games WHERE source = 'daily' AND ${liNotOwner}`).catch(() => empty) as { rows: unknown[] };
+    res.json({ live: row(live), livePeople: row(people), daily: row(daily), lichessLive: row(liLive), lichessMoved: row(liMoved), lichessDaily: row(liDaily) });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to load game stats", details: err.cause?.message ?? err.message });
   }
