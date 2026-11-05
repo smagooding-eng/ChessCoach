@@ -39,7 +39,13 @@ export function SeekGoneCard({ seek, kind, onClose }: { seek: SeekInfo; kind: 'l
     try {
       const r = await apiFetch('/api/challenges/direct', {
         method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ kind, timeControl: seek.tc, mode: seek.mode, targetUserId: seek.seekerId }),
+        // The clock they were looking for: a daily one is a daily challenge (Live and Daily share
+        // one screen now), and "any clock" (Play anyone) or a missing one is 10 minutes.
+        body: JSON.stringify(((): Record<string, string> => {
+          const daily = seek.tc.startsWith('corr_');
+          const tc = daily || ['blitz_5_0', 'blitz_5_3', 'rapid_10_0', 'rapid_15_0'].includes(seek.tc) ? seek.tc : 'rapid_10_0';
+          return { kind: daily ? 'daily' : kind === 'daily' && !seek.tc ? 'daily' : 'live', timeControl: kind === 'daily' && !seek.tc ? 'corr_1d' : tc, mode: seek.mode, targetUserId: seek.seekerId };
+        })()),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || 'Could not send the challenge');
