@@ -54,6 +54,11 @@ export function dailyTimeLeft(g: DailyGameRow, serverOffsetMs: number): number {
 
 type QueueRow = { id: string; timeControl: string; mode: string; joinedAt: string };
 
+
+/** A Lichess game: plays on ChessScout, or opens on lichess.org when Lichess won't let outside boards play it. */
+const LiLink = ({ href, children, ...rest }: { href: string; children: React.ReactNode; className?: string; style?: React.CSSProperties }) =>
+  href.startsWith('http') ? <a href={href} target="_blank" rel="noreferrer" {...rest}>{children}</a> : <Link href={href} {...rest}>{children}</Link>;
+
 /** embedded: shown inside Play Online (no page title or challenge inbox, which Play Online shows).
  *  listOnly: just your daily games and searches (Play Online has the clocks to start one). */
 export function DailyGames({ embedded = false, listOnly = false }: { embedded?: boolean; listOnly?: boolean } = {}) {
@@ -338,7 +343,7 @@ export function DailyGames({ embedded = false, listOnly = false }: { embedded?: 
             <section className="overflow-hidden" style={cardStyle}>
               <h2 className="px-4 py-3 text-[13px] font-black uppercase tracking-[0.14em]" style={{ color: PT.muted }}>♞ On Lichess · {liGames.length}</h2>
               {[...liGames].sort((a, b) => Number(!isDaily(b)) - Number(!isDaily(a)) || Number(!!b.isMyTurn) - Number(!!a.isMyTurn)).map((g) => (
-                <Link key={g.gameId} href={/^(ultraBullet|bullet|blitz)$/.test(g.speed ?? '') ? `https://lichess.org/${g.gameId}` : `/lichess?game=${g.gameId}`} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}` }}>
+                <LiLink key={g.gameId} href={/^(ultraBullet|bullet|blitz)$/.test(g.speed ?? '') ? `https://lichess.org/${g.gameId}` : `/lichess?game=${g.gameId}`} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}` }}>
                   <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: g.color === 'white' ? '#f0ede8' : '#1b1b1b', border: '1px solid rgba(255,255,255,.35)' }} />
                   <span className="min-w-0 flex-1">
                     <b className="block truncate text-[14.5px] font-extrabold" style={{ color: PT.text }}>vs {g.opponent?.username ?? 'Opponent'}</b>
@@ -349,7 +354,7 @@ export function DailyGames({ embedded = false, listOnly = false }: { embedded?: 
                     {typeof g.secondsLeft === 'number' && <span className="block text-[11px]" style={{ color: g.secondsLeft < 3600 ? PT.red : PT.muted }}>{formatLeft(g.secondsLeft * 1000)} left</span>}
                   </span>
                   <ChevronRight size={16} className="shrink-0" style={{ color: PT.muted }} />
-                </Link>
+                </LiLink>
               ))}
             </section>
           )}

@@ -31,6 +31,10 @@ function sansFromPgn(pgn?: string): string[] {
   try { const c = new Chess(); c.loadPgn(pgn); return c.history(); } catch { return []; }
 }
 
+/** A Lichess game: plays on ChessScout, or opens on lichess.org when Lichess won't let outside boards play it. */
+const LiLink = ({ href, children, ...rest }: { href: string; children: React.ReactNode; className?: string; style?: React.CSSProperties }) =>
+  href.startsWith('http') ? <a href={href} target="_blank" rel="noreferrer" {...rest}>{children}</a> : <Link href={href} {...rest}>{children}</Link>;
+
 /** Opponent names are never shown as an email address. */
 const nameOf = (n: string) => (n.includes('@') ? n.split('@')[0] : n) || 'Player';
 
@@ -140,7 +144,7 @@ export function ActiveGamesCard() {
             );
           })()}
           {liSorted.map((g) => (
-            <Link key={g.gameId} href={liHref(g)} className="w-[164px] shrink-0 snap-start rounded-2xl p-2"
+            <LiLink key={g.gameId} href={liHref(g)} className="w-[164px] shrink-0 snap-start rounded-2xl p-2"
               style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${g.isMyTurn ? 'rgba(129,182,76,0.55)' : PT.border}` }}>
               {g.fen ? <ThemedMiniBoard fen={g.fen} size={148} flipped={g.color === 'black'} /> : <span className="block h-[148px] w-[148px] rounded-md" style={{ background: 'rgba(255,255,255,0.05)' }} />}
               <b className="mt-2 flex items-center gap-1.5 truncate text-[13px] font-extrabold" style={{ color: PT.text }}>
@@ -151,7 +155,7 @@ export function ActiveGamesCard() {
                 <span className="font-extrabold" style={{ color: g.isMyTurn ? PT.green : PT.muted }}>{g.isMyTurn ? 'Your move' : 'Their move'}</span>
                 <span className="truncate" style={{ color: PT.muted }}>{liLabel(g)}</span>
               </span>
-            </Link>
+            </LiLink>
           ))}
           {sorted.map(g => {
             const white = g.whiteUserId === me;
@@ -193,7 +197,7 @@ export function ActiveGamesCard() {
         );
       })()}
       {view === 'list' && liSorted.map((g) => (
-        <Link key={g.gameId} href={liHref(g)} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}` }}>
+        <LiLink key={g.gameId} href={liHref(g)} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}` }}>
           {g.fen ? <ThemedMiniBoard fen={g.fen} size={56} flipped={g.color === 'black'} /> : <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: PT.green }} />}
           <span className="min-w-0 flex-1">
             <b className="flex items-center gap-1.5 truncate text-[14px] font-extrabold" style={{ color: PT.text }}>
@@ -207,7 +211,7 @@ export function ActiveGamesCard() {
             {isDaily(g) && typeof g.secondsLeft === 'number' && <span className="block text-[11px]" style={{ color: g.secondsLeft < 3600 ? PT.red : PT.muted }}>{formatLeft(g.secondsLeft * 1000)}</span>}
           </span>
           <ChevronRight size={16} style={{ color: PT.muted }} />
-        </Link>
+        </LiLink>
       ))}
       {view === 'list' && sorted.map(g => {
         const white = g.whiteUserId === me;
