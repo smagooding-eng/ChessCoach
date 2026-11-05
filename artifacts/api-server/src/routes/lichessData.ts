@@ -3,7 +3,8 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { Chess } from "chess.js";
 import { db, puzzlesTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import { requireAdmin } from "../middlewares/authMiddleware";
 import { tablebase, pieceCount, crosstable, ratingHistory, broadcastsTop, broadcastRoundPgn, dailyPuzzle } from "../lib/lichessApi";
 
 const router: IRouter = Router();
@@ -47,11 +48,62 @@ router.get("/lichess/rating-history/:user", async (req: Request, res: Response) 
   res.json({ available: true, series });
 });
 
+// An event's official video (YouTube / Twitch link), set by an admin from Watch Live.
+const rowsOf = <T,>(r: unknown): T[] => (Array.isArray(r) ? r : ((r as { rows?: T[] })?.rows ?? [])) as T[];
+let streamsReady: Promise<void> | null = null;
+const ensureStreams = () => (streamsReady ??= db.execute(sql`CREATE TABLE IF NOT EXISTS broadcast_streams (
+  tour_id varchar(8) PRIMARY KEY, url text NOT NULL, updated_at timestamptz NOT NULL DEFAULT now()
+)`).then(() => undefined).catch((e) => { streamsReady = null; throw e; }));
+async function eventStreams(): Promise<Map<string, string>> {
+  try { await ensureStreams(); return new Map(rowsOf<{ tour_id: string; url: string }>(await db.execute(sql`SELECT tour_id, url FROM broadcast_streams`)).map((r) => [r.tour_id, r.url])); }
+  catch { return new Map(); }
+}
+router.post("/admin/broadcast-stream", requireAdmin, async (req: Request, res: Response) => {
+  const tourId = String(req.body?.tourId ?? ""), url = String(req.body?.url ?? "").trim();
+  if (!/^[A-Za-z0-9]{8}$/.test(tourId)) { res.status(400).json({ error: "Bad event" }); return; }
+  if (url && !/^https:\/\/([a-z0-9-]+\.)*(youtube\.com|youtu\.be|twitch\.tv)\//i.test(url)) { res.status(400).json({ error: "Use a YouTube or Twitch link" }); return; }
+  try {
+    await ensureStreams();
+    if (url) await db.execute(sql`INSERT INTO broadcast_streams (tour_id, url) VALUES (${tourId}, ${url}) ON CONFLICT (tour_id) DO UPDATE SET url = EXCLUDED.url, updated_at = now()`);
+    else await db.execute(sql`DELETE FROM broadcast_streams WHERE tour_id = ${tourId}`);
+    res.json({ ok: true });
+  } catch { res.status(500).json({ error: "Couldn't save it" }); }
+});
+
+// Lichess streamers live right now (Twitch / YouTube), with the game each is playing.
+let streamersCache: { at: number; data: unknown } | null = null;
+router.get("/lichess/streamers", async (_req: Request, res: Response) => {
+  if (streamersCache && Date.now() - streamersCache.at < 45_000) { res.json(streamersCache.data); return; }
+  const get = async (u: string) => {
+    const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 8000);
+    try { const r = await fetch(u, { signal: ac.signal, headers: { Accept: "application/json" } }); return r.ok ? await r.json() : null; } catch { return null; } finally { clearTimeout(t); }
+  };
+  type S = { id: string; name: string; title?: string; stream?: { service?: string; status?: string; lang?: string }; streamer?: { name?: string; headline?: string; image?: string; twitch?: string; youTube?: string } };
+  const live = (await get("https://lichess.org/api/streamer/live")) as S[] | null;
+  if (!live) { res.json({ streamers: [] }); return; }
+  const ids = live.slice(0, 40).map((s) => s.id);
+  const status = ids.length ? ((await get(`https://lichess.org/api/users/status?ids=${ids.join(",")}&withGameIds=true`)) as { id: string; playing?: boolean; playingId?: string }[] | null) ?? [] : [];
+  const playing = new Map(status.map((s) => [s.id, s.playingId ?? null]));
+  const streamers = live.slice(0, 40).map((s) => ({
+    id: s.id, name: s.name, title: s.title ?? null,
+    service: s.stream?.service ?? null, status: s.stream?.status ?? null, lang: s.stream?.lang ?? null,
+    headline: s.streamer?.headline ?? null, image: s.streamer?.image ?? null,
+    twitch: s.streamer?.twitch ?? null, youTube: s.streamer?.youTube ?? null,
+    gameId: playing.get(s.id) ?? null,
+  }));
+  // Those in a game first.
+  streamers.sort((a, b) => Number(!!b.gameId) - Number(!!a.gameId));
+  const data = { streamers };
+  streamersCache = { at: Date.now(), data };
+  res.json(data);
+});
+
 // Live top events (Lichess broadcasts) and their games.
 router.get("/lichess/broadcasts", async (_req: Request, res: Response) => {
   const top = await broadcastsTop();
+  const streams = await eventStreams();
   const pick = (e: NonNullable<NonNullable<typeof top>["active"]>[number]) => ({
-    id: e.tour.id, name: e.tour.name, image: e.tour.image ?? null, info: e.tour.info ?? null,
+    id: e.tour.id, name: e.tour.name, image: e.tour.image ?? null, info: e.tour.info ?? null, stream: streams.get(e.tour.id) ?? null,
     round: e.round ? { id: e.round.id, name: e.round.name, ongoing: !!e.round.ongoing, startsAt: e.round.startsAt ?? null, finished: !!e.round.finished } : null,
   });
   res.json({ active: (top?.active ?? []).slice(0, 12).map(pick), upcoming: (top?.upcoming ?? []).slice(0, 6).map(pick) });
