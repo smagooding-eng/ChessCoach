@@ -131,7 +131,7 @@ export function KnightTour({ opts: initial = KNIGHT_TOUR_DEFAULT, render = false
         </div>
 
         <motion.div className="relative w-[92cqw]" animate={{ scale: phase === 'logo' ? 1.04 : 1 }} transition={{ duration: 0.6 }}>
-          <ChessBoard fen={fenWithKnight(knightOn)} practiceMode={false} expectedMoveSan={null} maxWidthOverride="100%" animationMs={Math.min(220, SPEEDS[opts.speed] - 60)} suppressConfirmMoves squareMarks={marks} />
+          <ChessBoard fen={fenWithKnight(knightOn)} practiceMode={false} expectedMoveSan={null} maxWidthOverride="100%" moveFx={Math.min(320, SPEEDS[opts.speed] - 40)} suppressConfirmMoves squareMarks={marks} />
           {/* chessscout.net on the board */}
           <AnimatePresence>
             {(phase === 'site' || phase === 'end') && (

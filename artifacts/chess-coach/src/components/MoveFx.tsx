@@ -17,9 +17,30 @@ export interface MoveFxPlan {
   knight: boolean;
 }
 
+// A board with no kings (e.g. a lone knight) isn't a legal position for chess.js:
+// there, one piece leaving one square and arriving on another is the move.
+const grid = (fen: string): string[] => {
+  const out: string[] = [];
+  for (const row of fen.split(' ')[0].split('/')) for (const ch of row) { if (/\d/.test(ch)) for (let k = 0; k < Number(ch); k++) out.push(''); else out.push(ch); }
+  return out.length === 64 ? out : [];
+};
+const sqName = (i: number) => `${'abcdefgh'[i % 8]}${8 - Math.floor(i / 8)}`;
+function planLoose(prevFen: string, nextFen: string): MoveFxPlan | null {
+  const a = grid(prevFen), b = grid(nextFen);
+  if (!a.length || !b.length) return null;
+  const left: number[] = [], came: number[] = [];
+  for (let i = 0; i < 64; i++) if (a[i] !== b[i]) { if (a[i] && !b[i]) left.push(i); else if (b[i]) came.push(i); else return null; }
+  if (left.length !== 1 || came.length !== 1 || a[left[0]] !== b[came[0]]) return null;
+  const ch = b[came[0]], side = ch === ch.toUpperCase() ? 'w' : 'b';
+  const hidden = [...b]; hidden[came[0]] = '';
+  const rows: string[] = [];
+  for (let r = 0; r < 8; r++) { let row = '', gap = 0; for (let f = 0; f < 8; f++) { const p = hidden[r * 8 + f]; if (p) { if (gap) row += gap; gap = 0; row += p; } else gap++; } if (gap) row += gap; rows.push(row); }
+  return { id: Date.now() + Math.random(), hiddenFen: [rows.join('/'), ...nextFen.split(' ').slice(1)].join(' '), movers: [{ piece: `${side}${ch.toUpperCase()}`, from: sqName(left[0]), to: sqName(came[0]) }], captured: null, knight: ch.toLowerCase() === 'n' };
+}
+
 export function planMoveFx(prevFen: string, nextFen: string): MoveFxPlan | null {
   const hit = detectSingleMove(prevFen, nextFen);
-  if (!hit) return null;
+  if (!hit) return planLoose(prevFen, nextFen);
   const m = hit.move;
   const side = m.color;
   const movers = [{ piece: `${side}${m.piece.toUpperCase()}`, from: m.from, to: m.to }];
