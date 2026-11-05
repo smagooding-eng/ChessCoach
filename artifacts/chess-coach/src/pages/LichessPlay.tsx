@@ -289,7 +289,7 @@ export function LichessPlay() {
         <div className="relative">{row(top)}<ChatBubble chat={chat} side={top} muted={chatMuted} /></div>
         <MaterialStrip fen={pending?.fen ?? pos.chess.fen()} color={top} className="px-1" />
         <ChessBoard fen={browser.viewing && browser.fen ? browser.fen : pending?.fen ?? pos.chess.fen()} flipped={myColor === 'b'} lastMove={browser.viewing ? browser.lastMove : pending?.last ?? pos.last}
-          practiceMode={myTurn && !pending && !browser.viewing} expectedMoveSan={null} onMovePlayed={(san) => void onMove(san)} reserveConfirmSpace
+          practiceMode={myTurn && !pending && !browser.viewing} expectedMoveSan={null} onMovePlayed={(san) => void onMove(san)}
           premoveMode={!myTurn && phase === 'playing' && !browser.viewing} premoveColor={myColor} premove={premove} onPremoveSet={(p) => setPremove(p)}
           sidePanel={full.clock ? {
             clocks: {
@@ -307,8 +307,9 @@ export function LichessPlay() {
                   : <OverlayButton onClick={newGame}><RotateCcw size={15} /> New game</OverlayButton>}
               </>} />
           ) : undefined} />
-        <MaterialStrip fen={pending?.fen ?? pos.chess.fen()} color={myColor} className="px-1" />
+        <MaterialStrip fen={pending?.fen ?? pos.chess.fen()} color={myColor} className="-mt-1 px-1" />
         <div className="relative">{row(myColor)}<ChatBubble chat={chat} side={myColor} /></div>
+        <MoveBrowserBar browser={browser} yourTurn={myTurn} />
         {!full.white.aiLevel && !full.black.aiLevel && (
           <div className="space-y-1.5">
             <ChatTray onSend={(t) => {
@@ -331,7 +332,6 @@ export function LichessPlay() {
             <button onClick={() => setPremove(null)} className="inline-flex items-center gap-1 font-bold"><X className="h-3 w-3" /> Cancel</button>
           </div>
         )}
-        <MoveBrowserBar browser={browser} yourTurn={myTurn} />
         {gone?.gone && phase === 'playing' && (
           <div className="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-[13px] font-bold" style={{ background: 'rgba(232,180,71,.14)', border: '1px solid rgba(232,180,71,.5)', color: PT.text }}>
             <span>Your opponent left.{gone.claimWinInSeconds ? ` You can claim the win in ${gone.claimWinInSeconds}s.` : ''}</span>
