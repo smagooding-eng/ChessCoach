@@ -661,7 +661,7 @@ export function ChessBoard({
 
       {squareMarks && Object.keys(squareMarks).length > 0 && (
         <div className="pointer-events-none absolute inset-x-0 top-0 z-10 aspect-square" style={{ containerType: 'inline-size' }}>
-          {Object.entries(squareMarks).map(([sq, m]) => {
+          {Object.entries(squareMarks).filter(([, m]) => m.text).map(([sq, m]) => {
             const p = squareToPercent(sq);
             return (
               <div key={sq} className="absolute grid place-items-end justify-center" style={{ left: p.left, top: p.top, width: '12.5%', height: '12.5%', paddingBottom: '0.6cqw' }}>
