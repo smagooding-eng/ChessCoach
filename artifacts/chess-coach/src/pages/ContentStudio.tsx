@@ -663,7 +663,7 @@ export function ContentStudio() {
         </div>
         {promoT === 'splash' ? (
           <div className="max-w-2xl space-y-2 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
-            <p className="text-[12px] text-white/55">Your loading screen with a green pawn: the rook smashes it, then "Chess.com is dead." and then "ChessScout.net". You can change both lines.</p>
+            <p className="text-[12px] text-white/55">Your loading screen with a green pawn and "Chess.com is dead." over it, then the black rook slides in and smashes the pawn, then "ChessScout.net". About 10 seconds; you can change both lines.</p>
             <button onClick={() => setSplashOpen(true)} className="rounded-lg bg-[#81B64C] px-4 py-2 text-[13px] font-black text-white">🎬 Make the clip</button>
           </div>
         ) : promoT === 'knight' ? (

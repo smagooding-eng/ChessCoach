@@ -52,6 +52,9 @@ const CSS = `
 .ss-title span { color: #81b64c; }
 .ss-tag { margin-top: 1.6cqh; font-size: 3cqh; font-weight: 800; color: rgba(229,229,224,.78); opacity: 0; animation: ssUp .5s ease 1.05s forwards; }
 .ss-tag span { color: #81b64c; }
+/* the rook slides in from the left before it jumps (used with a delay) */
+.ss-rook-in { animation: ssIn .7s cubic-bezier(.2,.8,.3,1) backwards; }
+@keyframes ssIn { 0% { transform: translateX(-130px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateX(0); opacity: 1; } }
 @keyframes ssUp { 0% { opacity: 0; transform: translateY(8px); } 100% { opacity: 1; transform: translateY(0); } }
 `;
 
@@ -66,12 +69,16 @@ const SPARKS: [number, number, string, string, string][] = [
   [-4, 1.5, '#e5e5e0', '-70px', '-6px'], [-4, 1.5, '#e5e5e0', '70px', '-4px'], [-8, 1.3, '#81b64c', '-8px', '-72px'],
 ];
 
-/** pawn: 'green' draws the smashed pawn green. below: replaces the name and tagline. */
-export function StudioSplash({ tagline = true, pawn = 'white', below }: { tagline?: boolean; pawn?: 'white' | 'green'; below?: React.ReactNode }) {
+/** pawn: 'green' draws the smashed pawn green. below: replaces the name and tagline. above: shown over the board.
+ *  delay: seconds the board and pawn sit there before the rook slides in (from the left) and jumps. */
+export function StudioSplash({ tagline = true, pawn = 'white', below, above, delay = 0 }: { tagline?: boolean; pawn?: 'white' | 'green'; below?: React.ReactNode; above?: React.ReactNode; delay?: number }) {
   const g = pawn === 'green';
+  // Every animation starts `delay` seconds later (their own delays kept).
+  const at = (...secs: number[]): React.CSSProperties | undefined => (delay ? { animationDelay: secs.map((x) => `${x + delay}s`).join(', ') } : undefined);
   return (
     <div className="absolute inset-0 z-[45] flex flex-col items-center justify-center" style={{ background: '#141413', fontFamily: 'Inter, system-ui, sans-serif' }}>
       <style>{CSS}</style>
+      {above}
       <svg className="ss-stage" viewBox="0 0 240 150" xmlns="http://www.w3.org/2000/svg" aria-label="ChessScout" role="img">
         <defs>
           <linearGradient id="ssRookFill" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#3a3a37" /><stop offset=".55" stopColor="#181817" /><stop offset="1" stopColor="#0a0a09" /></linearGradient>
@@ -90,34 +97,38 @@ export function StudioSplash({ tagline = true, pawn = 'white', below }: { taglin
           <clipPath id="ssC5"><polygon points="-21,-16 0,-20 4,2 -21,2" /></clipPath>
           <clipPath id="ssC6"><polygon points="0,-20 21,-14 21,2 4,2" /></clipPath>
         </defs>
-        <g className="ss-shake">
+        <g className="ss-shake" style={at(0.68)}>
           <g className="ss-board">
             <rect x="30" y="110" width="60" height="16" fill="#2b2b28" />
             <rect x="90" y="110" width="60" height="16" fill="#e9e8e2" />
             <rect x="150" y="110" width="60" height="16" fill="#2b2b28" />
-            <rect className="ss-flash" x="150" y="110" width="60" height="16" fill="#81b64c" />
+            <rect className="ss-flash" style={at(0.68)} x="150" y="110" width="60" height="16" fill="#81b64c" />
             <rect x="30" y="126" width="180" height="5" rx="1.5" fill="#0c0c0b" />
             <line x1="30" y1="110.5" x2="210" y2="110.5" stroke="#e5e5e0" strokeOpacity=".12" />
           </g>
-          <ellipse className="ss-glow" cx="180" cy="110" rx="46" ry="12" fill="url(#ssGlowFill)" />
-          <ellipse className="ss-shadow" cx="60" cy="111" rx="24" ry="4" fill="#000" />
-          <g transform="translate(180,110)">
-            <g className="ss-pawn">
-              {SHARDS.map(([clip, v]) => <g key={clip} className="ss-shard" clipPath={`url(#${clip})`} style={v}><use href="#ssPawnShape" /></g>)}
-              <use className="ss-pawn-whole" href="#ssPawnShape" />
-            </g>
-            <ellipse className="ss-ring" cx="0" cy="0" rx="62" ry="13" fill="none" stroke="#81b64c" strokeWidth="2.5" />
-            {SPARKS.map(([cy, r, fill, dx, dy], k) => <circle key={k} className="ss-spark" cx="0" cy={cy} r={r} fill={fill} style={{ '--dx': dx, '--dy': dy } as V} />)}
+          <ellipse className="ss-glow" style={at(0.75, 1.35)} cx="180" cy="110" rx="46" ry="12" fill="url(#ssGlowFill)" />
+          <g className={delay ? 'ss-rook-in' : undefined} style={delay ? { animationDelay: `${Math.max(0, delay - 0.9)}s` } : undefined}>
+            <ellipse className="ss-shadow" style={at(0)} cx="60" cy="111" rx="24" ry="4" fill="#000" />
           </g>
-          <g className="ss-rook-pos">
-            <g className="ss-rook-body">
+          <g transform="translate(180,110)">
+            <g className="ss-pawn" style={at(0.4, 0.58)}>
+              {SHARDS.map(([clip, v]) => <g key={clip} className="ss-shard" clipPath={`url(#${clip})`} style={{ ...v, ...at(0.68) }}><use href="#ssPawnShape" /></g>)}
+              <use className="ss-pawn-whole" style={at(0.68)} href="#ssPawnShape" />
+            </g>
+            <ellipse className="ss-ring" style={at(0.68)} cx="0" cy="0" rx="62" ry="13" fill="none" stroke="#81b64c" strokeWidth="2.5" />
+            {SPARKS.map(([cy, r, fill, dx, dy], k) => <circle key={k} className="ss-spark" cx="0" cy={cy} r={r} fill={fill} style={{ '--dx': dx, '--dy': dy, ...at(0.68) } as V} />)}
+          </g>
+          <g className={delay ? 'ss-rook-in' : undefined} style={delay ? { animationDelay: `${Math.max(0, delay - 0.9)}s` } : undefined}>
+          <g className="ss-rook-pos" style={at(0)}>
+            <g className="ss-rook-body" style={at(0)}>
               <path d="M-22,0 L22,0 L22,-7 L18,-10 L18,-14 L13,-17 L12,-44 L17,-47 L17,-64 L10,-64 L10,-57 L4,-57 L4,-64 L-4,-64 L-4,-57 L-10,-57 L-10,-64 L-17,-64 L-17,-47 L-12,-44 L-13,-17 L-18,-14 L-18,-10 L-22,-7 Z"
                 fill="url(#ssRookFill)" stroke="#e5e5e0" strokeWidth="2" strokeLinejoin="round" />
               <path d="M-12,-44 L12,-44 M-13,-17 L13,-17 M-18,-10 L18,-10" stroke="#e5e5e0" strokeOpacity=".28" strokeWidth="1.2" />
               <path d="M-8,-40 L-9,-21" stroke="#fff" strokeOpacity=".16" strokeWidth="2.5" strokeLinecap="round" />
             </g>
           </g>
-          <circle className="ss-pop" cx="180" cy="92" r="30" fill="url(#ssPopFill)" />
+          </g>
+          <circle className="ss-pop" style={at(0.68)} cx="180" cy="92" r="30" fill="url(#ssPopFill)" />
         </g>
       </svg>
       {below ?? (<>

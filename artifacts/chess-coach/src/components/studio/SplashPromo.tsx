@@ -1,6 +1,6 @@
-// Promo built from the app's splash: the black rook jumps and smashes a green pawn,
-// then "Chess.com is dead." and then "ChessScout.net". Lines are editable. Short
-// enough to loop; also played by the video maker (render mode).
+// Promo built from the app's splash: "Chess.com is dead." over the board with the green
+// pawn, then the black rook slides in, jumps and smashes it, then "ChessScout.net".
+// About 10 seconds; lines are editable. Also played by the video maker (render mode).
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Play, Maximize2 } from 'lucide-react';
@@ -39,11 +39,11 @@ export function SplashPromo({ opts: initial = SPLASH_PROMO_DEFAULT, render = fal
   const play = (onDone?: () => void) => {
     clear();
     try { const m = mus(); routeSoundsTo(m.unlock(), m.sfx); } catch { /* ignore */ }
-    setRun((n) => n + 1); setPhase('smash');
-    later(680, () => playMoveSound('capture')); // the rook lands on the pawn
-    later(1000, () => setPhase('line1'));
-    later(3000, () => setPhase('line2'));
-    later(5600, () => { setPhase('end'); onDone?.(); });
+    setRun((n) => n + 1); setPhase('line1');
+    // The board and green pawn with the first line; the rook slides in at ~3.1s and jumps at 4s.
+    later(4000 + 680, () => { playMoveSound('capture'); setPhase('smash'); }); // the splat
+    later(5200, () => setPhase('line2'));
+    later(10_000, () => { setPhase('end'); onDone?.(); });
   };
   useEffect(() => { if (!render) play(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const enterClean = () => { clear(); setClean(true); setBlank(true); setPhase('idle'); later(5000, () => { setBlank(false); play(); }); };
@@ -73,13 +73,19 @@ export function SplashPromo({ opts: initial = SPLASH_PROMO_DEFAULT, render = fal
     } };
   }, [render]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const below = (
-    <div className="mt-[3.4cqh] flex h-[16cqh] flex-col items-center justify-start text-center" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
-      <AnimatePresence mode="wait">
+  const above = (
+    <div className="mb-[3cqh] flex h-[14cqh] items-end justify-center text-center" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <AnimatePresence>
         {phase === 'line1' && (
-          <motion.p key="l1" initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, y: -10 }} transition={{ type: 'spring', stiffness: 260, damping: 18 }}
-            className="px-[6cqw] font-black leading-tight" style={{ fontSize: '5.8cqh', color: '#e5e5e0', letterSpacing: '-0.02em' }}>{brand(opts.line1)}</motion.p>
+          <motion.p key="l1" initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 1.15, filter: 'blur(4px)' }} transition={{ type: 'spring', stiffness: 260, damping: 18, delay: 0.3 }}
+            className="px-[6cqw] font-black leading-tight" style={{ fontSize: '6cqh', color: '#e5e5e0', letterSpacing: '-0.02em' }}>{brand(opts.line1)}</motion.p>
         )}
+      </AnimatePresence>
+    </div>
+  );
+  const below = (
+    <div className="mt-[3.4cqh] flex h-[14cqh] flex-col items-center justify-start text-center" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <AnimatePresence>
         {(phase === 'line2' || phase === 'end') && (
           <motion.div key="l2" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45 }}>
             <p className="font-black leading-tight" style={{ fontSize: '6.4cqh', color: '#e5e5e0', letterSpacing: '-0.02em' }}>{brand(opts.line2)}</p>
@@ -93,7 +99,7 @@ export function SplashPromo({ opts: initial = SPLASH_PROMO_DEFAULT, render = fal
   const frame = (
     <div className="relative overflow-hidden" style={{ aspectRatio: '9 / 16', height: clean || render ? '100dvh' : 'min(78dvh, 820px)', maxWidth: '100%', containerType: 'size', background: '#141413' }}
       onClick={() => { if (clean && (phase === 'end' || phase === 'idle')) setClean(false); }}>
-      {!blank && phase !== 'idle' && <StudioSplash key={run} pawn="green" below={below} />}
+      {!blank && phase !== 'idle' && <StudioSplash key={run} pawn="green" delay={4} above={above} below={below} />}
     </div>
   );
 
@@ -114,9 +120,9 @@ export function SplashPromo({ opts: initial = SPLASH_PROMO_DEFAULT, render = fal
             <p className="text-[17px] font-black">Splash promo</p>
             <button onClick={onClose} aria-label="Close" className="rounded-full bg-white/10 p-2"><X className="h-5 w-5" /></button>
           </div>
-          <p className="text-[12.5px] text-white/60">Your loading screen with the pawn green: the rook smashes it, then the first line, then the second. About 6 seconds, so it loops well.</p>
-          {field('line1', 'First line (after the smash)')}
-          {field('line2', 'Second line')}
+          <p className="text-[12.5px] text-white/60">Your loading screen with the pawn green: the rook smashes it, with the first line over it, then the rook slides in and smashes the pawn, then the second line. About 10 seconds.</p>
+          {field('line1', 'First line (over the board, before the smash)')}
+          {field('line2', 'Second line (after the smash)')}
           {field('tag', 'Small line under it (optional)')}
           <div className="flex flex-wrap gap-2">
             <button onClick={() => play()} className="inline-flex items-center gap-1.5 rounded-lg bg-[#81B64C] px-3 py-1.5 text-[12.5px] font-black text-white"><Play size={14} />Replay</button>
