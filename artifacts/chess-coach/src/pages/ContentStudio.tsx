@@ -10,6 +10,7 @@ import { StudioPlayer, themeLabel, type StudioMoment, type StudioTrap, type Stud
 import { Chess } from 'chess.js';
 import { KidsStudio } from '@/components/studio/KidsStudio';
 import { KnightTour } from '@/components/studio/KnightTour';
+import { SplashPromo } from '@/components/studio/SplashPromo';
 import { RenderReady, RecentRenders } from '@/components/studio/RenderMp4';
 import { KIDS_WORLDS, type KidsVideo } from '@/components/studio/kidsVideos';
 import { KidPiece } from '@/components/kids/KidsArt';
@@ -203,8 +204,9 @@ export function ContentStudio() {
     } catch { setScanBusy("Couldn't read that photo."); }
   };
   // Promos
-  const [promoT, setPromoT] = useState<'versus' | 'challenge' | 'live' | 'tour' | 'knight'>('tour');
+  const [promoT, setPromoT] = useState<'versus' | 'challenge' | 'live' | 'tour' | 'knight' | 'splash'>('tour');
   const [knightOpen, setKnightOpen] = useState(false);
+  const [splashOpen, setSplashOpen] = useState(false);
   const [promo, setPromo] = useState<StudioPromo>({
     template: 'versus', hook: 'Stop paying to review your chess games 🛑', rival: 'Chess.com',
     rows: [
@@ -655,11 +657,16 @@ export function ContentStudio() {
         )}
       </>) : view === 'promo' ? (<>
         <div className="mb-3 inline-flex flex-wrap rounded-xl bg-white/5 p-1">
-          {([['tour', 'App tour 🧭'], ['live', 'Live play ⚡'], ['knight', "Knight's tour → logo ♞"], ['versus', 'ChessScout vs …'], ['challenge', 'Challenge your friends']] as const).map(([k, t]) => (
+          {([['tour', 'App tour 🧭'], ['live', 'Live play ⚡'], ['knight', "Knight's tour → logo ♞"], ['splash', 'Splash smash ♜'], ['versus', 'ChessScout vs …'], ['challenge', 'Challenge your friends']] as const).map(([k, t]) => (
             <button key={k} onClick={() => setPromoT(k)} className="rounded-lg px-3.5 py-1.5 text-[13px] font-black" style={{ background: promoT === k ? '#81B64C' : 'transparent', color: promoT === k ? '#fff' : '#C9CFCD' }}>{t}</button>
           ))}
         </div>
-        {promoT === 'knight' ? (
+        {promoT === 'splash' ? (
+          <div className="max-w-2xl space-y-2 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
+            <p className="text-[12px] text-white/55">Your loading screen with a green pawn: the rook smashes it, then "Chess.com is dead." and then "ChessScout.net". You can change both lines.</p>
+            <button onClick={() => setSplashOpen(true)} className="rounded-lg bg-[#81B64C] px-4 py-2 text-[13px] font-black text-white">🎬 Make the clip</button>
+          </div>
+        ) : promoT === 'knight' ? (
           <div className="max-w-2xl space-y-2 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
             <p className="text-[12px] text-white/55">A knight lands on all 64 squares once each, on your regular board with the regular move sound. Every square it lands on turns green or black, so the finished board is the ChessScout logo, then chessscout.net appears on the board.</p>
             <button onClick={() => setKnightOpen(true)} className="rounded-lg bg-[#81B64C] px-4 py-2 text-[13px] font-black text-white">🎬 Make the clip</button>
@@ -925,6 +932,7 @@ export function ContentStudio() {
       )}
       {kidsVid && <KidsStudio video={kidsVid} onClose={() => setKidsVid(null)} />}
       {knightOpen && <KnightTour onClose={() => setKnightOpen(false)} />}
+      {splashOpen && <SplashPromo onClose={() => setSplashOpen(false)} />}
       {comp && <StudioPlayer source={comp[0]} queue={comp} title={compTitle} onClose={() => setComp(null)} />}
       {open && (
         <StudioPlayer source={open} onClose={() => setOpen(null)}

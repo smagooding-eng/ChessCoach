@@ -66,14 +66,16 @@ const SPARKS: [number, number, string, string, string][] = [
   [-4, 1.5, '#e5e5e0', '-70px', '-6px'], [-4, 1.5, '#e5e5e0', '70px', '-4px'], [-8, 1.3, '#81b64c', '-8px', '-72px'],
 ];
 
-export function StudioSplash({ tagline = true }: { tagline?: boolean }) {
+/** pawn: 'green' draws the smashed pawn green. below: replaces the name and tagline. */
+export function StudioSplash({ tagline = true, pawn = 'white', below }: { tagline?: boolean; pawn?: 'white' | 'green'; below?: React.ReactNode }) {
+  const g = pawn === 'green';
   return (
     <div className="absolute inset-0 z-[45] flex flex-col items-center justify-center" style={{ background: '#141413', fontFamily: 'Inter, system-ui, sans-serif' }}>
       <style>{CSS}</style>
       <svg className="ss-stage" viewBox="0 0 240 150" xmlns="http://www.w3.org/2000/svg" aria-label="ChessScout" role="img">
         <defs>
           <linearGradient id="ssRookFill" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#3a3a37" /><stop offset=".55" stopColor="#181817" /><stop offset="1" stopColor="#0a0a09" /></linearGradient>
-          <linearGradient id="ssPawnFill" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#ffffff" /><stop offset=".6" stopColor="#e9e8e2" /><stop offset="1" stopColor="#bdbcb4" /></linearGradient>
+          <linearGradient id="ssPawnFill" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={g ? '#b5e07f' : '#ffffff'} /><stop offset=".6" stopColor={g ? '#81b64c' : '#e9e8e2'} /><stop offset="1" stopColor={g ? '#5d8c32' : '#bdbcb4'} /></linearGradient>
           <radialGradient id="ssPopFill"><stop offset="0" stopColor="#fff" stopOpacity=".95" /><stop offset=".5" stopColor="#d9f0bf" stopOpacity=".45" /><stop offset="1" stopColor="#81b64c" stopOpacity="0" /></radialGradient>
           <radialGradient id="ssGlowFill"><stop offset="0" stopColor="#81b64c" stopOpacity=".7" /><stop offset="1" stopColor="#81b64c" stopOpacity="0" /></radialGradient>
           <g id="ssPawnShape">
@@ -118,8 +120,10 @@ export function StudioSplash({ tagline = true }: { tagline?: boolean }) {
           <circle className="ss-pop" cx="180" cy="92" r="30" fill="url(#ssPopFill)" />
         </g>
       </svg>
-      <div className="ss-title">Chess<span>Scout</span>.net</div>
-      {tagline && <div className="ss-tag">Play smarter. <span>Win more.</span></div>}
+      {below ?? (<>
+        <div className="ss-title">Chess<span>Scout</span>.net</div>
+        {tagline && <div className="ss-tag">Play smarter. <span>Win more.</span></div>}
+      </>)}
     </div>
   );
 }
