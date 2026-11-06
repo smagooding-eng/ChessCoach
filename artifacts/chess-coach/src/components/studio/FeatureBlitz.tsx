@@ -40,8 +40,26 @@ export interface FeatureBlitzOpts { hook: string; beat: number; music: MusicStyl
 export const FEATURE_BLITZ_DEFAULT: FeatureBlitzOpts = { hook: "Use this app for a week and you'll never go back to Chess.com", beat: 2.2, music: 'hype', looks: 'scene', footage: 'app' };
 
 /** The real app page in a phone-sized frame, scrolled a little while it's on screen. */
-function AppScreen({ src, active, scroll, beat }: { src: string; active: boolean; scroll: number; beat: number }) {
+function AppScreen({ src, active, scroll, beat, onReady }: { src: string; active: boolean; scroll: number; beat: number; onReady: (src: string) => void }) {
   const ref = useRef<HTMLIFrameElement>(null);
+  // Ready = the page has drawn its content (no spinner left), or 25 seconds have passed.
+  useEffect(() => {
+    let done = false; const t0 = Date.now(); let calm = 0;
+    const id = setInterval(() => {
+      if (done) return;
+      let ok = false;
+      try {
+        const d = ref.current?.contentDocument;
+        const root = d?.getElementById('root');
+        const text = root?.innerText ?? '';
+        const spinning = !!d?.querySelector('.animate-spin, .animate-pulse, [aria-busy="true"]');
+        ok = !!d && d.readyState === 'complete' && text.length > 120 && !spinning;
+      } catch { ok = true; }
+      calm = ok ? calm + 1 : 0;
+      if (calm >= 3 || Date.now() - t0 > 25_000) { done = true; clearInterval(id); onReady(src); }
+    }, 300);
+    return () => clearInterval(id);
+  }, [src]); // eslint-disable-line react-hooks/exhaustive-deps
   const box = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.5);
   useEffect(() => {
@@ -90,9 +108,58 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
   const looks = useMemo(() => SCENES.map(() => [randomLook(), randomLook()] as [BoardLook, BoardLook]), [seed]); // eslint-disable-line react-hooks/exhaustive-deps
   const look: BoardLook | null = opts.looks === 'mine' ? null : opts.looks === 'scene' ? looks[k][0] : looks[k][moved ? 1 : 0];
 
+  // ── Real app footage ──
+  const appFootage = (opts.footage ?? 'app') === 'app';
+  // Shown signed in as the ChessScout.net account (not yours), in frames of their own.
+  const [account, setAccount] = useState(() => { try { return localStorage.getItem('cs_studio_showcase') || 'chessscout'; } catch { return 'chessscout'; } });
+  const [accountDraft, setAccountDraft] = useState(account);
+  const [showcase, setShowcase] = useState<{ token: string | null; name: string | null; error?: string } | null>(null);
+  useEffect(() => {
+    if (!appFootage) return;
+    setShowcase(null);
+    void apiFetch('/api/admin/studio/showcase-session', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: account }) })
+      .then(async (r) => { const d = await r.json().catch(() => null); setShowcase(r.ok && d?.token ? { token: d.token, name: d.name } : { token: null, name: null, error: d?.error ?? "Couldn't sign in to that account" }); })
+      .catch(() => setShowcase({ token: null, name: null, error: "Couldn't sign in to that account" }));
+  }, [account, appFootage]);
+  // That account's latest reviewed game, for the review scene.
+  const [reviewPath, setReviewPath] = useState('/games');
+  useEffect(() => {
+    if (!showcase) return;
+    void apiFetch('/api/games?limit=30', { credentials: 'include', headers: showcase.token ? { Authorization: `Bearer ${showcase.token}` } : {} }).then((r) => (r.ok ? r.json() : null)).then((d) => {
+      const g = (d?.games ?? []).find((x: { reviewed?: boolean }) => x.reviewed) ?? d?.games?.[0];
+      setReviewPath(g?.id ? `/games/${g.id}` : '/games');
+    }).catch(() => {});
+  }, [showcase]);
+  // Each scene's page, with its own random board look.
+  const srcOf = (j: number) => {
+    const x = SCENES[j];
+    const path = x.kind === 'review' ? reviewPath : APP_PATH[x.kind].path;
+    const q = new URLSearchParams();
+    if (showcase?.token) q.set('studioAs', showcase.token);
+    if (showcase?.token && opts.looks !== 'mine') q.set('studioLook', JSON.stringify(looks[j][0]));
+    const qs = q.toString();
+    return `${import.meta.env.BASE_URL.replace(/\/$/, '')}${path}${qs ? `?${qs}` : ''}`;
+  };
+  // Wait for every page to finish loading before the clip starts.
+  const [, bump] = useState(0);
+  const readySet = useRef(new Set<string>());
+  const markReady = (src: string) => { if (!readySet.current.has(src)) { readySet.current.add(src); bump((x) => x + 1); } };
+  const readyN = showcase ? SCENES.filter((_, j) => readySet.current.has(srcOf(j))).length : 0;
+  const allReady = !appFootage || readyN >= SCENES.length;
+  const allReadyRef = useRef(allReady); allReadyRef.current = allReady;
+  const pending = useRef<null | (() => void)>(null);
+  useEffect(() => { if (allReady && pending.current) { const f = pending.current; pending.current = null; f(); } }, [allReady]);
+  useEffect(() => {
+    if (!render) return;
+    const w = window as unknown as { __studioRender?: Record<string, unknown> };
+    if (w.__studioRender) w.__studioRender.ready = allReady;
+  }, [allReady, render]);
+
   const total = () => 2200 + SCENES.length * opts.beat * 1000 + 3400;
   const play = (onDone?: () => void) => {
-    clear(); setSeed((x) => x + 1);
+    // App footage: start once every page has loaded.
+    if (!allReadyRef.current) { clear(); setPhase('idle'); pending.current = () => play(onDone); return; }
+    clear(); if (!appFootage) setSeed((x) => x + 1); // (new looks would reload the app pages)
     try { const m = mus(); routeSoundsTo(m.unlock(), m.sfx); m.stop(); if (opts.music !== 'off') m.start(opts.music); } catch { /* ignore */ }
     setPhase('hook'); setK(0); setMoved(false);
     later(150, () => mus().accent('riser'));
@@ -112,7 +179,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
   useEffect(() => {
     if (!render) return;
     const w = window as unknown as { __studioRender?: Record<string, unknown> };
-    w.__studioRender = { ready: true, done: false, start: () => {
+    w.__studioRender = { ready: allReadyRef.current, done: false, start: () => {
       const m = mus(); routeSoundsTo(m.unlock(), m.sfx);
       const type = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find((x) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(x)) ?? '';
       const chunks: Blob[] = [];
@@ -134,15 +201,6 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
     } };
   }, [render]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // The latest reviewed game, for the review scene's footage.
-  const [reviewPath, setReviewPath] = useState('/games');
-  useEffect(() => {
-    void apiFetch('/api/games?limit=30', { credentials: 'include' }).then((r) => (r.ok ? r.json() : null)).then((d) => {
-      const g = (d?.games ?? []).find((x: { reviewed?: boolean }) => x.reviewed) ?? d?.games?.[0];
-      if (g?.id) setReviewPath(`/games/${g.id}`);
-    }).catch(() => {});
-  }, []);
-  const appFootage = (opts.footage ?? 'app') === 'app';
   const sc = SCENES[k];
   const shown = sc.fen ? (moved ? afterMove(sc.fen, sc.move) : { fen: sc.fen, last: null }) : null;
   const flipped = sc.fen ? sc.fen.split(' ')[1] === 'b' && sc.kind !== 'review' : false;
@@ -197,6 +255,22 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
   const frame = (
     <div className="relative overflow-hidden" style={{ aspectRatio: '9 / 16', height: clean || render ? '100dvh' : 'min(78dvh, 820px)', maxWidth: '100%', containerType: 'size', background: 'radial-gradient(120% 80% at 50% 30%, #1d2a17 0%, #0d110c 55%, #070807 100%)', color: '#fff', fontFamily: 'Inter, system-ui, sans-serif' }}
       onClick={() => { if (clean && (phase === 'done' || phase === 'idle')) setClean(false); }}>
+      {/* Real app footage: every section's page stays loaded; the current one shows. */}
+        {appFootage && showcase && (
+          <div className="pointer-events-none absolute left-1/2 z-10 h-[60cqh] w-[30cqh] -translate-x-1/2 rounded-[5cqw]"
+            style={{ bottom: '9.5cqh', opacity: phase === 'scene' ? 1 : 0, transition: 'opacity .2s', boxShadow: '0 0 0 1.2cqw #1C1F1E, 0 0 0 1.5cqw rgba(255,255,255,.12), 0 18px 50px rgba(0,0,0,.6)' }}>
+            {SCENES.map((x, j) => (
+              <AppScreen key={x.kind} src={srcOf(j)} active={phase === 'scene' && j === k} scroll={APP_PATH[x.kind].scroll} beat={opts.beat} onReady={markReady} />
+            ))}
+          </div>
+        )}
+
+      {appFootage && !allReady && phase === 'idle' && !blank && (
+        <div className="absolute inset-0 z-30 flex flex-col items-center justify-center gap-[2cqh] text-center" style={{ background: '#0B1112' }}>
+          <div className="h-[8cqw] w-[8cqw] animate-spin rounded-full border-[0.8cqw] border-white/15 border-t-[#81B64C]" />
+          <p className="font-extrabold" style={{ fontSize: '4.4cqw' }}>Loading the app… {readyN}/{SCENES.length}</p>
+        </div>
+      )}
       {!blank && phase !== 'idle' && (<>
         {/* The hook stays on top the whole time. */}
         <motion.p initial={{ opacity: 0, y: -10 }} animate={{ opacity: phase === 'end' || phase === 'done' ? 0 : 1, y: 0, scale: phase === 'hook' ? 1.08 : 1 }} transition={{ duration: 0.35 }}
@@ -224,16 +298,6 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Real app footage: every section's page stays loaded; the current one shows. */}
-        {appFootage && (
-          <div className="pointer-events-none absolute left-1/2 z-10 h-[60cqh] w-[30cqh] -translate-x-1/2 rounded-[5cqw]"
-            style={{ bottom: '9.5cqh', opacity: phase === 'scene' ? 1 : 0, transition: 'opacity .2s', boxShadow: '0 0 0 1.2cqw #1C1F1E, 0 0 0 1.5cqw rgba(255,255,255,.12), 0 18px 50px rgba(0,0,0,.6)' }}>
-            {SCENES.map((x, j) => (
-              <AppScreen key={x.kind} src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}${x.kind === 'review' ? reviewPath : APP_PATH[x.kind].path}`} active={phase === 'scene' && j === k} scroll={APP_PATH[x.kind].scroll} beat={opts.beat} />
-            ))}
-          </div>
-        )}
 
         {phase === 'scene' && (
           <div className="absolute inset-x-[8cqw] bottom-[6cqh] flex gap-[1cqw]">
@@ -274,12 +338,24 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
             <span className="text-white/60">Footage:</span>
             {([['app', 'The real app'], ['boards', 'Board animations']] as const).map(([v, l]) => <button key={v} onClick={() => setOpts({ ...opts, footage: v })} className="rounded-full px-2.5 py-1 font-bold" style={pill((opts.footage ?? 'app') === v)}>{l}</button>)}
           </div>
-          {!appFootage && <div className="flex flex-wrap items-center gap-1.5 text-[12px]">
+          <div className="flex flex-wrap items-center gap-1.5 text-[12px]">
             <span className="text-white/60">Board:</span>
-            {([['scene', 'New look every scene'], ['move', 'Every move'], ['mine', 'My board']] as const).map(([v, l]) => <button key={v} onClick={() => setOpts({ ...opts, looks: v })} className="rounded-full px-2.5 py-1 font-bold" style={pill(opts.looks === v)}>{l}</button>)}
+            {(appFootage ? ([['scene', 'Random board every scene'], ['mine', 'Account’s own board']] as const) : ([['scene', 'New look every scene'], ['move', 'Every move'], ['mine', 'My board']] as const)).map(([v, l]) => <button key={v} onClick={() => setOpts({ ...opts, looks: v })} className="rounded-full px-2.5 py-1 font-bold" style={pill(opts.looks === v)}>{l}</button>)}
             {opts.looks !== 'mine' && <button onClick={() => setSeed((x) => x + 1)} className="rounded-full bg-white/10 px-2 py-1" aria-label="Shuffle looks"><Shuffle size={12} /></button>}
-          </div>}
-          {appFootage && <p className="text-[11.5px] text-white/50">Shows each section of the app as it really looks on your account. Give it a few seconds to load before you record.</p>}
+          </div>
+          {appFootage && (
+            <div className="space-y-1 rounded-lg bg-white/5 p-2 ring-1 ring-white/10">
+              <label className="block text-[12px] text-white/60">Account shown in the footage
+                <span className="mt-0.5 flex gap-1.5">
+                  <input value={accountDraft} onChange={(e) => setAccountDraft(e.target.value)} className="min-w-0 flex-1 rounded-md bg-white/5 px-2.5 py-1.5 text-[13px] font-bold text-white ring-1 ring-white/10" />
+                  <button onClick={() => { const v = accountDraft.trim(); if (!v) return; try { localStorage.setItem('cs_studio_showcase', v); } catch { /* ignore */ } setAccount(v); }} className="rounded-md bg-white/10 px-2.5 text-[12px] font-bold">Use</button>
+                </span>
+              </label>
+              <p className="text-[11.5px]" style={{ color: showcase?.error ? '#FF9AA0' : 'rgba(255,255,255,.5)' }}>
+                {!showcase ? 'Signing in…' : showcase.error ? `${showcase.error}. Showing your own account instead.` : `Showing ${showcase.name}. Each section gets its own random board. Loaded ${readyN}/${SCENES.length}.`}
+              </p>
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-1.5 text-[12px]">
             <span className="text-white/60">Music:</span>
             {(['hype', 'epic', 'lofi', 'off'] as MusicStyle[]).map((v) => <button key={v} onClick={() => setOpts({ ...opts, music: v })} className="rounded-full px-2.5 py-1 font-bold capitalize" style={pill(opts.music === v)}>{v === 'off' ? 'None' : v}</button>)}

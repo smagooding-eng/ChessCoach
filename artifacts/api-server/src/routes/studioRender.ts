@@ -67,6 +67,26 @@ router.post("/admin/studio/render", requireAdmin, async (req: Request, res: Resp
 });
 
 // The latest videos (for the "Your videos" list in the Studio).
+// The app footage in promo videos shows the ChessScout.net account, not yours: a
+// short-lived, non-admin session for it, used only inside the video's frames.
+router.post("/admin/studio/showcase-session", requireAdmin, async (req: Request, res: Response) => {
+  const want = String(req.body?.username ?? "chessscout").trim().toLowerCase().replace(/^@/, "");
+  if (!/^[a-z0-9._-]{2,40}$/.test(want)) { res.status(400).json({ error: "Bad username" }); return; }
+  try {
+    const rows = await db.execute(sql`SELECT * FROM users WHERE LOWER(scout_username) = ${want} OR LOWER(chesscom_username) = ${want} OR LOWER(lichess_username) = ${want} OR LOWER(email) = ${want} ORDER BY (LOWER(scout_username) = ${want}) DESC LIMIT 1`);
+    const u = ((rows as unknown as { rows?: Record<string, unknown>[] }).rows ?? (rows as unknown as Record<string, unknown>[]))[0];
+    if (!u) { res.status(404).json({ error: `No account called "${want}"` }); return; }
+    const user = {
+      id: u.id, email: u.email, firstName: u.first_name ?? null, lastName: u.last_name ?? null, profileImageUrl: u.profile_image_url ?? null,
+      chesscomUsername: u.chesscom_username ?? null, lichessUsername: u.lichess_username ?? null, scoutUsername: u.scout_username ?? null,
+      emailOptOut: true, isAdmin: false, inviteCode: u.invite_code ?? null, emailVerified: true,
+    };
+    const sid = await createSession({ user } as unknown as SessionData);
+    await db.update(sessionsTable).set({ expire: new Date(Date.now() + 2 * 3600_000) }).where(eq(sessionsTable.sid, sid));
+    res.json({ token: sid, name: (u.scout_username ?? u.chesscom_username ?? want) as string });
+  } catch (err) { logger.error({ err }, "[studio] showcase session"); res.status(500).json({ error: "Couldn't start it" }); }
+});
+
 router.get("/admin/studio/renders", requireAdmin, async (req: Request, res: Response) => {
   try {
     await ensureTable();

@@ -1,3 +1,4 @@
+import { STUDIO_FRAME } from "./lib/studioFrame"; // first: may swap storage for the Studio's app footage
 import { createRoot } from "react-dom/client";
 import { analytics } from "@heycatch/sdk";
 import { setBaseUrl, setAuthTokenGetter } from "@workspace/api-client-react";
@@ -19,7 +20,7 @@ rememberPlayAppLaunch();
 // on some routes. tracingHosts is set because the backend lives on a
 // separate host (Render) from the frontend (Vercel) -- same-origin API
 // calls wouldn't need this, but this app's don't apply here.
-analytics.init({
+if (!STUDIO_FRAME) analytics.init({
   projectKey: "hck_pk_SAR07dB6bnpluTvimEswcyXYddoGhbx8",
   install: {
     framework: "vite-react",

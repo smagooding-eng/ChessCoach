@@ -11,7 +11,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { RealtimeBridge } from "@/components/RealtimeBridge";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { UserProvider } from "@/context/UserContext";
-import { SettingsProvider, useSettings, BG_PHOTOS } from "@/context/SettingsContext";
+import { SettingsProvider, useSettings, BG_PHOTOS, LookOverride, type BoardLook } from "@/context/SettingsContext";
+import { STUDIO_FRAME } from "@/lib/studioFrame";
 // The four bottom-bar sections (Home, Play, Games, Analysis) are bundled up
 // front rather than code-split: swiping between them must show the next
 // page straight away, never a loading screen first.
@@ -718,7 +719,7 @@ function App() {
               <TooltipProvider>
                 <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
                   <Suspense fallback={<PageLoadingFallback />}>
-                    <Router />
+                    {STUDIO_FRAME?.look ? <LookOverride look={STUDIO_FRAME.look as unknown as BoardLook}><Router /></LookOverride> : <Router />}
                   </Suspense>
                   <NotInKidMode>
                     <ImportStatusWatcher />
