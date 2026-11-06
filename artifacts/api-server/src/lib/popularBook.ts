@@ -11,7 +11,7 @@ import { setPopularBookPositions } from "./openingBook";
 
 const MAX_PLIES = 20;
 const MIN_GAMES = 12;
-const MAX_GAMES_SCANNED = 40_000;
+const MAX_GAMES_SCANNED = 20_000;
 const START = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 function sanTokens(pgn: string): string[] {
@@ -41,6 +41,10 @@ export async function rebuildPopularBook(): Promise<number> {
         }
       } catch { /* stop at the first bad token */ }
       if (scanned % 50 === 0) await pause();
+      // Most positions past the first few moves are reached by one game only: drop
+      // those as we go so the count table never grows past a few MB (it reached
+      // ~150MB and, on Render's 512MB, crashed the server a minute after startup).
+      if (scanned % 1500 === 0) for (const [k, n] of counts) if (n <= 1) counts.delete(k);
     }
   }
   const keep = [...counts].filter(([, n]) => n >= MIN_GAMES).map(([k]) => k);
@@ -51,6 +55,6 @@ export async function rebuildPopularBook(): Promise<number> {
 
 export function startPopularBook(): void {
   const run = () => { rebuildPopularBook().catch((err) => logger.warn({ err }, "[book] rebuild failed")); };
-  setTimeout(run, 90_000);
+  setTimeout(run, 10 * 60_000);
   setInterval(run, 24 * 60 * 60 * 1000).unref?.();
 }
