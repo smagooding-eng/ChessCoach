@@ -376,3 +376,200 @@ export const OPENINGS: OpeningLine[] = [
     moves: ["e4", "c6", "d4", "d5", "exd5", "cxd5", "Bd3", "Nc6", "c3", "Nf6", "Bf4", "Bg4", "Qb3", "Qd7", "Nd2", "e6"],
   },
 ];
+
+// More lines to train against for each opening (the main line above is always the first).
+// Every move here was checked legal.
+export const MORE_LINES: Record<string, { name: string; moves: string[] }[]> = {
+  "italian-main": [
+    { name: "Two Knights (…Nf6)", moves: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Nf6", "d3", "Bc5", "c3", "d6", "O-O", "O-O", "Re1", "a6", "Bb3", "Ba7", "h3", "h6"] },
+    { name: "Hungarian (…Be7)", moves: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Be7", "d4", "d6", "d5", "Nb8", "Bd3", "Nf6", "c4", "O-O", "Nc3", "c6"] },
+    { name: "Early …d6", moves: ["e4", "e5", "Nf3", "Nc6", "Bc4", "d6", "c3", "Nf6", "d4", "Be7", "O-O", "O-O", "Re1", "Bg4", "h3", "Bh5"] },
+  ],
+  "ruy-lopez-main": [
+    { name: "Berlin Defense", moves: ["e4", "e5", "Nf3", "Nc6", "Bb5", "Nf6", "O-O", "Nxe4", "d4", "Nd6", "Bxc6", "dxc6", "dxe5", "Nf5", "Qxd8+", "Kxd8"] },
+    { name: "Marshall Attack", moves: ["e4", "e5", "Nf3", "Nc6", "Bb5", "a6", "Ba4", "Nf6", "O-O", "Be7", "Re1", "b5", "Bb3", "O-O", "c3", "d5", "exd5", "Nxd5", "Nxe5", "Nxe5", "Rxe5", "c6"] },
+    { name: "Classical (…Bc5)", moves: ["e4", "e5", "Nf3", "Nc6", "Bb5", "Bc5", "c3", "Nf6", "O-O", "O-O", "d4", "Bb6", "Re1", "d6", "h3", "exd4"] },
+  ],
+  "queens-gambit-declined": [
+    { name: "Exchange Variation", moves: ["d4", "d5", "c4", "e6", "Nc3", "Nf6", "cxd5", "exd5", "Bg5", "Be7", "e3", "O-O", "Bd3", "Nbd7", "Qc2", "Re8"] },
+    { name: "Tarrasch (…c5)", moves: ["d4", "d5", "c4", "e6", "Nc3", "c5", "cxd5", "exd5", "Nf3", "Nc6", "g3", "Nf6", "Bg2", "Be7", "O-O", "O-O"] },
+    { name: "Albin Countergambit", moves: ["d4", "d5", "c4", "e5", "dxe5", "d4", "Nf3", "Nc6", "g3", "Be6", "Nbd2", "Qd7", "Bg2", "O-O-O", "O-O", "h5"] },
+  ],
+  "london-system": [
+    { name: "Against …c5", moves: ["d4", "d5", "Bf4", "c5", "e3", "Nc6", "c3", "Nf6", "Nd2", "e6", "Ngf3", "Bd6", "Bg3", "O-O", "Bd3", "b6"] },
+    { name: "Against a King's Indian", moves: ["d4", "Nf6", "Bf4", "g6", "e3", "Bg7", "Nf3", "O-O", "Be2", "d6", "h3", "Nbd7", "O-O", "Qe8", "c4", "e5"] },
+    { name: "Against …Bf5", moves: ["d4", "d5", "Bf4", "Bf5", "e3", "e6", "Bd3", "Bxd3", "Qxd3", "Nf6", "Nf3", "Bd6", "Bg3", "O-O", "Nbd2", "c5"] },
+  ],
+  "caro-kann-main": [
+    { name: "Advance Variation", moves: ["e4", "c6", "d4", "d5", "e5", "Bf5", "Nf3", "e6", "Be2", "c5", "O-O", "Nc6", "c3", "Nge7", "Be3", "cxd4"] },
+    { name: "Exchange Variation", moves: ["e4", "c6", "d4", "d5", "exd5", "cxd5", "Bd3", "Nc6", "c3", "Nf6", "Bf4", "Bg4", "Qb3", "Qd7", "Nd2", "e6"] },
+    { name: "Two Knights", moves: ["e4", "c6", "Nc3", "d5", "Nf3", "Bg4", "h3", "Bxf3", "Qxf3", "e6", "d4", "Nf6", "Bd3", "dxe4", "Nxe4", "Qxd4"] },
+    { name: "Panov Attack", moves: ["e4", "c6", "d4", "d5", "exd5", "cxd5", "c4", "Nf6", "Nc3", "e6", "Nf3", "Be7", "cxd5", "Nxd5", "Bd3", "Nc6"] },
+  ],
+  "sicilian-najdorf": [
+    { name: "6.Bg5", moves: ["e4", "c5", "Nf3", "d6", "d4", "cxd4", "Nxd4", "Nf6", "Nc3", "a6", "Bg5", "e6", "f4", "Be7", "Qf3", "Qc7", "O-O-O", "Nbd7"] },
+    { name: "6.Be2 (Classical)", moves: ["e4", "c5", "Nf3", "d6", "d4", "cxd4", "Nxd4", "Nf6", "Nc3", "a6", "Be2", "e5", "Nb3", "Be7", "O-O", "O-O", "Be3", "Be6"] },
+    { name: "6.Bc4 (Fischer-Sozin)", moves: ["e4", "c5", "Nf3", "d6", "d4", "cxd4", "Nxd4", "Nf6", "Nc3", "a6", "Bc4", "e6", "Bb3", "b5", "O-O", "Be7", "Qf3", "Qc7", "Qg3", "O-O"] },
+  ],
+  "french-defense": [
+    { name: "Advance Variation", moves: ["e4", "e6", "d4", "d5", "e5", "c5", "c3", "Nc6", "Nf3", "Qb6", "a3", "c4", "Nbd2", "Na5", "Be2", "Bd7"] },
+    { name: "Exchange Variation", moves: ["e4", "e6", "d4", "d5", "exd5", "exd5", "Nf3", "Nf6", "Bd3", "Bd6", "O-O", "O-O", "Bg5", "Bg4", "Nbd2", "Nbd7"] },
+    { name: "Tarrasch (3.Nd2)", moves: ["e4", "e6", "d4", "d5", "Nd2", "Nf6", "e5", "Nfd7", "Bd3", "c5", "c3", "Nc6", "Ne2", "cxd4", "cxd4", "f6"] },
+  ],
+  "kings-indian": [
+    { name: "Sämisch (f3)", moves: ["d4", "Nf6", "c4", "g6", "Nc3", "Bg7", "e4", "d6", "f3", "O-O", "Be3", "e5", "Nge2", "c6", "Qd2", "Nbd7"] },
+    { name: "Fianchetto (g3)", moves: ["d4", "Nf6", "c4", "g6", "Nf3", "Bg7", "g3", "O-O", "Bg2", "d6", "O-O", "Nbd7", "Nc3", "e5", "e4", "c6"] },
+    { name: "Four Pawns Attack", moves: ["d4", "Nf6", "c4", "g6", "Nc3", "Bg7", "e4", "d6", "f4", "O-O", "Nf3", "c5", "d5", "e6", "Be2", "exd5"] },
+  ],
+  "scotch": [
+    { name: "Classical (…Bc5)", moves: ["e4", "e5", "Nf3", "Nc6", "d4", "exd4", "Nxd4", "Bc5", "Be3", "Qf6", "c3", "Nge7", "Bc4", "O-O", "O-O", "Bb6"] },
+    { name: "Steinitz (…Qh4)", moves: ["e4", "e5", "Nf3", "Nc6", "d4", "exd4", "Nxd4", "Qh4", "Nc3", "Bb4", "Be2", "Qxe4", "Nb5", "Bxc3+", "bxc3", "Kd8"] },
+    { name: "…Nxd4", moves: ["e4", "e5", "Nf3", "Nc6", "d4", "Nxd4", "Nxd4", "exd4", "Qxd4", "d6", "Bc4", "Nf6", "Nc3", "Be7", "O-O", "O-O"] },
+  ],
+  "vienna-gambit": [
+    { name: "Accepted (…exf4)", moves: ["e4", "e5", "Nc3", "Nf6", "f4", "exf4", "e5", "Ng8", "Nf3", "d6", "d4", "dxe5", "Qe2", "Be7", "dxe5", "Nc6"] },
+    { name: "Against …Nc6", moves: ["e4", "e5", "Nc3", "Nc6", "f4", "exf4", "Nf3", "g5", "h4", "g4", "Ng5", "h6", "Nxf7", "Kxf7", "d4", "d5"] },
+    { name: "Against …Bc5", moves: ["e4", "e5", "Nc3", "Bc5", "Nf3", "d6", "d4", "exd4", "Nxd4", "Nf6", "Be2", "O-O", "O-O", "Re8", "Bf3", "Nc6"] },
+  ],
+  "kings-gambit": [
+    { name: "Falkbeer (…d5)", moves: ["e4", "e5", "f4", "d5", "exd5", "exf4", "Nf3", "Nf6", "c4", "c6", "d4", "cxd5", "Bxf4", "Bb4+", "Nc3", "O-O"] },
+    { name: "Declined (…Bc5)", moves: ["e4", "e5", "f4", "Bc5", "Nf3", "d6", "c3", "Nf6", "d4", "exd4", "cxd4", "Bb4+", "Bd2", "Bxd2+", "Nbxd2", "O-O"] },
+    { name: "Fischer Defense (…d6)", moves: ["e4", "e5", "f4", "exf4", "Nf3", "d6", "d4", "g5", "h4", "g4", "Ng1", "Nf6", "Nc3", "Bh6", "Nge2", "Nh5"] },
+  ],
+  "evans-gambit": [
+    { name: "Accepted, …Be7", moves: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "b4", "Bxb4", "c3", "Be7", "d4", "Na5", "Be2", "exd4", "Qxd4", "Nf6"] },
+    { name: "Declined (…Bb6)", moves: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "b4", "Bb6", "a4", "a6", "Nc3", "Nf6", "Nd5", "Nxd5", "exd5", "Nd4"] },
+    { name: "Lasker Defense (…d6)", moves: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "b4", "Bxb4", "c3", "Ba5", "d4", "d6", "Qb3", "Qd7", "dxe5", "Bb6", "Nbd2", "Na5"] },
+  ],
+  "two-knights": [
+    { name: "Against 4.Ng5", moves: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Nf6", "Ng5", "d5", "exd5", "Na5", "Bb5+", "c6", "dxc6", "bxc6", "Be2", "h6", "Nf3", "e4"] },
+    { name: "Against 4.d4", moves: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Nf6", "d4", "exd4", "O-O", "Nxe4", "Re1", "d5", "Bxd5", "Qxd5", "Nc3", "Qa5", "Nxe4", "Be6"] },
+    { name: "Against 4.Nc3", moves: ["e4", "e5", "Nf3", "Nc6", "Bc4", "Nf6", "Nc3", "Nxe4", "Nxe4", "d5", "Bd3", "dxe4", "Bxe4", "Bd6", "d4", "Nxd4"] },
+  ],
+  "four-knights-scotch": [
+    { name: "Against …Bc5", moves: ["e4", "e5", "Nf3", "Nc6", "Nc3", "Nf6", "d4", "exd4", "Nxd4", "Bc5", "Nxc6", "bxc6", "Bd3", "d6", "O-O", "O-O", "h3", "Re8"] },
+    { name: "Against …Bb4 (d5)", moves: ["e4", "e5", "Nf3", "Nc6", "Nc3", "Nf6", "d4", "Bb4", "d5", "Ne7", "Nxe5", "d6", "Bb5+", "c6", "dxc6", "O-O"] },
+    { name: "Against …d6", moves: ["e4", "e5", "Nf3", "Nc6", "Nc3", "Nf6", "d4", "d6", "d5", "Ne7", "Bd3", "g6", "O-O", "Bg7", "h3", "O-O"] },
+  ],
+  "petrov": [
+    { name: "Against 3.d4", moves: ["e4", "e5", "Nf3", "Nf6", "d4", "Nxe4", "Bd3", "d5", "Nxe5", "Nd7", "Nxd7", "Bxd7", "O-O", "Bd6", "c4", "c6"] },
+    { name: "Against 5.Nc3", moves: ["e4", "e5", "Nf3", "Nf6", "Nxe5", "d6", "Nf3", "Nxe4", "Nc3", "Nxc3", "dxc3", "Be7", "Be3", "Nc6", "Qd2", "Be6"] },
+    { name: "Against 3.Nc3", moves: ["e4", "e5", "Nf3", "Nf6", "Nc3", "Nc6", "Bb5", "Bb4", "O-O", "O-O", "d3", "d6", "Bg5", "Bxc3", "bxc3", "Qe7"] },
+  ],
+  "philidor": [
+    { name: "Exchange (…exd4)", moves: ["e4", "e5", "Nf3", "d6", "d4", "exd4", "Nxd4", "Nf6", "Nc3", "Be7", "Be2", "O-O", "O-O", "Re8", "f4", "Bf8"] },
+    { name: "Against Bc4 & Ng5", moves: ["e4", "e5", "Nf3", "d6", "d4", "Nd7", "Bc4", "c6", "O-O", "Be7", "dxe5", "dxe5", "Ng5", "Bxg5", "Qh5", "Qe7"] },
+    { name: "Lion setup", moves: ["e4", "d6", "d4", "Nf6", "Nc3", "Nbd7", "Nf3", "e5", "Bc4", "Be7", "O-O", "O-O", "a4", "c6", "Re1", "exd4"] },
+  ],
+  "scandinavian": [
+    { name: "Modern (…Qd6)", moves: ["e4", "d5", "exd5", "Qxd5", "Nc3", "Qd6", "d4", "Nf6", "Nf3", "a6", "g3", "Bg4", "Bg2", "Nc6", "O-O", "O-O-O"] },
+    { name: "2…Nf6", moves: ["e4", "d5", "exd5", "Nf6", "d4", "Nxd5", "Nf3", "g6", "c4", "Nb6", "Nc3", "Bg7", "h3", "O-O", "Be3", "Nc6"] },
+    { name: "Retreat (…Qd8)", moves: ["e4", "d5", "exd5", "Qxd5", "Nc3", "Qd8", "d4", "Nf6", "Nf3", "Bg4", "h3", "Bxf3", "Qxf3", "c6", "Be3", "e6"] },
+  ],
+  "pirc": [
+    { name: "Austrian Attack (f4)", moves: ["e4", "d6", "d4", "Nf6", "Nc3", "g6", "f4", "Bg7", "Nf3", "O-O", "Bd3", "Na6", "O-O", "c5", "d5", "Bg4"] },
+    { name: "Classical (Nf3, Be2)", moves: ["e4", "d6", "d4", "Nf6", "Nc3", "g6", "Nf3", "Bg7", "Be2", "O-O", "O-O", "c6", "a4", "Nbd7", "h3", "e5"] },
+    { name: "Against Bg5", moves: ["e4", "d6", "d4", "Nf6", "Nc3", "g6", "Bg5", "Bg7", "Qd2", "h6", "Bh4", "c6", "f4", "Qb6", "Nf3", "Bg4"] },
+  ],
+  "alekhine": [
+    { name: "Exchange Variation", moves: ["e4", "Nf6", "e5", "Nd5", "d4", "d6", "c4", "Nb6", "exd6", "exd6", "Nc3", "Be7", "Bd3", "Nc6", "Nge2", "O-O"] },
+    { name: "Four Pawns Attack", moves: ["e4", "Nf6", "e5", "Nd5", "d4", "d6", "c4", "Nb6", "f4", "dxe5", "fxe5", "Nc6", "Be3", "Bf5", "Nc3", "e6"] },
+    { name: "Against 2.Nc3", moves: ["e4", "Nf6", "Nc3", "d5", "e5", "d4", "exf6", "dxc3", "fxg7", "cxd2+", "Bxd2", "Bxg7", "Nf3", "Nc6", "Bd3", "Bg4"] },
+  ],
+  "sicilian-dragon": [
+    { name: "Classical (Be2)", moves: ["e4", "c5", "Nf3", "d6", "d4", "cxd4", "Nxd4", "Nf6", "Nc3", "g6", "Be2", "Bg7", "O-O", "O-O", "Be3", "Nc6", "Nb3", "Be6"] },
+    { name: "Levenfish (f4)", moves: ["e4", "c5", "Nf3", "d6", "d4", "cxd4", "Nxd4", "Nf6", "Nc3", "g6", "f4", "Nbd7", "Nf3", "Qc7", "Bd3", "Bg7", "O-O", "O-O"] },
+    { name: "Fianchetto (g3)", moves: ["e4", "c5", "Nf3", "d6", "d4", "cxd4", "Nxd4", "Nf6", "Nc3", "g6", "g3", "Bg7", "Bg2", "O-O", "O-O", "Nc6", "Nde2", "Rb8"] },
+  ],
+  "sveshnikov": [
+    { name: "Against 8.Nd5", moves: ["e4", "c5", "Nf3", "Nc6", "d4", "cxd4", "Nxd4", "Nf6", "Nc3", "e5", "Ndb5", "d6", "Nd5", "Nxd5", "exd5", "Nb8", "c4", "Be7"] },
+    { name: "Against Rossolimo (3.Bb5)", moves: ["e4", "c5", "Nf3", "Nc6", "Bb5", "g6", "O-O", "Bg7", "Re1", "Nf6", "c3", "O-O", "d4", "cxd4", "cxd4", "d5"] },
+    { name: "Against 6.Nxc6", moves: ["e4", "c5", "Nf3", "Nc6", "d4", "cxd4", "Nxd4", "Nf6", "Nc3", "e5", "Nxc6", "bxc6", "Bc4", "Bc5", "O-O", "d6"] },
+  ],
+  "alapin": [
+    { name: "Against 2…d5", moves: ["e4", "c5", "c3", "d5", "exd5", "Qxd5", "d4", "Nf6", "Nf3", "e6", "Be2", "Nc6", "O-O", "cxd4", "cxd4", "Be7"] },
+    { name: "Against 2…e6", moves: ["e4", "c5", "c3", "e6", "d4", "d5", "e5", "Nc6", "Nf3", "Qb6", "a3", "c4", "Nbd2", "Na5", "Be2", "Bd7"] },
+    { name: "Against 2…d6", moves: ["e4", "c5", "c3", "d6", "d4", "Nf6", "Bd3", "Nc6", "Nf3", "Bg4", "d5", "Ne5", "Be2", "Bxf3", "Bxf3", "g6"] },
+  ],
+  "smith-morra": [
+    { name: "Declined (…d3)", moves: ["e4", "c5", "d4", "cxd4", "c3", "d3", "Bxd3", "Nc6", "Nf3", "d6", "O-O", "Nf6", "h3", "g6", "Re1", "Bg7"] },
+    { name: "Declined (…Nf6)", moves: ["e4", "c5", "d4", "cxd4", "c3", "Nf6", "e5", "Nd5", "cxd4", "d6", "Nf3", "Nc6", "Bc4", "Nb6", "Bb5", "dxe5"] },
+    { name: "Accepted, …e6 & …b5", moves: ["e4", "c5", "d4", "cxd4", "c3", "dxc3", "Nxc3", "e6", "Nf3", "a6", "Bc4", "b5", "Bb3", "Bb7", "O-O", "Ne7"] },
+  ],
+  "french-advance": [
+    { name: "Against …Nh6", moves: ["e4", "e6", "d4", "d5", "e5", "c5", "c3", "Nc6", "Nf3", "Nh6", "Bd3", "cxd4", "cxd4", "Nf5", "Bxf5", "exf5"] },
+    { name: "Against …Nge7", moves: ["e4", "e6", "d4", "d5", "e5", "c5", "c3", "Nc6", "Nf3", "Nge7", "Na3", "cxd4", "cxd4", "Nf5", "Nc2", "Qb6"] },
+    { name: "Against early …Qb6 & …Bd7", moves: ["e4", "e6", "d4", "d5", "e5", "c5", "c3", "Qb6", "Nf3", "Bd7", "Be2", "Bb5", "O-O", "Bxe2", "Qxe2", "Nc6"] },
+  ],
+  "qga": [
+    { name: "Against 3.e4", moves: ["d4", "d5", "c4", "dxc4", "e4", "e5", "Nf3", "exd4", "Bxc4", "Bb4+", "Nbd2", "Nc6", "O-O", "Nf6", "e5", "Nd5"] },
+    { name: "Against 3.e3", moves: ["d4", "d5", "c4", "dxc4", "e3", "e5", "Bxc4", "exd4", "exd4", "Nf6", "Nf3", "Be7", "O-O", "O-O", "h3", "Nbd7"] },
+    { name: "Against 3.Nc3", moves: ["d4", "d5", "c4", "dxc4", "Nc3", "e5", "d5", "c6", "e4", "b5", "a4", "b4", "Na2", "Nf6", "Bxc4", "Nxe4"] },
+  ],
+  "slav": [
+    { name: "Exchange Variation", moves: ["d4", "d5", "c4", "c6", "cxd5", "cxd5", "Nc3", "Nf6", "Bf4", "Nc6", "e3", "Bf5", "Nf3", "e6", "Bb5", "Bb4"] },
+    { name: "Against 4.e3", moves: ["d4", "d5", "c4", "c6", "Nf3", "Nf6", "e3", "Bf5", "Nc3", "e6", "Nh4", "Bg6", "Nxg6", "hxg6", "Bd3", "Nbd7"] },
+    { name: "Against 4.Qc2", moves: ["d4", "d5", "c4", "c6", "Nf3", "Nf6", "Qc2", "dxc4", "Qxc4", "Bf5", "g3", "e6", "Bg2", "Nbd7", "O-O", "Be7"] },
+  ],
+  "nimzo-indian": [
+    { name: "Rubinstein (4.e3)", moves: ["d4", "Nf6", "c4", "e6", "Nc3", "Bb4", "e3", "O-O", "Bd3", "d5", "Nf3", "c5", "O-O", "Nc6", "a3", "Bxc3"] },
+    { name: "Sämisch (4.a3)", moves: ["d4", "Nf6", "c4", "e6", "Nc3", "Bb4", "a3", "Bxc3+", "bxc3", "c5", "e3", "Nc6", "Bd3", "O-O", "Ne2", "b6"] },
+    { name: "Against 4.f3", moves: ["d4", "Nf6", "c4", "e6", "Nc3", "Bb4", "f3", "d5", "a3", "Be7", "e4", "dxe4", "fxe4", "e5", "d5", "Bc5"] },
+  ],
+  "grunfeld": [
+    { name: "Russian System (Qb3)", moves: ["d4", "Nf6", "c4", "g6", "Nc3", "d5", "Nf3", "Bg7", "Qb3", "dxc4", "Qxc4", "O-O", "e4", "a6", "Be2", "b5"] },
+    { name: "Against 4.Bf4", moves: ["d4", "Nf6", "c4", "g6", "Nc3", "d5", "Bf4", "Bg7", "e3", "c5", "dxc5", "Qa5", "Rc1", "dxc4", "Bxc4", "O-O"] },
+    { name: "Fianchetto (g3)", moves: ["d4", "Nf6", "c4", "g6", "g3", "d5", "Bg2", "Bg7", "cxd5", "Nxd5", "Nf3", "O-O", "O-O", "Nb6", "Nc3", "Nc6"] },
+  ],
+  "dutch-leningrad": [
+    { name: "Against 2.Bg5", moves: ["d4", "f5", "Bg5", "Nf6", "Bxf6", "exf6", "e3", "d5", "c4", "c6", "Nc3", "Be6", "Qb3", "Qd7", "Nf3", "Na6"] },
+    { name: "Staunton Gambit", moves: ["d4", "f5", "e4", "fxe4", "Nc3", "Nf6", "Bg5", "g6", "f3", "exf3", "Nxf3", "Bg7", "Bd3", "O-O", "O-O", "d6"] },
+    { name: "Against Nc3 & e3", moves: ["d4", "f5", "Nf3", "Nf6", "c4", "g6", "Nc3", "Bg7", "e3", "O-O", "Be2", "d6", "O-O", "Qe8", "b3", "e5"] },
+  ],
+  "english": [
+    { name: "Symmetrical (…c5)", moves: ["c4", "c5", "Nc3", "Nc6", "g3", "g6", "Bg2", "Bg7", "Nf3", "Nf6", "O-O", "O-O", "d3", "d6", "a3", "a6"] },
+    { name: "Flohr-Mikenas (…e6)", moves: ["c4", "Nf6", "Nc3", "e6", "e4", "d5", "e5", "d4", "exf6", "dxc3", "bxc3", "Qxf6", "d4", "c5", "Nf3", "h6"] },
+    { name: "Closed (…Nc6, …f5)", moves: ["c4", "e5", "Nc3", "Nc6", "g3", "g6", "Bg2", "Bg7", "d3", "d6", "e4", "f5", "Nge2", "Nf6", "O-O", "O-O"] },
+  ],
+  "catalan": [
+    { name: "Closed (…Be7)", moves: ["d4", "Nf6", "c4", "e6", "g3", "d5", "Bg2", "Be7", "Nf3", "O-O", "O-O", "c6", "Qc2", "Nbd7", "Nbd2", "b6"] },
+    { name: "Against …Bb4+", moves: ["d4", "Nf6", "c4", "e6", "g3", "d5", "Bg2", "Bb4+", "Bd2", "Be7", "Nf3", "O-O", "O-O", "c6", "Qc2", "b6"] },
+    { name: "Open (…a6, …b5)", moves: ["d4", "Nf6", "c4", "e6", "g3", "d5", "Nf3", "dxc4", "Bg2", "a6", "O-O", "Nc6", "e3", "Bd7", "Qe2", "b5"] },
+  ],
+  "kings-indian-attack": [
+    { name: "Against …e5", moves: ["Nf3", "Nc6", "g3", "e5", "d3", "d5", "Nbd2", "Nf6", "Bg2", "Be7", "O-O", "O-O", "e4", "dxe4", "dxe4", "Bc5"] },
+    { name: "Against …Bg4", moves: ["Nf3", "d5", "g3", "Bg4", "Bg2", "Nd7", "O-O", "Ngf6", "d3", "e6", "Nbd2", "Bc5", "e4", "O-O", "h3", "Bh5"] },
+    { name: "Against a King's Indian", moves: ["Nf3", "Nf6", "g3", "g6", "Bg2", "Bg7", "O-O", "O-O", "d3", "d6", "e4", "e5", "Nc3", "Nc6", "h3", "Nd4"] },
+  ],
+  "bird": [
+    { name: "From's Gambit (…e5)", moves: ["f4", "e5", "fxe5", "d6", "exd6", "Bxd6", "Nf3", "g5", "d4", "g4", "Ne5", "Bxe5", "dxe5", "Qxd1+", "Kxd1", "Nc6"] },
+    { name: "Against …c5", moves: ["f4", "c5", "Nf3", "Nc6", "e3", "g6", "Bb5", "Bg7", "O-O", "Nf6", "d3", "O-O", "Bxc6", "dxc6", "Qe1", "b6"] },
+    { name: "Against …Bg4", moves: ["f4", "d5", "Nf3", "Nf6", "e3", "Bg4", "Be2", "Nbd7", "b3", "e6", "Bb2", "Bd6", "O-O", "O-O", "c4", "c6"] },
+  ],
+  "benko": [
+    { name: "Declined (5.Nf3)", moves: ["d4", "Nf6", "c4", "c5", "d5", "b5", "Nf3", "g6", "cxb5", "a6", "b6", "d6", "Nc3", "Nbd7", "a4", "Bg7"] },
+    { name: "Against 5.b6", moves: ["d4", "Nf6", "c4", "c5", "d5", "b5", "cxb5", "a6", "b6", "e6", "Nc3", "Nxd5", "Nxd5", "exd5", "Qxd5", "Nc6"] },
+    { name: "Against 5.e3", moves: ["d4", "Nf6", "c4", "c5", "d5", "b5", "cxb5", "a6", "e3", "g6", "Nc3", "Bg7", "a4", "O-O", "Ra3", "e6"] },
+  ],
+  "modern-benoni": [
+    { name: "Fianchetto (g3)", moves: ["d4", "Nf6", "c4", "c5", "d5", "e6", "Nc3", "exd5", "cxd5", "d6", "Nf3", "g6", "g3", "Bg7", "Bg2", "O-O", "O-O", "Re8"] },
+    { name: "Taimanov (f4, Bb5+)", moves: ["d4", "Nf6", "c4", "c5", "d5", "e6", "Nc3", "exd5", "cxd5", "d6", "e4", "g6", "f4", "Bg7", "Bb5+", "Nfd7", "a4", "O-O", "Nf3", "Na6"] },
+    { name: "Against h3 & Bd3", moves: ["d4", "Nf6", "c4", "c5", "d5", "e6", "Nc3", "exd5", "cxd5", "d6", "e4", "g6", "Nf3", "Bg7", "h3", "O-O", "Bd3", "a6", "a4", "Nbd7", "O-O", "Rb8"] },
+  ],
+  "queens-indian": [
+    { name: "Petrosian (4.a3)", moves: ["d4", "Nf6", "c4", "e6", "Nf3", "b6", "a3", "Bb7", "Nc3", "d5", "cxd5", "Nxd5", "Qc2", "Nxc3", "bxc3", "Be7"] },
+    { name: "Against 4.Nc3", moves: ["d4", "Nf6", "c4", "e6", "Nf3", "b6", "Nc3", "Bb4", "Bg5", "Bb7", "e3", "h6", "Bh4", "g5", "Bg3", "Ne4"] },
+    { name: "Against 4.e3", moves: ["d4", "Nf6", "c4", "e6", "Nf3", "b6", "e3", "Bb7", "Bd3", "d5", "O-O", "Bd6", "Nc3", "O-O", "b3", "Nbd7"] },
+  ],
+  "caro-kann-exchange": [
+    { name: "Against …g6", moves: ["e4", "c6", "d4", "d5", "exd5", "cxd5", "Bd3", "Nc6", "c3", "g6", "Nf3", "Bg7", "O-O", "Nf6", "Bf4", "O-O"] },
+    { name: "Against …Qc7", moves: ["e4", "c6", "d4", "d5", "exd5", "cxd5", "Bd3", "Nc6", "c3", "Qc7", "Ne2", "Bg4", "f3", "Bd7", "Bf4", "e5"] },
+    { name: "Panov Attack (c4)", moves: ["e4", "c6", "d4", "d5", "exd5", "cxd5", "c4", "Nf6", "Nc3", "Nc6", "Bg5", "dxc4", "d5", "Ne5", "Qd4", "h6"] },
+  ],
+};
+
+export interface TrainLine { name: string; moves: string[] }
+/** The main line, then the others, for one opening. */
+export function linesOf(o: OpeningLine): TrainLine[] {
+  return [{ name: "Main line", moves: o.moves }, ...(MORE_LINES[o.id] ?? [])];
+}

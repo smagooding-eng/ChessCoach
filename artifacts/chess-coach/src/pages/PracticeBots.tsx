@@ -9,7 +9,8 @@ import { GameOverOverlay, OverlayButton } from '@/components/GameOverOverlay';
 import { normalizeFen } from '@/lib/utils';
 import { BOTS, getBotMove, BotConfig, analyzeMoveQuality, type MoveAnalysisResult } from '@/lib/chess-bot';
 import { useBotAvatar, useBotName, useBotDescription, useBotTag } from '@/lib/botAvatars';
-import { OPENINGS, type OpeningLine } from '@/lib/openings';
+import { OPENINGS, linesOf, type OpeningLine } from '@/lib/openings';
+import { MiniBoard } from '@/components/MiniBoard';
 import { AICoachCard, type AICoachTone } from '@/components/AICoachCard';
 import { ArrowLeft, RotateCcw, Undo2, Flag, Clock, Trophy, Swords, Zap, ChevronRight, ChevronDown, ChevronUp, BookOpen, Check, X, Lightbulb } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -909,7 +910,47 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
   );
 }
 
+// The position at the end of a line (for the list thumbnails), worked out once.
+const endCache = new Map<string, { fen: string; last: { from: string; to: string } | null }>();
+function endOf(moves: string[]) {
+  const key = moves.join(' ');
+  let v = endCache.get(key);
+  if (!v) {
+    const c = new Chess(); let last: { from: string; to: string } | null = null;
+    for (const m of moves) { try { const r = c.move(m); last = { from: r.from, to: r.to }; } catch { break; } }
+    v = { fen: c.fen(), last }; endCache.set(key, v);
+  }
+  return v;
+}
+
+/** Pick which line to train (main line or one of the others), then drill it. */
 function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack: () => void }) {
+  const lines = useMemo(() => linesOf(opening), [opening]);
+  const [idx, setIdx] = useState(0);
+  const line = lines[Math.min(idx, lines.length - 1)];
+  const active = useMemo<OpeningLine>(() => ({ ...opening, moves: line.moves }), [opening, line]);
+  return (
+    <>
+      {lines.length > 1 && (
+        <div className="mx-auto w-full max-w-[1100px] px-3 pt-3 md:px-6">
+          <p className="mb-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-white/50">Line to train · {opening.name}</p>
+          <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+            {lines.map((l, i) => (
+              <button key={l.name} onClick={() => setIdx(i)}
+                className="shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-bold transition-colors"
+                style={i === idx ? { background: '#81B64C', color: '#FFFFFF' } : { background: 'rgba(255,255,255,.07)', color: 'rgba(255,255,255,.8)' }}>
+                {l.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      <OpeningTrainerCore key={line.name} opening={active} onBack={onBack} />
+    </>
+  );
+}
+
+function OpeningTrainerCore({ opening, onBack }: { opening: OpeningLine; onBack: () => void }) {
   const playerColor = opening.userColor;
   const [chess] = useState(() => new Chess());
   const [fen, setFen] = useState(chess.fen());
@@ -1205,9 +1246,7 @@ function OpeningCard({ opening, onSelect }: { opening: OpeningLine; onSelect: (o
       className="relative flex flex-col gap-3 p-5 rounded-xl border border-white/10 bg-gradient-to-br from-[#2d2c29] to-[#1f1e1c] text-left transition-shadow hover:shadow-xl hover:shadow-black/30 group"
     >
       <div className="flex items-center justify-between">
-        <div className="w-10 h-10 rounded-xl bg-primary border border-primary/30 flex items-center justify-center">
-          <BookOpen className="w-5 h-5 text-primary-foreground" />
-        </div>
+        <MiniBoard fen={endOf(opening.moves).fen} lastMove={endOf(opening.moves).last} size={72} flipped={opening.userColor === 'b'} />
         <span className="text-xs font-bold px-2.5 py-1 rounded-xl bg-black/30 border border-white/10 text-white/80">
           {opening.eco}
         </span>
@@ -1215,7 +1254,7 @@ function OpeningCard({ opening, onSelect }: { opening: OpeningLine; onSelect: (o
       <div>
         <h3 className="text-base font-black text-white leading-tight">{opening.name}</h3>
         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/50 mt-1">
-          Play as {opening.userColor === 'w' ? 'White' : 'Black'} · {Math.ceil(opening.moves.length / 2)} moves deep
+          Play as {opening.userColor === 'w' ? 'White' : 'Black'} · {Math.ceil(opening.moves.length / 2)} moves deep{linesOf(opening).length > 1 ? ` · ${linesOf(opening).length} lines` : ''}
         </p>
       </div>
       <p className="text-xs text-white/60 leading-relaxed line-clamp-2">{opening.description}</p>
@@ -1288,17 +1327,16 @@ function OpeningTileRD({ opening, index, onSelect }: { opening: OpeningLine; ind
       className="flex w-full items-stretch overflow-hidden rounded-[18px] text-left transition-transform active:scale-[.99]"
       style={{ background: RD.card, border: `1px solid ${RD.border}` }}
     >
-      {!photoLook && (
-      <span className="relative w-[104px] shrink-0 overflow-hidden">
-        <img src={thumb} alt="" loading="lazy" className="absolute inset-0 h-full w-full scale-[1.08] object-cover" />
+      {/* The position the main line ends on. */}
+      <span className="grid shrink-0 place-items-center pl-3">
+        <MiniBoard fen={endOf(opening.moves).fen} lastMove={endOf(opening.moves).last} size={88} flipped={opening.userColor === 'b'} />
       </span>
-      )}
       <span className="min-w-0 flex-1 px-4 py-3.5">
         <span className="flex items-center gap-2">
           <b className="truncate text-[16px] font-extrabold" style={{ color: RD.text }}>{opening.name}</b>
         </span>
         <span className="block truncate text-[13px]" style={{ color: RD.muted }}>
-          {opening.eco} · Play as {opening.userColor === 'w' ? 'White' : 'Black'} · {Math.ceil(opening.moves.length / 2)} moves deep
+          {opening.eco} · Play as {opening.userColor === 'w' ? 'White' : 'Black'} · {Math.ceil(opening.moves.length / 2)} moves deep{linesOf(opening).length > 1 ? ` · ${linesOf(opening).length} lines` : ''}
         </span>
         <span className="mt-1.5 block text-[12.5px] leading-snug line-clamp-2" style={{ color: RD.muted }}>{opening.description}</span>
       </span>
@@ -1434,7 +1472,7 @@ export function PracticeBots() {
               ]} />
             ) : (
               <HowItWorksRD title="How opening drills work" steps={[
-                'Pick an opening. The bot will play the opposite side following the main theory line.',
+                'Pick an opening, then the line to train: the main line or one of the other replies. The bot plays the other side by the book.',
                 "Play the expected book move. If you deviate, you'll get instant feedback and a chance to retry.",
                 'Stuck? Tap the Hint button to reveal the next move and lock in the pattern.',
               ]} />
@@ -1526,7 +1564,7 @@ export function PracticeBots() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-sm text-muted-foreground">
               <div className="flex gap-3">
                 <span className="text-lg font-black text-primary shrink-0">1</span>
-                <p>Pick an opening. The bot will play the opposite side following the main theory line.</p>
+                <p>Pick an opening, then the line to train: the main line or one of the other replies. The bot plays the other side by the book.</p>
               </div>
               <div className="flex gap-3">
                 <span className="text-lg font-black text-primary shrink-0">2</span>
