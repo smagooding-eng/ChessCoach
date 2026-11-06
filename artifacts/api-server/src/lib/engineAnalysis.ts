@@ -2,6 +2,7 @@ import { Chess } from "chess.js";
 import { logger } from "./logger";
 import { cloudEval } from "./lichessApi";
 import { spawn, ChildProcessWithoutNullStreams } from "child_process";
+import os from "os";
 
 const IS_PROD = process.env.NODE_ENV === "production";
 
@@ -186,6 +187,9 @@ export class StockfishProcess {
     const threads = ENGINE_THREADS;
 
     this.proc = spawn("stockfish", [], { stdio: ["pipe", "pipe", "pipe"] });
+    // Stockfish runs at the lowest priority: on Render's half a CPU a long review
+    // otherwise starves the server itself, and Render's 5-second health check fails.
+    try { if (this.proc.pid) os.setPriority(this.proc.pid, 19); } catch { /* not allowed here */ }
 
     this.proc.on("exit", (code, signal) => {
       logger.warn({ code, signal }, "Stockfish process exited");
