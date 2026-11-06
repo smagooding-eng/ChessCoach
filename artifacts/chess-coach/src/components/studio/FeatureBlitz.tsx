@@ -26,7 +26,7 @@ const APP_PATH: Record<Kind, { path: string; scroll: number }> = {
 };
 const SCENES: Scene[] = [
   { kind: 'live', title: 'Live play', line: 'Real opponents, any clock. Daily games too.', fen: 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3', move: 'Bb5' },
-  { kind: 'review', title: 'Free game review', line: 'Every move rated, and the better move shown.', fen: 'r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQ1RK1 w kq - 6 5', move: 'Ng5', arrow: ['g5', 'f7'] },
+  { kind: 'review', title: 'Free game review', line: 'Every move rated, every mistake explained.', fen: 'r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQ1RK1 w kq - 6 5', move: 'Ng5', arrow: ['g5', 'f7'] },
   { kind: 'weak', title: 'Your weaknesses', line: 'Found in your own games, then fixed.', fen: '' },
   { kind: 'openings', title: 'Openings', line: 'Drill your lines until they’re automatic.', fen: 'rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2', move: 'Nc6', arrow: ['f1', 'c4'] },
   { kind: 'tactics', title: 'Tactics', line: 'Forks, pins, mates: learn the pattern, then drill it.', fen: 'r3k3/8/8/3N4/8/8/8/4K3 w - - 0 1', move: 'Nc7+' },
@@ -44,7 +44,7 @@ const FAILED = /didn.?t load|couldn.?t load|something went wrong|not found|faile
 
 /** The real app page in a phone-sized frame. While it's on screen it scrolls slowly
  *  through the page, and a tap ripple shows where you'd press. */
-function AppScreen({ src, pos, scroll, beat, onReady, onFail }: { src: string; pos: -1 | 0 | 1; scroll: number; beat: number; onReady: (src: string) => void; onFail: (src: string) => void }) {
+function AppScreen({ src, pos, scroll, beat, onReady, onFail, review = false }: { src: string; pos: -1 | 0 | 1; scroll: number; beat: number; onReady: (src: string) => void; onFail: (src: string) => void; review?: boolean }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const active = pos === 0;
   // Ready = the page has drawn its content (no spinner left), or 25 seconds have passed.
@@ -74,21 +74,39 @@ function AppScreen({ src, pos, scroll, beat, onReady, onFail }: { src: string; p
     const ro = new ResizeObserver(() => setScale(el.clientWidth / 390));
     ro.observe(el); return () => ro.disconnect();
   }, []);
-  // A slow, steady scroll through the page for most of the scene.
+  // A slow, steady scroll through the page for most of the scene. A game review
+  // plays through the game move by move first (each move rated), then scrolls
+  // down through the review: the game rating, the key mistakes and the coach notes.
   useEffect(() => {
     const w = ref.current?.contentWindow; if (!w) return;
     try { w.scrollTo({ top: 0 }); } catch { /* ignore */ }
-    if (!active || !scroll) return;
-    const start = performance.now() + 700, dur = Math.max(800, beat * 1000 - 1300);
+    if (!active) return;
+    const timers: ReturnType<typeof setTimeout>[] = [];
     let raf = 0;
-    const step = (now: number) => {
-      const t = Math.min(1, Math.max(0, (now - start) / dur));
-      const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-      try { w.scrollTo({ top: Math.round(scroll * e) }); } catch { /* ignore */ }
-      if (t < 1) raf = requestAnimationFrame(step);
+    const scrollTo = (to: number, after: number, dur: number) => {
+      timers.push(setTimeout(() => {
+        const from = w.scrollY || 0, t0 = performance.now();
+        const step = (now: number) => {
+          const t = Math.min(1, (now - t0) / dur);
+          const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+          try { w.scrollTo({ top: Math.round(from + (to - from) * e) }); } catch { /* ignore */ }
+          if (t < 1) raf = requestAnimationFrame(step);
+        };
+        raf = requestAnimationFrame(step);
+      }, after));
     };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
+    if (review) {
+      const total = beat * 1000;
+      const moves = 12, gap = Math.min(520, (total * 0.42) / moves);
+      for (let n = 0; n < moves; n++) timers.push(setTimeout(() => { try { w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); } catch { /* ignore */ } }, 600 + n * gap));
+      const after = 600 + moves * gap + 250;
+      const h = (() => { try { return Math.max(0, (w.document.documentElement.scrollHeight || 0) - 780); } catch { return 1200; } })();
+      scrollTo(Math.min(h, 520), after, 1400);
+      scrollTo(Math.min(h, 1100), after + 2300, 1600);
+      return () => { timers.forEach(clearTimeout); cancelAnimationFrame(raf); };
+    }
+    if (scroll) scrollTo(scroll, 700, Math.max(800, beat * 1000 - 1300));
+    return () => { timers.forEach(clearTimeout); cancelAnimationFrame(raf); };
   }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div ref={box} className="absolute inset-0 overflow-hidden rounded-[5cqw]"
@@ -178,7 +196,9 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
     if (w.__studioRender) w.__studioRender.ready = allReady;
   }, [allReady, render]);
 
-  const total = () => 2800 + SCENES.length * opts.beat * 1000 + 3400;
+  // The game review gets three times as long: it plays through the game and the review.
+  const lenOf = (sc: Scene) => opts.beat * 1000 * (sc.kind === 'review' && appFootage ? 3 : 1);
+  const total = () => 2800 + SCENES.reduce((a, sc) => a + lenOf(sc), 0) + 3400;
   const play = (onDone?: () => void) => {
     // App footage: start once every page has loaded.
     if (!allReadyRef.current) { clear(); setPhase('idle'); pending.current = () => play(onDone); return; }
@@ -186,8 +206,9 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
     try { const m = mus(); routeSoundsTo(m.unlock(), m.sfx); m.stop(); if (opts.music !== 'off') m.start(opts.music); } catch { /* ignore */ }
     setPhase('hook'); setK(0); setMoved(false);
     later(150, () => mus().accent('riser'));
-    let t = 2800; const beat = opts.beat * 1000;
+    let t = 2800;
     SCENES.forEach((sc, j) => {
+      const beat = lenOf(sc);
       later(t, () => { setPhase('scene'); setK(j); setMoved(false); mus().accent('whoosh'); });
       // The board plays the regular move sound itself.
       if (sc.move) later(t + Math.min(650, beat * 0.35), () => setMoved(true));
@@ -283,7 +304,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
           <div className="pointer-events-none absolute left-1/2 z-10 h-[60cqh] w-[30cqh] -translate-x-1/2 rounded-[5cqw]"
             style={{ bottom: '9.5cqh', opacity: phase === 'scene' ? 1 : 0, transition: 'opacity .2s', boxShadow: '0 0 0 1.2cqw #1C1F1E, 0 0 0 1.5cqw rgba(255,255,255,.12), 0 18px 50px rgba(0,0,0,.6)' }}>
             {SCENES.map((x, j) => (
-              <AppScreen key={x.kind} src={srcOf(j)} pos={phase !== 'scene' ? 1 : j < k ? -1 : j === k ? 0 : 1} scroll={APP_PATH[x.kind].scroll} beat={opts.beat} onReady={markReady} onFail={() => setFailed((f) => (f[x.kind] ? { ...f } : { ...f, [x.kind]: true }))} />
+              <AppScreen key={x.kind} src={srcOf(j)} pos={phase !== 'scene' ? 1 : j < k ? -1 : j === k ? 0 : 1} scroll={APP_PATH[x.kind].scroll} beat={lenOf(x) / 1000} review={x.kind === 'review' && !failed.review && reviewPath !== '/games'} onReady={markReady} onFail={() => setFailed((f) => (f[x.kind] ? { ...f } : { ...f, [x.kind]: true }))} />
             ))}
           </div>
         )}
