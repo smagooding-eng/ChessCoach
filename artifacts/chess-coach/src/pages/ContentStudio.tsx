@@ -11,6 +11,7 @@ import { Chess } from 'chess.js';
 import { KidsStudio } from '@/components/studio/KidsStudio';
 import { KnightTour } from '@/components/studio/KnightTour';
 import { SplashPromo } from '@/components/studio/SplashPromo';
+import { FeatureBlitz } from '@/components/studio/FeatureBlitz';
 import { RenderReady, RecentRenders } from '@/components/studio/RenderMp4';
 import { KIDS_WORLDS, type KidsVideo } from '@/components/studio/kidsVideos';
 import { KidPiece } from '@/components/kids/KidsArt';
@@ -204,7 +205,8 @@ export function ContentStudio() {
     } catch { setScanBusy("Couldn't read that photo."); }
   };
   // Promos
-  const [promoT, setPromoT] = useState<'versus' | 'challenge' | 'live' | 'tour' | 'knight' | 'splash'>('tour');
+  const [promoT, setPromoT] = useState<'versus' | 'challenge' | 'live' | 'tour' | 'knight' | 'splash' | 'blitz'>('blitz');
+  const [blitzOpen, setBlitzOpen] = useState(false);
   const [knightOpen, setKnightOpen] = useState(false);
   const [splashOpen, setSplashOpen] = useState(false);
   const [promo, setPromo] = useState<StudioPromo>({
@@ -657,11 +659,16 @@ export function ContentStudio() {
         )}
       </>) : view === 'promo' ? (<>
         <div className="mb-3 inline-flex flex-wrap rounded-xl bg-white/5 p-1">
-          {([['tour', 'App tour 🧭'], ['live', 'Live play ⚡'], ['knight', "Knight's tour → logo ♞"], ['splash', 'Splash smash ♜'], ['versus', 'ChessScout vs …'], ['challenge', 'Challenge your friends']] as const).map(([k, t]) => (
+          {([['blitz', 'App in 20 seconds ⚡'], ['tour', 'App tour 🧭'], ['live', 'Live play ⚡'], ['knight', "Knight's tour → logo ♞"], ['splash', 'Splash smash ♜'], ['versus', 'ChessScout vs …'], ['challenge', 'Challenge your friends']] as const).map(([k, t]) => (
             <button key={k} onClick={() => setPromoT(k)} className="rounded-lg px-3.5 py-1.5 text-[13px] font-black" style={{ background: promoT === k ? '#81B64C' : 'transparent', color: promoT === k ? '#fff' : '#C9CFCD' }}>{t}</button>
           ))}
         </div>
-        {promoT === 'splash' ? (
+        {promoT === 'blitz' ? (
+          <div className="max-w-2xl space-y-2 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
+            <p className="text-[12px] text-white/55">A fast cut through every feature (Live play, Game review, Weaknesses, Openings, Tactics, Endgames, Puzzles, Scan a position, Opponent Scout) under one hook line, ending on chessscout.net. Pick the pace, music and board looks.</p>
+            <button onClick={() => setBlitzOpen(true)} className="rounded-lg bg-[#81B64C] px-4 py-2 text-[13px] font-black text-white">🎬 Make the clip</button>
+          </div>
+        ) : promoT === 'splash' ? (
           <div className="max-w-2xl space-y-2 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
             <p className="text-[12px] text-white/55">Your loading screen with a green pawn and "Chess.com is dead." over it, then the black rook slides in and smashes the pawn, then "ChessScout.net". About 10 seconds; you can change both lines.</p>
             <button onClick={() => setSplashOpen(true)} className="rounded-lg bg-[#81B64C] px-4 py-2 text-[13px] font-black text-white">🎬 Make the clip</button>
@@ -933,6 +940,7 @@ export function ContentStudio() {
       {kidsVid && <KidsStudio video={kidsVid} onClose={() => setKidsVid(null)} />}
       {knightOpen && <KnightTour onClose={() => setKnightOpen(false)} />}
       {splashOpen && <SplashPromo onClose={() => setSplashOpen(false)} />}
+      {blitzOpen && <FeatureBlitz onClose={() => setBlitzOpen(false)} />}
       {comp && <StudioPlayer source={comp[0]} queue={comp} title={compTitle} onClose={() => setComp(null)} />}
       {open && (
         <StudioPlayer source={open} onClose={() => setOpen(null)}

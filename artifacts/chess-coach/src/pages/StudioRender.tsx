@@ -6,6 +6,7 @@ import { apiFetch } from '@/lib/api';
 import { StudioPlayer, PREF_KEY, type StudioSource } from '@/components/studio/StudioPlayer';
 import { KnightTour, type KnightTourOpts } from '@/components/studio/KnightTour';
 import { SplashPromo, type SplashPromoOpts } from '@/components/studio/SplashPromo';
+import { FeatureBlitz, type FeatureBlitzOpts } from '@/components/studio/FeatureBlitz';
 
 export function StudioRender() {
   const [job, setJob] = useState<{ source: StudioSource; queue?: StudioSource[]; title?: string } | null>(null);
@@ -35,6 +36,7 @@ export function StudioRender() {
   if (!job) return null;
   const src = job.source as unknown as { kind: string; opts?: KnightTourOpts };
   if (src.kind === 'knightTour') return <KnightTour render opts={src.opts as KnightTourOpts} onClose={() => {}} />;
+  if (src.kind === 'featureBlitz') return <FeatureBlitz render opts={src.opts as unknown as FeatureBlitzOpts} onClose={() => {}} />;
   if (src.kind === 'splashPromo') return <SplashPromo render opts={src.opts as unknown as SplashPromoOpts} onClose={() => {}} />;
   return <StudioPlayer render source={job.source} queue={job.queue} title={job.title} onClose={() => {}} />;
 }

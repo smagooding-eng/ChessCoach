@@ -189,7 +189,9 @@ const TEXT_STICKERS = ['BRILLIANT!!', 'BLUNDER??', 'WAIT FOR IT…', 'NO WAY', '
 // ── Preferences that carry over between clips (this browser only) ─────────
 export const PREF_KEY = 'cs_studio_prefs_v1';
 const DEFAULT_PREFS = {
-  before: 8, after: 5, speed: 1.2, guess: true, remix: true, captions: true, effects: true, arrow: true, sound: true, watermark: true,
+  before: 8, after: 5, speed: 1.2, guess: true, remix: true,
+  /** With remix on: a new board and pieces every move, or once per scene (a run of moves, a card, the intro…). */
+  remixEvery: 'move' as 'move' | 'scene', captions: true, effects: true, arrow: true, sound: true, watermark: true,
   bg: 'green', betterLine: true, guessRating: false, outro: true, progress: true, intro: true, safeArea: true, showNames: false,
   handle: '@chessscout.net3', outroLine: 'Review your games free',
   /** Call to action on the closing splash: spoken (with the voiceover on) and shown as big subtitles. */
@@ -1394,7 +1396,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   const [pop, setPop] = useState<{ cls: string; at: number } | null>(null);
   const [confetti, setConfetti] = useState(0);
   const [shake, setShake] = useState(0);
-  const looks = useRef(new Map<number, BoardLook>());
+  const looks = useRef(new Map<number | string, BoardLook>());
   // A new clip starts from the top; edits to the same clip (inserts, settings) stay on the frame you were on.
   const shownClip = useRef<Clip | null>(null);
   const curId = useRef<string | null>(null);
@@ -1430,7 +1432,10 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
 
   // Board and pieces: a compilation clip can have its own look; otherwise the global setting.
   const [clipLooks, setClipLooks] = useState<Record<string, ClipLook>>({});
-  const perFrame = () => looks.current.get(i) ?? (() => { const l = randomLook(); looks.current.set(i, l); return l; })();
+  // A scene is a run of frames of the same kind (all the moves of a line are one scene).
+  const sceneOf = useMemo(() => { let n = 0; return frames.map((f, j) => { if (j > 0 && f.kind !== frames[j - 1].kind) n++; return n; }); }, [frames]);
+  const lookKey: number | string = prefs.remixEvery === 'scene' ? `s${sceneOf[i] ?? 0}` : i;
+  const perFrame = () => looks.current.get(lookKey) ?? (() => { const l = randomLook(); looks.current.set(lookKey, l); return l; })();
   const cl = isComp ? clipLooks[loadedKey] : undefined;
   const look: BoardLook | null = cl === 'remix' ? perFrame() : cl === 'mine' ? null : cl ? cl : prefs.remix ? perFrame() : fixedLook;
   const cur = view?.move ?? null;
@@ -3478,7 +3483,14 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
           </div>
           <p className="mb-1 text-[11px] font-bold uppercase tracking-wide text-white/50">Look</p>
           <div className="mb-3 flex flex-wrap gap-1.5">
-            {toggle('remix', 'Remix board every move')}
+            {toggle('remix', 'Remix the board')}
+            {prefs.remix && (
+              <span className="inline-flex overflow-hidden rounded-full bg-white/10 text-[12px] font-bold">
+                {(['move', 'scene'] as const).map((v) => (
+                  <button key={v} onClick={() => { looks.current.clear(); set('remixEvery', v as never); }} className="px-2.5 py-1" style={prefs.remixEvery === v ? { background: '#81B64C', color: '#fff' } : undefined}>{v === 'move' ? 'Every move' : 'Every scene'}</button>
+                ))}
+              </span>
+            )}
             {toggle('pieceFx', 'Animated pieces')}
             {toggle('zoom', 'Zoom on the key move')}
             {toggle('effects', 'Pop, confetti, shake')}
