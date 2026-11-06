@@ -365,6 +365,27 @@ export function Puzzles() {
     } catch { return false; }
   }, [confirmMoves, tryMoveFromTo, game, state]);
 
+  // In a Content Studio frame: when it comes on screen, solve the puzzle move by
+  // move (the opponent's replies play as usual), so the video shows a full solve.
+  const autoSolve = useRef({ state, idx: currentMoveIndex, moves: solutionMoves, play: tryMoveFromTo });
+  autoSolve.current = { state, idx: currentMoveIndex, moves: solutionMoves, play: tryMoveFromTo };
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const on = (e: MessageEvent) => {
+      if ((e.data as { type?: string } | null)?.type !== 'cs-studio-restart') return;
+      if (timer) clearInterval(timer);
+      let ticks = 0;
+      timer = setInterval(() => {
+        const a = autoSolve.current; ticks++;
+        if (a.state === 'correct' || a.state === 'wrong' || ticks > 20) { if (timer) clearInterval(timer); timer = null; return; }
+        const u = a.state === 'ready' ? a.moves[a.idx] : null;
+        if (u && u.length >= 4) a.play(u.slice(0, 2), u.slice(2, 4));
+      }, 1200);
+    };
+    window.addEventListener('message', on);
+    return () => { window.removeEventListener('message', on); if (timer) clearInterval(timer); };
+  }, []);
+
   // A new position (next puzzle, opponent reply, reset) drops any staged move.
   useEffect(() => { setPendingMove(null); }, [game]);
 
