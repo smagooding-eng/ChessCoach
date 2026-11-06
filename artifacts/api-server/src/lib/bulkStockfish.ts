@@ -1,4 +1,4 @@
-import { StockfishProcess, winPct, type PositionEval } from "./engineAnalysis";
+import { StockfishProcess, SIDE_HASH_MB, winPct, type PositionEval } from "./engineAnalysis";
 import { logger } from "./logger";
 
 // A second, independent Stockfish process, entirely separate from the
@@ -13,7 +13,7 @@ let bulkEngineInit: Promise<void> | null = null;
 async function getBulkEngine(): Promise<StockfishProcess> {
   if (bulkEngine) return bulkEngine;
   if (bulkEngineInit) { await bulkEngineInit; return bulkEngine!; }
-  bulkEngine = new StockfishProcess(() => { bulkEngine = null; bulkEngineInit = null; });
+  bulkEngine = new StockfishProcess(() => { bulkEngine = null; bulkEngineInit = null; }, { hashMB: SIDE_HASH_MB });
   bulkEngineInit = bulkEngine.init();
   await bulkEngineInit;
   return bulkEngine!;

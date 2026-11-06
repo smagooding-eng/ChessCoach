@@ -43,4 +43,5 @@ RUN pnpm --filter @workspace/api-server run build
 ENV NODE_ENV=production
 EXPOSE 8080
 
-CMD ["node", "--enable-source-maps", "artifacts/api-server/dist/index.mjs"]
+# Keep the server under Render's 512MB (Stockfish runs in its own processes beside it).
+CMD ["node", "--max-old-space-size=280", "--enable-source-maps", "artifacts/api-server/dist/index.mjs"]

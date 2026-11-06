@@ -18,6 +18,7 @@ const CLOUD_EVAL = process.env.LICHESS_CLOUD_EVAL !== "0";
 const ENGINE_MULTIPV = parseInt(process.env.ENGINE_MULTIPV || "") || 3;
 const ENGINE_THREADS = parseInt(process.env.ENGINE_THREADS || "") || (IS_PROD ? 1 : 2);
 const ENGINE_HASH_MB = parseInt(process.env.ENGINE_HASH_MB || "") || (IS_PROD ? 64 : 256);
+export const SIDE_HASH_MB = parseInt(process.env.SIDE_ENGINE_HASH_MB || "") || 16;
 const ENGINE_TIMEOUT_MS = parseInt(process.env.ENGINE_TIMEOUT_MS || "") || (IS_PROD ? 20000 : 30000);
 
 export type EngineClassification =
@@ -147,8 +148,12 @@ export class StockfishProcess {
   // to a dead engine (like getEngine() below) wire that up via this hook.
   private onDead?: () => void;
 
-  constructor(onDead?: () => void) {
+  // The extra engines (bots, explorer, bulk) get a small hash table: four engines
+  // with 64MB each, plus the server itself, went past Render's 512MB.
+  private hashMB: number;
+  constructor(onDead?: () => void, opts?: { hashMB?: number }) {
     this.onDead = onDead;
+    this.hashMB = opts?.hashMB ?? ENGINE_HASH_MB;
   }
 
   private clearTimers(): void {
@@ -177,7 +182,7 @@ export class StockfishProcess {
   }
 
   async init(): Promise<void> {
-    const hashMB = ENGINE_HASH_MB;
+    const hashMB = this.hashMB;
     const threads = ENGINE_THREADS;
 
     this.proc = spawn("stockfish", [], { stdio: ["pipe", "pipe", "pipe"] });
@@ -427,7 +432,7 @@ async function getBotStockfish(): Promise<StockfishProcess> {
   if (botStockfish && !botStockfish["dead"]) return botStockfish;
   if (botStockfish?.["dead"]) { botStockfish = null; botStockfishInit = null; }
   if (botStockfishInit) { await botStockfishInit; return botStockfish!; }
-  botStockfish = new StockfishProcess(() => { botStockfish = null; botStockfishInit = null; });
+  botStockfish = new StockfishProcess(() => { botStockfish = null; botStockfishInit = null; }, { hashMB: SIDE_HASH_MB });
   botStockfishInit = botStockfish.init().catch((err) => {
     logger.error({ err }, "Failed to initialize bot Stockfish");
     botStockfish = null;
@@ -671,7 +676,7 @@ async function getExploreEngine(): Promise<StockfishProcess> {
   if (exploreEngine && !exploreEngine["dead"]) return exploreEngine;
   if (exploreEngine?.["dead"]) { exploreEngine = null; exploreInit = null; }
   if (exploreInit) { await exploreInit; return exploreEngine!; }
-  exploreEngine = new StockfishProcess(() => { exploreEngine = null; exploreInit = null; });
+  exploreEngine = new StockfishProcess(() => { exploreEngine = null; exploreInit = null; }, { hashMB: SIDE_HASH_MB });
   exploreInit = exploreEngine.init().catch((err) => {
     logger.error({ err }, "Failed to initialize explorer Stockfish");
     exploreEngine = null;
