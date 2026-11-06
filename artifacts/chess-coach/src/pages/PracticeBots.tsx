@@ -958,7 +958,9 @@ function OpeningTrainerCore({ opening, onBack }: { opening: OpeningLine; onBack:
   const [history, setHistory] = useState<{ san: string; expected: string; correct: boolean }[]>([]);
   const [phase, setPhase] = useState<'theory' | 'freeplay' | 'completed'>('theory');
   const [wrongFeedback, setWrongFeedback] = useState<{ played: string; expected: string } | null>(null);
-  const [hintOpen, setHintOpen] = useState(false);
+  // Hint stays on (like puzzles): every move of yours is shown until you turn it off.
+  const [hintOpen, setHintOpen] = useState(() => { try { return localStorage.getItem('cs_trainer_hint') === '1'; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem('cs_trainer_hint', hintOpen ? '1' : '0'); } catch { /* ignore */ } }, [hintOpen]);
   const [streak, setStreak] = useState(0);
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const botTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1015,7 +1017,6 @@ function OpeningTrainerCore({ opening, onBack }: { opening: OpeningLine; onBack:
       setScore(s => ({ correct: s.correct + 1, total: s.total + 1 }));
       setFen(chess.fen());
       setStepIdx(i => i + 1);
-      setHintOpen(false);
     } else {
       // Wrong move — undo so the user can retry.
       chess.undo();
@@ -1038,12 +1039,16 @@ function OpeningTrainerCore({ opening, onBack }: { opening: OpeningLine; onBack:
     setHistory([]);
     setPhase('theory');
     setWrongFeedback(null);
-    setHintOpen(false);
     setStreak(0);
     setScore({ correct: 0, total: 0 });
   };
 
-  const handleShowHint = () => setHintOpen(true);
+  const handleShowHint = () => setHintOpen((v) => !v);
+  // The hinted move as an arrow on the board.
+  const hintArrow = useMemo(() => {
+    if (!hintOpen || !playerExpected) return undefined;
+    try { const m = new Chess(fen).move(playerExpected); return [{ from: m.from, to: m.to, color: 'rgba(129,182,76,0.85)' }]; } catch { return undefined; }
+  }, [hintOpen, playerExpected, fen]);
 
   const lastMove = useMemo(() => {
     const hist = chess.history({ verbose: true });
@@ -1107,6 +1112,7 @@ function OpeningTrainerCore({ opening, onBack }: { opening: OpeningLine; onBack:
             onMovePlayed={handleMovePlayed}
             lastMove={lastMove}
             moveQuality={null}
+            arrows={hintArrow}
             reserveConfirmSpace
           />
 
@@ -1124,10 +1130,9 @@ function OpeningTrainerCore({ opening, onBack }: { opening: OpeningLine; onBack:
               )}
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={handleShowHint}
-                disabled={!playerExpected}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 border bg-amber-500 text-white text-xs font-bold hover:bg-amber-500/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                <Lightbulb className="w-3 h-3" /> {hintOpen && playerExpected ? playerExpected : 'Hint'}
+              <button onClick={handleShowHint} aria-pressed={hintOpen}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-colors ${hintOpen ? 'bg-amber-500 border-amber-400 text-white' : 'bg-white/5 border-white/10 text-amber-300 hover:bg-white/10'}`}>
+                <Lightbulb className="w-3 h-3" /> {hintOpen ? (playerExpected ? `Hint on: ${playerExpected}` : 'Hint on') : 'Hint'}
               </button>
               <button onClick={handleReset}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-muted-foreground text-xs font-bold hover:bg-white/10 transition-colors">
