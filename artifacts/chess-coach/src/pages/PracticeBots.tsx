@@ -1398,13 +1398,17 @@ function readInitialOpeningPick(): { opening: OpeningLine; line: number } | null
   const eco = p.get('eco');
   const played = (p.get('moves') ?? '').split(' ').filter(Boolean);
   if (!eco && !played.length) return null;
-  let best: { opening: OpeningLine; line: number; score: number } | null = null;
+  let best = null as { opening: OpeningLine; line: number; score: number } | null;
   if (played.length) {
-    for (const o of OPENINGS) linesOf(o).forEach((l, i) => {
-      let n = 0; while (n < played.length && n < l.moves.length && played[n] === l.moves[n]) n++;
-      const score = n * 10 + (o.eco === eco ? 5 : 0) - i; // longer shared start wins; same code, then main line breaks ties
-      if (n >= 2 && (!best || score > best.score)) best = { opening: o, line: i, score };
-    });
+    for (const o of OPENINGS) {
+      const ls = linesOf(o);
+      for (let i = 0; i < ls.length; i++) {
+        const l = ls[i];
+        let n = 0; while (n < played.length && n < l.moves.length && played[n] === l.moves[n]) n++;
+        const score = n * 10 + (o.eco === eco ? 5 : 0) - i; // longer shared start wins; same code, then main line breaks ties
+        if (n >= 2 && (!best || score > best.score)) best = { opening: o, line: i, score };
+      }
+    }
   }
   if (best) return { opening: best.opening, line: best.line };
   if (!eco) return null;
