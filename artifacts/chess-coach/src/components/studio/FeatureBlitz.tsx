@@ -530,10 +530,10 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
               <p className="text-[11.5px]" style={{ color: showcase?.error ? '#FF9AA0' : 'rgba(255,255,255,.5)' }}>
                 {!showcase ? 'Signing in…' : showcase.error ? `${showcase.error}. Showing your own account instead.` : `Showing ${showcase.name}: ${showcase.games ?? 0} games, ${showcase.reviewed ?? 0} reviewed. Loaded ${readyN}/${SCENES.length}.`}
               </p>
-              {showcase?.token && ((showcase.games ?? 0) < 5 || (showcase.reviewed ?? 0) < 1 || Object.keys(empty).length > 0) && (
+              {showcase?.token && ((showcase.games ?? 0) < 5 || (showcase.reviewed ?? 0) < 1 || Object.keys(empty).length > 0 || flowFailed.scout) && (
                 <div className="space-y-1 border-t border-white/10 pt-1.5">
                   <p className="text-[11.5px] text-[#E8B447]">
-                    {Object.keys(empty).length ? `Nothing to show yet in: ${SCENES.filter((x) => empty[x.kind]).map((x) => x.title).join(', ')}. ` : ''}This account needs games so the footage has something real in it.
+                    {Object.keys(empty).length ? `Nothing to show yet in: ${SCENES.filter((x) => empty[x.kind]).map((x) => x.title).join(', ')}. ` : ''}{flowFailed.scout ? 'No scouting report yet, so Opponent Scout shows only its search page. ' : ''}This account needs games so the footage has something real in it.
                   </p>
                   <span className="flex gap-1.5">
                     <input value={importFrom} onChange={(e) => setImportFrom(e.target.value)} placeholder={showcase.linked ? `Chess.com: ${showcase.linked}` : 'Chess.com username to import'} className="min-w-0 flex-1 rounded-md bg-white/5 px-2.5 py-1.5 text-[12.5px] text-white ring-1 ring-white/10" />
