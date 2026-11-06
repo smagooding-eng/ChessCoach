@@ -126,12 +126,14 @@ function AppScreen({ src, src2, flowAt = 0.35, pos, scroll, beat, onReady, onFai
     if (!active) return;
     const timers: ReturnType<typeof setTimeout>[] = [];
     let raf = 0;
-    const scrollTo = (win: Window, to: number, after: number, dur: number) => {
+    const scrollTo = (win: Window, to: number | (() => number), after: number, dur: number, linear = false) => {
       timers.push(setTimeout(() => {
         const from = win.scrollY || 0, t0 = performance.now();
+        const goal = typeof to === 'function' ? to() : to;
         const step = (now: number) => {
           const t = Math.min(1, (now - t0) / dur);
-          const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+          const e = linear ? t : t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+          const to = goal;
           try { win.scrollTo({ top: Math.round(from + (to - from) * e) }); } catch { /* ignore */ }
           if (t < 1) raf = requestAnimationFrame(step);
         };
@@ -140,12 +142,13 @@ function AppScreen({ src, src2, flowAt = 0.35, pos, scroll, beat, onReady, onFai
     };
     const total = beat * 1000;
     if (review) {
-      const moves = 5, gap = 650;
-      for (let n = 0; n < moves; n++) timers.push(setTimeout(() => { try { w.dispatchEvent(new (w as unknown as typeof window).KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); } catch { /* ignore */ } }, 600 + n * gap));
-      // Then one steady scroll down through the review that lasts to the end of the scene.
-      const after = 600 + moves * gap + 200;
-      const h = (() => { try { return Math.max(0, (w.document.documentElement.scrollHeight || 0) - 780); } catch { return 1600; } })();
-      scrollTo(w, Math.min(h, 700), after, Math.max(900, total - after - 100));
+      const moves = 4, gap = 550;
+      for (let n = 0; n < moves; n++) timers.push(setTimeout(() => { try { w.dispatchEvent(new (w as unknown as typeof window).KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); } catch { /* ignore */ } }, 400 + n * gap));
+      // Then one steady, even scroll down the review that is still moving when the
+      // scene cuts away (no ease-out, so it never sits still at the end).
+      const after = 400 + (moves - 1) * gap + 250;
+      const reach = () => { try { return Math.max(0, Math.min(900, (w.document.documentElement.scrollHeight || 0) - 780)); } catch { return 700; } };
+      scrollTo(w, reach, after, Math.max(900, total - after + 400), true);
     } else if (src2) {
       const at = total * flowAt;
       if (scroll) scrollTo(w, Math.min(scroll, 360), 500, Math.max(500, at - 1100));
@@ -277,15 +280,38 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
   // Scenes whose page has nothing to show yet (empty account, needs games…).
   const [empty, setEmpty] = useState<Record<string, boolean>>({});
 
-  // That account's latest scouting report, for the scout scene.
+  // That account's latest scouting report, for the scout scene. None yet: scout one
+  // of its opponents now (a minute or so) so the scene has a real report.
+  const [scouting, setScouting] = useState(false);
   useEffect(() => {
-    if (!showcase) return;
-    void apiFetch('/api/opponents/history', { credentials: 'include', headers: showcase.token ? { Authorization: `Bearer ${showcase.token}` } : {} })
-      .then((r) => (r.ok ? r.json() : null)).then((d) => {
-        const id = d?.scouts?.[0]?.id;
-        if (id) setFound((f) => ({ ...f, scout: `/opponents?job=${id}` }));
-        else setFlowFailed((f) => ({ ...f, scout: true }));
-      }).catch(() => {});
+    if (!showcase?.token) return;
+    let gone = false;
+    const H = { Authorization: `Bearer ${showcase.token}` };
+    const get = (u: string) => apiFetch(u, { credentials: 'include', headers: H, cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    void (async () => {
+      const d = await get('/api/opponents/history');
+      let id: string | undefined = d?.scouts?.[0]?.id;
+      if (!id) {
+        const who = (showcase.username ?? showcase.linked ?? '').toLowerCase();
+        const list = await get('/api/games?limit=10');
+        const opp = (list?.games ?? []).map((g: { whiteUsername?: string; blackUsername?: string; platform?: string }) => (g.platform === 'chessscout' ? null : (g.whiteUsername ?? '').toLowerCase() === who ? g.blackUsername : g.whiteUsername)).find((x: string | null | undefined) => !!x);
+        if (!opp || gone) { setFlowFailed((f) => ({ ...f, scout: true })); return; }
+        setScouting(true);
+        const st = await apiFetch('/api/opponents/start', { method: 'POST', credentials: 'include', headers: { ...H, 'Content-Type': 'application/json', ...(who ? { 'x-chess-username': who } : {}) }, body: JSON.stringify({ username: opp }) }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        const jobId: string | undefined = st?.jobId;
+        for (let n = 0; jobId && !gone && n < 60; n++) {
+          await new Promise((res) => setTimeout(res, 3000));
+          const js = await get(`/api/opponents/status/${jobId}`);
+          if (js?.status === 'done') { id = jobId; break; }
+          if (js?.status === 'error') break;
+        }
+        if (!gone) setScouting(false);
+      }
+      if (gone) return;
+      if (id) { setFlowFailed((f) => ({ ...f, scout: false })); setFound((f) => ({ ...f, scout: `/opponents?job=${id}` })); }
+      else setFlowFailed((f) => ({ ...f, scout: true }));
+    })();
+    return () => { gone = true; };
   }, [showcase]);
 
   // That account's latest reviewed game, for the review scene.
@@ -322,7 +348,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
   const readySet = useRef(new Set<string>());
   const markReady = (src: string) => { if (!readySet.current.has(src)) { readySet.current.add(src); bump((x) => x + 1); } };
   const readyN = showcase ? SCENES.filter((_, j) => readySet.current.has(srcOf(j))).length : 0;
-  const allReady = !appFootage || readyN >= SCENES.length;
+  const allReady = !appFootage || (readyN >= SCENES.length && !scouting);
   // Pages load two at a time (not all nine at once), so the server isn't hit with
   // every section's requests in the same second.
   const mayLoad = (j: number) => SCENES.slice(0, j).filter((_, q) => !readySet.current.has(srcOf(q))).length < 2;
@@ -336,7 +362,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
   }, [allReady, render]);
 
   // The game review gets three times as long: it plays through the game and the review.
-  const lenOf = (sc: Scene) => opts.beat * 1000 * (!appFootage ? 1 : sc.kind === 'review' ? 1.8 : sc.kind === 'puzzles' ? 2.2 : FLOW[sc.kind] && !flowFailed[sc.kind] ? 2 : 1);
+  const lenOf = (sc: Scene) => opts.beat * 1000 * (!appFootage ? 1 : sc.kind === 'review' ? 1.5 : sc.kind === 'puzzles' ? 2.2 : FLOW[sc.kind] && !flowFailed[sc.kind] ? 2 : 1);
   // (Scout and Weaknesses find their second page from the account; until then they run as one page.)
   const total = () => 2800 + SCENES.reduce((a, sc) => a + lenOf(sc), 0) + 3400;
   const play = (onDone?: () => void) => {
@@ -541,10 +567,10 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
                 {!showcase ? 'Signing in…' : showcase.error ? `${showcase.error.replace(/\.$/, '')}.` : `Showing ${showcase.name}${showcase.username ? ` (${showcase.username})` : ''}: ${showcase.games ?? 0} games, ${showcase.reviewed ?? 0} reviewed. Loaded ${readyN}/${SCENES.length}.`}
                 {showcase?.error && <button onClick={() => { readySet.current.clear(); setFailed({}); setFlowFailed({}); setFound({}); setReload((x) => x + 1); }} className="ml-2 rounded bg-white/10 px-2 py-0.5 font-bold text-white">Try again</button>}
               </p>
-              {showcase?.token && ((showcase.games ?? 0) < 5 || (showcase.reviewed ?? 0) < 1 || Object.keys(empty).length > 0 || flowFailed.scout) && (
+              {showcase?.token && ((showcase.games ?? 0) < 5 || (showcase.reviewed ?? 0) < 1 || Object.keys(empty).length > 0 || flowFailed.scout || scouting) && (
                 <div className="space-y-1 border-t border-white/10 pt-1.5">
                   <p className="text-[11.5px] text-[#E8B447]">
-                    {Object.keys(empty).length ? `Nothing to show yet in: ${SCENES.filter((x) => empty[x.kind]).map((x) => x.title).join(', ')}. ` : ''}{flowFailed.scout ? 'No scouting report yet, so Opponent Scout shows only its search page. ' : ''}This account needs games so the footage has something real in it.
+                    {Object.keys(empty).length ? `Nothing to show yet in: ${SCENES.filter((x) => empty[x.kind]).map((x) => x.title).join(', ')}. ` : ''}{scouting ? 'Scouting an opponent for the footage (about a minute)… ' : flowFailed.scout ? 'No scouting report yet, so Opponent Scout shows only its search page. ' : ''}This account needs games so the footage has something real in it.
                   </p>
                   <span className="flex gap-1.5">
                     <input value={importFrom} onChange={(e) => setImportFrom(e.target.value)} placeholder={showcase.linked ? `Chess.com: ${showcase.linked}` : 'Chess.com username to import'} className="min-w-0 flex-1 rounded-md bg-white/5 px-2.5 py-1.5 text-[12.5px] text-white ring-1 ring-white/10" />
