@@ -37,26 +37,33 @@ const SCENES: Scene[] = [
 ];
 
 export interface FeatureBlitzOpts { hook: string; beat: number; music: MusicStyle; looks: 'mine' | 'scene' | 'move'; footage?: 'app' | 'boards' }
-export const FEATURE_BLITZ_DEFAULT: FeatureBlitzOpts = { hook: "Use this app for a week and you'll never go back to Chess.com", beat: 2.2, music: 'hype', looks: 'scene', footage: 'app' };
+export const FEATURE_BLITZ_DEFAULT: FeatureBlitzOpts = { hook: "Use this app for a week and you'll never go back to Chess.com", beat: 3.6, music: 'hype', looks: 'scene', footage: 'app' };
 
 /** The real app page in a phone-sized frame, scrolled a little while it's on screen. */
-function AppScreen({ src, active, scroll, beat, onReady }: { src: string; active: boolean; scroll: number; beat: number; onReady: (src: string) => void }) {
+const FAILED = /didn.?t load|couldn.?t load|something went wrong|not found|failed to load|try again later/i;
+
+/** The real app page in a phone-sized frame. While it's on screen it scrolls slowly
+ *  through the page, and a tap ripple shows where you'd press. */
+function AppScreen({ src, pos, scroll, beat, onReady, onFail }: { src: string; pos: -1 | 0 | 1; scroll: number; beat: number; onReady: (src: string) => void; onFail: (src: string) => void }) {
   const ref = useRef<HTMLIFrameElement>(null);
+  const active = pos === 0;
   // Ready = the page has drawn its content (no spinner left), or 25 seconds have passed.
+  // A page that shows an error is reported, so the scene can show something else.
   useEffect(() => {
     let done = false; const t0 = Date.now(); let calm = 0;
     const id = setInterval(() => {
       if (done) return;
-      let ok = false;
+      let ok = false, bad = false;
       try {
         const d = ref.current?.contentDocument;
-        const root = d?.getElementById('root');
-        const text = root?.innerText ?? '';
-        const spinning = !!d?.querySelector('.animate-spin, .animate-pulse, [aria-busy="true"]');
+        const text = d?.getElementById('root')?.innerText ?? '';
+        const spinning = !!d?.querySelector('.animate-spin, [aria-busy="true"]');
         ok = !!d && d.readyState === 'complete' && text.length > 120 && !spinning;
+        bad = !!d && d.readyState === 'complete' && !spinning && text.length < 600 && FAILED.test(text);
       } catch { ok = true; }
+      if (bad) { done = true; clearInterval(id); onFail(src); return; }
       calm = ok ? calm + 1 : 0;
-      if (calm >= 3 || Date.now() - t0 > 25_000) { done = true; clearInterval(id); onReady(src); }
+      if (calm >= 4 || Date.now() - t0 > 25_000) { done = true; clearInterval(id); onReady(src); }
     }, 300);
     return () => clearInterval(id);
   }, [src]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -67,16 +74,30 @@ function AppScreen({ src, active, scroll, beat, onReady }: { src: string; active
     const ro = new ResizeObserver(() => setScale(el.clientWidth / 390));
     ro.observe(el); return () => ro.disconnect();
   }, []);
+  // A slow, steady scroll through the page for most of the scene.
   useEffect(() => {
     const w = ref.current?.contentWindow; if (!w) return;
     try { w.scrollTo({ top: 0 }); } catch { /* ignore */ }
     if (!active || !scroll) return;
-    const t = setTimeout(() => { try { w.scrollTo({ top: scroll, behavior: 'smooth' }); } catch { /* ignore */ } }, Math.min(700, beat * 300));
-    return () => clearTimeout(t);
+    const start = performance.now() + 700, dur = Math.max(800, beat * 1000 - 1300);
+    let raf = 0;
+    const step = (now: number) => {
+      const t = Math.min(1, Math.max(0, (now - start) / dur));
+      const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      try { w.scrollTo({ top: Math.round(scroll * e) }); } catch { /* ignore */ }
+      if (t < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
   }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
-    <div ref={box} className="absolute inset-0 overflow-hidden rounded-[5cqw]" style={{ opacity: active ? 1 : 0, pointerEvents: 'none' }}>
+    <div ref={box} className="absolute inset-0 overflow-hidden rounded-[5cqw]"
+      style={{ transform: `translateX(${pos * 110}%) scale(${active ? 1 : 0.92})`, opacity: active ? 1 : 0, transition: 'transform .45s cubic-bezier(.2,.8,.2,1), opacity .35s', pointerEvents: 'none' }}>
       <iframe ref={ref} src={src} title="" tabIndex={-1} aria-hidden="true" style={{ width: 390, height: 780, border: 0, transform: `scale(${scale})`, transformOrigin: 'top left', background: '#0B1112' }} />
+      {active && (
+        <motion.span className="absolute left-1/2 top-[38%] block h-[16%] w-[16%] -translate-x-1/2 rounded-full" style={{ border: '3px solid rgba(255,255,255,.85)', background: 'rgba(255,255,255,.18)' }}
+          initial={{ opacity: 0, scale: 0.4 }} animate={{ opacity: [0, 1, 0], scale: [0.4, 1, 1.5] }} transition={{ delay: Math.min(1.1, beat * 0.3), duration: 0.7 }} />
+      )}
     </div>
   );
 }
@@ -131,9 +152,11 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
     }).catch(() => {});
   }, [showcase]);
   // Each scene's page, with its own random board look.
+  // A page that showed an error falls back to a safer one (the review → your games list).
+  const [failed, setFailed] = useState<Record<string, boolean>>({});
   const srcOf = (j: number) => {
     const x = SCENES[j];
-    const path = x.kind === 'review' ? reviewPath : APP_PATH[x.kind].path;
+    const path = x.kind === 'review' ? (failed.review || !reviewPath ? '/games' : reviewPath) : failed[x.kind] && x.kind !== 'live' ? '/' : APP_PATH[x.kind].path;
     const q = new URLSearchParams();
     if (showcase?.token) q.set('studioAs', showcase.token);
     if (showcase?.token && opts.looks !== 'mine') q.set('studioLook', JSON.stringify(looks[j][0]));
@@ -155,7 +178,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
     if (w.__studioRender) w.__studioRender.ready = allReady;
   }, [allReady, render]);
 
-  const total = () => 2200 + SCENES.length * opts.beat * 1000 + 3400;
+  const total = () => 2800 + SCENES.length * opts.beat * 1000 + 3400;
   const play = (onDone?: () => void) => {
     // App footage: start once every page has loaded.
     if (!allReadyRef.current) { clear(); setPhase('idle'); pending.current = () => play(onDone); return; }
@@ -163,7 +186,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
     try { const m = mus(); routeSoundsTo(m.unlock(), m.sfx); m.stop(); if (opts.music !== 'off') m.start(opts.music); } catch { /* ignore */ }
     setPhase('hook'); setK(0); setMoved(false);
     later(150, () => mus().accent('riser'));
-    let t = 2200; const beat = opts.beat * 1000;
+    let t = 2800; const beat = opts.beat * 1000;
     SCENES.forEach((sc, j) => {
       later(t, () => { setPhase('scene'); setK(j); setMoved(false); mus().accent('whoosh'); });
       // The board plays the regular move sound itself.
@@ -260,7 +283,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
           <div className="pointer-events-none absolute left-1/2 z-10 h-[60cqh] w-[30cqh] -translate-x-1/2 rounded-[5cqw]"
             style={{ bottom: '9.5cqh', opacity: phase === 'scene' ? 1 : 0, transition: 'opacity .2s', boxShadow: '0 0 0 1.2cqw #1C1F1E, 0 0 0 1.5cqw rgba(255,255,255,.12), 0 18px 50px rgba(0,0,0,.6)' }}>
             {SCENES.map((x, j) => (
-              <AppScreen key={x.kind} src={srcOf(j)} active={phase === 'scene' && j === k} scroll={APP_PATH[x.kind].scroll} beat={opts.beat} onReady={markReady} />
+              <AppScreen key={x.kind} src={srcOf(j)} pos={phase !== 'scene' ? 1 : j < k ? -1 : j === k ? 0 : 1} scroll={APP_PATH[x.kind].scroll} beat={opts.beat} onReady={markReady} onFail={() => setFailed((f) => (f[x.kind] ? { ...f } : { ...f, [x.kind]: true }))} />
             ))}
           </div>
         )}
@@ -332,7 +355,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
           </div>
           <div className="flex flex-wrap items-center gap-1.5 text-[12px]">
             <span className="text-white/60">Pace:</span>
-            {[[1.7, 'Fast'], [2.2, 'Normal'], [2.8, 'Relaxed']].map(([b, l]) => <button key={l} onClick={() => setOpts({ ...opts, beat: b as number })} className="rounded-full px-2.5 py-1 font-bold" style={pill(opts.beat === b)}>{l as string}</button>)}
+            {[[2.8, 'Quick'], [3.6, 'Normal'], [4.6, 'Relaxed']].map(([b, l]) => <button key={l} onClick={() => setOpts({ ...opts, beat: b as number })} className="rounded-full px-2.5 py-1 font-bold" style={pill(opts.beat === b)}>{l as string}</button>)}
           </div>
           <div className="flex flex-wrap items-center gap-1.5 text-[12px]">
             <span className="text-white/60">Footage:</span>
