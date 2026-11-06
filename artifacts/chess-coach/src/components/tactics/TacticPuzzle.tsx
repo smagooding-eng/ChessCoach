@@ -26,7 +26,9 @@ export function TacticPuzzle({ puzzle, mode, onDone, onNext, nextLabel = 'Next' 
   const [idx, setIdx] = useState(0); // next move in the solution
   const [ready, setReady] = useState(!puzzle.setup);
   const [status, setStatus] = useState<'play' | 'solved' | 'failed'>('play');
-  const [missed, setMissed] = useState(false); // a wrong try in guided / kids mode
+  const [missed, setMissed] = useState(false); // used the hint (drill) / a wrong try (guided, kids)
+  // Drills: a wrong move can be retried 3 times before the puzzle counts as missed.
+  const [wrong, setWrong] = useState(0);
   const [hint, setHint] = useState(mode === 'guided');
   const [nonce, setNonce] = useState(0);
   const [last, setLast] = useState<{ from: string; to: string } | null>(null);
@@ -82,12 +84,13 @@ export function TacticPuzzle({ puzzle, mode, onDone, onNext, nextLabel = 'Next' 
     // Wrong.
     setNonce((n) => n + 1); // put the piece back
     if (mode === 'guided' || mode === 'kids') { setMissed(true); setHint(true); return; }
-    // Drill / speed: show the right move, count it as missed.
+    if (mode === 'drill' && wrong < 3) { setWrong((w) => w + 1); return; }
+    // Out of tries (or a speed round): show the right move, count it as missed.
     const c = new Chess(fen); const m = uciMove(c, solution[idx]);
     if (m) setLast({ from: m.from, to: m.to });
     setHint(true);
     finish(false);
-  }, [expected, status, fen, chess, idx, solution, finish, missed, mode]);
+  }, [expected, status, fen, chess, idx, solution, finish, missed, mode, wrong]);
 
   const arrow = hint && expected ? [{ from: expected.from, to: expected.to, color: 'rgba(129,182,76,0.85)' }]
     : status === 'failed' && idx < solution.length ? (() => { const c = new Chess(fen); const m = uciMove(c, solution[idx]); return m ? [{ from: m.from, to: m.to, color: 'rgba(129,182,76,0.85)' }] : undefined; })()
@@ -100,7 +103,8 @@ export function TacticPuzzle({ puzzle, mode, onDone, onNext, nextLabel = 'Next' 
         <span className="flex items-center gap-2">
           <span className="h-3 w-3 rounded-full" style={{ background: myColor.current === 'w' ? '#F5F5F0' : '#1A1A19', border: '1px solid rgba(255,255,255,.4)' }} />
           {status === 'solved' ? <span style={{ color: PT.green }}>Solved!</span> : status === 'failed' ? <span style={{ color: '#FF7A80' }}>Missed it. The green arrow shows the move.</span>
-            : !ready ? 'Watch their move…' : toMove === myColor.current ? `${myColor.current === 'w' ? 'White' : 'Black'} to move: find the best move` : '…'}
+            : !ready ? 'Watch their move…'
+            : wrong > 0 && mode === 'drill' ? <span style={{ color: '#E8B447' }}>Not that one. {3 - wrong + 1} {3 - wrong + 1 === 1 ? 'try' : 'tries'} left</span> : toMove === myColor.current ? `${myColor.current === 'w' ? 'White' : 'Black'} to move: find the best move` : '…'}
         </span>
         {mode !== 'speed' && <span style={{ color: PT.muted }}>{puzzle.rating}</span>}
       </div>

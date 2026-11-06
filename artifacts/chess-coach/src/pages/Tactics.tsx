@@ -374,7 +374,7 @@ export function TacticMotif() {
               {result.newly ? <Sparkles size={32} className="mx-auto" style={{ color: RD.gold }} /> : <Check size={32} className="mx-auto" style={{ color: RD.green }} />}
               <p className="text-[20px] font-black">{result.correct}/{result.total}{tab === 'guided' ? ' done' : ' right'}</p>
               <p className="text-[13px]" style={{ color: RD.muted }}>
-                {tab === 'guided' ? 'Now try a drill: 10 puzzles, no help. Get 8 right to master this pattern.'
+                {tab === 'guided' ? 'Now try a drill: 10 puzzles, no hints, 3 retries on each. Get 8 right to master this pattern.'
                   : result.newly ? `${m.name} mastered! ${pro ? 'It will come back for a quick review in a few days.' : ''}`
                   : result.reviewed ? (result.correct >= 7 ? 'Review passed. See you again in a bit longer.' : 'Needs another look. It will come back tomorrow.')
                   : result.mastered ? 'Already mastered. Try a speed round or a harder level.' : `Get ${8 - result.correct > 0 ? 8 - result.correct : 0} more right next time to master it.`}
