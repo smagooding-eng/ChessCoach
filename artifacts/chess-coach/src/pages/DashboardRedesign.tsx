@@ -234,23 +234,23 @@ export function DashboardRedesign() {
 
         {/* ── Play and Learn: a card each ── */}
         <div className="grid grid-cols-2 gap-3 lg:col-span-2">
-          <Link href="/play" className="flex items-center gap-2.5 rounded-[16px] px-3 py-2.5" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px]" style={{ background: `linear-gradient(180deg, ${GREEN}, ${GREEN_DARK})`, color: '#FFFFFF' }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ marginLeft: 2 }}><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z" /></svg>
+          <Link href="/play" className="flex items-center gap-3 rounded-[18px] px-3.5 py-3.5 transition-transform active:scale-[.98]" style={{ background: 'linear-gradient(160deg, rgba(129,182,76,.22), rgba(129,182,76,.07))', border: '1px solid rgba(129,182,76,.5)', boxShadow: '0 6px 18px rgba(0,0,0,.25)' }}>
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[13px]" style={{ background: `linear-gradient(180deg, ${GREEN}, ${GREEN_DARK})`, color: '#FFFFFF', boxShadow: '0 3px 0 rgba(0,0,0,.25)' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ marginLeft: 2 }}><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z" /></svg>
             </span>
             <span className="min-w-0 flex-1">
-              <b className="block text-[15px] font-extrabold leading-tight">Play</b>
-              <span className="block truncate text-[11.5px]" style={{ color: MUTED }}>Live, daily, bots</span>
+              <b className="block text-[17px] font-extrabold leading-tight">Play</b>
+              <span className="block truncate text-[12px]" style={{ color: MUTED }}>Live, daily, bots</span>
             </span>
             <ChevronRight size={16} className="shrink-0" style={{ color: MUTED }} />
           </Link>
-          <Link href="/learning" className="flex items-center gap-2.5 rounded-[16px] px-3 py-2.5" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px]" style={{ background: 'rgba(129,182,76,.14)', border: '1px solid rgba(129,182,76,.35)' }}>
-              <GraduationCap size={17} strokeWidth={2.25} style={{ color: GREEN }} />
+          <Link href="/learning" className="flex items-center gap-3 rounded-[18px] px-3.5 py-3.5 transition-transform active:scale-[.98]" style={{ background: 'linear-gradient(160deg, rgba(129,182,76,.14), rgba(255,255,255,.03))', border: '1px solid rgba(129,182,76,.35)', boxShadow: '0 6px 18px rgba(0,0,0,.25)' }}>
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[13px]" style={{ background: 'rgba(129,182,76,.18)', border: '1px solid rgba(129,182,76,.45)' }}>
+              <GraduationCap size={21} strokeWidth={2.25} style={{ color: GREEN }} />
             </span>
             <span className="min-w-0 flex-1">
-              <b className="block text-[15px] font-extrabold leading-tight">Learn</b>
-              <span className="block truncate text-[11.5px]" style={{ color: MUTED }}>Courses and drills</span>
+              <b className="block text-[17px] font-extrabold leading-tight">Learn</b>
+              <span className="block truncate text-[12px]" style={{ color: MUTED }}>Courses and drills</span>
             </span>
             <ChevronRight size={16} className="shrink-0" style={{ color: MUTED }} />
           </Link>

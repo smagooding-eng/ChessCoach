@@ -9,6 +9,8 @@ import { RD, DIFFICULTY_BADGE } from '@/lib/redesignTheme';
 import { QuickSignup, GoogleMark } from '@/components/QuickSignup';
 import { FenThumb } from '@/components/FenThumb';
 import { getLang, LANGUAGES } from '@/lib/i18n';
+import { MOTIFS as TACTIC_MOTIFS, GROUPS as TACTIC_GROUPS } from '@/lib/tactics';
+import { MotifDemo as TacticDemo } from '@/pages/Tactics';
 
 // Public, search-friendly pages: /play-chess-online, /chess-for-kids, ...,
 // their translations at /es/..., and the opening and trap pages. Open to
@@ -375,4 +377,79 @@ export function LangHome({ Landing }: { Landing: React.ComponentType }) {
   const [, navigate] = useLocation();
   useEffect(() => { if (isAuthenticated) navigate('/', { replace: true } as never); }, [isAuthenticated, navigate]);
   return isAuthenticated ? null : <Landing />;
+}
+
+// ── Chess tactics: /chess-tactics and /chess-tactics/<pattern> ──
+// Every pattern from the Tactics and Endgames sections with its demo, open to
+// everyone. /api/page puts the same text in the HTML for search engines.
+export function ChessTacticsIndex() {
+  useEffect(() => {
+    setPageMeta('Chess Tactics: Forks, Pins, Skewers & Mating Patterns | ChessScout', 'Every chess tactic explained with a short example: forks, pins, skewers, discovered attacks, back-rank and smothered mates, endgame tricks. Then drill each one free.', '/chess-tactics');
+  }, []);
+  return (
+    <>
+      <TopBar />
+      <main className="mx-auto w-full max-w-3xl space-y-4 px-4 pb-28 pt-5 md:pb-12">
+        <h1 className="text-[28px] font-black leading-tight" style={{ color: RD.text }}>Chess tactics</h1>
+        <p className="text-[14.5px] leading-relaxed" style={{ color: RD.muted }}>The patterns that win games, each shown with a short example: forks, pins and skewers, the combinations that set them up, the classic mating patterns and endgame tricks. Learn one, then drill it until you see it instantly.</p>
+        {TACTIC_GROUPS.map((g) => (
+          <section key={g.id} className="space-y-2">
+            <h2 className="text-[18px] font-extrabold" style={{ color: RD.text }}>{g.title}</h2>
+            <p className="text-[12.5px]" style={{ color: RD.muted }}>{g.sub}</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {TACTIC_MOTIFS.filter((m) => m.group === g.id).map((m) => (
+                <Link key={m.id} href={`/chess-tactics/${m.id}`} className="flex items-center gap-3 rounded-[16px] px-3 py-2.5" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+                  {m.demo && <FenThumb fen={m.demo.fen} size={52} />}
+                  <span className="min-w-0 flex-1">
+                    <b className="block truncate text-[14.5px]" style={{ color: RD.text }}>{m.name}</b>
+                    <span className="block text-[12px] leading-snug line-clamp-2" style={{ color: RD.muted }}>{m.blurb}</span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        ))}
+      </main>
+    </>
+  );
+}
+
+export function ChessTacticPage() {
+  const { slug } = useParams<{ slug: string }>();
+  const m = TACTIC_MOTIFS.find((x) => x.id === slug) ?? null;
+  useEffect(() => {
+    if (m) setPageMeta(`${m.name} in Chess: Explained With an Example | ChessScout`, `${m.blurb} See a ${m.name.toLowerCase()} step by step, then drill it free with real puzzles.`, `/chess-tactics/${m.id}`);
+  }, [m?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!m) return (<><TopBar /><main className="mx-auto max-w-3xl px-4 pt-8" style={{ color: RD.muted }}>That tactic isn’t here. <Link href="/chess-tactics" className="underline">All chess tactics</Link></main></>);
+  const related = TACTIC_MOTIFS.filter((x) => x.group === m.group && x.id !== m.id).slice(0, 6);
+  const moves = m.demo ? numberedMoves(m.demo.fen, m.demo.steps.map((s) => s.san)) : [];
+  return (
+    <>
+      <TopBar />
+      <main className="mx-auto w-full max-w-3xl space-y-3 px-4 pb-28 pt-5 md:pb-12">
+        <p className="text-[12.5px]"><Link href="/chess-tactics" className="font-bold underline" style={{ color: RD.green }}>Chess tactics</Link></p>
+        <h1 className="text-[28px] font-black leading-tight" style={{ color: RD.text }}>{m.name}</h1>
+        <p className="text-[15px] leading-relaxed" style={{ color: RD.muted }}>{m.blurb}</p>
+        {m.demo && (
+          <Card>
+            <TacticDemo m={m} onDone={() => {}} />
+            <p className="mt-3 text-[13px]" style={{ color: RD.muted }}>
+              {m.demo.intro} {moves.map((x, i) => <span key={i}><b style={{ color: RD.text }}>{x.label}{x.san}</b>{m.demo!.steps[i].say ? ` ${m.demo!.steps[i].say}` : ''} </span>)}
+            </p>
+          </Card>
+        )}
+        <Card>
+          <h2 className="text-[17px] font-extrabold" style={{ color: RD.text }}>Drill it with real puzzles</h2>
+          <p className="mt-1 text-[13.5px]" style={{ color: RD.muted }}>Three guided puzzles, then a drill of ten. Get eight right and the pattern is yours.</p>
+          <div className="mt-3"><CtaButton label={`Practice the ${m.name.toLowerCase()} free`} inApp={`/tactics/${m.id}`} title={m.name} /></div>
+        </Card>
+        {related.length > 0 && (
+          <Card>
+            <h2 className="mb-2 text-[15px] font-extrabold" style={{ color: RD.text }}>More like this</h2>
+            <div className="flex flex-wrap gap-1.5">{related.map((r) => <Link key={r.id} href={`/chess-tactics/${r.id}`} className="rounded-full px-3 py-1 text-[12.5px] font-bold" style={{ background: 'rgba(255,255,255,.07)', color: RD.text }}>{r.name}</Link>)}</div>
+          </Card>
+        )}
+      </main>
+    </>
+  );
 }

@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { MOTIFS, GROUPS } from '../artifacts/chess-coach/src/lib/tactics';
 
 // Readable-without-JavaScript versions of the public content pages.
 //
@@ -268,6 +269,33 @@ ${t.safeMoves?.length ? `<p><strong>Safe instead:</strong> ${esc(t.safeMoves.joi
   };
 }
 
+// ── Chess tactics ───────────────────────────────────────────────────────
+function tacticsIndex(): Page {
+  return {
+    title: 'Chess Tactics: Forks, Pins, Skewers & Mating Patterns | ChessScout', path: '/chess-tactics', image: 'og-learn.jpg',
+    description: 'Every chess tactic explained with a short example: forks, pins, skewers, discovered attacks, back-rank and smothered mates, endgame tricks. Then drill each one free.',
+    body: `${MAIN}<p><a href="/">ChessScout.net</a></p><h1>Chess tactics</h1>
+<p>The patterns that win games, each shown with a short example. Learn one, then drill it until you see it instantly.</p>
+${GROUPS.map((g) => `<h2>${esc(g.title)}</h2><p>${esc(g.sub)}</p><ul>${MOTIFS.filter((m) => m.group === g.id).map((m) => `<li><a href="/chess-tactics/${esc(m.id)}">${esc(m.name)}</a>: ${esc(m.blurb)}</li>`).join('')}</ul>`).join('\n')}</main>`,
+  };
+}
+function tacticPage(slug: string): Page | null {
+  const m = MOTIFS.find((x) => x.id === slug);
+  if (!m) return null;
+  const description = `${m.blurb} See a ${m.name.toLowerCase()} step by step, then drill it free with real puzzles.`.slice(0, 300);
+  const moves = m.demo ? numbered(m.demo.fen, m.demo.steps.map((x) => x.san)) : [];
+  const related = MOTIFS.filter((x) => x.group === m.group && x.id !== m.id);
+  return {
+    title: `${m.name} in Chess: Explained With an Example | ChessScout`, description, path: `/chess-tactics/${m.id}`, image: 'og-learn.jpg',
+    body: `${MAIN}<p><a href="/chess-tactics">Chess tactics</a></p><h1>${esc(m.name)}</h1>
+<p>${esc(m.blurb)}</p>${m.demo ? `<h2>Example</h2><p>${esc(m.demo.intro)}</p>
+<ol>${moves.map((x, i) => `<li><strong>${esc(x)}</strong>${m.demo!.steps[i].say ? `: ${esc(m.demo!.steps[i].say)}` : ''}</li>`).join('')}</ol>` : ''}
+<p><a href="/setup?signup=1">Practice the ${esc(m.name.toLowerCase())} free on ChessScout.net</a></p>
+${related.length ? `<h2>More like this</h2><ul>${related.map((r) => `<li><a href="/chess-tactics/${esc(r.id)}">${esc(r.name)}</a></li>`).join('')}</ul>` : ''}</main>`,
+    jsonLd: { '@context': 'https://schema.org', '@type': 'Article', headline: `${m.name} in chess`, description, mainEntityOfPage: `${SITE}/chess-tactics/${m.id}`, publisher: { '@type': 'Organization', name: 'ChessScout.net' } },
+  };
+}
+
 // ── HTML assembly ────────────────────────────────────────────────────────
 function apply(html: string, p: Page): string {
   const t = esc(p.title), d = esc(p.description), u = esc(`${SITE}${p.path}`);
@@ -326,6 +354,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     else if (kind === 'opening' && /^[a-z0-9-]{1,80}$/.test(slug)) page = await openingPage(slug);
     else if (kind === 'traps') page = await trapsIndex();
     else if (kind === 'trap' && /^[a-z0-9-]{1,80}$/.test(slug)) page = await trapPage(slug);
+    else if (kind === 'tactics') page = tacticsIndex();
+    else if (kind === 'tactic' && /^[a-z0-9-]{1,40}$/.test(slug)) page = tacticPage(slug);
   } catch { page = null; }
 
   // A language this page isn't translated into yet: send people (and crawlers)

@@ -9,6 +9,10 @@ const router: IRouter = Router();
 
 const SITE = "https://chessscout.net";
 
+// The public /chess-tactics pages (one per pattern; keep in step with
+// chess-coach/src/lib/tactics.ts).
+const TACTICS = ["fork", "pin", "skewer", "discovered", "double-check", "removing-defender", "hanging", "trapped", "deflection", "decoy", "overloading", "intermezzo", "x-ray", "clearance", "interference", "quiet-move", "sacrifice", "f7-attack", "mate-in-1", "mate-in-2", "mate-in-3", "back-rank", "smothered", "anastasia", "arabian", "boden", "hook", "double-bishop", "dovetail", "greek-gift", "promotion", "underpromotion", "passed-pawn", "breakthrough", "zugzwang", "rook-endgame", "queen-endgame", "minor-endgame"];
+
 // Static pages worth indexing. Deliberately does NOT include anything
 // behind ProtectedRoute (Openings, Traps, Endgames, Puzzles, etc.) --
 // a crawler can't reach real content behind the login wall, so listing
@@ -87,6 +91,8 @@ router.get("/sitemap.xml", async (_req: Request, res: Response) => {
       urlEntry(`${SITE}/chess-openings`, "weekly", "0.7"),
       ...openings.map((o) => urlEntry(`${SITE}/chess-openings/${o.slug}`, "weekly", "0.6")),
       urlEntry(`${SITE}/chess-traps`, "monthly", "0.7"),
+      urlEntry(`${SITE}/chess-tactics`, "monthly", "0.7"),
+      ...TACTICS.map((id) => urlEntry(`${SITE}/chess-tactics/${id}`, "monthly", "0.6")),
       ...traps.map((t) => urlEntry(`${SITE}/chess-traps/${t.slug}`, "monthly", "0.6")),
     ];
   } catch (err) { logger.warn({ err }, "[sitemap] Failed to load openings/traps"); }

@@ -185,6 +185,14 @@
       "destination": "/api/page?kind=trap&slug=:slug"
     },
     {
+      "source": "/chess-tactics",
+      "destination": "/api/page?kind=tactics"
+    },
+    {
+      "source": "/chess-tactics/:slug",
+      "destination": "/api/page?kind=tactic&slug=:slug"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

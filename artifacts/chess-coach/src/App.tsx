@@ -120,6 +120,8 @@ const ChessOpeningsIndex = lazyRetry(() => import("@/pages/SeoPages").then(m => 
 const ChessOpeningPage = lazyRetry(() => import("@/pages/SeoPages").then(m => ({ default: m.ChessOpeningPage })));
 const ChessTrapsIndex = lazyRetry(() => import("@/pages/SeoPages").then(m => ({ default: m.ChessTrapsIndex })));
 const ChessTrapPage = lazyRetry(() => import("@/pages/SeoPages").then(m => ({ default: m.ChessTrapPage })));
+const ChessTacticsIndex = lazyRetry(() => import("@/pages/SeoPages").then(m => ({ default: m.ChessTacticsIndex })));
+const ChessTacticPage = lazyRetry(() => import("@/pages/SeoPages").then(m => ({ default: m.ChessTacticPage })));
 const LangHome = lazyRetry(() => import("@/pages/SeoPages").then(m => ({ default: m.LangHome })));
 const PublicPlayersIndex = lazyRetry(() => import("@/pages/PublicPlayers").then(m => ({ default: m.PublicPlayersIndex })));
 const PublicPlayerPage = lazyRetry(() => import("@/pages/PublicPlayers").then(m => ({ default: m.PublicPlayerPage })));
@@ -564,6 +566,8 @@ function Router() {
       <Route path="/chess-openings/:slug" component={ChessOpeningPage} />
       <Route path="/chess-traps" component={ChessTrapsIndex} />
       <Route path="/chess-traps/:slug" component={ChessTrapPage} />
+      <Route path="/chess-tactics" component={ChessTacticsIndex} />
+      <Route path="/chess-tactics/:slug" component={ChessTacticPage} />
       <Route path="/scout/:data" component={ScoutShare} />
       <Route path="/players" component={PublicPlayersIndex} />
       <Route path="/players/:slug" component={PublicPlayerPage} />
