@@ -1,5 +1,5 @@
 // The tactics map: every motif, the Lichess puzzle tags its drills come from,
-// and (for most) a short hand-made demo. Middlegame motifs live on /tactics;
+// and a short hand-made demo. Middlegame motifs live on /tactics;
 // the mating patterns and endgame ones are shown on the Endgames page. Demo moves are checked legal.
 
 export type TacticGroup = 'basics' | 'next' | 'mates' | 'endgame';
@@ -147,6 +147,55 @@ export const MOTIFS: Motif[] = [
   { id: 'minor-endgame', name: 'Knight & bishop endgames', group: 'endgame', any: ['knightEndgame', 'bishopEndgame'],
     blurb: 'Outposts, wrong-colour bishops and knight forks.' },
 ];
+
+// Demos for the rest of the patterns (every move checked legal, every # a real mate).
+const MORE_DEMOS: Record<string, MotifDemo> = {
+  "deflection": { fen: "3r2k1/3q1ppp/8/8/6Q1/8/5PPP/4R1K1 w - - 0 1", intro: "Black's rook on d8 is the only thing guarding the back rank.",
+    steps: [{ san: "Qxd7", say: "Offer the queen: the rook has to choose." }, { san: "Rxd7", say: "It takes, and leaves the back rank." }, { san: "Re8#", say: "Checkmate. The defender was deflected." }] },
+  "decoy": { fen: "6k1/6pp/1q6/2N5/8/8/8/5R1K w - - 0 1", intro: "If the king were on f8, a knight could fork it with the queen.",
+    steps: [{ san: "Rf8+", say: "Lure the king to f8." }, { san: "Kxf8", say: "It has to take." }, { san: "Nd7+", say: "Now the fork: king and queen." }, { san: "Ke7", say: "" }, { san: "Nxb6", say: "The queen is won." }] },
+  "overloading": { fen: "3r2k1/5ppp/8/3n4/8/8/5PPP/3RR1K1 w - - 0 1", intro: "The rook on d8 has two jobs: guard the knight and guard the back rank.",
+    steps: [{ san: "Rxd5", say: "Take the knight." }, { san: "Rxd5", say: "If the rook takes back\u2026" }, { san: "Re8#", say: "\u2026it has left the back rank. Mate." }] },
+  "intermezzo": { fen: "6k1/5ppp/2q5/3N4/8/2b5/1P6/6K1 w - - 0 1", intro: "Black just took your knight on c3. Don't rush to take back.",
+    steps: [{ san: "Ne7+", say: "First, a check that forks the king and queen." }, { san: "Kf8", say: "" }, { san: "Nxc6", say: "Queen won, and the bishop on c3 is still there to take." }] },
+  "x-ray": { fen: "3r2k1/3q1ppp/8/8/8/8/3Q1PPP/3R2K1 w - - 0 1", intro: "Your rook on d1 'sees' through your queen.",
+    steps: [{ san: "Qxd7", say: "Trade queens." }, { san: "Rxd7", say: "Black takes back\u2026" }, { san: "Rxd7", say: "\u2026and the rook behind the queen takes too. A whole rook up." }] },
+  "clearance": { fen: "3r2k1/1p3ppp/8/4N3/6Q1/8/1B3PPP/6K1 w - - 0 1", intro: "Your knight is blocking the bishop's line to g7.",
+    steps: [{ san: "Nd7", say: "Move it out of the way (it attacks the rook too)." }, { san: "Rxd7", say: "Black takes it\u2026" }, { san: "Qxg7#", say: "\u2026and the bishop now guards g7. Mate." }] },
+  "interference": { fen: "r7/4P2k/1B6/8/8/8/8/7K w - - 0 1", intro: "The rook on a8 stops the pawn from queening on e8.",
+    steps: [{ san: "Bd8", say: "Block the rook's line." }, { san: "Rxd8", say: "If it takes the bishop\u2026" }, { san: "exd8=Q", say: "\u2026the pawn takes back and becomes a queen." }] },
+  "quiet-move": { fen: "r6k/1p4pp/8/8/3B4/5QR1/8/7K w - - 0 1", intro: "No check and no capture, but it wins.",
+    steps: [{ san: "Qf6", say: "A quiet move: it threatens mate on g7." }, { san: "gxf6", say: "Taking the queen opens the g-file and the long diagonal\u2026" }, { san: "Bxf6#", say: "\u2026mate." }] },
+  "sacrifice": { fen: "r6k/4N1pp/8/5R1Q/8/8/6PP/6K1 w - - 0 1", intro: "Give the queen to open the h-file.",
+    steps: [{ san: "Qxh7+", say: "The queen sacrifice." }, { san: "Kxh7", say: "The king has to take." }, { san: "Rh5#", say: "Mate: the knight covers g8 and g6." }] },
+  "f7-attack": { fen: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", intro: "At the start, f7 is guarded only by the king.",
+    steps: [{ san: "e4", say: "" }, { san: "e5", say: "" }, { san: "Bc4", say: "The bishop aims at f7." }, { san: "Nc6", say: "" }, { san: "Qh5", say: "Now the queen joins in." }, { san: "Nf6", say: "Black misses the threat\u2026" }, { san: "Qxf7#", say: "Mate on f7." }] },
+  "mate-in-1": { fen: "7k/7p/8/8/8/6Q1/1B3PPP/6K1 w - - 0 1", intro: "The bishop already aims at g7.",
+    steps: [{ san: "Qg7#", say: "The queen lands on g7, protected by the bishop. Mate." }] },
+  "mate-in-2": { fen: "3r2k1/5ppp/8/8/Q7/8/5PPP/4R1K1 w - - 0 1", intro: "A forcing move first, then the mate.",
+    steps: [{ san: "Re8+", say: "Check: the rook has to take." }, { san: "Rxe8", say: "" }, { san: "Qxe8#", say: "And the queen mates on the back rank." }] },
+  "mate-in-3": { fen: "2rr2k1/5ppp/8/4R3/4R3/4Q3/5PPP/6K1 w - - 0 1", intro: "Three pieces lined up on the e-file against two defenders.",
+    steps: [{ san: "Re8+", say: "" }, { san: "Rxe8", say: "" }, { san: "Rxe8+", say: "Check again." }, { san: "Rxe8", say: "" }, { san: "Qxe8#", say: "The last attacker mates." }] },
+  "hook": { fen: "5k2/5pp1/3N4/2P5/8/8/8/4R1K1 w - - 0 1", intro: "The pawn guards the knight, and the knight guards e8.",
+    steps: [{ san: "Re8#", say: "The rook checks on e8, protected by the knight. Mate." }] },
+  "double-bishop": { fen: "7k/7p/8/8/2B2B2/8/8/6K1 w - - 0 1", intro: "One bishop covers g8.",
+    steps: [{ san: "Be5#", say: "The other checks down the long diagonal. Mate." }] },
+  "dovetail": { fen: "4kb2/5p2/1N6/8/8/8/8/3Q2K1 w - - 0 1", intro: "The king's own pieces block f8 and f7.",
+    steps: [{ san: "Qd7#", say: "The queen lands right next to it, protected by the knight. Mate." }] },
+  "greek-gift": { fen: "5rk1/p4ppp/8/8/8/3B1N2/5PPP/3Q2K1 w - - 0 1", intro: "The classic bishop sacrifice on h7.",
+    steps: [{ san: "Bxh7+", say: "Give the bishop." }, { san: "Kxh7", say: "" }, { san: "Ng5+", say: "The knight comes in with check." }, { san: "Kg8", say: "" }, { san: "Qh5", say: "And the queen threatens mate on h7." }, { san: "a6", say: "" }, { san: "Qh7#", say: "Mate." }] },
+  "passed-pawn": { fen: "8/8/5k2/P7/8/8/8/6K1 w - - 0 1", intro: "Can the black king catch the pawn?",
+    steps: [{ san: "a6", say: "" }, { san: "Ke6", say: "" }, { san: "a7", say: "" }, { san: "Kd7", say: "Too far away." }, { san: "a8=Q", say: "A new queen." }] },
+  "zugzwang": { fen: "4k3/8/4K3/4P3/8/8/8/8 b - - 0 1", intro: "Black has to move, and every move gives ground.",
+    steps: [{ san: "Kf8", say: "If the king steps aside\u2026" }, { san: "Kd7", say: "\u2026White's king takes the key square." }, { san: "Kf7", say: "" }, { san: "e6+", say: "" }, { san: "Kf8", say: "" }, { san: "e7+", say: "" }, { san: "Kf7", say: "" }, { san: "e8=Q+", say: "The pawn queens." }] },
+  "rook-endgame": { fen: "R7/P5k1/8/8/8/8/r7/4K3 w - - 0 1", intro: "A rook on a8 in front of the pawn, the black rook behind it.",
+    steps: [{ san: "Rh8", say: "Get out of the way, with a trick." }, { san: "Kxh8", say: "If the king takes\u2026" }, { san: "a8=Q+", say: "\u2026the pawn queens with check." }, { san: "Kg7", say: "" }, { san: "Qxa2", say: "And the black rook falls." }] },
+  "queen-endgame": { fen: "7q/Q7/1K6/8/3k4/8/8/8 w - - 0 1", intro: "King and queen on the same diagonal.",
+    steps: [{ san: "Qa1+", say: "Check down the diagonal." }, { san: "Ke4", say: "The king steps off\u2026" }, { san: "Qxh8", say: "\u2026and the queen behind it goes." }] },
+  "minor-endgame": { fen: "8/8/8/5k2/8/1b6/2N5/6K1 w - - 0 1", intro: "Knights are deadly when there are only a few pieces left.",
+    steps: [{ san: "Nd4+", say: "A fork: the king and the bishop." }, { san: "Kf4", say: "" }, { san: "Nxb3", say: "Bishop won." }] },
+};
+for (const m of MOTIFS) if (!m.demo && MORE_DEMOS[m.id]) m.demo = MORE_DEMOS[m.id];
 
 export const motifById = (id: string) => MOTIFS.find((m) => m.id === id) ?? null;
 export const motifsIn = (g: TacticGroup) => MOTIFS.filter((m) => m.group === g);
