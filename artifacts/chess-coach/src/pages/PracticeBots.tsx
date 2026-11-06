@@ -924,9 +924,9 @@ function endOf(moves: string[]) {
 }
 
 /** Pick which line to train (main line or one of the others), then drill it. */
-function OpeningTrainerView({ opening, onBack }: { opening: OpeningLine; onBack: () => void }) {
+function OpeningTrainerView({ opening, onBack, startLine = 0 }: { opening: OpeningLine; onBack: () => void; startLine?: number }) {
   const lines = useMemo(() => linesOf(opening), [opening]);
-  const [idx, setIdx] = useState(0);
+  const [idx, setIdx] = useState(startLine);
   const line = lines[Math.min(idx, lines.length - 1)];
   const active = useMemo<OpeningLine>(() => ({ ...opening, moves: line.moves }), [opening, line]);
   return (
@@ -1391,7 +1391,33 @@ function readBotParam(): BotConfig | null {
   } catch { return null; }
 }
 
+/** From an opening page: the trainer opening (and line) closest to the moves you play,
+ *  falling back to the same ECO code, then the nearest code in the same family. */
+function readInitialOpeningPick(): { opening: OpeningLine; line: number } | null {
+  const p = new URLSearchParams(window.location.search);
+  const eco = p.get('eco');
+  const played = (p.get('moves') ?? '').split(' ').filter(Boolean);
+  if (!eco && !played.length) return null;
+  let best: { opening: OpeningLine; line: number; score: number } | null = null;
+  if (played.length) {
+    for (const o of OPENINGS) linesOf(o).forEach((l, i) => {
+      let n = 0; while (n < played.length && n < l.moves.length && played[n] === l.moves[n]) n++;
+      const score = n * 10 + (o.eco === eco ? 5 : 0) - i; // longer shared start wins; same code, then main line breaks ties
+      if (n >= 2 && (!best || score > best.score)) best = { opening: o, line: i, score };
+    });
+  }
+  if (best) return { opening: best.opening, line: best.line };
+  if (!eco) return null;
+  const exact = OPENINGS.find((o) => o.eco === eco);
+  if (exact) return { opening: exact, line: 0 };
+  const num = (e: string) => Number(e.slice(1));
+  const near = OPENINGS.filter((o) => o.eco[0] === eco[0]).sort((a, b) => Math.abs(num(a.eco) - num(eco)) - Math.abs(num(b.eco) - num(eco)))[0];
+  return near ? { opening: near, line: 0 } : null;
+}
+
 function readInitialOpeningParam(): OpeningLine | null {
+  const pick = readInitialOpeningPick();
+  if (pick) return pick.opening;
   const eco = new URLSearchParams(window.location.search).get('eco');
   if (!eco) return null;
   // Only some openings are curated for the trainer (37 now), so a user's actual game
@@ -1413,6 +1439,7 @@ export function PracticeBots() {
     isOnboarding ? (BOTS.find(b => b.rating === 1200) ?? null) : jumpIn ? findBotAboveRating(jumpIn.rating) : readBotParam()
   );
   const [selectedOpening, setSelectedOpening] = useState<OpeningLine | null>(readInitialOpeningParam);
+  const [urlPick] = useState(readInitialOpeningPick);
   const [tab, setTab] = useState<'bots' | 'openings'>(() => readInitialOpeningParam() ? 'openings' : readInitialTabParam());
   const { enabled: redesign } = useDashboardRedesignFlag();
 
@@ -1439,7 +1466,7 @@ export function PracticeBots() {
   }
 
   if (selectedOpening) {
-    return <OpeningTrainerView opening={selectedOpening} onBack={() => setSelectedOpening(null)} />;
+    return <OpeningTrainerView opening={selectedOpening} startLine={urlPick && urlPick.opening.id === selectedOpening.id ? urlPick.line : 0} onBack={() => setSelectedOpening(null)} />;
   }
 
   if (redesign) {
