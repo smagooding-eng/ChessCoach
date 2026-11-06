@@ -49,14 +49,11 @@ const FLOW: Partial<Record<Kind, { to: string; at: number }>> = {
 };
 const FAILED = /didn.?t load|couldn.?t load|something went wrong|not found|failed to load|try again later/i;
 
-/** The real app page in a phone-sized frame. While it's on screen it scrolls slowly
- *  through the page, and a tap ripple shows where you'd press. */
-function AppScreen({ src, pos, scroll, beat, onReady, onFail, review = false, flow }: { src: string; pos: -1 | 0 | 1; scroll: number; beat: number; onReady: (src: string) => void; onFail: (src: string) => void; review?: boolean; flow?: { to: string; at: number } }) {
-  const ref = useRef<HTMLIFrameElement>(null);
-  const active = pos === 0;
-  // Ready = the page has drawn its content (no spinner left), or 25 seconds have passed.
-  // A page that shows an error is reported, so the scene can show something else.
+/** Waits for one frame's page: content drawn, nothing spinning or skeleton-loading.
+ *  An error page, or still loading after 25 seconds, counts as failed. */
+function useFrameReady(ref: React.RefObject<HTMLIFrameElement | null>, src: string | undefined, onDone: (ok: boolean) => void) {
   useEffect(() => {
+    if (!src) return;
     let done = false; const t0 = Date.now(); let calm = 0;
     const id = setInterval(() => {
       if (done) return;
@@ -64,16 +61,33 @@ function AppScreen({ src, pos, scroll, beat, onReady, onFail, review = false, fl
       try {
         const d = ref.current?.contentDocument;
         const text = d?.getElementById('root')?.innerText ?? '';
-        const spinning = !!d?.querySelector('.animate-spin, [aria-busy="true"]');
-        ok = !!d && d.readyState === 'complete' && text.length > 120 && !spinning;
-        bad = !!d && d.readyState === 'complete' && !spinning && text.length < 600 && FAILED.test(text);
+        const loading = !!d?.querySelector('.animate-spin, [aria-busy="true"]') || (d?.querySelectorAll('.animate-pulse').length ?? 0) >= 4;
+        ok = !!d && d.readyState === 'complete' && text.length > 120 && !loading;
+        bad = !!d && d.readyState === 'complete' && !loading && text.length < 600 && FAILED.test(text);
       } catch { ok = true; }
-      if (bad) { done = true; clearInterval(id); onFail(src); return; }
+      if (bad || Date.now() - t0 > 25_000) { done = true; clearInterval(id); onDone(false); return; }
       calm = ok ? calm + 1 : 0;
-      if (calm >= 4 || Date.now() - t0 > 25_000) { done = true; clearInterval(id); onReady(src); }
+      if (calm >= 4) { done = true; clearInterval(id); onDone(true); }
     }, 300);
     return () => clearInterval(id);
   }, [src]); // eslint-disable-line react-hooks/exhaustive-deps
+}
+
+/** The real app page in a phone-sized frame. While it's on screen it scrolls slowly
+ *  through the page; a game review plays through the game first; a scene with a
+ *  second page (an opening trainer, a tactic…) taps through to it. Both pages are
+ *  loaded before the clip starts, so nothing is ever seen loading. */
+function AppScreen({ src, src2, flowAt = 0.35, pos, scroll, beat, onReady, onFail, review = false }: { src: string; src2?: string; flowAt?: number; pos: -1 | 0 | 1; scroll: number; beat: number; onReady: (src: string) => void; onFail: (src: string, which: 'page' | 'second') => void; review?: boolean }) {
+  const ref = useRef<HTMLIFrameElement>(null);
+  const ref2 = useRef<HTMLIFrameElement>(null);
+  const active = pos === 0;
+  const ok = useRef<{ a: boolean; b: boolean }>({ a: false, b: !src2 });
+  const check = () => { if (ok.current.a && ok.current.b) onReady(src); };
+  useEffect(() => { ok.current.a = false; }, [src]);
+  // Dropping the second page (it failed) shouldn't hold the scene up.
+  useEffect(() => { ok.current.b = !src2; if (!src2) check(); }, [src2]); // eslint-disable-line react-hooks/exhaustive-deps
+  useFrameReady(ref, src, (good) => { if (!good) { onFail(src, 'page'); return; } ok.current.a = true; check(); });
+  useFrameReady(ref2, src2, (good) => { if (!good) { onFail(src, 'second'); return; } ok.current.b = true; check(); });
   const box = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.5);
   useEffect(() => {
@@ -81,65 +95,59 @@ function AppScreen({ src, pos, scroll, beat, onReady, onFail, review = false, fl
     const ro = new ResizeObserver(() => setScale(el.clientWidth / 390));
     ro.observe(el); return () => ro.disconnect();
   }, []);
-  // A slow, steady scroll through the page for most of the scene. A game review
-  // plays through the game move by move first (each move rated), then scrolls
-  // down through the review: the game rating, the key mistakes and the coach notes.
+  const [second, setSecond] = useState(false);
+  const [tap, setTap] = useState(0);
   useEffect(() => {
     const w = ref.current?.contentWindow; if (!w) return;
-    try { w.scrollTo({ top: 0 }); } catch { /* ignore */ }
+    try { w.scrollTo({ top: 0 }); ref2.current?.contentWindow?.scrollTo({ top: 0 }); } catch { /* ignore */ }
+    setSecond(false);
     if (!active) return;
     const timers: ReturnType<typeof setTimeout>[] = [];
     let raf = 0;
-    const scrollTo = (to: number, after: number, dur: number) => {
+    const scrollTo = (win: Window, to: number, after: number, dur: number) => {
       timers.push(setTimeout(() => {
-        const from = w.scrollY || 0, t0 = performance.now();
+        const from = win.scrollY || 0, t0 = performance.now();
         const step = (now: number) => {
           const t = Math.min(1, (now - t0) / dur);
           const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-          try { w.scrollTo({ top: Math.round(from + (to - from) * e) }); } catch { /* ignore */ }
+          try { win.scrollTo({ top: Math.round(from + (to - from) * e) }); } catch { /* ignore */ }
           if (t < 1) raf = requestAnimationFrame(step);
         };
         raf = requestAnimationFrame(step);
       }, after));
     };
+    const total = beat * 1000;
     if (review) {
-      const total = beat * 1000;
       const moves = 12, gap = Math.min(520, (total * 0.42) / moves);
       for (let n = 0; n < moves; n++) timers.push(setTimeout(() => { try { w.dispatchEvent(new (w as unknown as typeof window).KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); } catch { /* ignore */ } }, 600 + n * gap));
       const after = 600 + moves * gap + 250;
       const h = (() => { try { return Math.max(0, (w.document.documentElement.scrollHeight || 0) - 780); } catch { return 1200; } })();
-      scrollTo(Math.min(h, 520), after, 1400);
-      scrollTo(Math.min(h, 1100), after + 2300, 1600);
-      return () => { timers.forEach(clearTimeout); cancelAnimationFrame(raf); };
-    }
-    if (flow) {
-      // Scroll the section page a little, then open the one item inside it.
-      const at = beat * 1000 * flow.at;
-      if (scroll) scrollTo(Math.min(scroll, 360), 500, Math.max(500, at - 900));
-      const startPath = (() => { try { return w.location.pathname + w.location.search; } catch { return ''; } })();
+      scrollTo(w, Math.min(h, 520), after, 1400);
+      scrollTo(w, Math.min(h, 1100), after + 2300, 1600);
+    } else if (src2) {
+      const at = total * flowAt;
+      if (scroll) scrollTo(w, Math.min(scroll, 360), 500, Math.max(500, at - 1100));
+      timers.push(setTimeout(() => setTap((x) => x + 1), at - 450));
       timers.push(setTimeout(() => {
-        try {
-          w.history.pushState({}, '', `${import.meta.env.BASE_URL.replace(/\/$/, '')}${flow.to}`);
-          w.dispatchEvent(new (w as unknown as typeof window).PopStateEvent('popstate'));
-          w.scrollTo({ top: 0 });
-        } catch { /* ignore */ }
+        setSecond(true);
+        // The page underneath restarts its demo now that it's on screen.
+        try { ref2.current?.contentWindow?.postMessage({ type: 'cs-studio-restart' }, '*'); } catch { /* ignore */ }
       }, at));
-      return () => {
-        timers.forEach(clearTimeout); cancelAnimationFrame(raf);
-        // Back to the section page for the next play.
-        try { if (startPath) { w.history.replaceState({}, '', startPath); w.dispatchEvent(new (w as unknown as typeof window).PopStateEvent('popstate')); } } catch { /* ignore */ }
-      };
+    } else {
+      timers.push(setTimeout(() => setTap((x) => x + 1), Math.min(1100, total * 0.3)));
+      if (scroll) scrollTo(w, scroll, 700, Math.max(800, total - 1300));
     }
-    if (scroll) scrollTo(scroll, 700, Math.max(800, beat * 1000 - 1300));
     return () => { timers.forEach(clearTimeout); cancelAnimationFrame(raf); };
   }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
+  const frameStyle = { width: 390, height: 780, border: 0, transform: `scale(${scale})`, transformOrigin: 'top left', background: '#0B1112' } as const;
   return (
     <div ref={box} className="absolute inset-0 overflow-hidden rounded-[5cqw]"
       style={{ transform: `translateX(${pos * 110}%) scale(${active ? 1 : 0.92})`, opacity: active ? 1 : 0, transition: 'transform .45s cubic-bezier(.2,.8,.2,1), opacity .35s', pointerEvents: 'none' }}>
-      <iframe ref={ref} src={src} title="" tabIndex={-1} aria-hidden="true" style={{ width: 390, height: 780, border: 0, transform: `scale(${scale})`, transformOrigin: 'top left', background: '#0B1112' }} />
-      {active && (
-        <motion.span className="absolute left-1/2 top-[38%] block h-[16%] w-[16%] -translate-x-1/2 rounded-full" style={{ border: '3px solid rgba(255,255,255,.85)', background: 'rgba(255,255,255,.18)' }}
-          initial={{ opacity: 0, scale: 0.4 }} animate={{ opacity: [0, 1, 0], scale: [0.4, 1, 1.5] }} transition={{ delay: Math.min(1.1, beat * 0.3), duration: 0.7 }} />
+      <iframe ref={ref} src={src} title="" tabIndex={-1} aria-hidden="true" style={{ ...frameStyle, position: 'absolute', inset: 0 }} />
+      {src2 && <iframe ref={ref2} src={src2} title="" tabIndex={-1} aria-hidden="true" style={{ ...frameStyle, position: 'absolute', inset: 0, opacity: second ? 1 : 0, transition: 'opacity .35s' }} />}
+      {active && tap > 0 && (
+        <motion.span key={tap} className="absolute left-1/2 top-[38%] block h-[16%] w-[16%] -translate-x-1/2 rounded-full" style={{ border: '3px solid rgba(255,255,255,.85)', background: 'rgba(255,255,255,.18)' }}
+          initial={{ opacity: 0, scale: 0.4 }} animate={{ opacity: [0, 1, 0], scale: [0.4, 1, 1.5] }} transition={{ duration: 0.7 }} />
       )}
     </div>
   );
@@ -197,14 +205,20 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
   // Each scene's page, with its own random board look.
   // A page that showed an error falls back to a safer one (the review → your games list).
   const [failed, setFailed] = useState<Record<string, boolean>>({});
-  const srcOf = (j: number) => {
-    const x = SCENES[j];
-    const path = x.kind === 'review' ? (failed.review || !reviewPath ? '/games' : reviewPath) : failed[x.kind] && x.kind !== 'live' ? '/' : APP_PATH[x.kind].path;
-    const q = new URLSearchParams();
+  const [flowFailed, setFlowFailed] = useState<Record<string, boolean>>({});
+  // A path with the frame's sign-in and board look added to its own query.
+  const withQ = (pathWithQuery: string, j: number) => {
+    const [path, own] = pathWithQuery.split('?');
+    const q = new URLSearchParams(own ?? '');
     if (showcase?.token) q.set('studioAs', showcase.token);
     if (showcase?.token && opts.looks !== 'mine') q.set('studioLook', JSON.stringify(looks[j][0]));
     const qs = q.toString();
     return `${import.meta.env.BASE_URL.replace(/\/$/, '')}${path}${qs ? `?${qs}` : ''}`;
+  };
+  const srcOf = (j: number) => {
+    const x = SCENES[j];
+    const path = x.kind === 'review' ? (failed.review || !reviewPath ? '/games' : reviewPath) : failed[x.kind] && x.kind !== 'live' ? '/' : APP_PATH[x.kind].path;
+    return withQ(path, j);
   };
   // Wait for every page to finish loading before the clip starts.
   const [, bump] = useState(0);
@@ -222,7 +236,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
   }, [allReady, render]);
 
   // The game review gets three times as long: it plays through the game and the review.
-  const lenOf = (sc: Scene) => opts.beat * 1000 * (!appFootage ? 1 : sc.kind === 'review' ? 3 : FLOW[sc.kind] ? 2 : 1);
+  const lenOf = (sc: Scene) => opts.beat * 1000 * (!appFootage ? 1 : sc.kind === 'review' ? 3 : FLOW[sc.kind] && !flowFailed[sc.kind] ? 2 : 1);
   const total = () => 2800 + SCENES.reduce((a, sc) => a + lenOf(sc), 0) + 3400;
   const play = (onDone?: () => void) => {
     // App footage: start once every page has loaded.
@@ -329,7 +343,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
           <div className="pointer-events-none absolute left-1/2 z-10 h-[60cqh] w-[30cqh] -translate-x-1/2 rounded-[5cqw]"
             style={{ bottom: '9.5cqh', opacity: phase === 'scene' ? 1 : 0, transition: 'opacity .2s', boxShadow: '0 0 0 1.2cqw #1C1F1E, 0 0 0 1.5cqw rgba(255,255,255,.12), 0 18px 50px rgba(0,0,0,.6)' }}>
             {SCENES.map((x, j) => (
-              <AppScreen key={x.kind} src={srcOf(j)} pos={phase !== 'scene' ? 1 : j < k ? -1 : j === k ? 0 : 1} scroll={APP_PATH[x.kind].scroll} beat={lenOf(x) / 1000} review={x.kind === 'review' && !failed.review && reviewPath !== '/games'} flow={failed[x.kind] ? undefined : FLOW[x.kind]} onReady={markReady} onFail={() => setFailed((f) => (f[x.kind] ? { ...f } : { ...f, [x.kind]: true }))} />
+              <AppScreen key={x.kind} src={srcOf(j)} pos={phase !== 'scene' ? 1 : j < k ? -1 : j === k ? 0 : 1} scroll={APP_PATH[x.kind].scroll} beat={lenOf(x) / 1000} review={x.kind === 'review' && !failed.review && reviewPath !== '/games'} src2={failed[x.kind] || flowFailed[x.kind] || !FLOW[x.kind] ? undefined : withQ(FLOW[x.kind]!.to, j)} flowAt={FLOW[x.kind]?.at} onReady={markReady} onFail={(src, which) => { if (which === 'page' && failed[x.kind]) { markReady(src); return; } (which === 'second' ? setFlowFailed : setFailed)((f) => (f[x.kind] ? f : { ...f, [x.kind]: true })); }} />
             ))}
           </div>
         )}

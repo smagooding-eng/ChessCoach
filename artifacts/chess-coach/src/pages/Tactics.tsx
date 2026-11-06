@@ -193,6 +193,12 @@ export function MotifDemo({ m, onDone }: { m: Motif; onDone: () => void }) {
     return out;
   }, [demo]);
   useEffect(() => { setI(0); setAuto(true); }, [demo]);
+  // In a Content Studio frame: start again when the frame comes on screen.
+  useEffect(() => {
+    const on = (e: MessageEvent) => { if ((e.data as { type?: string } | null)?.type === 'cs-studio-restart') { setI(0); setAuto(true); } };
+    window.addEventListener('message', on);
+    return () => window.removeEventListener('message', on);
+  }, []);
   useEffect(() => {
     if (!auto || !positions.length || i >= positions.length - 1) return;
     const t = setTimeout(() => setI((x) => x + 1), i === 0 ? 1600 : 1900);
