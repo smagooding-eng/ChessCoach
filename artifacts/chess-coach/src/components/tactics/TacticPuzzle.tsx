@@ -32,16 +32,19 @@ export function TacticPuzzle({ puzzle, mode, onDone, onNext, nextLabel = 'Next' 
   const [last, setLast] = useState<{ from: string; to: string } | null>(null);
   const started = useRef(Date.now());
   const finished = useRef(false);
+  // The side you play, known from the start (in Lichess puzzles the opponent moves first),
+  // so the board is the right way round from the first frame.
   const myColor = useRef<'w' | 'b'>('w');
+  myColor.current = useMemo(() => { const t = new Chess(puzzle.fen).turn(); return puzzle.setup ? (t === 'w' ? 'b' : 'w') : t; }, [puzzle.id, puzzle.fen, puzzle.setup]);
 
   // The opponent's opening move.
   useEffect(() => {
     finished.current = false; started.current = Date.now();
-    if (!puzzle.setup) { myColor.current = chess.turn(); return; }
+    if (!puzzle.setup) return;
     const t = setTimeout(() => {
       const m = uciMove(chess, puzzle.moves[0]);
       if (m) { setFen(chess.fen()); setLast({ from: m.from, to: m.to }); }
-      myColor.current = chess.turn(); setReady(true); started.current = Date.now();
+      setReady(true); started.current = Date.now();
     }, mode === 'speed' ? 250 : 650);
     return () => clearTimeout(t);
   }, [puzzle.id]); // eslint-disable-line react-hooks/exhaustive-deps
