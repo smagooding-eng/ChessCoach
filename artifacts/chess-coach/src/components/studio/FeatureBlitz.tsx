@@ -45,6 +45,10 @@ export const FEATURE_BLITZ_DEFAULT: FeatureBlitzOpts = { hook: "Use this app for
 const FLOW: Partial<Record<Kind, { to: string; at: number }>> = {
   // '' = found on the page: the first weakness on the Analysis page.
   weak: { to: '', at: 0.36 },
+  // Scan: a photo is scanned, then the position opens with the engine's ratings.
+  scan: { to: '/explore?from=scan&fen=' + encodeURIComponent('r1bq1rk1/ppp2ppp/2np1n2/2b1p3/2B1P3/2NP1N2/PPP2PPP/R1BQ1RK1 w - - 0 7'), at: 0.42 },
+  // Scout: the account's latest scouting report ('' = found from its history).
+  scout: { to: '', at: 0.34 },
   openings: { to: '/practice?tab=openings&eco=C50', at: 0.38 },
   tactics: { to: '/tactics/fork', at: 0.32 },
   endgames: { to: '/tactics/rook-endgame', at: 0.32 },
@@ -82,7 +86,7 @@ function useFrameReady(ref: React.RefObject<HTMLIFrameElement | null>, src: stri
  *  through the page; a game review plays through the game first; a scene with a
  *  second page (an opening trainer, a tactic…) taps through to it. Both pages are
  *  loaded before the clip starts, so nothing is ever seen loading. */
-function AppScreen({ src, src2, flowAt = 0.35, pos, scroll, beat, onReady, onFail, review = false, solve = false, discover, onDiscover, onEmpty }: { src: string; src2?: string; flowAt?: number; pos: -1 | 0 | 1; scroll: number; beat: number; onReady: (src: string) => void; onFail: (src: string, which: 'page' | 'second') => void; review?: boolean; solve?: boolean; discover?: string; onDiscover?: (path: string | null) => void; onEmpty?: (empty: boolean) => void }) {
+function AppScreen({ src, src2, flowAt = 0.35, pos, scroll, beat, onReady, onFail, review = false, solve = false, discover, onDiscover, onEmpty, scanFx = false }: { src: string; src2?: string; flowAt?: number; pos: -1 | 0 | 1; scroll: number; beat: number; onReady: (src: string) => void; onFail: (src: string, which: 'page' | 'second') => void; review?: boolean; solve?: boolean; discover?: string; onDiscover?: (path: string | null) => void; onEmpty?: (empty: boolean) => void; scanFx?: boolean }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const ref2 = useRef<HTMLIFrameElement>(null);
   const active = pos === 0;
@@ -113,6 +117,7 @@ function AppScreen({ src, src2, flowAt = 0.35, pos, scroll, beat, onReady, onFai
     ro.observe(el); return () => ro.disconnect();
   }, []);
   const [second, setSecond] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [tap, setTap] = useState(0);
   useEffect(() => {
     const w = ref.current?.contentWindow; if (!w) return;
@@ -145,6 +150,7 @@ function AppScreen({ src, src2, flowAt = 0.35, pos, scroll, beat, onReady, onFai
       const at = total * flowAt;
       if (scroll) scrollTo(w, Math.min(scroll, 360), 500, Math.max(500, at - 1100));
       timers.push(setTimeout(() => setTap((x) => x + 1), at - 450));
+      if (scanFx) timers.push(setTimeout(() => setScanning(true), Math.max(300, at - 1500)), setTimeout(() => setScanning(false), at + 150));
       timers.push(setTimeout(() => {
         setSecond(true);
         // The page underneath restarts its demo now that it's on screen.
@@ -165,6 +171,19 @@ function AppScreen({ src, src2, flowAt = 0.35, pos, scroll, beat, onReady, onFai
       style={{ transform: `translateX(${pos * 110}%) scale(${active ? 1 : 0.92})`, opacity: active ? 1 : 0, transition: 'transform .45s cubic-bezier(.2,.8,.2,1), opacity .35s', pointerEvents: 'none' }}>
       <iframe ref={ref} src={src} title="" tabIndex={-1} aria-hidden="true" style={{ ...frameStyle, position: 'absolute', inset: 0 }} />
       {src2 && <iframe ref={ref2} src={src2} title="" tabIndex={-1} aria-hidden="true" style={{ ...frameStyle, position: 'absolute', inset: 0, opacity: second ? 1 : 0, transition: 'opacity .35s' }} />}
+      {/* "Scanning a photo": a framed board shot with a sweeping line. */}
+      {active && scanning && (
+        <div className="absolute inset-0 z-10 grid place-items-center" style={{ background: 'rgba(5,8,6,.82)' }}>
+          <div className="relative w-[72%]" style={{ aspectRatio: '1 / 1' }}>
+            <div className="absolute inset-0 rounded-[6%]" style={{ border: '3px dashed rgba(255,255,255,.7)' }} />
+            <div className="absolute inset-[6%] grid grid-cols-8 overflow-hidden rounded-[3%]" style={{ filter: 'blur(0.4px) saturate(.9)' }}>
+              {Array.from({ length: 64 }, (_, q) => <span key={q} style={{ background: (Math.floor(q / 8) + q) % 2 ? '#769656' : '#EEEED2' }} />)}
+            </div>
+            <motion.div className="absolute inset-x-[2%] h-[3%] rounded-full" style={{ background: '#81B64C', boxShadow: '0 0 16px #81B64C' }} initial={{ top: '2%' }} animate={{ top: ['2%', '94%', '2%'] }} transition={{ duration: 1.3, ease: 'easeInOut' }} />
+            <p className="absolute -bottom-[16%] inset-x-0 text-center text-[15px] font-black text-white">Reading the board…</p>
+          </div>
+        </div>
+      )}
       {active && tap > 0 && (
         <motion.span key={tap} className="absolute left-1/2 top-[38%] block h-[16%] w-[16%] -translate-x-1/2 rounded-full" style={{ border: '3px solid rgba(255,255,255,.85)', background: 'rgba(255,255,255,.18)' }}
           initial={{ opacity: 0, scale: 0.4 }} animate={{ opacity: [0, 1, 0], scale: [0.4, 1, 1.5] }} transition={{ duration: 0.7 }} />
@@ -231,6 +250,18 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
       const list = await apiFetch('/api/games?limit=5', { credentials: 'include', headers: H }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
       const g = list?.games?.[0];
       if (g?.id) await apiFetch(`/api/games/${g.id}/review`, { method: 'POST', credentials: 'include', headers: H, body: '{}' }).catch(() => null);
+      setSetup('Scouting an opponent…');
+      const opp = list?.games?.[0] ? ((list.games[0].whiteUsername ?? '').toLowerCase() === who.toLowerCase() ? list.games[0].blackUsername : list.games[0].whiteUsername) : null;
+      if (opp) {
+        const st = await apiFetch('/api/opponents/start', { method: 'POST', credentials: 'include', headers: { ...H, 'x-chess-username': who }, body: JSON.stringify({ username: opp }) }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        const jobId = st?.jobId ?? st?.id;
+        for (let n = 0; jobId && n < 40; n++) {
+          await new Promise((res) => setTimeout(res, 3000));
+          const js = await apiFetch(`/api/opponents/status/${jobId}`, { credentials: 'include', headers: H, cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+          const status = js?.status ?? js?.job?.status;
+          if (status === 'done' || status === 'error') break;
+        }
+      }
       setSetup('Done. Reloading the footage…');
       readySet.current.clear(); setFailed({}); setFlowFailed({}); setFound({});
       setReload((x) => x + 1);
@@ -239,6 +270,17 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
   };
   // Scenes whose page has nothing to show yet (empty account, needs games…).
   const [empty, setEmpty] = useState<Record<string, boolean>>({});
+
+  // That account's latest scouting report, for the scout scene.
+  useEffect(() => {
+    if (!showcase) return;
+    void apiFetch('/api/opponents/history', { credentials: 'include', headers: showcase.token ? { Authorization: `Bearer ${showcase.token}` } : {} })
+      .then((r) => (r.ok ? r.json() : null)).then((d) => {
+        const id = d?.scouts?.[0]?.id;
+        if (id) setFound((f) => ({ ...f, scout: `/opponents?job=${id}` }));
+        else setFlowFailed((f) => ({ ...f, scout: true }));
+      }).catch(() => {});
+  }, [showcase]);
 
   // That account's latest reviewed game, for the review scene.
   const [reviewPath, setReviewPath] = useState('/games');
@@ -285,6 +327,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
 
   // The game review gets three times as long: it plays through the game and the review.
   const lenOf = (sc: Scene) => opts.beat * 1000 * (!appFootage ? 1 : sc.kind === 'review' ? 1.8 : sc.kind === 'puzzles' ? 2.2 : FLOW[sc.kind] && !flowFailed[sc.kind] ? 2 : 1);
+  // (Scout and Weaknesses find their second page from the account; until then they run as one page.)
   const total = () => 2800 + SCENES.reduce((a, sc) => a + lenOf(sc), 0) + 3400;
   const play = (onDone?: () => void) => {
     // App footage: start once every page has loaded.
@@ -393,7 +436,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
             {SCENES.map((x, j) => (
               <AppScreen key={x.kind} src={srcOf(j)} pos={phase !== 'scene' ? 1 : j < k ? -1 : j === k ? 0 : 1} scroll={APP_PATH[x.kind].scroll} beat={lenOf(x) / 1000} review={x.kind === 'review' && !failed.review && reviewPath !== '/games'} solve={x.kind === 'puzzles' && !failed.puzzles} src2={failed[x.kind] || flowFailed[x.kind] || !FLOW[x.kind] ? undefined : FLOW[x.kind]!.to ? withQ(FLOW[x.kind]!.to, j) : found[x.kind] ? withQ(found[x.kind]!, j) : undefined}
                 onEmpty={(e) => setEmpty((m) => { if (!!m[x.kind] === e) return m; const n = { ...m }; if (e) n[x.kind] = true; else delete n[x.kind]; return n; })}
-                discover={DISCOVER[x.kind]} onDiscover={(href) => { if (!href) setFlowFailed((f) => ({ ...f, [x.kind]: true })); else setFound((f) => (f[x.kind] === href ? f : { ...f, [x.kind]: href.replace(/\?.*$/, '') })); }} flowAt={FLOW[x.kind]?.at} onReady={markReady} onFail={(src, which) => { if (which === 'page' && failed[x.kind]) { markReady(src); return; } (which === 'second' ? setFlowFailed : setFailed)((f) => (f[x.kind] ? f : { ...f, [x.kind]: true })); }} />
+                discover={DISCOVER[x.kind]} scanFx={x.kind === 'scan'} onDiscover={(href) => { if (!href) setFlowFailed((f) => ({ ...f, [x.kind]: true })); else setFound((f) => (f[x.kind] === href ? f : { ...f, [x.kind]: href.replace(/\?.*$/, '') })); }} flowAt={FLOW[x.kind]?.at} onReady={markReady} onFail={(src, which) => { if (which === 'page' && failed[x.kind]) { markReady(src); return; } (which === 'second' ? setFlowFailed : setFailed)((f) => (f[x.kind] ? f : { ...f, [x.kind]: true })); }} />
             ))}
           </div>
         )}

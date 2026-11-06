@@ -290,6 +290,11 @@ export function OpponentAnalysis() {
   // resume) still applies unchanged. The param is stripped from the URL
   // immediately so a refresh or back-navigation can't re-trigger it.
   const autoStartRef = useRef<string | null>(null);
+  // ?job=<id>: open a saved scouting report straight away (links, Content Studio footage).
+  useEffect(() => {
+    const job = new URLSearchParams(window.location.search).get('job')?.trim();
+    if (job && /^[A-Za-z0-9_-]{4,80}$/.test(job)) void loadHistoricScout(job);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const param = new URLSearchParams(window.location.search).get('username')?.trim();
     if (!param) return;
