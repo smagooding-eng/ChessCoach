@@ -16,7 +16,7 @@ export const STUDIO_FRAME: StudioFrame | null = (() => {
 
 if (STUDIO_FRAME) {
   const mem = new Map<string, string>();
-  try { for (let i = 0; i < window.localStorage.length; i++) { const k = window.localStorage.key(i)!; mem.set(k, window.localStorage.getItem(k) ?? ''); } } catch { /* ignore */ }
+  // Starts empty: none of your own filters, settings or drafts carry into the footage.
   mem.set('chess_coach_token', STUDIO_FRAME.token);
   const store: Storage = {
     get length() { return mem.size; },

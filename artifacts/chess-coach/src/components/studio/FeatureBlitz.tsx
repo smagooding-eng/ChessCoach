@@ -51,11 +51,12 @@ const FLOW: Partial<Record<Kind, { to: string; at: number }>> = {
 };
 // Where to find the link a scene taps into (when its page decides it).
 const DISCOVER: Partial<Record<Kind, string>> = { weak: 'a[href*="/analysis/"]' };
+const EMPTY = /no games imported|no puzzles match|is part of pro|import your games to|no games yet|nothing here yet|no weaknesses yet/i;
 const FAILED = /didn.?t load|couldn.?t load|something went wrong|not found|failed to load|try again later/i;
 
 /** Waits for one frame's page: content drawn, nothing spinning or skeleton-loading.
  *  An error page, or still loading after 25 seconds, counts as failed. */
-function useFrameReady(ref: React.RefObject<HTMLIFrameElement | null>, src: string | undefined, onDone: (ok: boolean) => void) {
+function useFrameReady(ref: React.RefObject<HTMLIFrameElement | null>, src: string | undefined, onDone: (ok: boolean, text: string) => void) {
   useEffect(() => {
     if (!src) return;
     let done = false; const t0 = Date.now(); let calm = 0;
@@ -69,9 +70,9 @@ function useFrameReady(ref: React.RefObject<HTMLIFrameElement | null>, src: stri
         ok = !!d && d.readyState === 'complete' && text.length > 120 && !loading;
         bad = !!d && d.readyState === 'complete' && !loading && text.length < 600 && FAILED.test(text);
       } catch { ok = true; }
-      if (bad || Date.now() - t0 > 25_000) { done = true; clearInterval(id); onDone(false); return; }
+      if (bad || Date.now() - t0 > 25_000) { done = true; clearInterval(id); onDone(false, ''); return; }
       calm = ok ? calm + 1 : 0;
-      if (calm >= 4) { done = true; clearInterval(id); onDone(true); }
+      if (calm >= 4) { done = true; clearInterval(id); let t = ''; try { t = ref.current?.contentDocument?.getElementById('root')?.innerText ?? ''; } catch { /* ignore */ } onDone(true, t); }
     }, 300);
     return () => clearInterval(id);
   }, [src]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -81,7 +82,7 @@ function useFrameReady(ref: React.RefObject<HTMLIFrameElement | null>, src: stri
  *  through the page; a game review plays through the game first; a scene with a
  *  second page (an opening trainer, a tactic…) taps through to it. Both pages are
  *  loaded before the clip starts, so nothing is ever seen loading. */
-function AppScreen({ src, src2, flowAt = 0.35, pos, scroll, beat, onReady, onFail, review = false, solve = false, discover, onDiscover }: { src: string; src2?: string; flowAt?: number; pos: -1 | 0 | 1; scroll: number; beat: number; onReady: (src: string) => void; onFail: (src: string, which: 'page' | 'second') => void; review?: boolean; solve?: boolean; discover?: string; onDiscover?: (path: string | null) => void }) {
+function AppScreen({ src, src2, flowAt = 0.35, pos, scroll, beat, onReady, onFail, review = false, solve = false, discover, onDiscover, onEmpty }: { src: string; src2?: string; flowAt?: number; pos: -1 | 0 | 1; scroll: number; beat: number; onReady: (src: string) => void; onFail: (src: string, which: 'page' | 'second') => void; review?: boolean; solve?: boolean; discover?: string; onDiscover?: (path: string | null) => void; onEmpty?: (empty: boolean) => void }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const ref2 = useRef<HTMLIFrameElement>(null);
   const active = pos === 0;
@@ -90,8 +91,9 @@ function AppScreen({ src, src2, flowAt = 0.35, pos, scroll, beat, onReady, onFai
   useEffect(() => { ok.current.a = false; }, [src]);
   // Dropping the second page (it failed) shouldn't hold the scene up.
   useEffect(() => { ok.current.b = !src2; if (!src2) check(); }, [src2]); // eslint-disable-line react-hooks/exhaustive-deps
-  useFrameReady(ref, src, (good) => {
+  useFrameReady(ref, src, (good, text) => {
     if (!good) { onFail(src, 'page'); return; }
+    onEmpty?.(EMPTY.test(text));
     ok.current.a = true;
     // A scene that taps into something on its page finds the link now.
     if (discover && !src2 && onDiscover) {
@@ -203,14 +205,41 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
   // Shown signed in as the ChessScout.net account (not yours), in frames of their own.
   const [account, setAccount] = useState(() => { try { return localStorage.getItem('cs_studio_showcase') || 'chessscout'; } catch { return 'chessscout'; } });
   const [accountDraft, setAccountDraft] = useState(account);
-  const [showcase, setShowcase] = useState<{ token: string | null; name: string | null; error?: string } | null>(null);
+  const [showcase, setShowcase] = useState<{ token: string | null; name: string | null; error?: string; games?: number; reviewed?: number; linked?: string | null } | null>(null);
+  const [reload, setReload] = useState(0);
   useEffect(() => {
     if (!appFootage) return;
     setShowcase(null);
     void apiFetch('/api/admin/studio/showcase-session', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: account }) })
-      .then(async (r) => { const d = await r.json().catch(() => null); setShowcase(r.ok && d?.token ? { token: d.token, name: d.name } : { token: null, name: null, error: d?.error ?? "Couldn't sign in to that account" }); })
+      .then(async (r) => { const d = await r.json().catch(() => null); setShowcase(r.ok && d?.token ? { token: d.token, name: d.name, games: d.games, reviewed: d.reviewed, linked: d.linked } : { token: null, name: null, error: d?.error ?? "Couldn't sign in to that account" }); })
       .catch(() => setShowcase({ token: null, name: null, error: "Couldn't sign in to that account" }));
-  }, [account, appFootage]);
+  }, [account, appFootage, reload]);
+  // Fill the showcase account: import its games, find its weaknesses, review a game.
+  const [importFrom, setImportFrom] = useState('');
+  const [setup, setSetup] = useState<string | null>(null);
+  const runSetup = async () => {
+    const tok = showcase?.token; const who = (importFrom || showcase?.linked || '').trim();
+    if (!tok || !who) { setSetup('Type the Chess.com username whose games this account should have.'); return; }
+    const H = { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` };
+    try {
+      setSetup('Importing games…');
+      const im = await apiFetch('/api/games/import', { method: 'POST', credentials: 'include', headers: H, body: JSON.stringify({ username: who, platform: 'chesscom', months: 2 }) });
+      if (!im.ok) { const d = await im.json().catch(() => null); setSetup(d?.error ?? "Couldn't import those games."); return; }
+      setSetup('Finding weaknesses…');
+      await apiFetch('/api/analysis/start', { method: 'POST', credentials: 'include', headers: H, body: JSON.stringify({ username: who }) }).catch(() => null);
+      setSetup('Reviewing a game…');
+      const list = await apiFetch('/api/games?limit=5', { credentials: 'include', headers: H }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      const g = list?.games?.[0];
+      if (g?.id) await apiFetch(`/api/games/${g.id}/review`, { method: 'POST', credentials: 'include', headers: H, body: '{}' }).catch(() => null);
+      setSetup('Done. Reloading the footage…');
+      readySet.current.clear(); setFailed({}); setFlowFailed({}); setFound({});
+      setReload((x) => x + 1);
+      setTimeout(() => setSetup(null), 4000);
+    } catch { setSetup('Something went wrong setting it up.'); }
+  };
+  // Scenes whose page has nothing to show yet (empty account, needs games…).
+  const [empty, setEmpty] = useState<Record<string, boolean>>({});
+
   // That account's latest reviewed game, for the review scene.
   const [reviewPath, setReviewPath] = useState('/games');
   useEffect(() => {
@@ -363,6 +392,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
             style={{ bottom: '9.5cqh', opacity: phase === 'scene' ? 1 : 0, transition: 'opacity .2s', boxShadow: '0 0 0 1.2cqw #1C1F1E, 0 0 0 1.5cqw rgba(255,255,255,.12), 0 18px 50px rgba(0,0,0,.6)' }}>
             {SCENES.map((x, j) => (
               <AppScreen key={x.kind} src={srcOf(j)} pos={phase !== 'scene' ? 1 : j < k ? -1 : j === k ? 0 : 1} scroll={APP_PATH[x.kind].scroll} beat={lenOf(x) / 1000} review={x.kind === 'review' && !failed.review && reviewPath !== '/games'} solve={x.kind === 'puzzles' && !failed.puzzles} src2={failed[x.kind] || flowFailed[x.kind] || !FLOW[x.kind] ? undefined : FLOW[x.kind]!.to ? withQ(FLOW[x.kind]!.to, j) : found[x.kind] ? withQ(found[x.kind]!, j) : undefined}
+                onEmpty={(e) => setEmpty((m) => { if (!!m[x.kind] === e) return m; const n = { ...m }; if (e) n[x.kind] = true; else delete n[x.kind]; return n; })}
                 discover={DISCOVER[x.kind]} onDiscover={(href) => { if (!href) setFlowFailed((f) => ({ ...f, [x.kind]: true })); else setFound((f) => (f[x.kind] === href ? f : { ...f, [x.kind]: href.replace(/\?.*$/, '') })); }} flowAt={FLOW[x.kind]?.at} onReady={markReady} onFail={(src, which) => { if (which === 'page' && failed[x.kind]) { markReady(src); return; } (which === 'second' ? setFlowFailed : setFailed)((f) => (f[x.kind] ? f : { ...f, [x.kind]: true })); }} />
             ))}
           </div>
@@ -455,8 +485,20 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
                 </span>
               </label>
               <p className="text-[11.5px]" style={{ color: showcase?.error ? '#FF9AA0' : 'rgba(255,255,255,.5)' }}>
-                {!showcase ? 'Signing in…' : showcase.error ? `${showcase.error}. Showing your own account instead.` : `Showing ${showcase.name}. Each section gets its own random board. Loaded ${readyN}/${SCENES.length}.`}
+                {!showcase ? 'Signing in…' : showcase.error ? `${showcase.error}. Showing your own account instead.` : `Showing ${showcase.name}: ${showcase.games ?? 0} games, ${showcase.reviewed ?? 0} reviewed. Loaded ${readyN}/${SCENES.length}.`}
               </p>
+              {showcase?.token && ((showcase.games ?? 0) < 5 || (showcase.reviewed ?? 0) < 1 || Object.keys(empty).length > 0) && (
+                <div className="space-y-1 border-t border-white/10 pt-1.5">
+                  <p className="text-[11.5px] text-[#E8B447]">
+                    {Object.keys(empty).length ? `Nothing to show yet in: ${SCENES.filter((x) => empty[x.kind]).map((x) => x.title).join(', ')}. ` : ''}This account needs games so the footage has something real in it.
+                  </p>
+                  <span className="flex gap-1.5">
+                    <input value={importFrom} onChange={(e) => setImportFrom(e.target.value)} placeholder={showcase.linked ? `Chess.com: ${showcase.linked}` : 'Chess.com username to import'} className="min-w-0 flex-1 rounded-md bg-white/5 px-2.5 py-1.5 text-[12.5px] text-white ring-1 ring-white/10" />
+                    <button onClick={() => void runSetup()} disabled={!!setup && !setup.startsWith('Done')} className="rounded-md bg-[#81B64C] px-2.5 text-[12px] font-bold text-white disabled:opacity-50">Set it up</button>
+                  </span>
+                  {setup && <p className="text-[11.5px] text-white/60">{setup}</p>}
+                </div>
+              )}
             </div>
           )}
           <div className="flex flex-wrap items-center gap-1.5 text-[12px]">

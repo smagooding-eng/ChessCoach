@@ -1,3 +1,4 @@
+import { STUDIO_FRAME } from '@/lib/studioFrame';
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { ChevronRight } from 'lucide-react';
@@ -14,6 +15,10 @@ const fmt = (ms: number) => { const s = Math.max(0, Math.ceil(ms / 1000)); retur
  * whose move it is with your clock.
  */
 export function LiveGameReturn() {
+  if (STUDIO_FRAME) return null; // not in the Content Studio's app footage
+  return <LiveGameReturnInner />;
+}
+function LiveGameReturnInner() {
   const { authUser } = useUser();
   const [location] = useLocation();
   // Only the game screen itself (/live) has the game; Live history etc. don't.
