@@ -4,7 +4,7 @@ import { notifyUser } from "../lib/notify";
 import { logger as appLogger } from "../lib/logger";
 import { db, gamesTable, backgroundJobsTable, usersTable } from "@workspace/db";
 import { requireAuth, requirePremium, isUserPremium } from "../middlewares/authMiddleware";
-import { eq, desc, count, isNull, and, or, ilike, asc, sql, gte, inArray } from "drizzle-orm";
+import { eq, desc, count, isNull, and, or, ilike, asc, sql, gte, inArray, getTableColumns } from "drizzle-orm";
 import {
   ImportGamesBody,
   ImportGamesResponse,
@@ -462,8 +462,12 @@ router.get("/games", requireAuth, async (req, res): Promise<void> => {
     countQuery = countQuery.where(and(...conditions));
   }
 
+  // The list leaves out each game's full review (it can be hundreds of KB a game,
+  // and 50 of them at once was a big share of the server's memory); the review
+  // page loads it on its own. "reviewed" says whether there is one.
+  const { reviewData: _omitReview, ...listColumns } = getTableColumns(gamesTable);
   let dbQuery = db
-    .select()
+    .select({ ...listColumns, hasReview: sql<boolean>`(${gamesTable.reviewData} IS NOT NULL AND jsonb_typeof(${gamesTable.reviewData}) = 'object')` })
     .from(gamesTable)
     .orderBy(desc(gamesTable.playedAt))
     .limit(limit)
@@ -477,9 +481,9 @@ router.get("/games", requireAuth, async (req, res): Promise<void> => {
   const [games, [{ value: total }]] = await Promise.all([dbQuery, countQuery]);
 
   res.json({
-    games: games.map((g) => ({
+    games: games.map(({ hasReview, ...g }) => ({
       ...g,
-      reviewed: !!(g.reviewData && typeof g.reviewData === 'object'),
+      reviewed: !!hasReview,
       playedAt: g.playedAt.toISOString(),
       createdAt: g.createdAt.toISOString(),
       platform: g.platform || "chesscom",

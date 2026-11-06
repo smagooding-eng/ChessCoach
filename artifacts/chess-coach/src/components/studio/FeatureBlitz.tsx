@@ -322,6 +322,9 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
   const markReady = (src: string) => { if (!readySet.current.has(src)) { readySet.current.add(src); bump((x) => x + 1); } };
   const readyN = showcase ? SCENES.filter((_, j) => readySet.current.has(srcOf(j))).length : 0;
   const allReady = !appFootage || readyN >= SCENES.length;
+  // Pages load two at a time (not all nine at once), so the server isn't hit with
+  // every section's requests in the same second.
+  const mayLoad = (j: number) => SCENES.slice(0, j).filter((_, q) => !readySet.current.has(srcOf(q))).length < 2;
   const allReadyRef = useRef(allReady); allReadyRef.current = allReady;
   const pending = useRef<null | (() => void)>(null);
   useEffect(() => { if (allReady && pending.current) { const f = pending.current; pending.current = null; f(); } }, [allReady]);
@@ -439,7 +442,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
         {appFootage && showcase && (
           <div className="pointer-events-none absolute left-1/2 z-10 h-[60cqh] w-[30cqh] -translate-x-1/2 rounded-[5cqw]"
             style={{ bottom: '9.5cqh', opacity: phase === 'scene' ? 1 : 0, transition: 'opacity .2s', boxShadow: '0 0 0 1.2cqw #1C1F1E, 0 0 0 1.5cqw rgba(255,255,255,.12), 0 18px 50px rgba(0,0,0,.6)' }}>
-            {SCENES.map((x, j) => (
+            {SCENES.map((x, j) => !mayLoad(j) ? null : (
               <AppScreen key={x.kind} src={srcOf(j)} pos={phase !== 'scene' ? 1 : j < k ? -1 : j === k ? 0 : 1} scroll={APP_PATH[x.kind].scroll} beat={lenOf(x) / 1000} review={x.kind === 'review' && !failed.review && reviewPath !== '/games'} solve={x.kind === 'puzzles' && !failed.puzzles} src2={failed[x.kind] || flowFailed[x.kind] || !FLOW[x.kind] ? undefined : FLOW[x.kind]!.to ? withQ(FLOW[x.kind]!.to, j) : found[x.kind] ? withQ(found[x.kind]!, j) : undefined}
                 onEmpty={(e) => setEmpty((m) => { if (!!m[x.kind] === e) return m; const n = { ...m }; if (e) n[x.kind] = true; else delete n[x.kind]; return n; })}
                 discover={DISCOVER[x.kind]} scanFx={x.kind === 'scan'} onDiscover={(href) => { if (!href) setFlowFailed((f) => ({ ...f, [x.kind]: true })); else setFound((f) => (f[x.kind] === href ? f : { ...f, [x.kind]: href.replace(/\?.*$/, '') })); }} flowAt={FLOW[x.kind]?.at} onReady={markReady} onFail={(src, which) => { if (which === 'page' && failed[x.kind]) { markReady(src); return; } (which === 'second' ? setFlowFailed : setFailed)((f) => (f[x.kind] ? f : { ...f, [x.kind]: true })); }} />
