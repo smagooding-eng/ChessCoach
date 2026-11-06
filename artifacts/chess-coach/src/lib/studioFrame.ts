@@ -2,7 +2,7 @@
 // the ChessScout.net showcase account (?studioAs=<token>), with a board look of
 // its own (?studioLook=…). Storage there is kept in memory, so nothing the frame
 // does reaches the real signed-in app around it. Imported first in main.tsx.
-export interface StudioFrame { token: string; look: Record<string, unknown> | null }
+export interface StudioFrame { token: string; look: Record<string, unknown> | null; user: string | null }
 export const STUDIO_FRAME: StudioFrame | null = (() => {
   try {
     if (window.self === window.top) return null;
@@ -10,7 +10,8 @@ export const STUDIO_FRAME: StudioFrame | null = (() => {
     const token = p.get('studioAs');
     if (!token || !/^[a-f0-9]{20,128}$/i.test(token)) return null;
     const lookRaw = p.get('studioLook');
-    return { token, look: lookRaw ? JSON.parse(lookRaw) : null };
+    const user = p.get('studioUser');
+    return { token, look: lookRaw ? JSON.parse(lookRaw) : null, user: user && /^[\w.-]{2,40}$/.test(user) ? user : null };
   } catch { return null; }
 })();
 
@@ -18,6 +19,8 @@ if (STUDIO_FRAME) {
   const mem = new Map<string, string>();
   // Starts empty: none of your own filters, settings or drafts carry into the footage.
   mem.set('chess_coach_token', STUDIO_FRAME.token);
+  // The account's chess username: its games, weaknesses and reports are looked up by it.
+  if (STUDIO_FRAME.user) mem.set('chessCoachUsername', STUDIO_FRAME.user);
   const store: Storage = {
     get length() { return mem.size; },
     clear: () => mem.clear(),

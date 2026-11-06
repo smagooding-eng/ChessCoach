@@ -224,7 +224,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
   // Shown signed in as the ChessScout.net account (not yours), in frames of their own.
   const [account, setAccount] = useState(() => { try { return localStorage.getItem('cs_studio_showcase') || 'chessscout'; } catch { return 'chessscout'; } });
   const [accountDraft, setAccountDraft] = useState(account);
-  const [showcase, setShowcase] = useState<{ token: string | null; name: string | null; error?: string; games?: number; reviewed?: number; linked?: string | null } | null>(null);
+  const [showcase, setShowcase] = useState<{ token: string | null; name: string | null; error?: string; games?: number; reviewed?: number; linked?: string | null; username?: string | null } | null>(null);
   const [reload, setReload] = useState(0);
   useEffect(() => {
     if (!appFootage) return;
@@ -232,12 +232,12 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
     void apiFetch('/api/admin/studio/showcase-session', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: account }) })
       .then(async (r) => {
         const d = await r.json().catch(() => null);
-        if (r.ok && d?.token) { setShowcase({ token: d.token, name: d.name, games: d.games, reviewed: d.reviewed, linked: d.linked }); return; }
+        if (r.ok && d?.token) { setShowcase({ token: d.token, name: d.name, games: d.games, reviewed: d.reviewed, linked: d.linked, username: d.username ?? d.linked ?? null }); return; }
         // Say why, so it's clear what to fix.
         const why = d?.error ?? (r.status === 404 ? "The server doesn't have this yet (redeploy Render)" : r.status === 401 || r.status === 403 ? 'Only an admin can do this (sign in again?)' : `Server error ${r.status}`);
         setShowcase({ token: null, name: null, error: why });
       })
-      .catch(() => setShowcase({ token: null, name: null, error: "Couldn't sign in to that account" }));
+      .catch(() => setShowcase({ token: null, name: null, error: "Can't reach the server. Render is down or restarting: wait until it says Live, then tap Try again." }));
   }, [account, appFootage, reload]);
   // Fill the showcase account: import its games, find its weaknesses, review a game.
   const [importFrom, setImportFrom] = useState('');
@@ -307,6 +307,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
     const [path, own] = pathWithQuery.split('?');
     const q = new URLSearchParams(own ?? '');
     if (showcase?.token) q.set('studioAs', showcase.token);
+    if (showcase?.token && showcase.username) q.set('studioUser', showcase.username);
     if (showcase?.token && opts.looks !== 'mine') q.set('studioLook', JSON.stringify(looks[j][0]));
     const qs = q.toString();
     return `${import.meta.env.BASE_URL.replace(/\/$/, '')}${path}${qs ? `?${qs}` : ''}`;
@@ -537,7 +538,8 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
                 </span>
               </label>
               <p className="text-[11.5px]" style={{ color: showcase?.error ? '#FF9AA0' : 'rgba(255,255,255,.5)' }}>
-                {!showcase ? 'Signing in…' : showcase.error ? `${showcase.error}. Showing your own account instead.` : `Showing ${showcase.name}: ${showcase.games ?? 0} games, ${showcase.reviewed ?? 0} reviewed. Loaded ${readyN}/${SCENES.length}.`}
+                {!showcase ? 'Signing in…' : showcase.error ? `${showcase.error.replace(/\.$/, '')}.` : `Showing ${showcase.name}${showcase.username ? ` (${showcase.username})` : ''}: ${showcase.games ?? 0} games, ${showcase.reviewed ?? 0} reviewed. Loaded ${readyN}/${SCENES.length}.`}
+                {showcase?.error && <button onClick={() => { readySet.current.clear(); setFailed({}); setFlowFailed({}); setFound({}); setReload((x) => x + 1); }} className="ml-2 rounded bg-white/10 px-2 py-0.5 font-bold text-white">Try again</button>}
               </p>
               {showcase?.token && ((showcase.games ?? 0) < 5 || (showcase.reviewed ?? 0) < 1 || Object.keys(empty).length > 0 || flowFailed.scout) && (
                 <div className="space-y-1 border-t border-white/10 pt-1.5">

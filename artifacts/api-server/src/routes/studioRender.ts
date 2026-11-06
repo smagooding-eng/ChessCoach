@@ -86,7 +86,10 @@ router.post("/admin/studio/showcase-session", requireAdmin, async (req: Request,
     const sid = await createSession({ user } as unknown as SessionData);
     await db.update(sessionsTable).set({ expire: new Date(Date.now() + 2 * 3600_000) }).where(eq(sessionsTable.sid, sid));
     const [g] = ((await db.execute(sql`SELECT COUNT(*) AS n, COUNT(*) FILTER (WHERE review_data IS NOT NULL) AS reviewed FROM games WHERE user_id = ${u.id as string}`)) as unknown as { rows: { n: string; reviewed: string }[] }).rows;
-    res.json({ games: Number(g?.n ?? 0), reviewed: Number(g?.reviewed ?? 0), linked: (u.chesscom_username ?? u.lichess_username ?? null) as string | null, token: sid, name: (u.scout_username ?? u.chesscom_username ?? want) as string });
+    // The username its games and weaknesses are stored under (the pages look it up by name).
+    const [top] = ((await db.execute(sql`SELECT username, COUNT(*) AS n FROM games WHERE user_id = ${u.id as string} AND platform <> 'chessscout' GROUP BY username ORDER BY n DESC LIMIT 1`)) as unknown as { rows: { username: string }[] }).rows;
+    const username = (top?.username ?? u.chesscom_username ?? u.lichess_username ?? null) as string | null;
+    res.json({ games: Number(g?.n ?? 0), reviewed: Number(g?.reviewed ?? 0), linked: (u.chesscom_username ?? u.lichess_username ?? top?.username ?? null) as string | null, username, token: sid, name: (u.scout_username ?? u.chesscom_username ?? want) as string });
   } catch (err) { logger.error({ err }, "[studio] showcase session"); res.status(500).json({ error: "Couldn't start it" }); }
 });
 
