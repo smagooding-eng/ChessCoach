@@ -1044,6 +1044,27 @@ function OpeningTrainerCore({ opening, onBack }: { opening: OpeningLine; onBack:
   };
 
   const handleShowHint = () => setHintOpen((v) => !v);
+  // In a Content Studio frame: when it comes on screen, play the line itself
+  // (your moves, with the hint arrows), so the video shows the opening being drilled.
+  const autoRef = useRef<{ expected: string | null; play: (san: string, ok: boolean) => void; reset: () => void }>({ expected: null, play: () => {}, reset: () => {} });
+  autoRef.current = { expected: playerExpected, play: handleMovePlayed, reset: handleReset };
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const on = (e: MessageEvent) => {
+      if ((e.data as { type?: string } | null)?.type !== 'cs-studio-restart') return;
+      if (timer) clearInterval(timer);
+      autoRef.current.reset(); // from the start each time
+      setHintOpen(true);
+      let n = 0;
+      timer = setInterval(() => {
+        const exp = autoRef.current.expected;
+        if (exp) { autoRef.current.play(exp, true); n++; }
+        if (n >= 6 && timer) { clearInterval(timer); timer = null; }
+      }, 1100);
+    };
+    window.addEventListener('message', on);
+    return () => { window.removeEventListener('message', on); if (timer) clearInterval(timer); };
+  }, []);
   // The hinted move as an arrow on the board.
   const hintArrow = useMemo(() => {
     if (!hintOpen || !playerExpected) return undefined;

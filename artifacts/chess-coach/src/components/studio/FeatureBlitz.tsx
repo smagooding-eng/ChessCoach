@@ -43,10 +43,14 @@ export const FEATURE_BLITZ_DEFAULT: FeatureBlitzOpts = { hook: "Use this app for
 // Scenes that open one thing inside their section part-way through: an opening
 // trainer, a tactic, an endgame pattern. (Their scenes run twice as long.)
 const FLOW: Partial<Record<Kind, { to: string; at: number }>> = {
+  // '' = found on the page: the first weakness on the Analysis page.
+  weak: { to: '', at: 0.36 },
   openings: { to: '/practice?tab=openings&eco=C50', at: 0.38 },
   tactics: { to: '/tactics/fork', at: 0.32 },
   endgames: { to: '/tactics/rook-endgame', at: 0.32 },
 };
+// Where to find the link a scene taps into (when its page decides it).
+const DISCOVER: Partial<Record<Kind, string>> = { weak: 'a[href*="/analysis/"]' };
 const FAILED = /didn.?t load|couldn.?t load|something went wrong|not found|failed to load|try again later/i;
 
 /** Waits for one frame's page: content drawn, nothing spinning or skeleton-loading.
@@ -77,7 +81,7 @@ function useFrameReady(ref: React.RefObject<HTMLIFrameElement | null>, src: stri
  *  through the page; a game review plays through the game first; a scene with a
  *  second page (an opening trainer, a tactic…) taps through to it. Both pages are
  *  loaded before the clip starts, so nothing is ever seen loading. */
-function AppScreen({ src, src2, flowAt = 0.35, pos, scroll, beat, onReady, onFail, review = false }: { src: string; src2?: string; flowAt?: number; pos: -1 | 0 | 1; scroll: number; beat: number; onReady: (src: string) => void; onFail: (src: string, which: 'page' | 'second') => void; review?: boolean }) {
+function AppScreen({ src, src2, flowAt = 0.35, pos, scroll, beat, onReady, onFail, review = false, discover, onDiscover }: { src: string; src2?: string; flowAt?: number; pos: -1 | 0 | 1; scroll: number; beat: number; onReady: (src: string) => void; onFail: (src: string, which: 'page' | 'second') => void; review?: boolean; discover?: string; onDiscover?: (path: string | null) => void }) {
   const ref = useRef<HTMLIFrameElement>(null);
   const ref2 = useRef<HTMLIFrameElement>(null);
   const active = pos === 0;
@@ -86,7 +90,18 @@ function AppScreen({ src, src2, flowAt = 0.35, pos, scroll, beat, onReady, onFai
   useEffect(() => { ok.current.a = false; }, [src]);
   // Dropping the second page (it failed) shouldn't hold the scene up.
   useEffect(() => { ok.current.b = !src2; if (!src2) check(); }, [src2]); // eslint-disable-line react-hooks/exhaustive-deps
-  useFrameReady(ref, src, (good) => { if (!good) { onFail(src, 'page'); return; } ok.current.a = true; check(); });
+  useFrameReady(ref, src, (good) => {
+    if (!good) { onFail(src, 'page'); return; }
+    ok.current.a = true;
+    // A scene that taps into something on its page finds the link now.
+    if (discover && !src2 && onDiscover) {
+      let href: string | null = null;
+      try { href = ref.current?.contentDocument?.querySelector<HTMLAnchorElement>(discover)?.getAttribute('href') ?? null; } catch { /* ignore */ }
+      onDiscover(href);
+      if (href) return; // wait for that page to load too
+    }
+    check();
+  });
   useFrameReady(ref2, src2, (good) => { if (!good) { onFail(src, 'second'); return; } ok.current.b = true; check(); });
   const box = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.5);
@@ -120,10 +135,10 @@ function AppScreen({ src, src2, flowAt = 0.35, pos, scroll, beat, onReady, onFai
     if (review) {
       const moves = 12, gap = Math.min(520, (total * 0.42) / moves);
       for (let n = 0; n < moves; n++) timers.push(setTimeout(() => { try { w.dispatchEvent(new (w as unknown as typeof window).KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })); } catch { /* ignore */ } }, 600 + n * gap));
-      const after = 600 + moves * gap + 250;
-      const h = (() => { try { return Math.max(0, (w.document.documentElement.scrollHeight || 0) - 780); } catch { return 1200; } })();
-      scrollTo(w, Math.min(h, 520), after, 1400);
-      scrollTo(w, Math.min(h, 1100), after + 2300, 1600);
+      // Then one steady scroll down through the review that lasts to the end of the scene.
+      const after = 600 + moves * gap + 200;
+      const h = (() => { try { return Math.max(0, (w.document.documentElement.scrollHeight || 0) - 780); } catch { return 1600; } })();
+      scrollTo(w, Math.min(h, 1800), after, Math.max(1200, total - after - 150));
     } else if (src2) {
       const at = total * flowAt;
       if (scroll) scrollTo(w, Math.min(scroll, 360), 500, Math.max(500, at - 1100));
@@ -206,6 +221,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
   // A page that showed an error falls back to a safer one (the review → your games list).
   const [failed, setFailed] = useState<Record<string, boolean>>({});
   const [flowFailed, setFlowFailed] = useState<Record<string, boolean>>({});
+  const [found, setFound] = useState<Record<string, string | null>>({});
   // A path with the frame's sign-in and board look added to its own query.
   const withQ = (pathWithQuery: string, j: number) => {
     const [path, own] = pathWithQuery.split('?');
@@ -343,7 +359,8 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
           <div className="pointer-events-none absolute left-1/2 z-10 h-[60cqh] w-[30cqh] -translate-x-1/2 rounded-[5cqw]"
             style={{ bottom: '9.5cqh', opacity: phase === 'scene' ? 1 : 0, transition: 'opacity .2s', boxShadow: '0 0 0 1.2cqw #1C1F1E, 0 0 0 1.5cqw rgba(255,255,255,.12), 0 18px 50px rgba(0,0,0,.6)' }}>
             {SCENES.map((x, j) => (
-              <AppScreen key={x.kind} src={srcOf(j)} pos={phase !== 'scene' ? 1 : j < k ? -1 : j === k ? 0 : 1} scroll={APP_PATH[x.kind].scroll} beat={lenOf(x) / 1000} review={x.kind === 'review' && !failed.review && reviewPath !== '/games'} src2={failed[x.kind] || flowFailed[x.kind] || !FLOW[x.kind] ? undefined : withQ(FLOW[x.kind]!.to, j)} flowAt={FLOW[x.kind]?.at} onReady={markReady} onFail={(src, which) => { if (which === 'page' && failed[x.kind]) { markReady(src); return; } (which === 'second' ? setFlowFailed : setFailed)((f) => (f[x.kind] ? f : { ...f, [x.kind]: true })); }} />
+              <AppScreen key={x.kind} src={srcOf(j)} pos={phase !== 'scene' ? 1 : j < k ? -1 : j === k ? 0 : 1} scroll={APP_PATH[x.kind].scroll} beat={lenOf(x) / 1000} review={x.kind === 'review' && !failed.review && reviewPath !== '/games'} src2={failed[x.kind] || flowFailed[x.kind] || !FLOW[x.kind] ? undefined : FLOW[x.kind]!.to ? withQ(FLOW[x.kind]!.to, j) : found[x.kind] ? withQ(found[x.kind]!, j) : undefined}
+                discover={DISCOVER[x.kind]} onDiscover={(href) => { if (!href) setFlowFailed((f) => ({ ...f, [x.kind]: true })); else setFound((f) => (f[x.kind] === href ? f : { ...f, [x.kind]: href.replace(/\?.*$/, '') })); }} flowAt={FLOW[x.kind]?.at} onReady={markReady} onFail={(src, which) => { if (which === 'page' && failed[x.kind]) { markReady(src); return; } (which === 'second' ? setFlowFailed : setFailed)((f) => (f[x.kind] ? f : { ...f, [x.kind]: true })); }} />
             ))}
           </div>
         )}
