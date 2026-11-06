@@ -230,7 +230,13 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
     if (!appFootage) return;
     setShowcase(null);
     void apiFetch('/api/admin/studio/showcase-session', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: account }) })
-      .then(async (r) => { const d = await r.json().catch(() => null); setShowcase(r.ok && d?.token ? { token: d.token, name: d.name, games: d.games, reviewed: d.reviewed, linked: d.linked } : { token: null, name: null, error: d?.error ?? "Couldn't sign in to that account" }); })
+      .then(async (r) => {
+        const d = await r.json().catch(() => null);
+        if (r.ok && d?.token) { setShowcase({ token: d.token, name: d.name, games: d.games, reviewed: d.reviewed, linked: d.linked }); return; }
+        // Say why, so it's clear what to fix.
+        const why = d?.error ?? (r.status === 404 ? "The server doesn't have this yet (redeploy Render)" : r.status === 401 || r.status === 403 ? 'Only an admin can do this (sign in again?)' : `Server error ${r.status}`);
+        setShowcase({ token: null, name: null, error: why });
+      })
       .catch(() => setShowcase({ token: null, name: null, error: "Couldn't sign in to that account" }));
   }, [account, appFootage, reload]);
   // Fill the showcase account: import its games, find its weaknesses, review a game.
