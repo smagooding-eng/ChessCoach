@@ -368,7 +368,7 @@ export function Openings() {
 
                         <td className="px-4 py-3.5 text-center" onClick={e => e.stopPropagation()}>
                           <Link href={`/openings/${linkParam}`}
-                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary hover:bg-primary border border-primary/25 hover:border-primary text-primary hover:text-primary-foreground text-xs font-black transition-all">
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary hover:bg-primary/90 border border-primary/25 hover:border-primary text-primary-foreground hover:text-primary-foreground text-xs font-black transition-all">
                             <GraduationCap className="w-3.5 h-3.5" />
                             Practice
                           </Link>

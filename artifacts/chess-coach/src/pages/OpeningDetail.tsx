@@ -254,7 +254,7 @@ export function OpeningDetail() {
           {data.eco && (
             <Link
               href={`/practice?tab=openings&eco=${encodeURIComponent(data.eco)}`}
-              className="inline-flex items-center gap-1.5 mt-2.5 px-3 py-1.5 rounded-lg text-xs font-bold text-primary bg-primary border border-primary/20 hover:bg-primary transition-colors"
+              className="inline-flex items-center gap-1.5 mt-2.5 px-3 py-1.5 rounded-lg text-xs font-bold text-primary-foreground bg-primary border border-primary/20 hover:bg-primary/90 transition-colors"
             >
               <Swords className="w-3.5 h-3.5" /> Practice This Opening
             </Link>

@@ -360,7 +360,7 @@ export function WeaknessDetail() {
                   <div className="flex flex-wrap gap-2 px-4 pb-3 ml-10">
                     {ex.gameIds.map((gameId, gi) => (
                       <Link key={gameId} href={`/games/${gameId}`}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary border border-primary/25 hover:border-primary text-primary hover:text-primary-foreground text-xs font-bold transition-all">
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary hover:bg-primary/90 border border-primary/25 hover:border-primary text-primary-foreground hover:text-primary-foreground text-xs font-bold transition-all">
                         <Play className="w-3 h-3" />
                         View Game {gi + 1}
                       </Link>
