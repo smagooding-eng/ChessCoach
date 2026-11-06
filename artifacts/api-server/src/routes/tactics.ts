@@ -6,6 +6,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { db, puzzlesTable, puzzleAttemptsTable, gamesTable } from "@workspace/db";
 import { and, eq, sql, inArray, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/authMiddleware";
+import { Chess } from "chess.js";
 
 const router: IRouter = Router();
 const rowsOf = <T,>(r: unknown): T[] => (Array.isArray(r) ? r : ((r as { rows?: T[] })?.rows ?? [])) as T[];
@@ -82,6 +83,29 @@ router.get("/tactics/kids-batch", async (req: Request, res: Response) => {
     if (!any.length) { res.status(400).json({ error: "Pick a trick" }); return; }
     res.json({ puzzles: await pick({ any, all: [], n: Math.min(15, num(req.query.n) ?? 8), maxRating: 1150, exclude: [] }) });
   } catch { res.status(500).json({ error: "Couldn't load puzzles" }); }
+});
+
+// One sample position per motif, for the card thumbnails (the puzzle position,
+// after the opponent's first move). Cached for a day.
+const sampleCache = new Map<string, { at: number; fen: string | null; last: { from: string; to: string } | null; side: "w" | "b" | null }>();
+router.get("/tactics/sample", async (req: Request, res: Response) => {
+  const any = tagsOf(req.query.any), all = tagsOf(req.query.all);
+  if (!any.length && !all.length) { res.status(400).json({ error: "Pick a motif" }); return; }
+  const key = `${any.join(",")}|${all.join(",")}`;
+  const hit = sampleCache.get(key);
+  if (hit && Date.now() - hit.at < 86400_000) { res.json(hit); return; }
+  try {
+    const [p] = await pick({ any, all, n: 1, maxRating: 1600, exclude: [] });
+    let fen: string | null = null, last: { from: string; to: string } | null = null;
+    if (p) {
+      const c = new Chess(p.fen);
+      if (p.setup && p.moves[0]) { try { const m = c.move({ from: p.moves[0].slice(0, 2), to: p.moves[0].slice(2, 4), promotion: p.moves[0][4] as "q" | undefined }); last = { from: m.from, to: m.to }; } catch { /* keep start */ } }
+      fen = c.fen();
+    }
+    const v = { at: Date.now(), fen, last, side: fen ? (fen.split(" ")[1] as "w" | "b") : null };
+    sampleCache.set(key, v);
+    res.json(v);
+  } catch { res.json({ fen: null, last: null, side: null }); }
 });
 
 // How many puzzles each motif has (so empty motifs can say so).

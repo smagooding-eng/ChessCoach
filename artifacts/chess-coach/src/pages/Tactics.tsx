@@ -51,12 +51,31 @@ function Ring({ value, done }: { value: number; done: boolean }) {
     </svg>
   );
 }
+// A real puzzle position for motifs without a hand-made demo (kept for the session).
+function useSample(m: Motif) {
+  const key = `cs_tsample_${m.id}`;
+  const [v, setV] = useState<{ fen: string | null; last: { from: string; to: string } | null; side: 'w' | 'b' | null } | null>(() => {
+    if (m.demo) return { fen: m.demo.fen, last: null, side: m.demo.fen.split(' ')[1] as 'w' | 'b' };
+    try { return JSON.parse(sessionStorage.getItem(key) || 'null'); } catch { return null; }
+  });
+  useEffect(() => {
+    if (m.demo || v) return;
+    const q = new URLSearchParams({ any: m.any.join(','), all: (m.all ?? []).join(',') });
+    void apiFetch(`/api/tactics/sample?${q}`).then((r) => (r.ok ? r.json() : null)).then((d) => {
+      if (!d) return;
+      setV(d); try { sessionStorage.setItem(key, JSON.stringify(d)); } catch { /* ignore */ }
+    }).catch(() => {});
+  }, [m.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  return v;
+}
 function MotifCard({ m, p }: { m: Motif; p?: TacticProgress }) {
+  const sample = useSample(m);
   const done = !!p?.masteredAt;
   const due = isDue(p);
   return (
     <Link href={`/tactics/${m.id}`} className="flex items-center gap-3 rounded-[16px] p-3 transition-transform active:scale-[.99]" style={card}>
-      {m.demo ? <MiniBoard fen={m.demo.fen} size={56} /> : <span className="grid h-14 w-14 shrink-0 place-items-center rounded-lg text-2xl" style={{ background: 'rgba(255,255,255,.05)' }}>{m.group === 'mates' ? '♚' : m.group === 'endgame' ? '♙' : '♞'}</span>}
+      {sample?.fen ? <span className="shrink-0"><MiniBoard fen={sample.fen} lastMove={sample.last} size={56} flipped={sample.side === 'b'} /></span>
+        : <span className="h-14 w-14 shrink-0 animate-pulse rounded-lg" style={{ background: 'rgba(255,255,255,.05)' }} />}
       <span className="min-w-0 flex-1">
         <b className="flex items-center gap-1.5 truncate text-[15px] font-extrabold" style={{ color: RD.text }}>{m.name}{due && <span className="rounded-full px-1.5 py-0.5 text-[9.5px] font-black" style={{ background: RD.gold, color: '#1A1A19' }}>REVIEW</span>}</b>
         <span className="mt-0.5 block text-[12px] leading-snug line-clamp-2" style={{ color: RD.muted }}>{m.blurb}</span>
