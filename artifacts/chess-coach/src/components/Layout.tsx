@@ -11,7 +11,7 @@ import { GooglePlayBadge, PlayLogo } from '@/components/GooglePlayBadge';
 import { PLAY_STORE_URL, shouldShowPlayBadge } from '@/lib/playApp';
 import { runPageSwipe, pageCanSwipe, swipeAllowedFrom, swipeAllowedLoose } from '@/lib/swipeNav';
 import { useLiveRatings, bestLiveRating } from '@/hooks/use-live-ratings';
-import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard, Camera, Shield, Target, BarChart3, Zap } from 'lucide-react';
+import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard, Camera, Shield, Target, BarChart3, Zap, Crosshair, Radio, Users, Medal, Baby, Newspaper, Clapperboard, X } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 import { InstallGuide } from '@/components/InstallGuide';
 import { cn } from '@/lib/utils';
@@ -61,32 +61,52 @@ const REDESIGN_NAV_ICON: Record<string, React.ElementType> = {
   '/analysis': BarChart3,
 };
 
-const PRIMARY_NAV = [
-  // The first four are the bottom bar (and the swipe order): Home, Play, Games, Analysis.
+type NavItem = { href: string; label: string; icon: React.ElementType; badge?: string };
+
+// The bottom bar (and the swipe order): Home, Play, Games, Analysis.
+const PRIMARY_NAV: NavItem[] = [
   { href: '/',          label: 'Home',            icon: LayoutDashboard },
   { href: '/play',      label: 'Play',            icon: Play },
   { href: '/games',     label: 'Games',           icon: History },
   { href: '/analysis',  label: 'Analysis',        icon: BrainCircuit },
-  { href: '/opponents', label: 'Opponent Scout',  icon: Swords },
-  { href: '/puzzles',   label: 'Puzzles',         icon: Puzzle },
-  { href: '/lookup',    label: 'Game Lookup',     icon: Search },
-  { href: '/scan',      label: 'Scan Position',   icon: Camera, badge: 'NEW' },
 ];
 
-const SECONDARY_NAV = [
-  { href: '/practice',     label: 'Practice Bots',   icon: Bot },
-  { href: '/import',       label: 'Import Games',    icon: Import },
-  { href: '/courses',      label: 'Courses',         icon: GraduationCap },
-  { href: '/tactics',      label: 'Tactics',         icon: Zap },
-  { href: '/endgames',     label: 'Endgames',        icon: Trophy },
-  { href: '/openings',     label: 'Openings',        icon: BookOpen },
-  { href: '/subscription', label: 'Subscription',    icon: Crown },
-  { href: '/settings',     label: 'Settings',        icon: Settings },
+// Everything else, in the More menu and the sidebar, grouped.
+const MENU_GROUPS: { title: string; items: NavItem[] }[] = [
+  { title: 'Train', items: [
+    { href: '/openings',  label: 'Openings',       icon: BookOpen },
+    { href: '/tactics',   label: 'Tactics',        icon: Zap, badge: 'NEW' },
+    { href: '/endgames',  label: 'Endgames',       icon: Trophy },
+    { href: '/puzzles',   label: 'Puzzles',        icon: Puzzle },
+    { href: '/traps',     label: 'Chess Traps',    icon: Crosshair },
+    { href: '/courses',   label: 'Courses',        icon: GraduationCap },
+    { href: '/practice',  label: 'Practice Bots',  icon: Bot },
+    { href: '/learn',     label: 'Articles',       icon: Newspaper },
+  ] },
+  { title: 'Play & watch', items: [
+    { href: '/live',        label: 'Play Online',   icon: Swords },
+    { href: '/watch',       label: 'Watch Live',    icon: Radio },
+    { href: '/friends',     label: 'Friends',       icon: Users },
+    { href: '/tournaments', label: 'Tournaments',   icon: Medal },
+    { href: '/kids',        label: 'Chess for Kids', icon: Baby },
+  ] },
+  { title: 'Your games', items: [
+    { href: '/import',    label: 'Import Games',   icon: Import },
+    { href: '/lookup',    label: 'Game Lookup',    icon: Search },
+    { href: '/opponents', label: 'Opponent Scout', icon: Target },
+    { href: '/scan',      label: 'Scan Position',  icon: Camera },
+  ] },
+  { title: 'Account', items: [
+    { href: '/subscription', label: 'Subscription', icon: Crown },
+    { href: '/settings',     label: 'Settings',     icon: Settings },
+  ] },
 ];
 
-const ADMIN_NAV = [
-  { href: '/admin', label: 'Admin', icon: Shield },
+const ADMIN_NAV: NavItem[] = [
+  { href: '/admin',        label: 'Admin',          icon: Shield },
+  { href: '/admin/studio', label: 'Content Studio', icon: Clapperboard },
 ];
+const SECONDARY_NAV: NavItem[] = MENU_GROUPS.flatMap((g) => g.items);
 
 const ALL_NAV = [...PRIMARY_NAV, ...SECONDARY_NAV, ...ADMIN_NAV];
 
@@ -310,6 +330,19 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
   const { showGuide, setShowGuide, dismissInstall, platform } = usePwaInstall();
 
   useEffect(() => { setMoreOpen(false); setProfileOpen(false); }, [location]);
+  // The More menu takes a step in the browser history, so swiping back (or the
+  // Android back button) closes it instead of leaving the page.
+  useEffect(() => {
+    if (!moreOpen) return;
+    try { if (!(window.history.state as { csMore?: boolean } | null)?.csMore) window.history.pushState({ ...(window.history.state ?? {}), csMore: true }, ''); } catch { /* ignore */ }
+    const onPop = () => setMoreOpen(false);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [moreOpen]);
+  const closeMore = () => {
+    if ((window.history.state as { csMore?: boolean } | null)?.csMore) window.history.back(); // popstate closes it
+    else setMoreOpen(false);
+  };
 
   const ratings: number[] = [];
   if (multiElo.chesscom?.hasData) ratings.push(multiElo.chesscom.currentRating);
@@ -322,8 +355,10 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
         ? Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length)
         : (player?.rating ?? null));
 
-  const moreItems = [...PRIMARY_NAV.slice(4), ...SECONDARY_NAV, ...(authUser?.isAdmin ? ADMIN_NAV : [])];
-  const activeMore = moreItems.find(i => location === i.href || location.startsWith(i.href + '/'));
+  const moreItems = [...SECONDARY_NAV, ...(authUser?.isAdmin ? ADMIN_NAV : [])];
+  // The longest match wins (so /admin/studio is Content Studio, not Admin).
+  const activeMore = moreItems.filter(i => location === i.href || location.startsWith(i.href + '/')).sort((a, b) => b.href.length - a.href.length)[0];
+  const moreGroups = authUser?.isAdmin ? [...MENU_GROUPS, { title: 'Admin', items: ADMIN_NAV }] : MENU_GROUPS;
   const isMoreActive = !!activeMore;
 
   // All the hooks above still run every render regardless of this flag
@@ -362,9 +397,13 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
           {PRIMARY_NAV.map(item => (
             <SidebarLink key={item.href} item={item} isActive={location === item.href} />
           ))}
-          <p className="text-[9px] font-black uppercase tracking-widest px-3 mt-3 mb-1.5" data-side-label style={{ color: 'rgba(158,155,152,0.5)' }}>Tools</p>
-          {SECONDARY_NAV.map(item => (
-            <SidebarLink key={item.href} item={item} isActive={location === item.href} />
+          {MENU_GROUPS.map((g) => (
+            <React.Fragment key={g.title}>
+              <p className="text-[9px] font-black uppercase tracking-widest px-3 mt-3 mb-1.5" data-side-label style={{ color: 'rgba(158,155,152,0.5)' }}>{g.title}</p>
+              {g.items.map(item => (
+                <SidebarLink key={item.href} item={item} isActive={location === item.href || location.startsWith(item.href + '/')} />
+              ))}
+            </React.Fragment>
           ))}
           {authUser?.isAdmin && (
             <>
@@ -535,7 +574,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
               </Link>
             );
           })}
-          <button onClick={() => setMoreOpen(o => !o)} className="flex-1">
+          <button onClick={() => (moreOpen ? closeMore() : setMoreOpen(true))} className="flex-1">
             <div className="relative flex flex-col items-center justify-center gap-0.5 pt-2 pb-1.5 min-h-[52px] transition-all active:scale-95">
               {isMoreActive && <span className="absolute top-0 left-1/2 -translate-x-1/2 h-[2px] w-8 rounded-full" style={{ background: CHESSCOM_GREEN }} />}
               {React.createElement(activeMore?.icon ?? MoreHorizontal, {
@@ -560,21 +599,28 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setMoreOpen(false)}
+              onClick={closeMore}
             />
             <motion.div
               key="more-sheet"
-              className="md:hidden fixed bottom-0 left-0 right-0 z-[70] rounded-t-2xl"
+              className="md:hidden fixed bottom-0 left-0 right-0 z-[70] flex max-h-[88dvh] flex-col rounded-t-2xl"
               style={{ background: PANEL_SOLID, borderTop: `1px solid ${BORDER_COLOR}` }}
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+              drag="y" dragConstraints={{ top: 0, bottom: 0 }} dragElastic={{ top: 0, bottom: 0.6 }}
+              onDragEnd={(_, info) => { if (info.offset.y > 90 || info.velocity.y > 600) closeMore(); }}
             >
-              <div className="w-10 h-1 rounded-full mx-auto mt-2.5" style={{ background: 'rgba(255,255,255,0.1)' }} />
-              <nav className="px-3 pt-3 pb-8 space-y-0.5">
+              {/* Pull down (or swipe back) to close. */}
+              <div className="flex shrink-0 cursor-grab items-center justify-between px-4 pt-2.5">
+                <span className="w-8" />
+                <span className="h-1 w-10 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
+                <button onClick={closeMore} aria-label="Close menu" className="grid h-8 w-8 place-items-center rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: TEXT_MUTED }}><X className="h-4 w-4" /></button>
+              </div>
+              <nav className="overflow-y-auto overscroll-contain px-3 pt-1 pb-[calc(1.5rem+env(safe-area-inset-bottom))]" onPointerDownCapture={(e) => e.stopPropagation()}>
                 {freePlan && (
-                  <Link href="/subscription" onClick={() => setMoreOpen(false)} className="mb-2 block">
+                  <Link href="/subscription" replace className="mb-3 block">
                     <div className="flex items-center gap-3 rounded-xl px-3.5 py-3" style={{ background: 'linear-gradient(135deg, rgba(232,180,71,.16), rgba(129,182,76,.06))', border: '1px solid rgba(232,180,71,.4)' }}>
                       <Crown className="w-5 h-5" style={{ color: '#E8B447' }} />
                       <span className="min-w-0 flex-1">
@@ -585,29 +631,28 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
                     </div>
                   </Link>
                 )}
-                {moreItems.map(item => {
-                  const active = location === item.href || location.startsWith(item.href + '/');
-                  const badge = (item as any).badge as string | undefined;
-                  return (
-                    <Link key={item.href} href={item.href} className="block">
-                      <div className="flex items-center gap-3 px-3.5 py-3 rounded-xl transition-colors"
-                        style={{
-                          background: active ? 'rgba(255,255,255,0.07)' : 'transparent',
-                          color: TEXT_LIGHT,
-                        }}>
-                        <item.icon className="w-5 h-5" />
-                        <span className="font-semibold text-sm">{item.label}</span>
-                        {badge && (
-                          <span className="px-1.5 py-px rounded text-[9px] font-black tracking-wider" style={{ background: 'rgba(234,166,49,0.35)', color: '#ffffff' }}>
-                            {badge}
-                          </span>
-                        )}
-                        {active && <ChevronRight className="w-4 h-4 ml-auto" />}
-                      </div>
-                    </Link>
-                  );
-                })}
-                <div className="mt-2 pt-2" style={{ borderTop: `1px solid ${BORDER_COLOR}` }}>
+                {moreGroups.map((g) => (
+                  <section key={g.title} className="mb-3">
+                    <p className="mb-1.5 px-1 text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: TEXT_MUTED }}>{g.title}</p>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {g.items.map((item) => {
+                        const active = activeMore?.href === item.href;
+                        return (
+                          // replace: the menu's history step becomes the new page, so Back goes where you were.
+                          <Link key={item.href} href={item.href} replace className="block" onClick={() => { if (item.href === location) setMoreOpen(false); }}>
+                            <div className="relative flex h-[74px] flex-col items-center justify-center gap-1.5 rounded-xl px-1 text-center transition-colors active:scale-[.97]"
+                              style={{ background: active ? 'rgba(129,182,76,0.16)' : 'rgba(255,255,255,0.045)', border: `1px solid ${active ? 'rgba(129,182,76,0.55)' : 'rgba(255,255,255,0.06)'}`, color: TEXT_LIGHT }}>
+                              <item.icon className="h-5 w-5" style={{ color: active ? CHESSCOM_GREEN : TEXT_LIGHT }} />
+                              <span className="text-[11.5px] font-bold leading-tight">{item.label}</span>
+                              {item.badge && <span className="absolute right-1.5 top-1.5 rounded px-1 py-px text-[8px] font-black tracking-wider" style={{ background: 'rgba(129,182,76,0.9)', color: '#fff' }}>{item.badge}</span>}
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </section>
+                ))}
+                <div className="mt-1 pt-2" style={{ borderTop: `1px solid ${BORDER_COLOR}` }}>
                   {shouldShowPlayBadge() && (
                     <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
                       <span className="font-semibold text-sm" style={{ color: TEXT_LIGHT }}>Get the Android app</span>
