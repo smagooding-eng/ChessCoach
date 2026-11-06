@@ -109,7 +109,7 @@ export function TacticsGroupCards({ group, title }: { group: TacticGroup; title?
 export function Tactics() {
   const { progress, pro, loaded } = useTacticsProgress();
   const due = MOTIFS.filter((m) => isDue(progress[m.id]));
-  const total = MOTIFS.filter((m) => m.group !== 'endgame');
+  const total = MOTIFS.filter((m) => m.group === 'basics' || m.group === 'next');
   const mastered = total.filter((m) => progress[m.id]?.masteredAt).length;
   return (
     <div className="min-h-screen px-3 pb-[calc(7.5rem+env(safe-area-inset-bottom))] pt-3 md:px-6 md:pt-6" style={{ background: RD.bg, color: RD.text }}>
@@ -142,13 +142,13 @@ export function Tactics() {
           <ChevronRight size={18} style={{ color: RD.muted }} />
         </Link>
 
-        {(['basics', 'next', 'mates'] as TacticGroup[]).map((g) => <TacticsGroupCards key={g} group={g} />)}
+        {(['basics', 'next'] as TacticGroup[]).map((g) => <TacticsGroupCards key={g} group={g} />)}
 
         <Link href="/endgames" className="flex items-center gap-3 rounded-[18px] p-4" style={card}>
           <span className="text-2xl">♙</span>
           <span className="min-w-0 flex-1">
-            <b className="block text-[15px] font-extrabold">Endgame tactics</b>
-            <span className="block text-[12.5px]" style={{ color: RD.muted }}>Promotion, breakthroughs, zugzwang and more, in Endgames.</span>
+            <b className="block text-[15px] font-extrabold">Mating patterns & endgame tactics</b>
+            <span className="block text-[12.5px]" style={{ color: RD.muted }}>Back-rank, smothered and other mates, plus promotion, breakthroughs and zugzwang, in Endgames.</span>
           </span>
           <ChevronRight size={18} style={{ color: RD.muted }} />
         </Link>
@@ -322,7 +322,8 @@ export function TacticMotif() {
   }, [m?.id, tab, diff, run]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!m) return <div className="p-6 text-center" style={{ color: RD.muted }}>That pattern doesn’t exist. <Link href="/tactics" className="underline">All tactics</Link></div>;
-  const back = m.group === 'endgame' ? '/endgames' : '/tactics';
+  const inEndgames = m.group === 'endgame' || m.group === 'mates';
+  const back = inEndgames ? '/endgames' : '/tactics';
 
   const finishDrill = async (correct: number, total: number) => {
     const r = await apiFetch('/api/tactics/session', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ motif: m.id, correct, total }) }).catch(() => null);
@@ -335,7 +336,7 @@ export function TacticMotif() {
   return (
     <div className="min-h-screen px-3 pb-[calc(7.5rem+env(safe-area-inset-bottom))] pt-3 md:px-6 md:pt-6" style={{ background: RD.bg, color: RD.text }}>
       <div className="mx-auto max-w-[900px] space-y-3">
-        <Link href={back} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[13px] font-bold" style={{ background: 'rgba(255,255,255,.06)' }}><ArrowLeft size={15} />{m.group === 'endgame' ? 'Endgames' : 'Tactics'}</Link>
+        <Link href={back} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[13px] font-bold" style={{ background: 'rgba(255,255,255,.06)' }}><ArrowLeft size={15} />{inEndgames ? 'Endgames' : 'Tactics'}</Link>
         <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="text-[24px] font-black">{m.name}</h1>

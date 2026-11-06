@@ -1,6 +1,6 @@
 // The tactics map: every motif, the Lichess puzzle tags its drills come from,
 // and (for most) a short hand-made demo. Middlegame motifs live on /tactics;
-// the endgame ones are shown on the Endgames page. Demo moves are checked legal.
+// the mating patterns and endgame ones are shown on the Endgames page. Demo moves are checked legal.
 
 export type TacticGroup = 'basics' | 'next' | 'mates' | 'endgame';
 export interface DemoStep { san: string; say: string }
