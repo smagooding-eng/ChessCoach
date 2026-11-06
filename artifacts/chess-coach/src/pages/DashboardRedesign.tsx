@@ -62,6 +62,9 @@ const TILES = [
   { label: 'Puzzles', sub: 'Smart training', href: '/puzzles', img: 'puzzles.webp', pos: '73% center', icon: Puzzle, c1: '#5f8f36', c2: '#81B64C', glow: 'rgba(92,150,255,.30)' },
   { label: 'Openings', sub: 'Drill and learn', href: '/openings', img: 'openings.webp', pos: '68% center', icon: BookOpen, c1: '#5f8f36', c2: '#81B64C', glow: 'rgba(168,120,255,.30)' },
   { label: 'Chess Traps', sub: 'Learn the classics', href: '/traps', img: 'traps.webp', pos: '59% center', icon: Crosshair, c1: '#5f8f36', c2: '#81B64C', glow: 'rgba(232,180,71,.30)' },
+  // Openings → Tactics → Endgames.
+  { label: 'Tactics', sub: 'Patterns that win', href: '/tactics', img: 'puzzles.webp', pos: '30% center', icon: Zap, c1: '#5f8f36', c2: '#81B64C', glow: 'rgba(129,182,76,.30)' },
+  { label: 'Endgames', sub: 'Finish the job', href: '/endgames', img: 'openings.webp', pos: '35% center', icon: Trophy, c1: '#5f8f36', c2: '#81B64C', glow: 'rgba(232,180,71,.30)' },
 ];
 
 function RookIcon({ size = 18, color = GREEN }: { size?: number; color?: string }) {

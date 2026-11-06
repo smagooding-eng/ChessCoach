@@ -50,6 +50,15 @@ export default function KidsHome() {
         </div>
       )}
 
+      {/* Chess tricks (forks, pins…) */}
+      <Link href="/kids/tactics" className="mb-5 flex items-center gap-3 rounded-[28px] bg-white p-3 pr-4" style={{ boxShadow: '0 6px 0 #E8B447', border: '3px solid #E8B447' }}>
+        <span className="grid h-[64px] w-[64px] shrink-0 place-items-center rounded-[20px] text-[40px]" style={{ background: '#E8B44733' }}>✨</span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[24px] font-extrabold leading-tight" style={{ color: '#2F2257', fontFamily: KID_FONT }}>Chess Tricks</span>
+          <span className="block text-sm font-bold" style={{ color: '#6C51C2' }}>Forks, pins and sneaky checkmates</span>
+        </span>
+      </Link>
+
       {/* the path */}
       <div className="relative">
 

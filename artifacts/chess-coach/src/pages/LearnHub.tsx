@@ -4,7 +4,7 @@ import React from 'react';
 // Chess Traps and Endgames, plus the free articles.
 
 import { Link } from 'wouter';
-import { ArrowUpRight, BookOpen, GraduationCap, Puzzle, Trophy, Baby, Sprout, Newspaper, Crosshair } from 'lucide-react';
+import { ArrowUpRight, BookOpen, GraduationCap, Puzzle, Trophy, Baby, Sprout, Newspaper, Crosshair, Zap } from 'lucide-react';
 import { RD } from '@/lib/redesignTheme';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import { useDashboardRedesignFlag, useSiteImg } from '@/hooks/use-app-config';
@@ -48,6 +48,8 @@ export function LearnHub() {
       art: board('6k1/5ppp/8/8/8/8/5PPP/3R2K1 w - - 0 1') },
     { title: 'Openings', sub: 'Learn and drill your repertoire', href: '/openings', icon: BookOpen,
       art: board('rnbqkbnr/ppp1pppp/8/3p4/2PP4/8/PP2PPPP/RNBQKBNR b KQkq - 0 2') },
+    { title: 'Tactics', sub: 'Forks, pins, mates: learn each pattern, then drill it', href: '/tactics', icon: Zap,
+      art: board('r3k3/2N5/8/8/8/8/8/4K3 b - - 0 1') },
     { title: 'Chess Traps', sub: 'The classic traps, and how to avoid them', href: '/traps', icon: Crosshair,
       art: board('r1bqkb1r/pppp1Qpp/2n2n2/4p3/2B1P3/8/PPPP1PPP/RNB1K1NR b KQkq - 0 4') },
     { title: 'Endgames', sub: 'The positions every player must know', href: '/endgames', icon: Trophy,

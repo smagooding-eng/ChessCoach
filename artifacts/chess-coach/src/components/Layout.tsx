@@ -11,7 +11,7 @@ import { GooglePlayBadge, PlayLogo } from '@/components/GooglePlayBadge';
 import { PLAY_STORE_URL, shouldShowPlayBadge } from '@/lib/playApp';
 import { runPageSwipe, pageCanSwipe, swipeAllowedFrom, swipeAllowedLoose } from '@/lib/swipeNav';
 import { useLiveRatings, bestLiveRating } from '@/hooks/use-live-ratings';
-import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard, Camera, Shield, Target, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard, Camera, Shield, Target, BarChart3, Zap } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 import { InstallGuide } from '@/components/InstallGuide';
 import { cn } from '@/lib/utils';
@@ -77,6 +77,7 @@ const SECONDARY_NAV = [
   { href: '/practice',     label: 'Practice Bots',   icon: Bot },
   { href: '/import',       label: 'Import Games',    icon: Import },
   { href: '/courses',      label: 'Courses',         icon: GraduationCap },
+  { href: '/tactics',      label: 'Tactics',         icon: Zap },
   { href: '/endgames',     label: 'Endgames',        icon: Trophy },
   { href: '/openings',     label: 'Openings',        icon: BookOpen },
   { href: '/subscription', label: 'Subscription',    icon: Crown },

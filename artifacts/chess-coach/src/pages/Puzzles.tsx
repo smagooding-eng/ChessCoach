@@ -12,6 +12,7 @@ import { PieceGradientDefs } from '@/components/PieceGradientDefs';
 import { useUser } from '@/hooks/use-user';
 import { Crown, RotateCcw, ChevronRight, Trophy, Target, Flame, Zap, Lightbulb, Loader2, Lock, Share2, Puzzle, GitFork, Pin, ArrowRightToLine, Eye, ShieldOff } from 'lucide-react';
 import { useLocation, useSearch, Link } from 'wouter';
+import { motifForThemes } from '@/lib/tactics';
 import { encodeCard } from '@/pages/ShareCard';
 import { UpgradeNudge } from '@/components/UpgradeNudge';
 import { ProUpsell } from '@/components/ProUpsell';
@@ -775,6 +776,9 @@ export function Puzzles() {
                         {themeLabels[theme] || theme}
                       </span>
                     ))}
+                    {(() => { const m = motifForThemes(puzzle.themes); return m ? (
+                      <Link href={`/tactics/${m.id}`} className="text-xs font-bold underline" style={{ color: '#81B64C' }}>Learn the {m.name.toLowerCase()} →</Link>
+                    ) : null; })()}
                   </div>
                   {puzzle.lichessId && (
                     <a href={`https://lichess.org/training/${puzzle.lichessId}`}

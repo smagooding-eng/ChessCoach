@@ -327,6 +327,13 @@ function GameRatingPanel({
           </div>
         </div>
       ))}
+      {/* Train each phase. */}
+      <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-t border-white/5 px-3 py-2.5 text-[12px] font-bold">
+        <span className="text-muted-foreground">Train:</span>
+        <Link href="/openings" className="text-primary underline">Openings</Link>
+        <Link href={(wc.blunder + wc.missed_win + bc.blunder + bc.missed_win) > 0 ? '/tactics/missed' : '/tactics'} className="text-primary underline">Tactics{(wc.blunder + wc.missed_win + bc.blunder + bc.missed_win) > 0 ? ' you missed' : ''}</Link>
+        <Link href="/endgames" className="text-primary underline">Endgames</Link>
+      </div>
     </div>
   );
 }

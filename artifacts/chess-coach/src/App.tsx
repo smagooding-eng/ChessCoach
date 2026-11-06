@@ -182,6 +182,10 @@ const Courses = lazyRetry(() => import("@/pages/Courses").then(m => ({ default: 
 const LearnHub = lazyRetry(() => import("@/pages/LearnHub").then(m => ({ default: m.LearnHub })));
 const CourseDetail = lazyRetry(() => import("@/pages/CourseDetail").then(m => ({ default: m.CourseDetail })));
 const Endgames = lazyRetry(() => import("@/pages/Endgames").then(m => ({ default: m.Endgames })));
+const TacticsPage = lazyRetry(() => import("@/pages/Tactics").then(m => ({ default: m.Tactics })));
+const TacticMotifPage = lazyRetry(() => import("@/pages/Tactics").then(m => ({ default: m.TacticMotif })));
+const TacticsMissedPage = lazyRetry(() => import("@/pages/Tactics").then(m => ({ default: m.TacticsMissed })));
+const KidsTacticsPage = lazyRetry(() => import("@/pages/kids/KidsTactics"));
 const WeaknessDetail = lazyRetry(() => import("@/pages/WeaknessDetail").then(m => ({ default: m.WeaknessDetail })));
 const OpponentAnalysis = lazyRetry(() => import("@/pages/OpponentAnalysis").then(m => ({ default: m.OpponentAnalysis })));
 const Openings = lazyRetry(() => import("@/pages/Openings").then(m => ({ default: m.Openings })));
@@ -334,6 +338,9 @@ const PDailyGames    = () => <ProtectedRoute component={DailyTab} />;
 const PDailyGame     = () => <ProtectedRoute component={DailyGame} />;
 const PNotifications = () => <ProtectedRoute component={NotificationsPage} />;
 const PTraps         = () => <ProtectedRoute component={TrapsPage} />;
+const PTactics       = () => <ProtectedRoute component={TacticsPage} />;
+const PTacticMotif   = () => <ProtectedRoute component={TacticMotifPage} />;
+const PTacticsMissed = () => <ProtectedRoute component={TacticsMissedPage} />;
 const PTrapTraining  = () => <ProtectedRoute component={TrapTrainingPage} />;
 const PBeginnerCourses = () => <ProtectedRoute component={BeginnerCoursesPage} requireAdmin />;
 // Chess for Kids works without signing in (progress stays on the device), so
@@ -343,6 +350,7 @@ const PKidsHome = kidsPage(KidsHomePage);
 const PKidsWorld = kidsPage(KidsWorldPage);
 const PKidsPlay = kidsPage(KidsPlayPage);
 const PKidsGame = kidsPage(KidsGamePage);
+const PKidsTactics = kidsPage(KidsTacticsPage);
 // The Beginner Path is open to visitors too (a shareable way in: try a lesson
 // before signing up). Signed in, it skips the link-your-account redirect,
 // since brand-new players may not have a chess.com / Lichess account yet.
@@ -619,6 +627,7 @@ function Router() {
       <Route path="/beginner/:unit/:lesson" component={PBeginnerLessonPlay} />
       <Route path="/beginner" component={PBeginnerPath} />
       <Route path="/kids/benny" component={PKidsGame} />
+      <Route path="/kids/tactics" component={PKidsTactics} />
       <Route path="/kids/:world/:level" component={PKidsPlay} />
       <Route path="/kids/:world" component={PKidsWorld} />
       <Route path="/kids" component={PKidsHome} />
@@ -630,6 +639,9 @@ function Router() {
       <Route path="/admin/kids"><RedirectTo to="/kids" /></Route>
 <Route path="/admin/beginner-lessons/:id" component={PBeginnerLesson} />
       <Route path="/traps"     component={PTraps} />
+      <Route path="/tactics"         component={PTactics} />
+      <Route path="/tactics/missed"  component={PTacticsMissed} />
+      <Route path="/tactics/:id"     component={PTacticMotif} />
       <Route path="/live/history"    component={PLiveHistory} />
       <Route path="/lookup"          component={PGameLookup} />
       <Route path="/puzzles"          component={PPuzzles} />
