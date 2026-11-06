@@ -13,10 +13,17 @@ import { LookOverride, randomLook, type BoardLook } from '@/context/SettingsCont
 import { routeSoundsTo } from '@/lib/sounds';
 import { StudioMusic, type MusicStyle } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
+import { apiFetch } from '@/lib/api';
 
 const GREEN = '#81B64C';
 type Kind = 'live' | 'review' | 'weak' | 'openings' | 'tactics' | 'endgames' | 'puzzles' | 'scan' | 'scout';
 interface Scene { kind: Kind; title: string; line: string; fen: string; move?: string; arrow?: [string, string] }
+// Real footage: the app page for each section, and how far to scroll it during the scene.
+const APP_PATH: Record<Kind, { path: string; scroll: number }> = {
+  live: { path: '/live', scroll: 160 }, review: { path: '/games', scroll: 420 }, weak: { path: '/analysis', scroll: 380 },
+  openings: { path: '/openings', scroll: 360 }, tactics: { path: '/tactics', scroll: 520 }, endgames: { path: '/endgames', scroll: 420 },
+  puzzles: { path: '/puzzles', scroll: 0 }, scan: { path: '/scan', scroll: 120 }, scout: { path: '/opponents', scroll: 300 },
+};
 const SCENES: Scene[] = [
   { kind: 'live', title: 'Live play', line: 'Real opponents, any clock. Daily games too.', fen: 'r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3', move: 'Bb5' },
   { kind: 'review', title: 'Free game review', line: 'Every move rated, and the better move shown.', fen: 'r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQ1RK1 w kq - 6 5', move: 'Ng5', arrow: ['g5', 'f7'] },
@@ -29,8 +36,32 @@ const SCENES: Scene[] = [
   { kind: 'scout', title: 'Opponent Scout', line: 'See what they play before the game starts.', fen: '' },
 ];
 
-export interface FeatureBlitzOpts { hook: string; beat: number; music: MusicStyle; looks: 'mine' | 'scene' | 'move' }
-export const FEATURE_BLITZ_DEFAULT: FeatureBlitzOpts = { hook: "Use this app for a week and you'll never go back to Chess.com", beat: 1.9, music: 'hype', looks: 'scene' };
+export interface FeatureBlitzOpts { hook: string; beat: number; music: MusicStyle; looks: 'mine' | 'scene' | 'move'; footage?: 'app' | 'boards' }
+export const FEATURE_BLITZ_DEFAULT: FeatureBlitzOpts = { hook: "Use this app for a week and you'll never go back to Chess.com", beat: 2.2, music: 'hype', looks: 'scene', footage: 'app' };
+
+/** The real app page in a phone-sized frame, scrolled a little while it's on screen. */
+function AppScreen({ src, active, scroll, beat }: { src: string; active: boolean; scroll: number; beat: number }) {
+  const ref = useRef<HTMLIFrameElement>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.5);
+  useEffect(() => {
+    const el = box.current; if (!el) return;
+    const ro = new ResizeObserver(() => setScale(el.clientWidth / 390));
+    ro.observe(el); return () => ro.disconnect();
+  }, []);
+  useEffect(() => {
+    const w = ref.current?.contentWindow; if (!w) return;
+    try { w.scrollTo({ top: 0 }); } catch { /* ignore */ }
+    if (!active || !scroll) return;
+    const t = setTimeout(() => { try { w.scrollTo({ top: scroll, behavior: 'smooth' }); } catch { /* ignore */ } }, Math.min(700, beat * 300));
+    return () => clearTimeout(t);
+  }, [active]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div ref={box} className="absolute inset-0 overflow-hidden rounded-[5cqw]" style={{ opacity: active ? 1 : 0, pointerEvents: 'none' }}>
+      <iframe ref={ref} src={src} title="" tabIndex={-1} aria-hidden="true" style={{ width: 390, height: 780, border: 0, transform: `scale(${scale})`, transformOrigin: 'top left', background: '#0B1112' }} />
+    </div>
+  );
+}
 
 type Phase = 'idle' | 'hook' | 'scene' | 'end' | 'done';
 
@@ -103,6 +134,15 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
     } };
   }, [render]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The latest reviewed game, for the review scene's footage.
+  const [reviewPath, setReviewPath] = useState('/games');
+  useEffect(() => {
+    void apiFetch('/api/games?limit=30', { credentials: 'include' }).then((r) => (r.ok ? r.json() : null)).then((d) => {
+      const g = (d?.games ?? []).find((x: { reviewed?: boolean }) => x.reviewed) ?? d?.games?.[0];
+      if (g?.id) setReviewPath(`/games/${g.id}`);
+    }).catch(() => {});
+  }, []);
+  const appFootage = (opts.footage ?? 'app') === 'app';
   const sc = SCENES[k];
   const shown = sc.fen ? (moved ? afterMove(sc.fen, sc.move) : { fen: sc.fen, last: null }) : null;
   const flipped = sc.fen ? sc.fen.split(' ')[1] === 'b' && sc.kind !== 'review' : false;
@@ -172,7 +212,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
               <p className="mb-[0.6cqh] font-black" style={{ fontSize: '3.4cqw', color: GREEN, letterSpacing: '.14em' }}>{String(k + 1).padStart(2, '0')} / {String(SCENES.length).padStart(2, '0')}</p>
               <p className="font-black leading-none" style={{ fontSize: '10cqw', letterSpacing: '-0.02em' }}>{sc.title}</p>
               <p className="mb-[3.4cqh] mt-[1cqh] px-[8cqw] text-center font-bold" style={{ fontSize: '4.2cqw', color: 'rgba(255,255,255,.75)' }}>{sc.line}</p>
-              {visual}
+              {appFootage ? <div className="h-[60cqh] w-[30cqh]" /> : visual}
             </motion.div>
           )}
           {(phase === 'end' || phase === 'done') && (
@@ -184,6 +224,16 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Real app footage: every section's page stays loaded; the current one shows. */}
+        {appFootage && (
+          <div className="pointer-events-none absolute left-1/2 z-10 h-[60cqh] w-[30cqh] -translate-x-1/2 rounded-[5cqw]"
+            style={{ bottom: '9.5cqh', opacity: phase === 'scene' ? 1 : 0, transition: 'opacity .2s', boxShadow: '0 0 0 1.2cqw #1C1F1E, 0 0 0 1.5cqw rgba(255,255,255,.12), 0 18px 50px rgba(0,0,0,.6)' }}>
+            {SCENES.map((x, j) => (
+              <AppScreen key={x.kind} src={`${import.meta.env.BASE_URL.replace(/\/$/, '')}${x.kind === 'review' ? reviewPath : APP_PATH[x.kind].path}`} active={phase === 'scene' && j === k} scroll={APP_PATH[x.kind].scroll} beat={opts.beat} />
+            ))}
+          </div>
+        )}
 
         {phase === 'scene' && (
           <div className="absolute inset-x-[8cqw] bottom-[6cqh] flex gap-[1cqw]">
@@ -218,13 +268,18 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
           </div>
           <div className="flex flex-wrap items-center gap-1.5 text-[12px]">
             <span className="text-white/60">Pace:</span>
-            {[[1.5, 'Fast'], [1.9, 'Normal'], [2.4, 'Relaxed']].map(([b, l]) => <button key={l} onClick={() => setOpts({ ...opts, beat: b as number })} className="rounded-full px-2.5 py-1 font-bold" style={pill(opts.beat === b)}>{l as string}</button>)}
+            {[[1.7, 'Fast'], [2.2, 'Normal'], [2.8, 'Relaxed']].map(([b, l]) => <button key={l} onClick={() => setOpts({ ...opts, beat: b as number })} className="rounded-full px-2.5 py-1 font-bold" style={pill(opts.beat === b)}>{l as string}</button>)}
           </div>
           <div className="flex flex-wrap items-center gap-1.5 text-[12px]">
+            <span className="text-white/60">Footage:</span>
+            {([['app', 'The real app'], ['boards', 'Board animations']] as const).map(([v, l]) => <button key={v} onClick={() => setOpts({ ...opts, footage: v })} className="rounded-full px-2.5 py-1 font-bold" style={pill((opts.footage ?? 'app') === v)}>{l}</button>)}
+          </div>
+          {!appFootage && <div className="flex flex-wrap items-center gap-1.5 text-[12px]">
             <span className="text-white/60">Board:</span>
             {([['scene', 'New look every scene'], ['move', 'Every move'], ['mine', 'My board']] as const).map(([v, l]) => <button key={v} onClick={() => setOpts({ ...opts, looks: v })} className="rounded-full px-2.5 py-1 font-bold" style={pill(opts.looks === v)}>{l}</button>)}
             {opts.looks !== 'mine' && <button onClick={() => setSeed((x) => x + 1)} className="rounded-full bg-white/10 px-2 py-1" aria-label="Shuffle looks"><Shuffle size={12} /></button>}
-          </div>
+          </div>}
+          {appFootage && <p className="text-[11.5px] text-white/50">Shows each section of the app as it really looks on your account. Give it a few seconds to load before you record.</p>}
           <div className="flex flex-wrap items-center gap-1.5 text-[12px]">
             <span className="text-white/60">Music:</span>
             {(['hype', 'epic', 'lofi', 'off'] as MusicStyle[]).map((v) => <button key={v} onClick={() => setOpts({ ...opts, music: v })} className="rounded-full px-2.5 py-1 font-bold capitalize" style={pill(opts.music === v)}>{v === 'off' ? 'None' : v}</button>)}

@@ -463,7 +463,13 @@ function ReleaseWatcher() {
   return null;
 }
 
+// Inside a frame (the Content Studio's app footage) nothing is counted.
+const IN_FRAME = (() => { try { return window.self !== window.top; } catch { return true; } })();
 function PageTracker() {
+  if (IN_FRAME) return null;
+  return <PageTrackerInner />;
+}
+function PageTrackerInner() {
   const [location] = useLocation();
   const { authUser } = useUser();
   const who = authUser?.id ?? 'visitor';
