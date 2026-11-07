@@ -11,6 +11,7 @@ import { Chess } from 'chess.js';
 import { KidsStudio } from '@/components/studio/KidsStudio';
 import { KnightTour } from '@/components/studio/KnightTour';
 import { SplashPromo } from '@/components/studio/SplashPromo';
+import { TournamentReel } from '@/components/studio/TournamentReel';
 import { FeatureBlitz } from '@/components/studio/FeatureBlitz';
 import { RenderReady, RecentRenders } from '@/components/studio/RenderMp4';
 import { KIDS_WORLDS, type KidsVideo } from '@/components/studio/kidsVideos';
@@ -205,7 +206,8 @@ export function ContentStudio() {
     } catch { setScanBusy("Couldn't read that photo."); }
   };
   // Promos
-  const [promoT, setPromoT] = useState<'versus' | 'challenge' | 'live' | 'tour' | 'knight' | 'splash' | 'blitz'>('blitz');
+  const [promoT, setPromoT] = useState<'versus' | 'challenge' | 'live' | 'tour' | 'knight' | 'splash' | 'blitz' | 'tournament'>('blitz');
+  const [tournamentOpen, setTournamentOpen] = useState(false);
   const [blitzOpen, setBlitzOpen] = useState(false);
   const [knightOpen, setKnightOpen] = useState(false);
   const [splashOpen, setSplashOpen] = useState(false);
@@ -659,7 +661,7 @@ export function ContentStudio() {
         )}
       </>) : view === 'promo' ? (<>
         <div className="mb-3 inline-flex flex-wrap rounded-xl bg-white/5 p-1">
-          {([['blitz', 'App in 20 seconds ⚡'], ['tour', 'App tour 🧭'], ['live', 'Live play ⚡'], ['knight', "Knight's tour → logo ♞"], ['splash', 'Splash smash ♜'], ['versus', 'ChessScout vs …'], ['challenge', 'Challenge your friends']] as const).map(([k, t]) => (
+          {([['blitz', 'App in 20 seconds ⚡'], ['tournament', 'Host a tournament 🏆'], ['tour', 'App tour 🧭'], ['live', 'Live play ⚡'], ['knight', "Knight's tour → logo ♞"], ['splash', 'Splash smash ♜'], ['versus', 'ChessScout vs …'], ['challenge', 'Challenge your friends']] as const).map(([k, t]) => (
             <button key={k} onClick={() => setPromoT(k)} className="rounded-lg px-3.5 py-1.5 text-[13px] font-black" style={{ background: promoT === k ? '#81B64C' : 'transparent', color: promoT === k ? '#fff' : '#C9CFCD' }}>{t}</button>
           ))}
         </div>
@@ -667,6 +669,11 @@ export function ContentStudio() {
           <div className="max-w-2xl space-y-2 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
             <p className="text-[12px] text-white/55">A fast cut through every feature (Live play, Game review, Weaknesses, Openings, Tactics, Endgames, Puzzles, Scan a position, Opponent Scout) under one hook line, ending on chessscout.net. Pick the pace, music and board looks.</p>
             <button onClick={() => setBlitzOpen(true)} className="rounded-lg bg-[#81B64C] px-4 py-2 text-[13px] font-black text-white">🎬 Make the clip</button>
+          </div>
+        ) : promoT === 'tournament' ? (
+          <div className="max-w-2xl space-y-2 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
+            <p className="text-[12px] text-white/55">"Run a chess tournament" for your club, school, office or friends: making one (name, knockout, daily, logo), sharing the link as players join, the bracket playing out, four boards live for anyone to watch, the champion, then "Host yours free · chessscout.net/tournaments". About 21 seconds. Players are made-up demo names.</p>
+            <button onClick={() => setTournamentOpen(true)} className="rounded-lg bg-[#81B64C] px-4 py-2 text-[13px] font-black text-white">🎬 Make the clip</button>
           </div>
         ) : promoT === 'splash' ? (
           <div className="max-w-2xl space-y-2 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
@@ -940,6 +947,7 @@ export function ContentStudio() {
       {kidsVid && <KidsStudio video={kidsVid} onClose={() => setKidsVid(null)} />}
       {knightOpen && <KnightTour onClose={() => setKnightOpen(false)} />}
       {splashOpen && <SplashPromo onClose={() => setSplashOpen(false)} />}
+      {tournamentOpen && <TournamentReel onClose={() => setTournamentOpen(false)} />}
       {blitzOpen && <FeatureBlitz onClose={() => setBlitzOpen(false)} />}
       {comp && <StudioPlayer source={comp[0]} queue={comp} title={compTitle} onClose={() => setComp(null)} />}
       {open && (
