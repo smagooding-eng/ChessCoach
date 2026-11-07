@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useParams, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { TournamentLogo, TournamentEditCard } from '@/components/play/TournamentBranding';
-import { ArrowLeft, Trophy, Users, Clock, Loader2, Play, Pause, Swords, Medal, Award, Sparkles, Crown, CalendarDays, Check } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, Clock, Loader2, Play, Pause, Swords, Medal, Award, Sparkles, Crown, CalendarDays, Check, Tv, Eye } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { useLivePlay } from '@/hooks/use-live-play';
 import { LiveGame } from '@/pages/LiveGame';
@@ -18,7 +18,7 @@ interface Standing {
 }
 interface TGame { gameId: string; kind: string; white: string; black: string; result: string | null; termination: string | null; startedAt: string; mine: boolean }
 interface Side { name: string | null; seed: number | null; isMe: boolean }
-interface BMatch { id: number; round: number; slot: number; roundLabel: string; a: Side | null; b: Side | null; status: string; winner: 'a' | 'b' | null; note: string | null; gamesPlayed: number }
+interface BMatch { id: number; round: number; slot: number; roundLabel: string; a: Side | null; b: Side | null; status: string; winner: 'a' | 'b' | null; note: string | null; gamesPlayed: number; gameId?: string | null }
 interface MyMatch { id: number; roundLabel: string; opponent: string | null; status: string; deadline: string | null; gameId: string | null; replay: boolean }
 interface Detail {
   tournament: TournamentSummary; serverNow: number; standings: Standing[]; games: TGame[];
@@ -421,7 +421,7 @@ function TournamentView({ live, signedIn }: { live: Live; signedIn: boolean }) {
       </div>
 
       {isBracket && data.bracket.length > 0 ? (
-        <BracketView matches={data.bracket} />
+        <BracketView matches={data.bracket} tid={t.id} />
       ) : isBracket ? (
         <PlayerList standings={data.standings} title={t.status === 'scheduled' ? 'Registered' : 'Players'} />
       ) : (
@@ -433,8 +433,13 @@ function TournamentView({ live, signedIn }: { live: Live; signedIn: boolean }) {
 
       {/* Recent games */}
       {data.games.length > 0 && (
+        <Link href={`/tournaments/${t.id}/tv`} className="flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[14px] font-extrabold" style={ghostBtn}>
+          <Tv size={16} style={{ color: PT.green }} /> {data.games.some((g) => !g.result) ? 'Watch the games live' : 'Watch the games'}
+        </Link>
+      )}
+      {data.games.length > 0 && (
         <div className="overflow-hidden" style={cardStyle}>
-          <p className="px-4 pt-3 text-[11px] font-black uppercase tracking-[0.16em]" style={{ color: PT.muted }}>Latest games</p>
+          <p className="px-4 pt-3 text-[11px] font-black uppercase tracking-[0.16em]" style={{ color: PT.muted }}>Latest games · tap one to watch</p>
           {data.games.map((g) => {
             const row = (
               <>
@@ -446,9 +451,7 @@ function TournamentView({ live, signedIn }: { live: Live; signedIn: boolean }) {
               </>
             );
             const style = { borderTop: `1px solid ${PT.border}`, color: PT.text, background: g.mine ? 'rgba(255,255,255,.03)' : undefined };
-            return g.mine && g.kind === 'daily'
-              ? <Link key={g.gameId} href={`/daily/${g.gameId}`} className="flex items-center gap-2 px-4 py-2 text-[13px]" style={style}>{row}</Link>
-              : <div key={g.gameId} className="flex items-center gap-2 px-4 py-2 text-[13px]" style={style}>{row}</div>;
+            return <Link key={g.gameId} href={g.mine && g.kind === 'daily' && !g.result ? `/daily/${g.gameId}` : `/tournaments/${t.id}/watch/${g.gameId}`} className="flex items-center gap-2 px-4 py-2 text-[13px]" style={style}>{row}</Link>;
           })}
         </div>
       )}
@@ -529,7 +532,7 @@ function PlayerList({ standings, title }: { standings: Standing[]; title: string
 }
 
 /** Knockout bracket: one column per round, scrolls sideways on phones. */
-function BracketView({ matches }: { matches: BMatch[] }) {
+function BracketView({ matches, tid }: { matches: BMatch[]; tid: string }) {
   const rounds = [...new Set(matches.map((m) => m.round))].sort((a, b) => a - b);
   const first = matches.filter((m) => m.round === rounds[0]).length;
   const height = Math.max(first, 1) * 92;
@@ -563,6 +566,11 @@ function BracketView({ matches }: { matches: BMatch[] }) {
                       {side(m, 'a')}
                       <div style={{ borderTop: `1px solid ${PT.border}` }} />
                       {side(m, 'b')}
+                      {m.gameId && (m.status === 'playing' || m.status === 'done') && (
+                        <Link href={`/tournaments/${tid}/watch/${m.gameId}`} className="flex items-center justify-center gap-1 py-1 text-[10.5px] font-black" style={{ background: 'rgba(0,0,0,.2)', color: PT.green, borderTop: `1px solid ${PT.border}` }}>
+                          <Eye size={11} /> {m.status === 'playing' ? 'Watch' : 'Replay'}
+                        </Link>
+                      )}
                       {(m.status === 'playing' || m.status === 'ready' || m.note) && (
                         <p className="truncate px-2.5 py-1 text-[10.5px] font-bold" style={{ background: 'rgba(0,0,0,.2)', color: m.status === 'done' ? PT.muted : PT.gold }}>
                           {m.status === 'playing' ? (m.gamesPlayed > 1 ? 'Replay in progress' : 'In progress') : m.status === 'ready' ? 'Starting soon' : m.note === 'bye' ? 'Bye' : m.note}

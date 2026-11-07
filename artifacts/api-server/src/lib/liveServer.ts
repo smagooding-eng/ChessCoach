@@ -1585,6 +1585,12 @@ export async function getUserRatings(userId: string) {
   return out;
 }
 
+/** A game in progress, for spectators (tournament watch pages). Null once it's over and gone from memory. */
+export function getLiveGameState(gameId: string): ReturnType<typeof gamePublicState> | null {
+  const g = games.get(gameId);
+  return g ? gamePublicState(g) : null;
+}
+
 export function getActiveGameForUser(userId: string): { state: ReturnType<typeof gamePublicState>; color: 'w' | 'b' } | null {
   const gid = userActiveGame.get(userId);
   if (!gid) return null;

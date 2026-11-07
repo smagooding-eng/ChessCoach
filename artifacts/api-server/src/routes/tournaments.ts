@@ -3,7 +3,8 @@ import crypto from "crypto";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth, isUserPremium } from "../middlewares/authMiddleware";
-import { listTimeControls, tournamentLiveStatus, closeTournamentPool } from "../lib/liveServer";
+import { listTimeControls, tournamentLiveStatus, closeTournamentPool, getLiveGameState } from "../lib/liveServer";
+import { Chess } from "chess.js";
 import { listCorrespondenceTimeControls } from "../lib/correspondence";
 import { withdrawFromBracket, roundLabel } from "../lib/tournamentEngine";
 import { logger } from "../lib/logger";
@@ -379,6 +380,7 @@ router.get("/tournaments/:id", async (req: Request, res: Response) => {
       winner: m.winner_id ? (m.winner_id === m.a_id ? "a" : "b") : null,
       note: m.note,
       gamesPlayed: m.games_played,
+      gameId: m.game_id,
     }));
     const mine = matchRows.find((m) => m.status !== "done" && (m.a_id === uid || m.b_id === uid));
     const myMatch = mine ? {
@@ -418,6 +420,104 @@ router.get("/tournaments/:id", async (req: Request, res: Response) => {
   } catch (err) {
     logger.error({ err }, "[tournaments] detail failed");
     res.status(500).json({ error: "Could not load the tournament" });
+  }
+});
+
+// ── Watching ────────────────────────────────────────────────────────────────
+// Anyone with the tournament link can watch its games (no sign-in): one game
+// with every move, or all the boards being played right now (for streaming).
+
+/** The moves of a game from its PGN (or a bare move list). */
+function sansOf(pgn: string): string[] {
+  const text = String(pgn ?? "").trim();
+  if (!text) return [];
+  try { const c = new Chess(); c.loadPgn(text); return c.history(); } catch { /* try it as a bare move list */ }
+  try {
+    const c = new Chess();
+    const toks = text.replace(/\[[^\]]*\]/g, " ").replace(/\{[^}]*\}/g, " ").replace(/\d+\.(\.\.)?/g, " ").split(/\s+/);
+    for (const tok of toks) {
+      if (!tok || /^(1-0|0-1|1\/2-1\/2|\*)$/.test(tok)) continue;
+      try { c.move(tok); } catch { break; }
+    }
+    return c.history();
+  } catch { return []; }
+}
+
+interface WatchGame {
+  id: string; kind: string; white: string; black: string; sans: string[]; fen: string | null;
+  status: "active" | "finished"; result: string | null; termination: string | null; turn: "w" | "b";
+  whiteTimeMs: number | null; blackTimeMs: number | null; lastMoveAt: string | null; timeControl: string | null;
+}
+
+async function watchGame(gid: string, tg: { kind: string; white_username: string; black_username: string; result: string | null; termination: string | null }): Promise<WatchGame> {
+  const base = { id: gid, kind: tg.kind, white: tg.white_username, black: tg.black_username };
+  if (tg.kind === "daily") {
+    const [g] = rowsOf<{ pgn: string; fen: string; status: string; result: string | null; termination: string | null; turn_user_id: string; white_user_id: string; last_move_at: string; time_control: string; white_bank_ms: number; black_bank_ms: number }>(await db.execute(sql`
+      SELECT pgn, fen, status, result, termination, turn_user_id, white_user_id, last_move_at, time_control, white_bank_ms, black_bank_ms
+      FROM correspondence_games WHERE id = ${gid}`));
+    if (g) return {
+      ...base, sans: sansOf(g.pgn), fen: g.fen, status: g.status === "active" ? "active" : "finished",
+      result: g.result, termination: g.termination, turn: g.turn_user_id === g.white_user_id ? "w" : "b",
+      whiteTimeMs: null, blackTimeMs: null, lastMoveAt: g.last_move_at ? new Date(g.last_move_at).toISOString() : null, timeControl: g.time_control,
+    };
+  } else {
+    const live = getLiveGameState(gid);
+    if (live) return {
+      ...base, sans: live.sanMoves, fen: live.fen, status: live.status === "active" ? "active" : "finished",
+      result: live.result ?? null, termination: live.termination ?? null, turn: live.turn,
+      whiteTimeMs: live.whiteTimeMs, blackTimeMs: live.blackTimeMs, lastMoveAt: null, timeControl: live.timeControl?.label ?? null,
+    };
+    const [g] = rowsOf<{ pgn: string; result: string | null; termination: string | null; time_control: string }>(await db.execute(sql`
+      SELECT pgn, result, termination, time_control FROM live_games WHERE id = ${gid}`));
+    if (g) {
+      const sans = sansOf(g.pgn);
+      return { ...base, sans, fen: null, status: "finished", result: g.result, termination: g.termination, turn: sans.length % 2 ? "b" : "w", whiteTimeMs: null, blackTimeMs: null, lastMoveAt: null, timeControl: g.time_control };
+    }
+  }
+  // Not found anywhere (yet): what the tournament knows.
+  return { ...base, sans: [], fen: null, status: tg.result ? "finished" : "active", result: tg.result, termination: tg.termination, turn: "w", whiteTimeMs: null, blackTimeMs: null, lastMoveAt: null, timeControl: null };
+}
+
+async function watchableTournament(id: string): Promise<{ id: string; name: string; kind: string } | null> {
+  const [t] = rowsOf<{ id: string; name: string; kind: string; status: string }>(await db.execute(sql`SELECT id, name, kind, status FROM tournaments WHERE id = ${id}`));
+  return t && t.status !== "cancelled" ? { id: t.id, name: t.name, kind: t.kind } : null;
+}
+
+router.get("/tournaments/:id/watch/:gameId", async (req: Request, res: Response) => {
+  try {
+    const t = await watchableTournament(String(req.params.id));
+    if (!t) { res.status(404).json({ error: "Tournament not found" }); return; }
+    const gid = String(req.params.gameId);
+    const [tg] = rowsOf<{ kind: string; white_username: string; black_username: string; result: string | null; termination: string | null }>(await db.execute(sql`
+      SELECT kind, white_username, black_username, result, termination FROM tournament_games WHERE tournament_id = ${t.id} AND game_id = ${gid}`));
+    if (!tg) { res.status(404).json({ error: "That game isn't part of this tournament" }); return; }
+    res.set("Cache-Control", "no-store");
+    res.json({ tournament: t, game: await watchGame(gid, tg), serverNow: Date.now() });
+  } catch (err) {
+    logger.error({ err }, "[tournaments] watch failed");
+    res.status(500).json({ error: "Could not load the game" });
+  }
+});
+
+/** Every board in play right now (and the latest finished ones when nothing is on), for the TV view. */
+router.get("/tournaments/:id/boards", async (req: Request, res: Response) => {
+  try {
+    const t = await watchableTournament(String(req.params.id));
+    if (!t) { res.status(404).json({ error: "Tournament not found" }); return; }
+    type TG = { game_id: string; kind: string; white_username: string; black_username: string; result: string | null; termination: string | null };
+    let rows = rowsOf<TG>(await db.execute(sql`
+      SELECT game_id, kind, white_username, black_username, result, termination FROM tournament_games
+      WHERE tournament_id = ${t.id} AND result IS NULL ORDER BY started_at DESC LIMIT 16`));
+    const live = rows.length > 0;
+    if (!live) rows = rowsOf<TG>(await db.execute(sql`
+      SELECT game_id, kind, white_username, black_username, result, termination FROM tournament_games
+      WHERE tournament_id = ${t.id} ORDER BY started_at DESC LIMIT 8`));
+    const boards = await Promise.all(rows.map((r) => watchGame(r.game_id, r)));
+    res.set("Cache-Control", "no-store");
+    res.json({ tournament: t, live, boards, serverNow: Date.now() });
+  } catch (err) {
+    logger.error({ err }, "[tournaments] boards failed");
+    res.status(500).json({ error: "Could not load the boards" });
   }
 });
 
