@@ -8,6 +8,7 @@ import { KnightTour, type KnightTourOpts } from '@/components/studio/KnightTour'
 import { SplashPromo, type SplashPromoOpts } from '@/components/studio/SplashPromo';
 import { FeatureBlitz, type FeatureBlitzOpts } from '@/components/studio/FeatureBlitz';
 import { TournamentReel, type TournamentReelOpts } from '@/components/studio/TournamentReel';
+import { SectionReel, type SectionReelOpts } from '@/components/studio/SectionReels';
 
 export function StudioRender() {
   const [job, setJob] = useState<{ source: StudioSource; queue?: StudioSource[]; title?: string } | null>(null);
@@ -39,6 +40,7 @@ export function StudioRender() {
   if (src.kind === 'knightTour') return <KnightTour render opts={src.opts as KnightTourOpts} onClose={() => {}} />;
   if (src.kind === 'featureBlitz') return <FeatureBlitz render opts={src.opts as unknown as FeatureBlitzOpts} onClose={() => {}} />;
   if (src.kind === 'tournamentReel') return <TournamentReel render opts={src.opts as unknown as TournamentReelOpts} onClose={() => {}} />;
+  if (src.kind === 'sectionReel') return <SectionReel render opts={src.opts as unknown as SectionReelOpts} onClose={() => {}} />;
   if (src.kind === 'splashPromo') return <SplashPromo render opts={src.opts as unknown as SplashPromoOpts} onClose={() => {}} />;
   return <StudioPlayer render source={job.source} queue={job.queue} title={job.title} onClose={() => {}} />;
 }
