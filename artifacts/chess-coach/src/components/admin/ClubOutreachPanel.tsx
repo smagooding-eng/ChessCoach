@@ -1064,10 +1064,20 @@ export function ClubOutreachPanel() {
         body: JSON.stringify({ items, replyTo: settings.gmail || undefined, template: template.id }),
       });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { setMsg(d.error || 'Could not send'); return false; }
-      setMsg(`Sent ${d.sent} through Resend${d.failed?.length ? `, ${d.failed.length} failed` : ''}${d.skippedForLimit ? `, ${d.skippedForLimit} left for tomorrow (daily limit)` : ''}. Replies go to ${settings.gmail || 'your Resend sender address'}.`);
-      return true;
-    } catch { setMsg('Could not send'); return false; }
+      if (!r.ok) { setMsg(d.error || `Could not send (server error ${r.status}).`); return false; }
+      const failed = (d.failed ?? []) as { id: number; error: string }[];
+      // Why it failed, in plain words (Resend's own message otherwise).
+      const why = (e: string) => /quota|daily|too many|429|rate/i.test(e) ? "Resend's sending limit is used up (it counts the app's own emails too). Use Gmail or try again later."
+        : /domain|verify|not verified|testing emails/i.test(e) ? "Resend won't send from this address: the sending domain isn't verified in Resend."
+        : /api key|unauthori|forbidden|401|403/i.test(e) ? "Resend rejected the API key (check RESEND_API_KEY on Render)."
+        : /do-not-contact|missing/i.test(e) ? 'That address is on the do-not-contact list.'
+        : e.replace(/^Failed to send email:\s*/i, '');
+      setMsg(d.sent
+        ? `Sent ${d.sent} through Resend${failed.length ? `, ${failed.length} failed: ${why(failed[0].error)}` : ''}${d.skippedForLimit ? `, ${d.skippedForLimit} left for tomorrow (daily limit)` : ''}. Replies go to ${settings.gmail || 'your Resend sender address'}.`
+        : `Nothing was sent. ${failed.length ? why(failed[0].error) : 'Resend sent nothing back.'}`);
+      // Only move on when something actually went out.
+      return d.sent > 0;
+    } catch { setMsg("Can't reach the server, so nothing was sent. Render may be down or restarting: wait until it says Live and try again."); return false; }
     finally { setResendBusy(false); void loadQuota(); void loadData(); }
   };
 
@@ -1313,6 +1323,7 @@ export function ClubOutreachPanel() {
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold disabled:opacity-50" style={{ background: 'rgba(129,182,76,.18)', color: '#fff', border: '1px solid rgba(129,182,76,.5)' }}>
               {resendBusy ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />} Send this batch with Resend, one email each{quota ? ` (${quota.remaining} left today)` : ''}
             </button>
+            {msg && <p className="rounded-lg px-3 py-2 text-xs font-semibold text-white" style={{ background: 'rgba(255,255,255,0.06)' }}>{msg}</p>}
             <button onClick={finishBatch} className="w-full rounded-xl py-2.5 text-xs font-bold text-white" style={{ background: 'rgba(255,255,255,.08)' }}>
               {bi + 1 >= batches.length ? 'Sent — mark contacted and finish' : 'Sent — mark contacted, next batch'}
             </button>
@@ -1341,6 +1352,7 @@ export function ClubOutreachPanel() {
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold disabled:opacity-50" style={{ background: 'rgba(129,182,76,.18)', color: '#fff', border: '1px solid rgba(129,182,76,.5)' }}>
               {resendBusy ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />} Send styled with Resend instead{quota ? ` (${quota.remaining} left today)` : ''}
             </button>
+            {msg && <p className="rounded-lg px-3 py-2 text-xs font-semibold text-white" style={{ background: 'rgba(255,255,255,0.06)' }}>{msg}</p>}
             <button onClick={markSentAndNext} className="w-full rounded-xl py-2.5 text-xs font-bold" style={opened ? { background: GREEN, color: '#fff' } : { background: 'rgba(255,255,255,.08)', color: '#fff' }}>
               {qi + 1 >= queue.length ? 'Sent — mark contacted and finish' : 'Sent — mark contacted, next'}
             </button>
