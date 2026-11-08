@@ -1054,7 +1054,8 @@ export function GameReplay() {
   // Share the review as a picture (accuracy, best moves, your best moment on the board).
   const shareSpec = (): ShareSpec | null => {
     if (!game || reviewMoves.length === 0) return null;
-    const me: 'w' | 'b' = (game.username ?? '').toLowerCase() === (game.blackUsername ?? '').toLowerCase() ? 'b' : 'w';
+    const mineNames = [username, authUser?.chesscomUsername, authUser?.lichessUsername].filter(Boolean).map((n) => String(n).toLowerCase());
+    const me: 'w' | 'b' = mineNames.includes((game.blackUsername ?? '').toLowerCase()) ? 'b' : 'w';
     const mine = reviewMoves.filter((m) => m.color === (me === 'w' ? 'white' : 'black'));
     const count = (...c: string[]) => mine.filter((m) => c.includes(m.classification)).length;
     const acc = gameAccuracy ? Math.round(me === 'w' ? gameAccuracy.white : gameAccuracy.black) : null;
