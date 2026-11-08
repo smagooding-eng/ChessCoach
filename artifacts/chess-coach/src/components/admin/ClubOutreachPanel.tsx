@@ -30,8 +30,8 @@ const AUDIENCE_META: Record<Audience, { tab: string; title: string; icon: typeof
     blurb: 'Chess clubs, leagues, associations, organizers and coaches that list a contact email on their own website, in English-speaking countries and, now, in the other countries the app speaks. Pick the email language below to write to a club in its own language.',
   },
   influencer: {
-    tab: 'Creators', title: 'Creator Outreach', icon: Users, find: 'Find new creators', noun: 'creators', who: 'creator', defaultTemplate: 'aff_invite', day: 'Thursday',
-    blurb: 'Chess YouTubers, streamers, TikTokers, coaches, bloggers and podcasters, in every market the app speaks, who list a business email on their own website or link-in-bio page. Invite them to the affiliate program: $1 for every member who goes Pro with their code, and they can edit the code to fit their channel. When someone says yes, add them in Affiliates with the Creator preset.',
+    tab: 'Creators', title: 'Creator Outreach', icon: Users, find: 'Find new creators', noun: 'creators', who: 'creator', defaultTemplate: 'aff_free_tournament', day: 'Thursday',
+    blurb: 'Chess YouTubers, streamers, TikTokers, coaches, bloggers and podcasters, in every market the app speaks, who list a business email on their own website or link-in-bio page. Lead with what costs nothing: free Pro for them and a free tournament for their followers with their name and logo (plus the live watch page for their stream). The $1-per-Pro affiliate code is a bonus, not the pitch. When someone says yes, give their account Pro, add them in Affiliates with the Creator preset, and help them set up the first tournament.',
   },
   library: {
     tab: 'Libraries', title: 'Library Outreach', icon: Library, find: 'Find new libraries', noun: 'libraries', who: 'library', defaultTemplate: 'lib_programs', day: 'Tuesday',
@@ -86,6 +86,42 @@ ChessScout.net
 If you'd rather not hear from me again, email chessscout.net@gmail.com with "no thanks" and I won't email you again.`;
 
 const CREATOR_TEMPLATES: Template[] = [
+  {
+    id: 'aff_free_tournament', audience: 'influencer', kind: 'personal',
+    name: 'Free Pro + your own tournament (no cost)',
+    subject: 'A free tournament for your followers, {{name}} (with your name and logo)',
+    body: `Hi {{name}},
+
+I'm {{sender}}, a solo developer building ChessScout.net, a chess app where people play, review their games and train. I came across your chess content{{onPlatform}} and I'd like to offer you two things, free:
+
+- Your own tournament for your followers, with your name and logo on it. Knockout or arena, live or one move a day. You share one link; pairings, clocks and results are automatic.
+- A live page anyone can watch, including an all-boards view you can put on stream or a TV, so the tournament doubles as content for you.
+- Free Pro on your account, so you can try everything: AI coach explanations, weakness analysis, opponent prep and photo scanning.
+
+If you'd ever like to share it, I can send ready-made clips you're welcome to post, or we can do an Instagram collab post. And if your followers go Pro with your code, you get $1 for each, but there's no obligation at all.
+
+If you're interested, reply to this email and I'll switch your account to Pro and help you set up the first tournament.
+
+${SIGN_OFF}`,
+  },
+  {
+    id: 'aff_free_tournament_general', audience: 'influencer', kind: 'general',
+    name: 'Free Pro + your own tournament (no cost)',
+    subject: 'A free tournament for your followers (with your name and logo)',
+    body: `Hi there,
+
+I'm {{sender}}, a solo developer building ChessScout.net, a chess app where people play, review their games and train. I'm writing to a few chess creators and coaches to offer two things, free:
+
+- Your own tournament for your followers, with your name and logo on it. Knockout or arena, live or one move a day. You share one link; pairings, clocks and results are automatic.
+- A live page anyone can watch, including an all-boards view you can put on stream or a TV, so the tournament doubles as content for you.
+- Free Pro on your account, so you can try everything: AI coach explanations, weakness analysis, opponent prep and photo scanning.
+
+If you'd ever like to share it, I can send ready-made clips you're welcome to post, or we can do an Instagram collab post. And if your followers go Pro with your code, you get $1 for each, but there's no obligation at all.
+
+If you're interested, reply to this email and I'll switch your account to Pro and help you set up the first tournament.
+
+${SIGN_OFF}`,
+  },
   {
     id: 'aff_invite', audience: 'influencer', kind: 'personal',
     name: 'Affiliate invite ($1 per Pro)',
