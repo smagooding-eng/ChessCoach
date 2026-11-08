@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ShareButton, SHARE_BASE } from '@/components/ShareButton';
 import { RatePlayCard } from '@/components/RatePlayCard';
 import { Link, useLocation, useParams } from 'wouter';
 import { Chess } from 'chess.js';
@@ -189,6 +190,12 @@ export function DailyGame() {
             <BookOpen size={15} /> Review game
           </button>
           <Link href="/daily" className="rounded-xl px-4 py-2.5 text-[13px] font-bold" style={ghostBtn}>Daily games</Link>
+          {won && game.result !== 'draw' && game.termination !== 'aborted' && (
+            <ShareButton spec={{ kicker: 'Daily chess', headline: 'I won!', sub: `${game.whiteUsername} vs ${game.blackUsername}`,
+              board: { fen: game.fen, flipped: !white }, stats: delta != null && delta !== 0 ? [{ value: `${delta > 0 ? '+' : ''}${delta}`, label: 'Daily rating', color: delta > 0 ? '#81B64C' : '#E5484D' }] : [],
+              cta: 'One move a day. Play free' }}
+              url={`${SHARE_BASE}/daily?ref=win`} text="Won a daily chess game on ChessScout.net ♟️" name="chessscout-daily-win" label="Share your win" />
+          )}
         </div>
         {won && game.result !== 'draw' && game.termination !== 'aborted' && <RatePlayCard moment="Great win!" />}
       </div>

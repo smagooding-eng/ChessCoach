@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { ShareButton, SHARE_BASE } from '@/components/ShareButton';
 import { RatePlayCard } from '@/components/RatePlayCard';
 import { PieceTile } from '@/components/DesignSystem';
 import { useSettings } from '@/context/SettingsContext';
@@ -860,6 +861,13 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
                   {result === 'win' ? 'You Win!' : result === 'loss' ? 'You Lost' : 'Draw'}
                 </h3>
                 {result === 'win' && !isOnboarding && <RatePlayCard moment="You beat the bot!" />}
+                {result === 'win' && !isOnboarding && (
+                  <div className="flex justify-center">
+                    <ShareButton spec={{ kicker: 'Bot beaten', headline: `I beat ${botName(bot)}!`, sub: `${bot.rating}-rated bot · ${Math.ceil(moves.length / 2)} moves`,
+                      board: { fen, flipped: playerColor === 'b' }, cta: 'Think you can beat it? Play free' }}
+                      url={`${SHARE_BASE}/practice?ref=bot`} text={`I beat the ${bot.rating}-rated bot on ChessScout.net 🤖♟️`} name="chessscout-bot-win" label="Share your win" />
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground">
                   vs {botName(bot)} ({bot.rating}) · {Math.ceil(moves.length / 2)} moves · {formatTime(elapsedSec)}
                 </p>

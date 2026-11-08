@@ -13,7 +13,7 @@ import { useUser } from '@/hooks/use-user';
 import { Crown, RotateCcw, ChevronRight, Trophy, Target, Flame, Zap, Lightbulb, Loader2, Lock, Share2, Puzzle, GitFork, Pin, ArrowRightToLine, Eye, ShieldOff } from 'lucide-react';
 import { useLocation, useSearch, Link } from 'wouter';
 import { motifForThemes } from '@/lib/tactics';
-import { encodeCard } from '@/pages/ShareCard';
+import { ShareButton, SHARE_BASE } from '@/components/ShareButton';
 import { UpgradeNudge } from '@/components/UpgradeNudge';
 import { ProUpsell } from '@/components/ProUpsell';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -921,20 +921,16 @@ export function Puzzles() {
                   )}
 
                   {state === 'correct' && puzzle && (
-                    <button
-                      onClick={() => {
-                        const encoded = encodeCard({
-                          type: 'puzzle_position',
-                          fen: puzzle.fen,
-                          rating: puzzle.rating,
-                          themes: puzzle.themes ?? [],
-                        });
-                        navigate(`/share/${encoded}`);
+                    <ShareButton
+                      spec={() => {
+                        const black = puzzle.fen.split(' ')[1] === 'b';
+                        const themes = (puzzle.themes ?? []).slice(0, 2).join(' · ');
+                        return { kicker: 'Chess puzzle', headline: 'Can you find the winning move?', sub: `${black ? 'Black' : 'White'} to play · ${puzzle.rating}-rated${themes ? ` · ${themes}` : ''}`,
+                          board: { fen: puzzle.fen, flipped: black }, cta: 'Solve it, and unlimited more, free' };
                       }}
-                      className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-all"
-                      style={{ background: 'rgba(255,255,255,0.08)', color: TEXT_MUTED }}>
-                      <Share2 size={16} />Share as Image
-                    </button>
+                      url={`${SHARE_BASE}/puzzles?ref=share`} text="I solved this one. Can you find the winning move?" name="chessscout-puzzle"
+                      label="Share puzzle" className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-all"
+                      style={{ background: 'rgba(255,255,255,0.08)', color: TEXT_LIGHT }} />
                   )}
 
                   {state === 'wrong' && solutionMoves.length > 0 && (
@@ -1019,25 +1015,14 @@ export function Puzzles() {
             )}
 
             {stats && stats.streak >= 3 && (
-              <button
-                onClick={async () => {
-                  const url = `${window.location.origin}/share/${encodeCard({
-                    type: 'streak',
-                    username: authUser?.chesscomUsername ?? authUser?.lichessUsername ?? 'A ChessScout.net user',
-                    streakDays: stats.streak,
-                    accuracy: stats.accuracy,
-                  })}`;
-                  const shareData = { title: `${stats.streak}-day puzzle streak on ChessScout.net`, url };
-                  if (navigator.share) {
-                    try { await navigator.share(shareData); return; } catch { /* fall through to clipboard */ }
-                  }
-                  try { await navigator.clipboard.writeText(url); } catch { /* nothing more we can do */ }
-                }}
+              <ShareButton
+                spec={{ kicker: 'Puzzle streak', headline: `${stats.streak} days in a row`, sub: 'Solving chess puzzles every day on ChessScout',
+                  stats: [{ value: String(stats.streak), label: 'Day streak', color: '#F59E0B' }, ...(stats.accuracy != null ? [{ value: `${stats.accuracy}%`, label: 'Accuracy', color: '#81B64C' }] : [])],
+                  cta: 'Unlimited free puzzles' }}
+                url={`${SHARE_BASE}/puzzles?ref=streak`} text={`${stats.streak}-day puzzle streak on ChessScout.net 🔥`} name="chessscout-streak"
+                label={<>Share your {stats.streak}-day streak</>}
                 className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-black"
-                style={{ background: 'linear-gradient(180deg, #fbbf46 0%, #f59e0b 55%, #c9800a 100%)', color: '#000', boxShadow: '0 3px 0 #92620a, 0 6px 12px rgba(0,0,0,0.3)' }}
-              >
-                <Flame size={15} /> Share your {stats.streak}-day streak
-              </button>
+                style={{ background: 'linear-gradient(180deg, #fbbf46 0%, #f59e0b 55%, #c9800a 100%)', color: '#000', boxShadow: '0 3px 0 #92620a, 0 6px 12px rgba(0,0,0,0.3)' }} />
             )}
             {stats && stats.streak >= 3 && <div className="mt-3"><RatePlayCard moment={`${stats.streak}-day streak!`} /></div>}
           </div>

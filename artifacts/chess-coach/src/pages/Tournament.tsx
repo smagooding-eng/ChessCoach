@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { ShareButton, SHARE_BASE } from '@/components/ShareButton';
 import { Link, useParams, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { TournamentLogo, TournamentEditCard } from '@/components/play/TournamentBranding';
@@ -338,6 +339,12 @@ function TournamentView({ live, signedIn }: { live: Live; signedIn: boolean }) {
             {t.eligibility === 'pro' && <span className="rounded px-1.5 py-0.5 text-[10px]" style={{ background: '#81B64C', color: '#FFFFFF' }}>Pro tournament</span>}
           </p>
           <h1 className="truncate text-2xl font-black md:text-3xl" style={{ color: PT.text, letterSpacing: '-0.02em' }}>{t.name}</h1>
+          {finished && t.winner && (
+            <div className="mt-2">
+              <ShareButton spec={{ kicker: 'Tournament champion', headline: t.winner, sub: t.name, stats: [{ value: String(t.players), label: 'Players', color: '#81B64C' }], cta: 'Run your own tournament free' }}
+                url={`${SHARE_BASE}/tournaments/${t.id}`} text={`${t.winner} won "${t.name}" on ChessScout.net 🏆`} name="chessscout-champion" label="Share the champion" />
+            </div>
+          )}
           {(t.clubName || (t.createdByName && t.createdByName !== 'ChessScout.net')) && (
             <p className="truncate text-[12.5px]" style={{ color: PT.muted }}>
               {t.clubName ? <>Hosted by <b style={{ color: PT.text }}>{t.clubName}</b>{t.createdByName && t.createdByName !== 'ChessScout.net' ? ` · organized by ${t.isCreator ? 'you' : t.createdByName}` : ''}</> : <>Organized by {t.isCreator ? 'you' : t.createdByName}</>}
@@ -372,6 +379,12 @@ function TournamentView({ live, signedIn }: { live: Live; signedIn: boolean }) {
             {t.maxPlayers ? <span className="text-[12px] font-bold" style={{ color: PT.muted }}>{Math.max(0, t.maxPlayers - t.players)} spots left</span> : null}
           </div>
           <ShareLink url={`${window.location.origin}/tournaments/${t.id}`} text={`Join "${t.name}" on ChessScout (${t.timeControlLabel})`} />
+          <ShareButton
+            spec={{ kicker: `${isBracket ? 'Knockout' : 'Arena'} · ${isLive ? 'Live' : 'Daily'} chess tournament`, headline: t.name, sub: `${t.timeControlLabel} · starts ${startLabel}${t.clubName ? ` · ${t.clubName}` : ''}`,
+              stats: [{ value: String(t.players), label: t.players === 1 ? 'Player in' : 'Players in', color: '#81B64C' }, ...(t.maxPlayers ? [{ value: String(Math.max(0, t.maxPlayers - t.players)), label: 'Spots left' }] : [])],
+              cta: 'Join free, and anyone can watch live' }}
+            url={`${SHARE_BASE}/tournaments/${t.id}`} text={`Join "${t.name}" on ChessScout.net ♟️`} name="chessscout-tournament"
+            label="Share as a picture" className="flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-extrabold" style={ghostBtn} />
           {t.isCreator && !editing && (
             <button onClick={() => setEditing(true)} className="w-full rounded-xl py-2 text-[12.5px] font-bold" style={ghostBtn}>
               Edit name, club or logo

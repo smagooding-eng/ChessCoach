@@ -1,4 +1,6 @@
 import { RedesignHeader } from '@/components/RedesignHeader';
+import { ShareButton, SHARE_BASE } from '@/components/ShareButton';
+import { landingSquare, type ShareSpec } from '@/lib/shareImage';
 import { TablebaseBadge } from '@/components/TablebaseBadge';
 import { MoveTimeline } from '@/components/MoveTimeline';
 import { Search as SearchIcon, Check } from 'lucide-react';
@@ -1049,8 +1051,48 @@ export function GameReplay() {
   const cfg = currentReview ? CLASS_CFG[currentReview.classification] : null;
   const isBad = currentReview && ['inaccuracy', 'mistake', 'blunder', 'missed_win'].includes(currentReview.classification);
 
+  // Share the review as a picture (accuracy, best moves, your best moment on the board).
+  const shareSpec = (): ShareSpec | null => {
+    if (!game || reviewMoves.length === 0) return null;
+    const me: 'w' | 'b' = (game.username ?? '').toLowerCase() === (game.blackUsername ?? '').toLowerCase() ? 'b' : 'w';
+    const mine = reviewMoves.filter((m) => m.color === (me === 'w' ? 'white' : 'black'));
+    const count = (...c: string[]) => mine.filter((m) => c.includes(m.classification)).length;
+    const acc = gameAccuracy ? Math.round(me === 'w' ? gameAccuracy.white : gameAccuracy.black) : null;
+    const star = mine.find((m) => m.classification === 'brilliant') ?? mine.find((m) => m.classification === 'great') ?? null;
+    const fenAt = (ply: number) => (ply <= 0 ? gameStartFen : (moves[ply - 1]?.fen ?? gameStartFen));
+    let board: ShareSpec['board'];
+    if (star) {
+      const lm = landingSquare(fenAt(star.moveIndex), star.san);
+      board = { fen: fenAt(star.moveIndex + 1), lastMove: lm, flipped: me === 'b',
+        badge: lm ? { square: lm.to, text: star.classification === 'brilliant' ? '!!' : '!', color: star.classification === 'brilliant' ? '#1BACA6' : '#5C8BB0' } : null };
+    } else if (moves.length) {
+      const lm = landingSquare(fenAt(moves.length - 1), moves[moves.length - 1].san);
+      board = { fen: fenAt(moves.length), lastMove: lm, flipped: me === 'b' };
+    }
+    const won = game.result === 'win', drew = game.result === 'draw';
+    return {
+      kicker: 'Game review',
+      headline: acc != null ? (won ? `Won with ${acc}% accuracy` : `${acc}% accuracy`) : won ? 'I won this one' : drew ? 'A hard-fought draw' : 'My game, reviewed',
+      sub: `${game.whiteUsername} vs ${game.blackUsername}${star ? ` · ${star.classification === 'brilliant' ? 'Brilliant' : 'Great'} move ${star.san}` : ''}`,
+      board,
+      stats: [
+        ...(acc != null ? [{ value: `${acc}%`, label: 'Accuracy', color: '#81B64C' }] : []),
+        { value: String(count('brilliant', 'great')), label: 'Brilliant & great', color: '#1BACA6' },
+        { value: String(count('best', 'excellent')), label: 'Best moves' },
+      ],
+      cta: 'Review your games free',
+    };
+  };
+  const shareFab = reviewMoves.length > 0 && game ? (
+    <div className="fixed right-3 z-40" style={{ bottom: 'calc(env(safe-area-inset-bottom, 0px) + 86px)' }}>
+      <ShareButton spec={shareSpec} url={`${SHARE_BASE}/?ref=review`} text="I reviewed my chess game on ChessScout:" name="chessscout-review"
+        label="Share" className="inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 text-[13px] font-black shadow-lg"
+        style={{ background: '#81B64C', color: '#fff', boxShadow: '0 6px 18px rgba(0,0,0,.45)' }} ariaLabel="Share this review" />
+    </div>
+  ) : null;
+
   if (showGuided) {
-    return (
+    return (<>{shareFab}
       <GuidedReview
         status={reviewMoves.length > 0 && !reviewing ? 'ready' : reviewError ? 'error' : loadingSavedReview && !reviewing ? 'loading' : 'preparing'}
         progress={reviewProgress}
@@ -1073,7 +1115,7 @@ export function GameReplay() {
         onExit={() => { setGtab('analysis'); setGuided(false); }}
         onReport={openReport}
         onBack={() => { if (window.history.length > 1) window.history.back(); else navigate('/games'); }}
-      />
+      /></>
     );
   }
 
@@ -1083,7 +1125,7 @@ export function GameReplay() {
   if (canFullAnalysis && !classic) {
     const names = [username, authUser?.chesscomUsername, authUser?.lichessUsername].filter(Boolean).map((n) => String(n).toLowerCase());
     const meColor: 'w' | 'b' | null = names.includes((game.whiteUsername ?? '').toLowerCase()) ? 'w' : names.includes((game.blackUsername ?? '').toLowerCase()) ? 'b' : null;
-    return (
+    return (<>{shareFab}
       <ProAnalysis
         game={game}
         moves={moves as any}
@@ -1109,12 +1151,13 @@ export function GameReplay() {
           navigate(`/practice?fen=${encodeURIComponent(fenBefore)}&rating=${oppRating}&color=${isBlack ? 'b' : 'w'}`);
         }}
         initialTab={gtab === 'report' ? 'report' : 'board'}
-      />
+      /></>
     );
   }
 
   return (
     <div className={`gap-2 md:gap-3 px-3 ${redesign ? 'pt-0' : 'pt-3'} md:px-0 md:pt-0 pb-2 md:pb-0 ${redesign ? 'h-[calc(100dvh-5.75rem)]' : 'h-[calc(100dvh-8rem)]'} md:h-[calc(100vh-3.5rem)] xl:h-[calc(100vh-3rem)] flex flex-col overflow-hidden`}>
+      {shareFab}
       {redesign && (
         <div className="shrink-0">
           <RedesignHeader

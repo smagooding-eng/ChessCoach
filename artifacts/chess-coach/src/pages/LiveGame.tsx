@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ShareButton, SHARE_BASE } from '@/components/ShareButton';
 import { RatePlayCard } from '@/components/RatePlayCard';
 import { ChessBoard } from '@/components/ChessBoard';
 import { EvalBar, MaterialStrip } from '@/components/GameStatusStrip';
@@ -235,6 +236,18 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
         {notice && <p className="text-xs font-bold" style={{ color: '#ec6b6b' }}>{notice}</p>}
         <div className="mx-auto flex max-w-[320px] flex-col gap-2">{rematchButtons}{addFriendButton}</div>
         {youWon && !opponentIsBot && <RatePlayCard moment="Great win!" />}
+        {(youWon || draw) && (
+          <div className="flex justify-center">
+            <ShareButton
+              spec={{ kicker: youWon ? 'Victory' : 'Draw', headline: youWon ? 'I won!' : 'Hard-fought draw',
+                sub: `${game.white.username} vs ${game.black.username}${game.timeControl?.label ? ` · ${game.timeControl.label}` : ''}`,
+                board: { fen: game.fen, lastMove: lastMoveSquares as { from: string; to: string } | null, flipped: !youAreWhite },
+                stats: [{ value: String(game.sanMoves.length ? Math.ceil(game.sanMoves.length / 2) : 0), label: 'Moves' }, ...(game.mode === 'ranked' && typeof myDelta === 'number' && myDelta !== 0 ? [{ value: `${myDelta > 0 ? '+' : ''}${myDelta}`, label: 'Rating', color: myDelta > 0 ? '#81B64C' : '#E5484D' }] : [])],
+                cta: 'Play free, then get a free review' }}
+              url={`${SHARE_BASE}/play?ref=win`} text={youWon ? 'Just won a game on ChessScout.net ♟️' : 'A tough draw on ChessScout.net ♟️'} name="chessscout-win"
+              label={youWon ? 'Share your win' : 'Share'} />
+          </div>
+        )}
         <div className="flex justify-center gap-2 pt-2 flex-wrap">
           <button onClick={onLeave}
             className="px-4 py-2 rounded-lg font-black text-xs"

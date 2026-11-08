@@ -245,8 +245,20 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
       daily: rowsOf<Record<string, unknown>>(devDaily).map((r) => ({ day: String(r.day), device: String(r.device), visitors: num(r.visitors), members: num(r.members), views: num(r.views), androidApp: num(r.android_app), installedApp: num(r.installed_app) })),
     };
 
+    // "Where did you find us?" answers: everyone who has answered, and those who answered in the range.
+    const heard = await db.execute(sql`
+      SELECT h.source, COUNT(*) AS all_time,
+        COUNT(*) FILTER (WHERE h.created_at >= ${since} AND h.created_at <= ${until}) AS in_range,
+        COUNT(*) FILTER (WHERE u.created_at >= ${since} AND u.created_at <= ${until}) AS signed_up_in_range
+      FROM user_heard_from h JOIN users u ON u.id = h.user_id
+      WHERE h.user_id NOT IN (SELECT id FROM analytics_excluded_users)
+      GROUP BY 1 ORDER BY all_time DESC`).catch(() => []);
     const t = rowsOf<Record<string, unknown>>(totals)[0] ?? {};
     res.json({
+      heardFrom: {
+        note: "Answers to 'Where did you find us?', asked once after a win or a puzzle streak (not at signup). allTime = everyone who answered; signedUpInRange = answers from users who signed up in this range.",
+        answers: rowsOf<Record<string, unknown>>(heard).map((r) => ({ source: String(r.source), allTime: num(r.all_time), answeredInRange: num(r.in_range), signedUpInRange: num(r.signed_up_in_range) })),
+      },
       devices,
       about: "ChessScout.net traffic and funnel export. Aggregates only (no IPs, emails or user ids). Days are in the admin's local time zone. The owner's own accounts (and their browsers) and suspected bots are left out.",
       excluded: await exclusionSummary(),
