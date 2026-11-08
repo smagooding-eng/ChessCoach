@@ -32,6 +32,17 @@ ChessScout.net is a chess site and app where people play and improve in one plac
 - Chess opening traps explained: https://chessscout.net/chess-traps
 - Top players' repertoires: https://chessscout.net/players
 - Articles: https://chessscout.net/learn
+- Answer guides:
+  - How to review your chess games for free: https://chessscout.net/learn/free-chess-game-review
+  - Free alternatives to Chess.com Game Review: https://chessscout.net/learn/chess-com-game-review-alternative
+  - How to stop blundering in chess: https://chessscout.net/learn/how-to-stop-blundering-in-chess
+  - How to find your chess weaknesses: https://chessscout.net/learn/find-your-chess-weaknesses
+  - How to scout a chess opponent: https://chessscout.net/learn/how-to-prepare-for-a-chess-opponent
+  - How to run a free online chess tournament (club, school, office): https://chessscout.net/learn/how-to-run-an-online-chess-tournament-for-free
+  - Cómo organizar un torneo de ajedrez online gratis: https://chessscout.net/learn/como-organizar-un-torneo-de-ajedrez-online-gratis
+  - Best free chess apps to improve: https://chessscout.net/learn/best-free-chess-apps-to-improve
+  - How to teach kids chess: https://chessscout.net/learn/chess-for-kids-how-to-start
+  - Analyze a chess position from a photo: https://chessscout.net/learn/analyze-chess-position-from-photo
 - Pricing: https://chessscout.net/pricing
 - Android app: https://play.google.com/store/apps/details?id=net.chessscout.app
 - Comparisons: https://chessscout.net/vs/aimchess, https://chessscout.net/vs/improve-my-chess, https://chessscout.net/vs/free-chess-analysis

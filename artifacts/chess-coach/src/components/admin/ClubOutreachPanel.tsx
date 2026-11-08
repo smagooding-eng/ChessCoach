@@ -1046,12 +1046,22 @@ export function ClubOutreachPanel() {
   }, []);
   useEffect(() => { void loadQuota(); }, [loadQuota]);
   /** Sends each contact its own styled email (template filled for that club) through Resend. */
+  const [resendArmed, setResendArmed] = useState<string | null>(null);
   const sendViaResend = async (list: Contact[]): Promise<boolean> => {
     if (!list.length) return false;
     if (!settings.address.trim()) { setMsg('Add your mailing address in Sender details first. Marketing emails must include one.'); setEditing(true); return false; }
     const n = quota ? Math.min(list.length, quota.remaining) : list.length;
     if (quota && quota.remaining <= 0) { setMsg(`Resend's daily outreach limit is used up (${quota.limit} a day). Use Gmail or try tomorrow.`); return false; }
-    if (!confirm(`Send ${n} styled email${n === 1 ? '' : 's'} through Resend now?${quota && list.length > quota.remaining ? ` (${list.length - quota.remaining} will wait for tomorrow's limit.)` : ''}`)) return false;
+    // Tap twice instead of a browser confirm box: the Android app and some
+    // browsers block confirm() dialogs, which made the button do nothing.
+    const key = list.map((c) => c.id).join(',');
+    if (resendArmed !== key) {
+      setResendArmed(key);
+      setMsg(`Tap the Resend button again to send ${n} styled email${n === 1 ? '' : 's'} now.${quota && list.length > quota.remaining ? ` (${list.length - quota.remaining} will wait for tomorrow's limit.)` : ''}`);
+      setTimeout(() => setResendArmed((k) => (k === key ? null : k)), 8000);
+      return false;
+    }
+    setResendArmed(null);
     setResendBusy(true); setMsg(`Sending ${n} through Resend…`);
     const items = list.map((c) => {
       const tpl = tplFor(langOf(c));
@@ -1321,7 +1331,7 @@ export function ClubOutreachPanel() {
                 }
               }} disabled={resendBusy || (quota?.remaining ?? 1) <= 0}
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold disabled:opacity-50" style={{ background: 'rgba(129,182,76,.18)', color: '#fff', border: '1px solid rgba(129,182,76,.5)' }}>
-              {resendBusy ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />} Send this batch with Resend, one email each{quota ? ` (${quota.remaining} left today)` : ''}
+              {resendBusy ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />} {resendArmed ? 'Tap again to send' : 'Send this batch with Resend, one email each'}{quota ? ` (${quota.remaining} left today)` : ''}
             </button>
             {msg && <p className="rounded-lg px-3 py-2 text-xs font-semibold text-white" style={{ background: 'rgba(255,255,255,0.06)' }}>{msg}</p>}
             <button onClick={finishBatch} className="w-full rounded-xl py-2.5 text-xs font-bold text-white" style={{ background: 'rgba(255,255,255,.08)' }}>
@@ -1350,7 +1360,7 @@ export function ClubOutreachPanel() {
               track={{ contacts: [{ id: current.id, email: current.email }], template: template.id }} />
             <button onClick={async () => { if (await sendViaResend([current])) advance(); }} disabled={resendBusy || (quota?.remaining ?? 1) <= 0}
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl py-3 text-sm font-bold disabled:opacity-50" style={{ background: 'rgba(129,182,76,.18)', color: '#fff', border: '1px solid rgba(129,182,76,.5)' }}>
-              {resendBusy ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />} Send styled with Resend instead{quota ? ` (${quota.remaining} left today)` : ''}
+              {resendBusy ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />} {resendArmed ? 'Tap again to send' : 'Send styled with Resend instead'}{quota ? ` (${quota.remaining} left today)` : ''}
             </button>
             {msg && <p className="rounded-lg px-3 py-2 text-xs font-semibold text-white" style={{ background: 'rgba(255,255,255,0.06)' }}>{msg}</p>}
             <button onClick={markSentAndNext} className="w-full rounded-xl py-2.5 text-xs font-bold" style={opened ? { background: GREEN, color: '#fff' } : { background: 'rgba(255,255,255,.08)', color: '#fff' }}>

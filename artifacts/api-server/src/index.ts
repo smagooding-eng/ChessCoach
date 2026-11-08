@@ -79,6 +79,15 @@ async function runSchemaMigrations() {
     await db.execute(sql`ALTER TABLE lichess_cs_games ADD COLUMN IF NOT EXISTS source varchar(16)`);
     // "Where did you find us?": one answer per user, asked after a win or a streak.
     await db.execute(sql`CREATE TABLE IF NOT EXISTS user_heard_from (user_id varchar PRIMARY KEY, source varchar(32) NOT NULL, detail varchar(80), created_at timestamptz NOT NULL DEFAULT now())`);
+    // Answer pages for Google and ChatGPT (free game review, stop blundering...). An article
+    // that already exists is left as it is, so edits in the admin stay.
+    try {
+      const { GEO_ARTICLES } = await import("./lib/geoArticles");
+      for (const g of GEO_ARTICLES) {
+        await db.execute(sql`INSERT INTO seo_articles (slug, title, target_keyword, meta_description, content, published)
+          VALUES (${g.slug}, ${g.title}, ${g.targetKeyword}, ${g.metaDescription}, ${g.content}, true) ON CONFLICT (slug) DO NOTHING`);
+      }
+    } catch (err) { logger.warn({ err }, "[startup] answer pages not seeded"); }
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ`);
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_opt_out BOOLEAN NOT NULL DEFAULT false`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_page_views_user_time ON page_views(user_id, created_at DESC)`);
