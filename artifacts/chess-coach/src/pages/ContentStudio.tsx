@@ -6,7 +6,7 @@ import { apiFetch } from '@/lib/api';
 import { MiniBoard } from '@/components/MiniBoard';
 import { useUser } from '@/hooks/use-user';
 import { OPENING_MAP } from '@/components/studio/openingMap';
-import { StudioPlayer, themeLabel, type StudioMoment, type StudioTrap, type StudioSource, type StudioPuzzle, type StudioReview, type StudioScout, type StudioLesson, type StudioPromo } from '@/components/studio/StudioPlayer';
+import { StudioPlayer, themeLabel, comebackHook, type StudioMoment, type StudioTrap, type StudioSource, type StudioPuzzle, type StudioReview, type StudioScout, type StudioLesson, type StudioPromo } from '@/components/studio/StudioPlayer';
 import { Chess } from 'chess.js';
 import { KidsStudio } from '@/components/studio/KidsStudio';
 import { KnightTour } from '@/components/studio/KnightTour';
@@ -132,7 +132,7 @@ export function ContentStudio() {
   const togglePick = (x: StudioSource) => setPicked((cur) => (cur.some((c) => keyOf(c) === keyOf(x)) ? cur.filter((c) => keyOf(c) !== keyOf(x)) : [...cur, x]));
   const isPicked = (x: StudioSource) => picked.some((c) => keyOf(c) === keyOf(x));
   const choose = (x: StudioSource) => (picking ? togglePick(x) : setOpen(x));
-  const [view, setView] = useState<'plan' | 'moments' | 'traps' | 'puzzles' | 'reviews' | 'kids' | 'scout' | 'scan' | 'analyzer' | 'promo' | 'openings'>('plan');
+  const [view, setView] = useState<'plan' | 'moments' | 'traps' | 'puzzles' | 'reviews' | 'kids' | 'scout' | 'scan' | 'analyzer' | 'promo' | 'openings' | 'comebacks'>('plan');
   // Openings: main line, ideas, replies and variations, with real-game numbers and Stockfish.
   const [openings, setOpenings] = useState<{ id: string; name: string; side: 'white' | 'black'; line: string[]; lines: string[] }[] | null>(null);
   useEffect(() => {
@@ -264,14 +264,14 @@ export function ContentStudio() {
   const [rAll, setRAll] = useState(false);
   const [reviewing, setReviewing] = useState<{ id: number; error?: string } | null>(null);
   const loadReviews = useCallback((offset: number) => {
-    const q = new URLSearchParams({ sort: rSort, limit: '48', offset: String(offset) });
+    const q = new URLSearchParams({ sort: view === 'comebacks' ? 'comeback' : rSort, limit: '48', offset: String(offset) });
     if (rQ.trim()) q.set('q', rQ.trim());
     if (rPlayer.trim()) q.set('player', rPlayer.trim());
     if (rGameNo.trim()) q.set('gameNo', rGameNo.trim());
     if (rBots) q.set('bots', '1');
     if (rAll) q.set('all', '1'); if (minRating) q.set('minRating', String(minRating)); if (platform) q.set('platform', platform); if (since) q.set('sinceDays', String(since));
     return apiFetch(`/api/admin/studio/reviews?${q}`, { credentials: 'include' }).then((r) => (r.ok ? r.json() : { reviews: [] })).then((d) => (d.reviews ?? []) as StudioReview[]);
-  }, [rQ, rSort, minRating, platform, since, rPlayer, rGameNo, rBots, rAll]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rQ, rSort, minRating, platform, since, rPlayer, rGameNo, rBots, rAll, view]); // eslint-disable-line react-hooks/exhaustive-deps
   // A game without a review yet: review it with the Studio's own engine, then open it.
   const reviewThenOpen = async (rv: StudioReview) => {
     setReviewing({ id: rv.id });
@@ -287,7 +287,7 @@ export function ContentStudio() {
     }
   };
   useEffect(() => {
-    if (view !== 'reviews') return;
+    if (view !== 'reviews' && view !== 'comebacks') return;
     let live = true; setReviews(null);
     const t = setTimeout(() => { loadReviews(0).then((r) => live && setReviews(r)).catch(() => live && setReviews([])); }, 250);
     return () => { live = false; clearTimeout(t); };
@@ -302,7 +302,7 @@ export function ContentStudio() {
     if (view === 'traps' && traps?.[k]) setOpen({ kind: 'trap', trap: traps[k] });
     if (view === 'moments' && moments?.[k]) setOpen({ kind: 'game', moment: moments[k] });
     if (view === 'puzzles' && puzzles?.[k]) setOpen({ kind: 'puzzle', puzzle: puzzles[k] });
-    if (view === 'reviews' && reviews?.[k]) setOpen({ kind: 'review', review: reviews[k] });
+    if ((view === 'reviews' || view === 'comebacks') && reviews?.[k]) setOpen({ kind: 'review', review: reviews[k] });
   };
   const openIndex = !open ? -1 : open.kind === 'trap' ? (traps ?? []).findIndex((t) => t.id === open.trap.id)
     : open.kind === 'puzzle' ? (puzzles ?? []).findIndex((p) => p.id === open.puzzle.id)
@@ -412,7 +412,7 @@ export function ContentStudio() {
         {picking ? 'Cancel compilation' : '🎬 Make a compilation'}
       </button>
       <div className="order-1 inline-flex flex-wrap rounded-xl bg-white/5 p-1">
-        {([['plan', 'Reels plan 📅'], ['moments', 'Game moments'], ['reviews', 'Game reviews'], ['puzzles', 'Puzzles'], ['traps', 'Trap lessons'], ['kids', 'Kids & beginners'], ['scout', 'Opponent scout'], ['scan', 'Scan position'], ['analyzer', 'Analyzer games'], ['openings', 'Openings'], ['promo', 'Promos']] as const).map(([k, t]) => (
+        {([['plan', 'Reels plan 📅'], ['moments', 'Game moments'], ['comebacks', 'Comebacks 🔥'], ['reviews', 'Game reviews'], ['puzzles', 'Puzzles'], ['traps', 'Trap lessons'], ['kids', 'Kids & beginners'], ['scout', 'Opponent scout'], ['scan', 'Scan position'], ['analyzer', 'Analyzer games'], ['openings', 'Openings'], ['promo', 'Promos']] as const).map(([k, t]) => (
           <button key={k} onClick={() => setView(k)} className="rounded-lg px-3.5 py-1.5 text-[13px] font-black" style={{ background: view === k ? '#81B64C' : 'transparent', color: view === k ? '#fff' : '#C9CFCD' }}>{t}</button>
         ))}
       </div>
@@ -813,7 +813,8 @@ export function ContentStudio() {
             {puzzles.length % 48 === 0 && <button onClick={() => loadPuzzles(puzzles.length).then((m) => setPuzzles((cur) => [...(cur ?? []), ...m]))} className="mx-auto mt-4 block rounded-lg bg-white/10 px-4 py-2 text-[13px] font-bold">Load more</button>}
           </>
         )}
-      </>) : view === 'reviews' ? (<>
+      </>) : view === 'reviews' || view === 'comebacks' ? (<>
+        {view === 'comebacks' && <p className="mb-3 text-[12.5px] text-white/60">Real games where the winner was losing by 3 pawns or more (Stockfish) and still won, biggest comeback first. The clip opens on the low point with the eval in the hook.</p>}
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <div className="flex min-w-[220px] flex-1 items-center gap-2 rounded-lg bg-white/5 px-3 py-2 ring-1 ring-white/10">
             <Search size={15} className="text-white/50" />
@@ -822,7 +823,7 @@ export function ContentStudio() {
           <input value={rPlayer} onChange={(e) => setRPlayer(e.target.value)} placeholder="Username (bots too)" className="min-w-[150px] flex-1 rounded-lg bg-white/5 px-3 py-2 text-[13px] text-white outline-none ring-1 ring-white/10 focus:ring-[#81B64C]" />
           <input value={rGameNo} onChange={(e) => setRGameNo(e.target.value)} placeholder="Chess.com game # or link" className="min-w-[170px] flex-1 rounded-lg bg-white/5 px-3 py-2 text-[13px] text-white outline-none ring-1 ring-white/10 focus:ring-[#81B64C]" />
           <label className="flex items-center gap-1.5 rounded-lg bg-white/5 px-2.5 py-2 text-[12.5px] font-bold text-white ring-1 ring-white/10"><input type="checkbox" checked={rBots} onChange={(e) => setRBots(e.target.checked)} className="accent-[#81B64C]" /> Bot games</label>
-          <label className="flex items-center gap-1.5 rounded-lg bg-white/5 px-2.5 py-2 text-[12.5px] font-bold text-white ring-1 ring-white/10"><input type="checkbox" checked={rAll} onChange={(e) => setRAll(e.target.checked)} className="accent-[#81B64C]" /> Not reviewed too</label>
+          {view === 'reviews' && <label className="flex items-center gap-1.5 rounded-lg bg-white/5 px-2.5 py-2 text-[12.5px] font-bold text-white ring-1 ring-white/10"><input type="checkbox" checked={rAll} onChange={(e) => setRAll(e.target.checked)} className="accent-[#81B64C]" /> Not reviewed too</label>}
           <select value={minRating} onChange={(e) => setMinRating(Number(e.target.value))} className="rounded-lg bg-white/5 px-2 py-2 text-[13px] text-white ring-1 ring-white/10">
             <option value={0}>Any rating</option><option value={1000}>1000+</option><option value={1500}>1500+</option><option value={2000}>2000+</option><option value={2500}>2500+</option>
           </select>
@@ -832,9 +833,9 @@ export function ContentStudio() {
           <select value={since} onChange={(e) => setSince(Number(e.target.value))} className="rounded-lg bg-white/5 px-2 py-2 text-[13px] text-white ring-1 ring-white/10">
             <option value={0}>All time</option><option value={7}>This week</option><option value={30}>This month</option>
           </select>
-          <select value={rSort} onChange={(e) => setRSort(e.target.value as typeof rSort)} className="rounded-lg bg-white/5 px-2 py-2 text-[13px] text-white ring-1 ring-white/10">
+          {view === 'reviews' && <select value={rSort} onChange={(e) => setRSort(e.target.value as typeof rSort)} className="rounded-lg bg-white/5 px-2 py-2 text-[13px] text-white ring-1 ring-white/10">
             <option value="drama">Most happening</option><option value="new">Newest</option><option value="accuracy">Highest accuracy</option>
-          </select>
+          </select>}
         </div>
         {!reviews ? <Loader2 className="mx-auto mt-10 animate-spin text-white/60" /> : reviews.length === 0 ? <p className="mt-10 text-center text-[14px] text-white/60">{rGameNo.trim() ? 'No game with that number is in the database. Import it first (Import on the Games page), then search again.' : 'No games match.'}</p> : (
           <>
@@ -851,6 +852,7 @@ export function ContentStudio() {
                       <p className="truncate text-[11.5px] text-white/55">{rv.opening || 'Unknown opening'}{rv.result ? ` · ${rv.result}` : ''}</p>
                       <p className="truncate text-[11.5px] tabular-nums text-white/45">{rv.whiteRating ?? '?'} vs {rv.blackRating ?? '?'}{rv.whiteAccuracy != null && rv.blackAccuracy != null ? ` · ${rv.whiteAccuracy.toFixed(0)}% / ${rv.blackAccuracy.toFixed(0)}%` : ''}</p>
                       <div className="mt-1.5 flex flex-wrap gap-1">
+                        {comebackHook(rv) && <span className="rounded bg-[#E8B447]/20 px-1.5 py-0.5 text-[10px] font-black uppercase text-[#E8B447]">{rv.worstCp! <= -1500 ? 'was getting mated' : `down ${(Math.abs(rv.worstCp!) / 100).toFixed(1)}`} → won</span>}
                         {rv.brilliant > 0 && <span className="rounded bg-[#1BACA6]/20 px-1.5 py-0.5 text-[10px] font-black uppercase text-[#1BACA6]">{rv.brilliant} brilliant</span>}
                         {rv.blunders > 0 && <span className="rounded bg-[#CA3431]/20 px-1.5 py-0.5 text-[10px] font-black uppercase text-[#F0605D]">{rv.blunders} blunder{rv.blunders > 1 ? 's' : ''}</span>}
                         {rv.mate > 0 && <span className="rounded bg-[#E8B447]/20 px-1.5 py-0.5 text-[10px] font-black uppercase text-[#E8B447]">mate</span>}

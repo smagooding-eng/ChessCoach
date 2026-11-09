@@ -384,7 +384,7 @@ export async function puzzleThemes() {
 
 // ── Game reviews: whole reviewed games, ranked by how much happened ─────
 export interface ReviewQuery {
-  q?: string; minRating?: number; platform?: string; sort?: "drama" | "new" | "accuracy"; limit?: number; offset?: number; sinceDays?: number;
+  q?: string; minRating?: number; platform?: string; sort?: "drama" | "new" | "accuracy" | "comeback"; limit?: number; offset?: number; sinceDays?: number;
   /** A player's games (white or black), bots included by name. */
   player?: string;
   /** A Chess.com / Lichess game number or link, or a ChessScout game id. */
@@ -398,7 +398,8 @@ export async function studioReviews(q: ReviewQuery) {
   const conds = [];
   // A game number or player picks specific games, so it shows them reviewed or not, bots or not.
   const specific = !!(q.gameNo || q.player);
-  if (!q.all && !specific) conds.push(sql`(g.review_data IS NOT NULL OR cr.game_id IS NOT NULL)`);
+  const comeback = q.sort === "comeback";
+  if ((!q.all && !specific) || comeback) conds.push(sql`(g.review_data IS NOT NULL OR cr.game_id IS NOT NULL)`);
   if (!q.bots && !specific) conds.push(sql`g.platform IS DISTINCT FROM 'bot'`);
   if (q.player) conds.push(sql`(g.white_username ILIKE ${"%" + q.player + "%"} OR g.black_username ILIKE ${"%" + q.player + "%"})`);
   if (q.gameNo) {
@@ -416,7 +417,18 @@ export async function studioReviews(q: ReviewQuery) {
   if (q.platform) conds.push(sql`g.platform = ${q.platform}`);
   if (q.sinceDays) conds.push(sql`g.played_at >= now() - make_interval(days => ${Math.round(q.sinceDays)})`);
   const RD = sql`COALESCE(g.review_data, cr.review)`;
-  const order = q.sort === "new" ? sql`g.played_at DESC NULLS LAST, g.id DESC`
+  // Comebacks: the winner was losing badly at some point (Stockfish, from the winner's side,
+  // at or below -3 pawns; mates count as -20) and still won.
+  const WINNER = sql`(CASE WHEN g.result = 'win' THEN (CASE WHEN lower(g.white_username) = lower(g.username) THEN 'white' ELSE 'black' END)
+    WHEN g.result = 'loss' THEN (CASE WHEN lower(g.white_username) = lower(g.username) THEN 'black' ELSE 'white' END) END)`;
+  const MOVES = sql`(CASE WHEN jsonb_typeof(${RD}) = 'array' THEN ${RD} WHEN jsonb_typeof(${RD}->'moves') = 'array' THEN ${RD}->'moves' ELSE '[]'::jsonb END)`;
+  const cbJoin = comeback ? sql`JOIN LATERAL (SELECT ${WINNER} AS winner, w.cp AS worst, w.idx AS "worstMove" FROM (
+        SELECT (CASE WHEN ${WINNER} = 'white' THEN 1 ELSE -1 END) * LEAST(2000, GREATEST(-2000, (x.e->>'evalAfterCp')::float)) AS cp, (x.ord - 1)::int AS idx
+        FROM jsonb_array_elements(${MOVES}) WITH ORDINALITY AS x(e, ord)
+        WHERE jsonb_typeof(x.e->'evalAfterCp') = 'number' ORDER BY 1 ASC, 2 ASC LIMIT 1) w) cb ON cb.winner IS NOT NULL AND cb.worst <= -300` : sql``;
+  const cbCols = comeback ? sql`, cb.winner, cb.worst AS "worstCp", cb."worstMove"` : sql``;
+  const order = comeback ? sql`cb.worst ASC, g.played_at DESC NULLS LAST`
+    : q.sort === "new" ? sql`g.played_at DESC NULLS LAST, g.id DESC`
     : q.sort === "accuracy" ? sql`GREATEST(COALESCE((CASE WHEN jsonb_typeof(${RD}) = 'object' THEN (${RD}->>'whiteAccuracy') END)::float,0), COALESCE((CASE WHEN jsonb_typeof(${RD}) = 'object' THEN (${RD}->>'blackAccuracy') END)::float,0)) DESC, g.id DESC`
     : sql`COALESCE(m.score, 0) DESC, g.id DESC`;
   const limit = Math.min(120, Math.max(1, q.limit ?? 48));
@@ -425,15 +437,16 @@ export async function studioReviews(q: ReviewQuery) {
       CASE WHEN jsonb_typeof(${RD}) = 'object' THEN (${RD}->>'whiteAccuracy')::float END AS "whiteAccuracy",
       CASE WHEN jsonb_typeof(${RD}) = 'object' THEN (${RD}->>'blackAccuracy')::float END AS "blackAccuracy",
       (g.review_data IS NOT NULL OR (cr.game_id IS NOT NULL AND jsonb_array_length(COALESCE(cr.review->'moves', '[]'::jsonb)) > 0)) AS reviewed,
-      g.chesscom_game_id AS "chesscomGameId", g.url
+      g.chesscom_game_id AS "chesscomGameId", g.url,
       COALESCE(m.n, 0)::int AS moments, COALESCE(m.brilliant, 0)::int AS brilliant, COALESCE(m.blunder, 0)::int AS blunders, COALESCE(m.mate, 0)::int AS mate,
-      m.last_fen AS "lastFen"
+      m.last_fen AS "lastFen"${cbCols}
     FROM games g
     LEFT JOIN (SELECT game_id, COUNT(*) AS n, SUM(score) AS score,
         COUNT(*) FILTER (WHERE 'brilliant' = ANY(tags)) AS brilliant, COUNT(*) FILTER (WHERE 'blunder' = ANY(tags)) AS blunder,
         COUNT(*) FILTER (WHERE 'checkmate' = ANY(tags)) AS mate, (array_agg(fen_before ORDER BY move_index DESC))[1] AS last_fen
       FROM content_moments GROUP BY game_id) m ON m.game_id = g.id
     LEFT JOIN content_reviews cr ON cr.game_id = g.id
+    ${cbJoin}
     WHERE ${sql.join(conds, sql` AND `)} ORDER BY ${order} LIMIT ${limit} OFFSET ${Math.max(0, q.offset ?? 0)}`));
 }
 

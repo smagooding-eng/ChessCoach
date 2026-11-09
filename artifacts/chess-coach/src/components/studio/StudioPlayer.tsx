@@ -40,6 +40,15 @@ export interface StudioReview {
   moments: number; brilliant: number; blunders: number; mate: number; lastFen: string | null;
   /** False when the game has no move-by-move review yet. */
   reviewed?: boolean; chesscomGameId?: string | null; url?: string | null;
+  /** Comebacks: who won, their worst Stockfish eval on the way (centipawns, their side), and that move. */
+  winner?: 'white' | 'black' | null; worstCp?: number | null; worstMove?: number | null;
+}
+/** "Down 6.4 and still won" style hook, from the game's real eval. */
+export function comebackHook(r: StudioReview): string | null {
+  if (r.worstCp == null || !r.winner) return null;
+  const who = (r.winner === 'white' ? r.white : r.black) ?? (r.winner === 'white' ? 'White' : 'Black');
+  if (r.worstCp <= -1500) return `${who} was getting mated… and won 🤯`;
+  return `${who} was down ${(Math.abs(r.worstCp) / 100).toFixed(1)}… and won 🔥`;
 }
 export interface ScoutData {
   username: string; gamesAnalyzed: number; wins: number; losses: number; draws: number;
@@ -865,9 +874,12 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     if (current.kind === 'review') {
       const sc = !!current.showcase;
       getGame(current.review.id).then((g) => {
-        const rc = reviewClip(g);
+        const base = reviewClip(g);
+        const cb = comebackHook(current.review);
+        // A comeback: its hook, and the cover / key move at the winner's lowest point.
+        const rc = cb ? { ...base, hook: cb, tags: [...base.tags, 'comeback'], key: Math.min(Math.max(0, current.review.worstMove ?? base.key), Math.max(0, base.plies.length - 1)), fileBase: `chessscout-comeback-${g.id}`, label: `Comeback #${g.id}` } : base;
         const bad = rc.plies.some((x) => ['blunder', 'missed_win', 'mistake'].includes(x.review?.classification ?? ''));
-        setClip(sc ? { ...rc, showcase: true, hook: bad ? 'Where did this game go wrong? 👀' : 'Your coach grades every move 📊', fileBase: `${rc.fileBase}-showcase`, label: `Review showcase #${g.id}` } : rc);
+        setClip(sc ? { ...rc, showcase: true, hook: cb ?? (bad ? 'Where did this game go wrong? 👀' : 'Your coach grades every move 📊'), fileBase: `${rc.fileBase}-showcase`, label: `Review showcase #${g.id}` } : rc);
         setClipQ(slot); setLoadedKey(key);
       }).catch((e) => setErr(String(e?.message ?? e)));
       return;

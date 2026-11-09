@@ -103,7 +103,7 @@ router.get("/admin/studio/reviews", requireAdmin, async (req: Request, res: Resp
       q: typeof q.q === "string" && q.q.trim() ? q.q.trim().slice(0, 60) : undefined,
       minRating: q.minRating ? Number(q.minRating) || undefined : undefined,
       platform: typeof q.platform === "string" && q.platform ? q.platform : undefined,
-      sort: q.sort === "new" || q.sort === "accuracy" ? q.sort : "drama",
+      sort: q.sort === "new" || q.sort === "accuracy" || q.sort === "comeback" ? q.sort : "drama",
       limit: q.limit ? Number(q.limit) : 48, offset: q.offset ? Number(q.offset) : 0,
       sinceDays: q.sinceDays ? Number(q.sinceDays) || undefined : undefined,
       player: typeof q.player === "string" && q.player.trim() ? q.player.trim().slice(0, 60) : undefined,
