@@ -1551,10 +1551,16 @@ async function catchupOne(u: { id: string; chesscom_username: string | null; lic
     await db.execute(sql`UPDATE catchup_reviews SET reviewed = reviewed + 1, updated_at = now() WHERE user_id = ${u.id}`);
     await new Promise((r) => setTimeout(r, CATCHUP_GAP_MS));
   }
-  // Brand-new members get the day-after "your reviews are ready" email instead.
+  // Email only people who had games waiting for a review (we just reviewed some)
+  // and haven't been on the app for 3 days. Brand-new members get the day-after
+  // "your reviews are ready" email instead.
   const isNew = Date.now() - new Date(u.created_at).getTime() < 72 * 3600_000;
+  const [act] = rowsOfAny<{ away: boolean }>(await db.execute(sql`SELECT GREATEST(
+      u.created_at, COALESCE(u.last_login_at, 'epoch'::timestamptz), COALESCE(u.last_active_at, 'epoch'::timestamptz),
+      COALESCE((SELECT MAX(pv.created_at) FROM page_views pv WHERE pv.user_id = u.id), 'epoch'::timestamptz)
+    ) < now() - interval '3 days' AS away FROM users u WHERE u.id = ${u.id}`));
   let emailed = false;
-  if (!isNew) {
+  if (!isNew && reviewed > 0 && act?.away) {
     try { emailed = await (await import("../lib/firstReviewEmail")).sendGamesReviewedEmail(u.id); }
     catch (err) { appLogger.warn({ err, userId: u.id }, "[catchup] email failed"); }
   }
