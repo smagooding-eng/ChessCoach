@@ -38,10 +38,19 @@ async function fetchWithTimeout(url: string, ms: number): Promise<FetchRes | nul
   const t = setTimeout(() => c.abort(), ms);
   try { return (await fetch(url, { signal: c.signal })) as unknown as FetchRes; } catch { return null; } finally { clearTimeout(t); }
 }
+/** The API was down or too slow: not the same as "no such page". */
+class UpstreamDown extends Error {}
+// Null for a page that doesn't exist (404); throws when the API can't answer, so
+// we never cache an empty page or redirect a real page away because Render was
+// restarting. Kept well inside Vercel's 10-second function limit (going past it
+// is what Google saw as "Server error (5xx)").
 async function getJson<T>(path: string): Promise<T | null> {
-  const r = await fetchWithTimeout(`${API}${path}`, 6000);
-  if (!r || !r.ok) return null;
-  return (await r.json().catch(() => null)) as T | null;
+  const r = await fetchWithTimeout(`${API}${path}`, 5000);
+  if (r && r.status === 404) return null;
+  if (!r || !r.ok) throw new UpstreamDown(path);
+  const j = (await r.json().catch(() => null)) as T | null;
+  if (j == null) throw new UpstreamDown(path);
+  return j;
 }
 
 // image: designed picture (public/og-*.jpg); the preview uses the section's
@@ -134,6 +143,8 @@ async function articlePage(slug: string): Promise<Page | null> {
 async function articlesIndex(): Promise<Page> {
   const d = await getJson<{ articles: { slug: string; title: string; metaDescription: string }[] }>('/api/articles');
   const articles = d?.articles ?? [];
+  // An empty list is what Google flagged as a "soft 404": treat it as the API not answering.
+  if (!articles.length) throw new UpstreamDown('/api/articles');
   return {
     title: 'Chess Improvement Articles — ChessScout.net', description: 'Practical chess improvement articles on blunders, time trouble, and opening mistakes.', path: '/learn', image: 'og-learn.jpg',
     body: `<main style="max-width:720px;margin:0 auto;padding:16px;color:#F5F7F6;font-family:system-ui,sans-serif"><h1>Chess improvement articles</h1><ul>${articles.map((a) => `<li><a href="/learn/${esc(a.slug)}">${esc(a.title)}</a> — ${esc(a.metaDescription)}</li>`).join('')}</ul></main>`,
@@ -340,6 +351,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const kind = String(req.query.kind ?? '');
   const slug = String(req.query.slug ?? '').toLowerCase().slice(0, 120);
   let page: Page | null = null;
+  let down = false;
+  // Fetch the app shell at the same time as the page's data, not after it.
+  const shell = fetchWithTimeout(`${SITE}/index.html`, 3500);
   try {
     if (kind === 'players') page = await playersIndex();
     else if (kind === 'player' && /^[a-z0-9_-]{2,40}$/.test(slug)) page = await playerPage(slug);
@@ -356,7 +370,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     else if (kind === 'trap' && /^[a-z0-9-]{1,80}$/.test(slug)) page = await trapPage(slug);
     else if (kind === 'tactics') page = tacticsIndex();
     else if (kind === 'tactic' && /^[a-z0-9-]{1,40}$/.test(slug)) page = tacticPage(slug);
-  } catch { page = null; }
+  } catch (e) { page = null; down = e instanceof UpstreamDown; }
+
+  // The API is restarting: say "try again shortly" (503) instead of serving an empty
+  // page or redirecting. Google retries a 503 later and keeps the page indexed, and
+  // the CDN keeps serving the last good copy to visitors where it has one.
+  if (down) {
+    const pageRes = await shell;
+    const html = pageRes && pageRes.ok ? await pageRes.text() : `<!doctype html><html><head><meta charset="utf-8" /><title>ChessScout.net</title></head><body><div id="root"></div></body></html>`;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Retry-After', '120');
+    res.setHeader('Cache-Control', 'no-store');
+    res.status(503).send(html);
+    return;
+  }
 
   // A language this page isn't translated into yet: send people (and crawlers)
   // to the English page rather than show English at a translated address.
@@ -368,7 +395,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const [pageRes] = await Promise.all([
-    fetchWithTimeout(`${SITE}/index.html`, 3500),
+    shell,
     reportBot(req, page?.path ?? `/${kind}`),
   ]);
   let html = pageRes && pageRes.ok ? await pageRes.text() : '';
@@ -376,6 +403,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (page) html = apply(html, page);
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.setHeader('Cache-Control', page ? 'public, s-maxage=3600, stale-while-revalidate=86400' : 'public, s-maxage=60');
+  res.setHeader('Cache-Control', page ? 'public, s-maxage=3600, stale-while-revalidate=86400, stale-if-error=604800' : 'public, s-maxage=60');
   res.status(200).send(html);
 }
