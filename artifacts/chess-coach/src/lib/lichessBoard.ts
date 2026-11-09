@@ -137,9 +137,51 @@ export async function readStream<T>(path: string, onLine: (x: T) => void, signal
 }
 
 // ── Events, seeks and games ───────────────────────────────────────────────
+export interface LichessChallenge {
+  id: string; direction?: 'in' | 'out'; rated?: boolean; speed?: string; color?: string;
+  challenger?: { id?: string; name?: string; rating?: number; title?: string | null; provisional?: boolean };
+  destUser?: { id?: string; name?: string } | null;
+  variant?: { key?: string; name?: string };
+  timeControl?: { type: 'clock'; limit: number; increment: number; show?: string } | { type: 'correspondence'; daysPerTurn: number } | { type: 'unlimited' };
+}
 export type LichessEvent =
   | { type: 'gameStart' | 'gameFinish'; game: { gameId: string; fullId?: string; color: 'white' | 'black'; opponent?: { username?: string; rating?: number }; speed?: string } }
-  | { type: 'challenge' | 'challengeCanceled' | 'challengeDeclined'; challenge: { id: string } };
+  | { type: 'challenge' | 'challengeCanceled' | 'challengeDeclined'; challenge: LichessChallenge };
+
+// One event stream for the whole app (Lichess limits how many a token may open at
+// once): the Play on Lichess page and the incoming-challenge pop-up both listen to it.
+const listeners = new Set<(e: LichessEvent) => void>();
+let shared: AbortController | null = null;
+let sharedToken = '';
+function runShared() {
+  const a = lichessAuth();
+  if (!a || !listeners.size) return;
+  if (shared && sharedToken === a.token) return;
+  shared?.abort();
+  const ac = new AbortController(); shared = ac; sharedToken = a.token;
+  void readStream<LichessEvent>('/api/stream/event', (e) => { for (const l of [...listeners]) { try { l(e); } catch { /* one listener's bug */ } } }, ac.signal)
+    .catch(() => 0)
+    .then((code) => {
+      if (shared !== ac) return;
+      shared = null; sharedToken = '';
+      // The stream ended (network, Lichess restart): reconnect while anyone listens and we're still connected.
+      if (!ac.signal.aborted && code !== 401 && listeners.size) setTimeout(runShared, code === 429 ? 60_000 : 5_000);
+    });
+}
+/** Listen to the account's Lichess events. Returns the unsubscribe. */
+export function onLichessEvent(fn: (e: LichessEvent) => void): () => void {
+  listeners.add(fn); runShared();
+  return () => { listeners.delete(fn); if (!listeners.size) { shared?.abort(); shared = null; sharedToken = ''; } };
+}
+/** Restart the shared stream after connecting a (new) Lichess account. */
+export const refreshLichessEvents = () => runShared();
+
+export const acceptChallenge = (id: string) => call(`/api/challenge/${id}/accept`, { method: 'POST' });
+export const declineChallenge = (id: string, reason = 'generic') => call(`/api/challenge/${id}/decline`, { method: 'POST', body: new URLSearchParams({ reason }), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+/** A link that opens Lichess's challenge dialog for this player. */
+export const lichessChallengeLink = (username: string) => `https://lichess.org/?user=${encodeURIComponent(username)}#friend`;
+/** Games ChessScout's board can play (Lichess keeps bullet and blitz to its own site). */
+export const playsHere = (speed?: string) => !/^(ultraBullet|bullet|blitz)$/.test(speed ?? '');
 
 /** Seek a game. Resolves when the seek ends (paired, cancelled or refused). Abort the signal to cancel. */
 export function seek(o: { minutes: number; increment: number; rated: boolean }, signal: AbortSignal): Promise<number> {
@@ -153,7 +195,11 @@ export interface LichessGameFull { type: 'gameFull'; id: string; rated: boolean;
 export type LichessGameLine = LichessGameFull | LichessState | { type: 'chatLine'; username: string; text: string; room: string } | { type: 'opponentGone'; gone: boolean; claimWinInSeconds?: number };
 
 export const streamGame = (id: string, onLine: (x: LichessGameLine) => void, signal: AbortSignal) => readStream<LichessGameLine>(`/api/board/game/stream/${id}`, onLine, signal);
-export const streamEvents = (onLine: (x: LichessEvent) => void, signal: AbortSignal) => readStream<LichessEvent>('/api/stream/event', onLine, signal);
+export const streamEvents = (onLine: (x: LichessEvent) => void, signal: AbortSignal) => new Promise<number>((resolve) => {
+  if (signal.aborted) { resolve(0); return; }
+  const off = onLichessEvent(onLine);
+  signal.addEventListener('abort', () => { off(); resolve(0); }, { once: true });
+});
 
 export async function playMove(id: string, uci: string, offerDraw = false): Promise<{ ok: boolean; error?: string }> {
   const r = await call(`/api/board/game/${id}/move/${uci}${offerDraw ? '?offeringDraw=true' : ''}`, { method: 'POST' });

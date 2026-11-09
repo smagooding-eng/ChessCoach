@@ -20,11 +20,33 @@ import { NotifyPrompt } from '@/components/play/NotifyPrompt';
 import type { LiveChat } from '@/hooks/use-live-play';
 import {
   lichessAuth, connectLichess, disconnectLichess, syncLichessAuth, seek as lichessSeek, streamEvents, streamGame, playMove, resign, abort, draw, claimVictory,
-  nowPlaying, isDaily, exportPgn, sendChat, chatHistory, isOver, LICHESS_STATUS_TEXT, type LichessGameFull, type LichessState, type LichessPlayer,
+  nowPlaying, isDaily, exportPgn, lichessChallengeLink, sendChat, chatHistory, isOver, LICHESS_STATUS_TEXT, type LichessGameFull, type LichessState, type LichessPlayer,
 } from '@/lib/lichessBoard';
 
 // ChessScout's team on Lichess.
 export const LICHESS_TEAM_URL = 'https://lichess.org/team/chessscoutnet';
+// How Lichess players and bots can challenge you: a link that opens Lichess's challenge box.
+function ChallengeMeCard({ username }: { username: string }) {
+  const [copied, setCopied] = useState(false);
+  const link = lichessChallengeLink(username);
+  const copy = async () => {
+    try {
+      if (navigator.share) { await navigator.share({ title: 'Challenge me on Lichess', url: link }); return; }
+      await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 1800);
+    } catch { /* closed the share sheet */ }
+  };
+  return (
+    <div className="p-4" style={cardStyle}>
+      <p className="text-[14.5px] font-extrabold" style={{ color: PT.text }}>Get challenged on Lichess</p>
+      <p className="mt-0.5 text-[12.5px]" style={{ color: PT.muted }}>Anyone on Lichess, people or bots, can challenge <b style={{ color: PT.text }}>{username}</b>. While ChessScout is open you'll get a pop-up to accept or decline, and you play it right here (bullet and blitz open on lichess.org). Share this link so friends can challenge you:</p>
+      <div className="mt-2.5 flex gap-2">
+        <span className="min-w-0 flex-1 truncate rounded-lg px-3 py-2 text-[12px]" style={{ background: 'rgba(255,255,255,.05)', color: PT.muted }}>{link.replace('https://', '')}</span>
+        <button onClick={() => void copy()} className="rounded-lg px-3 py-2 text-[12.5px] font-bold" style={greenBtn}>{copied ? 'Copied' : 'Share'}</button>
+      </div>
+    </div>
+  );
+}
+
 function TeamCard() {
   return (
     <a href={LICHESS_TEAM_URL} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-4" style={cardStyle}>
@@ -420,6 +442,7 @@ export function LichessPlay() {
         </div>
       )}
       {error && <p className="text-center text-[13px]" style={{ color: PT.red }}>{error}</p>}
+      {auth && phase === 'idle' && <ChallengeMeCard username={auth.username} />}
       <TeamCard />
       <div className="flex justify-center"><Link href="/live" className="rounded-xl px-4 py-2.5 text-[13px] font-bold" style={ghostBtn}>Back to Live Play</Link></div>
     </div>
