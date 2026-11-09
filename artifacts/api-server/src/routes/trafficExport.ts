@@ -256,7 +256,7 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
     const t = rowsOf<Record<string, unknown>>(totals)[0] ?? {};
     const catchup = await import("./games").then((m) => m.catchupReviewStatus()).catch(() => null);
     res.json({
-      catchupReviews: catchup ? { note: "Free catch-up reviews for every member (latest games, Stockfish). The 'we reviewed your games' email goes only to people who had unreviewed games and haven't been on the app for 3 days.", ...catchup } : null,
+      catchupReviews: catchup ? { note: "Weekly: members away 7+ days get their latest games imported and reviewed (Stockfish), and one 'we reviewed your games' email if any games were reviewed. At most once a week per person.", ...catchup } : null,
       heardFrom: {
         note: "Answers to 'Where did you find us?', asked once after a win or a puzzle streak (not at signup). allTime = everyone who answered; signedUpInRange = answers from users who signed up in this range.",
         answers: rowsOf<Record<string, unknown>>(heard).map((r) => ({ source: String(r.source), allTime: num(r.all_time), answeredInRange: num(r.in_range), signedUpInRange: num(r.signed_up_in_range) })),

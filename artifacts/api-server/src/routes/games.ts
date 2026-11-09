@@ -1499,45 +1499,39 @@ export async function startReviewServices(): Promise<void> {
   void sweep();
 }
 
-// ── Catch-up reviews: free reviews for every member, then one email ─────────
-// Goes through every account (newest first), one person at a time: brings in
-// their recent games if they linked Chess.com / Lichess but have few games here,
-// reviews their latest CATCHUP_GAMES unreviewed games with Stockfish (no AI, so
-// no cost), then emails them once with links straight to their reviews
-// (lib/firstReviewEmail.ts). It's slow on purpose: one game at a time with a
-// pause between, so live play and people's own reviews always get the engine
-// quickly. Progress is kept in catchup_reviews, so a restart carries on where it
-// stopped, and new members are picked up as they join (after a couple of hours).
-// CATCHUP_REVIEWS=0 turns it off.
+// ── Weekly catch-up reviews for members who've been away ──────────────────
+// Once a week per person: anyone who hasn't been on the app for 7 days gets their
+// recent games brought in (if they linked Chess.com / Lichess), their latest
+// CATCHUP_GAMES unreviewed games reviewed with Stockfish (no AI, so no cost), and,
+// if any games were reviewed, one "we reviewed your games" email with links
+// straight to the reviews (lib/firstReviewEmail.ts). People using the app are
+// left alone. One game at a time with a pause between, so live play and people's
+// own reviews always get the engine first. catchup_reviews keeps when each person
+// was last done, so a restart carries on. CATCHUP_REVIEWS=0 turns it off.
 const CATCHUP_GAMES = Math.max(1, parseInt(process.env.CATCHUP_REVIEW_GAMES || "") || 5);
 const CATCHUP_GAP_MS = 20_000;
 let catchupRunning = false;
 const rowsOfAny = <T,>(r: unknown): T[] => (Array.isArray(r) ? r : ((r as { rows?: T[] })?.rows ?? [])) as T[];
+const LAST_SEEN = sql`GREATEST(u.created_at, COALESCE(u.last_login_at, 'epoch'::timestamptz), COALESCE(u.last_active_at, 'epoch'::timestamptz),
+  COALESCE((SELECT MAX(pv.created_at) FROM page_views pv WHERE pv.user_id = u.id), 'epoch'::timestamptz))`;
 
 export async function catchupReviewStatus() {
   const [r] = rowsOfAny<Record<string, number>>(await db.execute(sql`SELECT
       (SELECT COUNT(*)::int FROM users) AS members,
-      COUNT(*) FILTER (WHERE status = 'done')::int AS done,
-      COUNT(*) FILTER (WHERE status = 'no_games')::int AS "noGames",
-      COALESCE(SUM(reviewed), 0)::int AS "gamesReviewed",
-      COUNT(*) FILTER (WHERE emailed)::int AS emailed
+      (SELECT COUNT(*)::int FROM users u WHERE ${LAST_SEEN} < now() - interval '7 days') AS "awayAWeek",
+      COUNT(*) FILTER (WHERE last_run_at >= now() - interval '7 days')::int AS "doneThisWeek",
+      COUNT(*) FILTER (WHERE last_emailed_at >= now() - interval '7 days')::int AS "emailedThisWeek",
+      COALESCE(SUM(reviewed), 0)::int AS "gamesReviewedAllTime"
     FROM catchup_reviews`));
   return { running: catchupRunning, ...r };
 }
 
-async function catchupOne(u: { id: string; chesscom_username: string | null; lichess_username: string | null; created_at: Date | string }): Promise<void> {
-  const owned = async () => Number(rowsOfAny<{ n: number }>(await db.execute(sql`SELECT COUNT(*)::int AS n FROM games WHERE user_id = ${u.id} AND platform IS DISTINCT FROM 'bot'`))[0]?.n ?? 0);
-  // Linked an account but have few games here: bring in the last month or so.
-  if ((await owned()) < CATCHUP_GAMES) {
-    for (const [platform, name] of [["chesscom", u.chesscom_username], ["lichess", u.lichess_username]] as const) {
-      if (!name) continue;
-      try { await runImportJob({ userId: u.id, platformUsername: name, platform, months: 1, forceUpdate: false, log: appLogger }); }
-      catch (err) { appLogger.warn({ err, userId: u.id, platform }, "[catchup] import failed"); }
-    }
-  }
-  if ((await owned()) === 0) {
-    await db.execute(sql`UPDATE catchup_reviews SET status = 'no_games', updated_at = now() WHERE user_id = ${u.id}`);
-    return;
+async function catchupOne(u: { id: string; chesscom_username: string | null; lichess_username: string | null }): Promise<void> {
+  // Their latest games from Chess.com / Lichess (already-imported ones are skipped).
+  for (const [platform, name] of [["chesscom", u.chesscom_username], ["lichess", u.lichess_username]] as const) {
+    if (!name) continue;
+    try { await runImportJob({ userId: u.id, platformUsername: name, platform, months: 1, forceUpdate: false, log: appLogger }); }
+    catch (err) { appLogger.warn({ err, userId: u.id, platform }, "[catchup] import failed"); }
   }
   const todo = await db.select().from(gamesTable)
     .where(and(eq(gamesTable.userId, u.id), sql`${gamesTable.platform} IS DISTINCT FROM 'bot'`))
@@ -1551,20 +1545,14 @@ async function catchupOne(u: { id: string; chesscom_username: string | null; lic
     await db.execute(sql`UPDATE catchup_reviews SET reviewed = reviewed + 1, updated_at = now() WHERE user_id = ${u.id}`);
     await new Promise((r) => setTimeout(r, CATCHUP_GAP_MS));
   }
-  // Email only people who had games waiting for a review (we just reviewed some)
-  // and haven't been on the app for 3 days. Brand-new members get the day-after
-  // "your reviews are ready" email instead.
-  const isNew = Date.now() - new Date(u.created_at).getTime() < 72 * 3600_000;
-  const [act] = rowsOfAny<{ away: boolean }>(await db.execute(sql`SELECT GREATEST(
-      u.created_at, COALESCE(u.last_login_at, 'epoch'::timestamptz), COALESCE(u.last_active_at, 'epoch'::timestamptz),
-      COALESCE((SELECT MAX(pv.created_at) FROM page_views pv WHERE pv.user_id = u.id), 'epoch'::timestamptz)
-    ) < now() - interval '3 days' AS away FROM users u WHERE u.id = ${u.id}`));
+  // Email only when there were games waiting for a review, at most once a week.
   let emailed = false;
-  if (!isNew && reviewed > 0 && act?.away) {
-    try { emailed = await (await import("../lib/firstReviewEmail")).sendGamesReviewedEmail(u.id); }
+  if (reviewed > 0) {
+    try { emailed = await (await import("../lib/firstReviewEmail")).sendGamesReviewedEmail(u.id, reviewed); }
     catch (err) { appLogger.warn({ err, userId: u.id }, "[catchup] email failed"); }
   }
-  await db.execute(sql`UPDATE catchup_reviews SET status = 'done', emailed = ${emailed}, updated_at = now() WHERE user_id = ${u.id}`);
+  await db.execute(sql`UPDATE catchup_reviews SET status = 'done', last_run_at = now(), updated_at = now()
+    ${emailed ? sql`, last_emailed_at = now()` : sql``} WHERE user_id = ${u.id}`);
   appLogger.info({ userId: u.id, reviewed, emailed }, "[catchup] member done");
 }
 
@@ -1573,20 +1561,23 @@ async function catchupTick(): Promise<void> {
   catchupRunning = true;
   try {
     for (;;) {
-      // Next member not done yet (joined 2+ hours ago, so they've had time to link an account).
-      const [u] = rowsOfAny<{ id: string; chesscom_username: string | null; lichess_username: string | null; created_at: Date | string }>(await db.execute(sql`
-        SELECT u.id, u.chesscom_username, u.lichess_username, u.created_at FROM users u
+      // Next member away for 7+ days who hasn't been done in the last week (longest away first).
+      const [u] = rowsOfAny<{ id: string; chesscom_username: string | null; lichess_username: string | null }>(await db.execute(sql`
+        SELECT u.id, u.chesscom_username, u.lichess_username FROM users u
         LEFT JOIN catchup_reviews c ON c.user_id = u.id
-        WHERE u.created_at < now() - interval '2 hours'
-          AND (c.user_id IS NULL OR (c.status = 'working' AND c.updated_at < now() - interval '30 minutes'))
-        ORDER BY u.created_at DESC LIMIT 1`));
+        WHERE ${LAST_SEEN} < now() - interval '7 days'
+          AND u.id NOT IN (SELECT id FROM analytics_excluded_users)
+          AND (c.user_id IS NULL OR c.last_run_at IS NULL OR c.last_run_at < now() - interval '7 days')
+          AND (c.user_id IS NULL OR c.status <> 'working' OR c.updated_at < now() - interval '30 minutes')
+        ORDER BY c.last_run_at ASC NULLS FIRST LIMIT 1`));
       if (!u) break;
       await db.execute(sql`INSERT INTO catchup_reviews (user_id, status) VALUES (${u.id}, 'working')
         ON CONFLICT (user_id) DO UPDATE SET status = 'working', updated_at = now()`);
       try { await catchupOne(u); }
       catch (err) {
         appLogger.warn({ err, userId: u.id }, "[catchup] member failed");
-        await db.execute(sql`UPDATE catchup_reviews SET status = 'error', updated_at = now() WHERE user_id = ${u.id}`).catch(() => {});
+        // Counted as this week's turn, so one bad account can't hold up the rest.
+        await db.execute(sql`UPDATE catchup_reviews SET status = 'error', last_run_at = now(), updated_at = now() WHERE user_id = ${u.id}`).catch(() => {});
       }
     }
   } finally { catchupRunning = false; }
@@ -1597,7 +1588,9 @@ export async function startCatchupReviews(): Promise<void> {
   await db.execute(sql`CREATE TABLE IF NOT EXISTS catchup_reviews (
     user_id VARCHAR PRIMARY KEY, status VARCHAR(16) NOT NULL DEFAULT 'working', reviewed INTEGER NOT NULL DEFAULT 0,
     emailed BOOLEAN NOT NULL DEFAULT false, updated_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
-  // Starts a few minutes after boot (after the server has settled), then checks for new members hourly.
+  await db.execute(sql`ALTER TABLE catchup_reviews ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMPTZ`);
+  await db.execute(sql`ALTER TABLE catchup_reviews ADD COLUMN IF NOT EXISTS last_emailed_at TIMESTAMPTZ`);
+  // A few minutes after boot (once the server has settled), then hourly for whoever comes due.
   setTimeout(() => { void catchupTick(); }, 5 * 60_000).unref();
   setInterval(() => { void catchupTick(); }, 60 * 60_000).unref();
 }

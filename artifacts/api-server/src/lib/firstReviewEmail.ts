@@ -138,38 +138,40 @@ export async function runFirstReviewEmails(): Promise<void> {
   }
 }
 
-// ── "We reviewed your games" for every member (the catch-up reviewer) ────────
-// Sent once per person, after the catch-up reviewer (routes/games.ts) has gone
-// through their latest games. Every link goes straight to a reviewed game.
-export function gamesReviewedHtml(name: string | null, f: Found, latestReviewedId: number, unsubUrl: string): string {
+// ── "We reviewed your games": the weekly email for members who've been away ──
+// Sent by the weekly catch-up reviewer (routes/games.ts), at most once a week,
+// after it has reviewed some of their latest games. Every link goes straight to
+// a reviewed game.
+export function gamesReviewedHtml(name: string | null, f: Found, reviewedNow: number, latestReviewedId: number, unsubUrl: string): string {
   const n = name ? escapeHtml(name) : null;
   const items: { glyph: string; title: string; text: string }[] = [];
   if (f.best) items.push({ glyph: '&#9819;', title: `Your best game: ${f.best.acc}% accuracy`, text: `Against ${escapeHtml(f.best.opp)}. <a href="${EMAIL.site}/games/${f.best.id}" style="color:${EMAIL.green};font-weight:700;">See what you did right &rarr;</a>` });
   if (f.worst) items.push({ glyph: '&#9822;', title: `${f.worst.blunders} blunder${f.worst.blunders > 1 ? 's' : ''} in one game`, text: `Against ${escapeHtml(f.worst.opp)}. <a href="${EMAIL.site}/games/${f.worst.id}" style="color:${EMAIL.green};font-weight:700;">See each one and the better move &rarr;</a>` });
+  const what = reviewedNow === 1 ? 'your latest game' : `your ${reviewedNow} latest games`;
   return emailLayout({
-    preheader: `Your ${f.reviewed === 1 ? 'game is' : `${f.reviewed} latest games are`} reviewed, free. Every move graded.`,
+    preheader: `We reviewed ${what}, free. Every move graded.`,
     badge: 'Your reviews are ready',
-    title: n ? `${n}, we reviewed your games` : 'We reviewed your games',
-    subtitle: `${f.reviewed === 1 ? 'Your latest game' : `Your ${f.reviewed} latest games`}, every move graded by Stockfish, free.`,
+    title: n ? `${n}, we reviewed ${what}` : `We reviewed ${what}`,
+    subtitle: 'Every move graded by Stockfish, free.',
     body: [
       items.length ? emailFeatures(items) : '',
       emailP('Each review shows your mistakes, the better move, and the moments you got right. Your coach also picks out what you get wrong most, so you know what to work on.', { center: true, mb: 22 }),
     ].join(''),
     cta: { label: 'See my game review &rarr;', href: `${EMAIL.site}/games/${latestReviewedId}` },
     afterCta: `<p style="margin:14px 0 0;text-align:center;font-size:13px;color:${EMAIL.muted};"><a href="${EMAIL.site}/games" style="color:${EMAIL.green};font-weight:700;">All my reviewed games &rarr;</a></p>`,
-    footerNote: "You're getting this because you have a ChessScout.net account. We only send this once.",
+    footerNote: "You're getting this because you have a ChessScout.net account and haven't been on in a while. At most once a week.",
     unsubscribeUrl: unsubUrl,
   });
 }
 
-/** Email (and push) one member that their games are reviewed. Returns false if nothing was sent. */
-export async function sendGamesReviewedEmail(userId: string): Promise<boolean> {
-  const [u] = rowsOf<{ id: string; email: string | null; first_name: string | null; email_opt_out: boolean; excluded: boolean; sent: boolean }>(await db.execute(sql`
+/** Email (and push) one member that their latest games are reviewed. Returns false if nothing was sent. */
+export async function sendGamesReviewedEmail(userId: string, reviewedNow: number): Promise<boolean> {
+  const [u] = rowsOf<{ id: string; email: string | null; first_name: string | null; email_opt_out: boolean; excluded: boolean; recent: boolean }>(await db.execute(sql`
     SELECT u.id, u.email, u.first_name, u.email_opt_out,
       EXISTS (SELECT 1 FROM analytics_excluded_users x WHERE x.id = u.id) AS excluded,
-      EXISTS (SELECT 1 FROM email_drip_log d WHERE d.user_id = u.id AND d.drip_type = 'games_reviewed_catchup') AS sent
+      EXISTS (SELECT 1 FROM catchup_reviews c WHERE c.user_id = u.id AND c.last_emailed_at >= now() - interval '6 days') AS recent
     FROM users u WHERE u.id = ${userId}`));
-  if (!u || u.excluded || u.sent) return false;
+  if (!u || u.excluded || u.recent) return false;
   const f = await findings(userId);
   const [last] = rowsOf<{ id: number }>(await db.execute(sql`SELECT id FROM games WHERE user_id = ${userId} AND review_data IS NOT NULL
     AND platform IS DISTINCT FROM 'bot' ORDER BY played_at DESC LIMIT 1`));
@@ -177,16 +179,15 @@ export async function sendGamesReviewedEmail(userId: string): Promise<boolean> {
   const name = (u.first_name || '').trim().split(/\s+/)[0] || null;
   let sent = false;
   if (u.email && !u.email_opt_out) {
-    const subject = name ? `${name}, we reviewed your games (free)` : 'We reviewed your games (free)';
-    const html = await trackHtml(gamesReviewedHtml(name, f, last.id, unsubscribeUrl(u.id)), { kind: 'drip', template: 'games_reviewed_catchup', email: u.email, userId: u.id, subject });
+    const subject = name ? `${name}, we reviewed your latest games (free)` : 'We reviewed your latest games (free)';
+    const html = await trackHtml(gamesReviewedHtml(name, f, reviewedNow, last.id, unsubscribeUrl(u.id)), { kind: 'drip', template: 'games_reviewed_weekly', email: u.email, userId: u.id, subject });
     await sendEmail({ to: u.email, subject, html, headers: unsubscribeHeaders(u.id) });
     sent = true;
   }
   if (isPushConfigured()) {
-    const r = await sendPushToUser(u.id, { title: 'Your games are reviewed', body: f.worst ? `One had ${f.worst.blunders} blunder${f.worst.blunders > 1 ? 's' : ''}: see the better moves.` : 'Every move graded. See your mistakes and best moves.', url: `/games/${f.worst?.id ?? last.id}`, tag: 'cs:drip:games_reviewed' }).catch(() => ({ sent: 0 }));
+    const r = await sendPushToUser(u.id, { title: 'Your latest games are reviewed', body: f.worst ? `One had ${f.worst.blunders} blunder${f.worst.blunders > 1 ? 's' : ''}: see the better moves.` : 'Every move graded. See your mistakes and best moves.', url: `/games/${f.worst?.id ?? last.id}`, tag: 'cs:drip:games_reviewed' }).catch(() => ({ sent: 0 }));
     if (r.sent > 0) sent = true;
   }
-  await db.execute(sql`INSERT INTO email_drip_log (user_id, drip_type) VALUES (${u.id}, 'games_reviewed_catchup') ON CONFLICT DO NOTHING`);
-  if (sent) logger.info({ userId }, '[games-reviewed] sent');
+  if (sent) logger.info({ userId, reviewedNow }, '[games-reviewed] sent');
   return sent;
 }
