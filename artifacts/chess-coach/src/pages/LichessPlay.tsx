@@ -25,6 +25,57 @@ import {
 
 // ChessScout's team on Lichess.
 export const LICHESS_TEAM_URL = 'https://lichess.org/team/chessscoutnet';
+// Opt-in: one friendly line in the game chat at the start, so opponents know where
+// you're playing from. No link (Lichess's chat filter treats outside links as spam),
+// once per game, and only when the player has switched it on.
+const HELLO_KEY = 'cs_lichess_hello';
+const HELLO_SENT = 'cs_lichess_hello_sent';
+const HELLO_TEXT = 'Hi! Playing from ChessScout ♞ Good luck, have fun!';
+const helloOn = () => { try { return localStorage.getItem(HELLO_KEY) === '1'; } catch { return false; } };
+function sayHelloOnce(id: string) {
+  if (!helloOn()) return;
+  try {
+    const sent: string[] = JSON.parse(localStorage.getItem(HELLO_SENT) || '[]');
+    if (sent.includes(id)) return;
+    localStorage.setItem(HELLO_SENT, JSON.stringify([...sent, id].slice(-50)));
+  } catch { return; }
+  void sendChat(id, HELLO_TEXT).catch(() => {});
+}
+
+function HelloCard() {
+  const [on, setOn] = useState(helloOn);
+  const flip = () => { const v = !on; setOn(v); try { localStorage.setItem(HELLO_KEY, v ? '1' : '0'); } catch { /* ignore */ } };
+  return (
+    <button onClick={flip} className="flex w-full items-center gap-3 p-4 text-left" style={cardStyle}>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[14.5px] font-extrabold" style={{ color: PT.text }}>Say hi from ChessScout</span>
+        <span className="block text-[12.5px]" style={{ color: PT.muted }}>Sends one line in the game chat when a Lichess game starts: “{HELLO_TEXT}”</span>
+      </span>
+      <span className="relative h-6 w-11 shrink-0 rounded-full transition-colors" style={{ background: on ? PT.green : 'rgba(255,255,255,.15)' }}>
+        <span className="absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all" style={{ left: on ? 22 : 2 }} />
+      </span>
+    </button>
+  );
+}
+
+// A ready-made line for their Lichess profile: profiles are what opponents look at.
+const PROFILE_LINE = 'I train and review my games with ChessScout (chessscout.net) ♞';
+function ProfileCard() {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => { try { await navigator.clipboard.writeText(PROFILE_LINE); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /* ignore */ } };
+  return (
+    <div className="p-4" style={cardStyle}>
+      <p className="text-[14.5px] font-extrabold" style={{ color: PT.text }}>Put ChessScout on your Lichess profile</p>
+      <p className="mt-0.5 text-[12.5px]" style={{ color: PT.muted }}>Opponents check your profile. Copy this into your bio, and add chessscout.net under Links:</p>
+      <p className="mt-2 rounded-lg px-3 py-2 text-[12.5px]" style={{ background: 'rgba(255,255,255,.05)', color: PT.text }}>{PROFILE_LINE}</p>
+      <div className="mt-2.5 flex gap-2">
+        <button onClick={() => void copy()} className="flex-1 rounded-lg px-3 py-2 text-[12.5px] font-bold" style={greenBtn}>{copied ? 'Copied' : 'Copy'}</button>
+        <a href="https://lichess.org/account/profile" target="_blank" rel="noreferrer" className="flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-bold" style={ghostBtn}>Edit profile <ExternalLink size={13} /></a>
+      </div>
+    </div>
+  );
+}
+
 // How Lichess players and bots can challenge you: a link that opens Lichess's challenge box.
 function ChallengeMeCard({ username }: { username: string }) {
   const [copied, setCopied] = useState(false);
@@ -189,7 +240,8 @@ export function LichessPlay() {
         // Who's who, for the chat; and what was said before this page opened.
         colorRef.current = x.black.id === meRef.current ? 'b' : 'w';
         if (!historyLoaded) { historyLoaded = true; void chatHistory(x.id).then((h) => h.forEach((m) => addChat(m.user, m.text, 0))); }
-        setFull(x); setSt(x.state); setStAt(Date.now()); if (isOver(x.state.status)) setPhase('over'); }
+        setFull(x); setSt(x.state); setStAt(Date.now()); if (isOver(x.state.status)) setPhase('over');
+        else if (x.state.moves.split(' ').filter(Boolean).length < 2) sayHelloOnce(x.id); }
       else if (x.type === 'gameState') {
         // Move sounds come from the board itself (your sound settings, as in ChessScout games).
         setSt(x); setStAt(Date.now());
@@ -442,7 +494,7 @@ export function LichessPlay() {
         </div>
       )}
       {error && <p className="text-center text-[13px]" style={{ color: PT.red }}>{error}</p>}
-      {auth && phase === 'idle' && <ChallengeMeCard username={auth.username} />}
+      {auth && phase === 'idle' && <><HelloCard /><ChallengeMeCard username={auth.username} /><ProfileCard /></>}
       <TeamCard />
       <div className="flex justify-center"><Link href="/live" className="rounded-xl px-4 py-2.5 text-[13px] font-bold" style={ghostBtn}>Back to Live Play</Link></div>
     </div>
