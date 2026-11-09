@@ -29,6 +29,22 @@ router.post("/scanned-positions", requireAuth, async (req: Request, res: Respons
   }
 });
 
+// Update a saved position's FEN (scans save themselves, then follow the player's fixes).
+router.patch("/scanned-positions/:id", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const id = Number(req.params.id);
+    const fen = typeof req.body?.fen === "string" ? req.body.fen.trim().slice(0, 120) : "";
+    if (!Number.isFinite(id) || !fen) { res.status(400).json({ error: "id and fen are required" }); return; }
+    const [row] = await db.update(scannedPositionsTable).set({ fen })
+      .where(and(eq(scannedPositionsTable.id, id), eq(scannedPositionsTable.userId, req.user!.id)))
+      .returning({ id: scannedPositionsTable.id });
+    if (!row) { res.status(404).json({ error: "Not found" }); return; }
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to update position" });
+  }
+});
+
 // List the signed-in user's archive, most recent first.
 router.get("/scanned-positions", requireAuth, async (req: Request, res: Response) => {
   try {

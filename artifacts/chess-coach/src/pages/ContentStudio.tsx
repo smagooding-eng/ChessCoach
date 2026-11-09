@@ -781,8 +781,18 @@ export function ContentStudio() {
         </div>
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <select value={pRating} onChange={(e) => setPRating(e.target.value)} className="rounded-lg bg-white/5 px-2 py-2 text-[13px] text-white ring-1 ring-white/10">
-            <option value="">Any rating</option><option value="0-1200">Under 1200</option><option value="1200-1600">1200–1600</option><option value="1600-2000">1600–2000</option><option value="2000-2400">2000–2400</option><option value="2400-">2400+</option>
+            <option value="">Any rating</option><option value="0-1000">Under 1000</option><option value="0-1200">Under 1200</option><option value="1000-1400">1000–1400</option><option value="1200-1600">1200–1600</option><option value="1400-1800">1400–1800</option><option value="1600-2000">1600–2000</option><option value="2000-2400">2000–2400</option><option value="2400-">2400+</option>
+            {pRating && !['0-1000', '0-1200', '1000-1400', '1200-1600', '1400-1800', '1600-2000', '2000-2400', '2400-'].includes(pRating) && <option value={pRating}>{pRating.replace('-', '–')}</option>}
           </select>
+          <span className="flex items-center gap-1 text-[12.5px] text-white/50">
+            <input type="number" step={50} placeholder="Min" defaultValue={pRating.split('-')[0] || ''} key={`lo${pRating}`}
+              onBlur={(e) => { const lo = e.target.value.trim(); const hi = pRating.split('-')[1] ?? ''; setPRating(lo || hi ? `${lo}-${hi}` : ''); }}
+              className="w-[70px] rounded-lg bg-white/5 px-2 py-2 text-[13px] text-white ring-1 ring-white/10" aria-label="Lowest rating" />
+            to
+            <input type="number" step={50} placeholder="Max" defaultValue={pRating.split('-')[1] || ''} key={`hi${pRating}`}
+              onBlur={(e) => { const hi = e.target.value.trim(); const lo = pRating.split('-')[0] ?? ''; setPRating(lo || hi ? `${lo}-${hi}` : ''); }}
+              className="w-[70px] rounded-lg bg-white/5 px-2 py-2 text-[13px] text-white ring-1 ring-white/10" aria-label="Highest rating" />
+          </span>
           <select value={pSort} onChange={(e) => setPSort(e.target.value as typeof pSort)} className="rounded-lg bg-white/5 px-2 py-2 text-[13px] text-white ring-1 ring-white/10">
             <option value="random">Shuffle</option><option value="hard">Hardest first</option><option value="easy">Easiest first</option><option value="new">Newest</option>
           </select>

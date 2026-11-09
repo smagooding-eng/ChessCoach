@@ -113,10 +113,20 @@ export function PuzzleReel({ opts: initial, render = false, onClose }: { opts?: 
   const at = (ms: number, f: () => void) => { timers.current.push(setTimeout(f, ms)); };
   useEffect(() => () => { clear(); music.current?.stop(); routeSoundsTo(null, null); }, []);
 
-  const load = async (mode = opts.mode, theme = opts.theme ?? 'mateIn2') => {
+  // Puzzle rating range (remembered on this device).
+  const [range, setRangeState] = useState<[number, number]>(() => {
+    try { const v = JSON.parse(localStorage.getItem('cs_puzzle_reel_range') || 'null'); if (Array.isArray(v) && v.length === 2) return [Number(v[0]) || 400, Number(v[1]) || 3200]; } catch { /* default */ }
+    return [900, 1900];
+  });
+  const setRange = (r: [number, number]) => {
+    const lo = Math.max(400, Math.min(3200, Math.round(r[0]))), hi = Math.max(lo + 50, Math.min(3300, Math.round(r[1])));
+    setRangeState([lo, hi]); try { localStorage.setItem('cs_puzzle_reel_range', JSON.stringify([lo, hi])); } catch { /* ignore */ }
+    return [lo, hi] as [number, number];
+  };
+  const load = async (mode = opts.mode, theme = opts.theme ?? 'mateIn2', rr: [number, number] = range) => {
     setLoading(true); setErr(null);
     try {
-      const q = new URLSearchParams({ minRating: '900', maxRating: '1900', exclude: seen.current.slice(-50).join(',') });
+      const q = new URLSearchParams({ minRating: String(rr[0]), maxRating: String(rr[1]), exclude: seen.current.slice(-50).join(',') });
       q.set('puzzleTheme', theme);
       const r = await apiFetch(`/api/puzzles/next?${q}`, { credentials: 'include' });
       const d = await r.json().catch(() => ({}));
@@ -277,6 +287,18 @@ export function PuzzleReel({ opts: initial, render = false, onClose }: { opts?: 
                 ))}
               </div>
             ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="w-[70px] text-[11px] font-bold uppercase tracking-wider text-white/40">Rating</span>
+            {([[400, 1000, 'Beginner'], [1000, 1500, '1000–1500'], [1500, 1900, '1500–1900'], [1900, 2300, '1900–2300'], [2300, 3300, '2300+']] as const).map(([lo, hi, l]) => (
+              <button key={l} onClick={() => void load(opts.mode, opts.theme, setRange([lo, hi]))} className="rounded-md px-2 py-1 text-[11.5px] font-bold"
+                style={{ background: range[0] === lo && range[1] === hi ? G : 'rgba(255,255,255,.07)' }}>{l}</button>
+            ))}
+            <span className="ml-1 flex items-center gap-1 text-[11.5px] text-white/50">
+              <input type="number" step={50} value={range[0]} onChange={(e) => setRangeState([Number(e.target.value), range[1]])} onBlur={() => void load(opts.mode, opts.theme, setRange(range))} className="w-[64px] rounded-md bg-white/5 px-1.5 py-1 text-[12px] font-bold text-white ring-1 ring-white/10" aria-label="Lowest rating" />
+              to
+              <input type="number" step={50} value={range[1]} onChange={(e) => setRangeState([range[0], Number(e.target.value)])} onBlur={() => void load(opts.mode, opts.theme, setRange(range))} className="w-[64px] rounded-md bg-white/5 px-1.5 py-1 text-[12px] font-bold text-white ring-1 ring-white/10" aria-label="Highest rating" />
+            </span>
           </div>
           {err && <p className="text-[12px] text-[#E5484D]">{err}</p>}
           {p && <p className="text-[12px] text-white/55">Puzzle #{p.id} · rated {p.rating}{opts.mode === 'abc' ? ` · answer: ${correctLetter}` : ''}</p>}

@@ -175,6 +175,9 @@ export function ScanPosition() {
   const [flipped, setFlipped] = useState(false);
   const [mode, setMode] = useState<'preview' | 'explore' | 'solve'>('preview');
   const [unsure, setUnsure] = useState<string[]>([]);
+  // Scans save themselves to Saved Positions; fixes made afterwards update that same entry.
+  const savedId = useRef<number | null>(null);
+  const savedFen = useRef('');
   const [gameStatus, setGameStatus] = useState<string | null>(null);
   const [builderFen, setBuilderFen] = useState(START_FEN);
   const [builderPiece, setBuilderPiece] = useState<string | null>('P');
@@ -190,6 +193,17 @@ export function ScanPosition() {
     if (positionProblems(f).length) { setBuilderFen(f); setState('builder'); return; }
     setFen(f); setSaveState('saved'); setState('result'); setMode(q.get('solve') === '1' ? 'solve' : 'preview');
   }, []);
+  React.useEffect(() => {
+    if (state !== 'result' || !savedId.current || !fen || fen === savedFen.current) return;
+    const id = savedId.current;
+    const t = setTimeout(() => {
+      setSaveState('saving');
+      apiFetch(`/api/scanned-positions/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fen }) })
+        .then((r) => { if (r.ok) { savedFen.current = fen; setSaveState('saved'); } else setSaveState('error'); })
+        .catch(() => setSaveState('error'));
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [fen, state, saveState]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -235,6 +249,11 @@ export function ScanPosition() {
         setUnsure(Array.isArray(data.unsure) ? data.unsure.slice(0, 64) : []);
         setNotes(data.notes || '');
         setCroppedImage(data.croppedImage || '');
+        savedId.current = null; savedFen.current = data.fen;
+        setSaveState('saving');
+        void apiFetch('/api/scanned-positions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fen: data.fen }) })
+          .then(async (r) => { const d = await r.json().catch(() => ({})); if (r.ok && d.position?.id) { savedId.current = d.position.id; setSaveState('saved'); } else setSaveState('error'); })
+          .catch(() => setSaveState('error'));
         setAnnotatedImage(data.annotatedImage || '');
         setState('result');
       } catch {
@@ -301,12 +320,12 @@ export function ScanPosition() {
     if (!fen || saveState === 'saving') return;
     setSaveState('saving');
     try {
-      const res = await apiFetch('/api/scanned-positions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fen }),
-      });
+      const res = savedId.current
+        ? await apiFetch(`/api/scanned-positions/${savedId.current}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fen }) })
+        : await apiFetch('/api/scanned-positions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fen }) });
       if (res.ok) {
+        if (!savedId.current) { const d = await res.json().catch(() => ({})); if (d.position?.id) savedId.current = d.position.id; }
+        savedFen.current = fen;
         setSaveState('saved');
       } else {
         setSaveState('error');
@@ -333,6 +352,7 @@ export function ScanPosition() {
     setSaveState('idle');
     setIsLimitReached(false);
     setUnsure([]);
+    savedId.current = null; savedFen.current = '';
   }, []);
 
   const goToPlayAI = useCallback((fromFen?: string) => {
@@ -611,7 +631,7 @@ export function ScanPosition() {
             {saveState === 'saving' && <Loader2 className="w-4 h-4 animate-spin" />}
             {saveState === 'saved' && <Check className="w-4 h-4" />}
             {(saveState === 'idle' || saveState === 'error') && <Archive className="w-4 h-4" />}
-            {saveState === 'saved' ? 'Saved to Archive' : saveState === 'error' ? 'Save Failed — Tap to Retry' : 'Save to Archive'}
+            {saveState === 'saved' ? (savedId.current ? 'Saved automatically · fixes save too' : 'Saved to Archive') : saveState === 'saving' ? 'Saving…' : saveState === 'error' ? 'Save Failed — Tap to Retry' : 'Save to Archive'}
           </button>
 
           <button
