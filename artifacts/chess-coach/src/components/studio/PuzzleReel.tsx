@@ -68,6 +68,14 @@ const DEFAULTS: Record<PuzzleReelOpts['mode'], Pick<PuzzleReelOpts, 'headline' |
   abc: { headline: 'Which move is correct?', sub: 'A, B or C' },
 };
 
+/** Full options for a puzzle reel from a few choices (mode, theme, reveal). */
+export function puzzleOptsFor(o: Partial<PuzzleReelOpts>): PuzzleReelOpts {
+  const mode = o.mode ?? 'mate2';
+  const t = themeOf(o.theme);
+  return { mode, theme: t.id, puzzle: null, seconds: o.seconds ?? 7, reveal: o.reveal ?? false, music: o.music ?? 'hype',
+    ...(mode === 'abc' ? DEFAULTS.abc : { headline: t.headline, sub: t.sub }) };
+}
+
 const uciMove = (c: Chess, uci: string) => {
   try { return c.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] || undefined }); } catch { return null; }
 };

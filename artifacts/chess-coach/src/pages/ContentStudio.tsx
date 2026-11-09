@@ -13,7 +13,8 @@ import { KnightTour } from '@/components/studio/KnightTour';
 import { SplashPromo } from '@/components/studio/SplashPromo';
 import { TournamentReel } from '@/components/studio/TournamentReel';
 import { SectionReel, SECTIONS } from '@/components/studio/SectionReels';
-import { PuzzleReel } from '@/components/studio/PuzzleReel';
+import { PuzzleReel, puzzleOptsFor, type PuzzleReelOpts } from '@/components/studio/PuzzleReel';
+import { ReelsPlan, type PlanAction } from '@/components/studio/ReelsPlan';
 import { FeatureBlitz } from '@/components/studio/FeatureBlitz';
 import { RenderReady, RecentRenders } from '@/components/studio/RenderMp4';
 import { KIDS_WORLDS, type KidsVideo } from '@/components/studio/kidsVideos';
@@ -131,7 +132,7 @@ export function ContentStudio() {
   const togglePick = (x: StudioSource) => setPicked((cur) => (cur.some((c) => keyOf(c) === keyOf(x)) ? cur.filter((c) => keyOf(c) !== keyOf(x)) : [...cur, x]));
   const isPicked = (x: StudioSource) => picked.some((c) => keyOf(c) === keyOf(x));
   const choose = (x: StudioSource) => (picking ? togglePick(x) : setOpen(x));
-  const [view, setView] = useState<'moments' | 'traps' | 'puzzles' | 'reviews' | 'kids' | 'scout' | 'scan' | 'analyzer' | 'promo' | 'openings'>('moments');
+  const [view, setView] = useState<'plan' | 'moments' | 'traps' | 'puzzles' | 'reviews' | 'kids' | 'scout' | 'scan' | 'analyzer' | 'promo' | 'openings'>('moments');
   // Openings: main line, ideas, replies and variations, with real-game numbers and Stockfish.
   const [openings, setOpenings] = useState<{ id: string; name: string; side: 'white' | 'black'; line: string[]; lines: string[] }[] | null>(null);
   useEffect(() => {
@@ -209,7 +210,7 @@ export function ContentStudio() {
   };
   // Promos
   const [promoT, setPromoT] = useState<'versus' | 'challenge' | 'live' | 'tour' | 'knight' | 'splash' | 'blitz' | 'tournament' | 'sections' | 'puzzles'>('blitz');
-  const [puzzleOpen, setPuzzleOpen] = useState(false);
+  const [puzzleOpen, setPuzzleOpen] = useState<Partial<PuzzleReelOpts> | null>(null);
   const [tournamentOpen, setTournamentOpen] = useState(false);
   const [sectionOpen, setSectionOpen] = useState<string | null>(null);
   const [blitzOpen, setBlitzOpen] = useState(false);
@@ -411,7 +412,7 @@ export function ContentStudio() {
         {picking ? 'Cancel compilation' : '🎬 Make a compilation'}
       </button>
       <div className="order-1 inline-flex flex-wrap rounded-xl bg-white/5 p-1">
-        {([['moments', 'Game moments'], ['reviews', 'Game reviews'], ['puzzles', 'Puzzles'], ['traps', 'Trap lessons'], ['kids', 'Kids & beginners'], ['scout', 'Opponent scout'], ['scan', 'Scan position'], ['analyzer', 'Analyzer games'], ['openings', 'Openings'], ['promo', 'Promos']] as const).map(([k, t]) => (
+        {([['plan', 'Reels plan 📅'], ['moments', 'Game moments'], ['reviews', 'Game reviews'], ['puzzles', 'Puzzles'], ['traps', 'Trap lessons'], ['kids', 'Kids & beginners'], ['scout', 'Opponent scout'], ['scan', 'Scan position'], ['analyzer', 'Analyzer games'], ['openings', 'Openings'], ['promo', 'Promos']] as const).map(([k, t]) => (
           <button key={k} onClick={() => setView(k)} className="rounded-lg px-3.5 py-1.5 text-[13px] font-black" style={{ background: view === k ? '#81B64C' : 'transparent', color: view === k ? '#fff' : '#C9CFCD' }}>{t}</button>
         ))}
       </div>
@@ -446,7 +447,16 @@ export function ContentStudio() {
       )}
       {picking && <p className="mb-3 text-[12.5px] text-[#E8B447]">Tap moments, reviews, puzzles or traps (you can mix tabs) in the order you want them (they count down #{Math.max(picked.length, 1)} to #1), then play them as one clip.</p>}
 
-      {view === 'kids' ? (<>
+      {view === 'plan' ? (
+        <ReelsPlan onAction={(a: PlanAction) => {
+          if (a.kind === 'puzzle') setPuzzleOpen(a.opts);
+          else if (a.kind === 'section') setSectionOpen(a.id);
+          else if (a.kind === 'tournament') setTournamentOpen(true);
+          else if (a.kind === 'promo') { setView('promo'); setPromoT(a.promo); }
+          else { setView(a.view); }
+          if (a.kind === 'view' || a.kind === 'promo') window.scrollTo({ top: 0 });
+        }} />
+      ) : view === 'kids' ? (<>
         {/* From the kids app: the same worlds, buddies and levels as chessscout.net/kids */}
         <div className="mb-5 rounded-2xl p-3 ring-1 ring-[#FF6FA8]/40" style={{ background: 'linear-gradient(180deg, rgba(143,208,255,.14), rgba(255,111,168,.10))' }}>
           <p className="text-[15px] font-black">🧒 From the kids app</p>
@@ -677,7 +687,7 @@ export function ContentStudio() {
         ) : promoT === 'puzzles' ? (
           <div className="max-w-2xl space-y-2 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
             <p className="text-[12px] text-white/55">8–15 second puzzle reels from the real puzzle database: "Mate in 2. Looks easy. It isn't." or "Which move is correct? A, B or C", with a countdown. Pick a theme (mates, forks, pins, skewers, rook endgames, promotion...). Hide the answer to pull comments, or show it for the payoff. Each comes with a caption.</p>
-            <button onClick={() => setPuzzleOpen(true)} className="rounded-lg bg-[#81B64C] px-4 py-2 text-[13px] font-black text-white">🧩 Make puzzle reels</button>
+            <button onClick={() => setPuzzleOpen({})} className="rounded-lg bg-[#81B64C] px-4 py-2 text-[13px] font-black text-white">🧩 Make puzzle reels</button>
           </div>
         ) : promoT === 'sections' ? (
           <div className="max-w-2xl space-y-2 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
@@ -964,7 +974,7 @@ export function ContentStudio() {
       {knightOpen && <KnightTour onClose={() => setKnightOpen(false)} />}
       {splashOpen && <SplashPromo onClose={() => setSplashOpen(false)} />}
       {tournamentOpen && <TournamentReel onClose={() => setTournamentOpen(false)} />}
-      {puzzleOpen && <PuzzleReel onClose={() => setPuzzleOpen(false)} />}
+      {puzzleOpen && <PuzzleReel opts={puzzleOptsFor(puzzleOpen)} onClose={() => setPuzzleOpen(null)} />}
       {sectionOpen && <SectionReel opts={{ section: sectionOpen, hook: '', closer: '', music: 'hype' }} onClose={() => setSectionOpen(null)} />}
       {blitzOpen && <FeatureBlitz onClose={() => setBlitzOpen(false)} />}
       {comp && <StudioPlayer source={comp[0]} queue={comp} title={compTitle} onClose={() => setComp(null)} />}
