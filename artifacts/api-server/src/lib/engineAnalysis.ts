@@ -18,7 +18,13 @@ const ANALYSIS_DEPTH = parseInt(process.env.ENGINE_DEPTH || "") || (IS_PROD ? 18
 const CLOUD_EVAL = process.env.LICHESS_CLOUD_EVAL !== "0";
 const ENGINE_MULTIPV = parseInt(process.env.ENGINE_MULTIPV || "") || 3;
 const ENGINE_THREADS = parseInt(process.env.ENGINE_THREADS || "") || (IS_PROD ? 1 : 2);
-const ENGINE_HASH_MB = parseInt(process.env.ENGINE_HASH_MB || "") || (IS_PROD ? 64 : 256);
+const ENGINE_HASH_MB = parseInt(process.env.ENGINE_HASH_MB || "") || (IS_PROD ? 32 : 256);
+// Each Stockfish process holds its own copy of the neural net (~50MB) plus its hash.
+// Up to four of them stayed alive forever and, with the server, went past Render's
+// 512MB. An engine now shuts itself down after this long unused and starts again
+// (in well under a second) the next time it's needed.
+const ENGINE_IDLE_MS = parseInt(process.env.ENGINE_IDLE_MS || "") || 3 * 60_000;
+const SIDE_IDLE_MS = parseInt(process.env.SIDE_ENGINE_IDLE_MS || "") || 60_000;
 export const SIDE_HASH_MB = parseInt(process.env.SIDE_ENGINE_HASH_MB || "") || 16;
 const ENGINE_TIMEOUT_MS = parseInt(process.env.ENGINE_TIMEOUT_MS || "") || (IS_PROD ? 20000 : 30000);
 
@@ -152,9 +158,26 @@ export class StockfishProcess {
   // The extra engines (bots, explorer, bulk) get a small hash table: four engines
   // with 64MB each, plus the server itself, went past Render's 512MB.
   private hashMB: number;
-  constructor(onDead?: () => void, opts?: { hashMB?: number }) {
+  private idleMs: number;
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  constructor(onDead?: () => void, opts?: { hashMB?: number; idleMs?: number }) {
     this.onDead = onDead;
     this.hashMB = opts?.hashMB ?? ENGINE_HASH_MB;
+    this.idleMs = opts?.idleMs ?? (opts?.hashMB != null ? SIDE_IDLE_MS : ENGINE_IDLE_MS);
+  }
+
+  /** Restart the idle countdown; when it runs out with nothing in flight, the process quits. */
+  private touch(): void {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.idleTimer = setTimeout(() => {
+      this.idleTimer = null;
+      if (this.dead || !this.proc) return;
+      if (this.resolveFunc) { this.touch(); return; } // still searching
+      this.dead = true;
+      this.onDead?.();
+      this.destroy();
+    }, this.idleMs);
+    this.idleTimer.unref?.();
   }
 
   private clearTimers(): void {
@@ -192,18 +215,22 @@ export class StockfishProcess {
     try { if (this.proc.pid) os.setPriority(this.proc.pid, 19); } catch { /* not allowed here */ }
 
     this.proc.on("exit", (code, signal) => {
-      logger.warn({ code, signal }, "Stockfish process exited");
+      // An idle shutdown already told the owner; telling it again could clear a
+      // newer engine that replaced this one.
+      const already = this.dead;
+      if (!already) logger.warn({ code, signal }, "Stockfish process exited");
       this.dead = true;
       this.proc = null;
-      this.onDead?.();
+      if (!already) this.onDead?.();
       this.doReject(new Error(`Stockfish exited: code=${code} signal=${signal}`));
     });
 
     this.proc.on("error", (err) => {
       logger.error({ err }, "Stockfish process error");
+      const already = this.dead;
       this.dead = true;
       this.proc = null;
-      this.onDead?.();
+      if (!already) this.onDead?.();
       this.doReject(err);
     });
 
@@ -236,6 +263,7 @@ export class StockfishProcess {
   }
 
   private sendAndWait(command: string, token: string): Promise<string[]> {
+    this.touch();
     return new Promise((resolve, reject) => {
       if (!this.proc || this.dead) { reject(new Error("Stockfish not started or dead")); return; }
       this.collectedLines = [];
@@ -374,6 +402,7 @@ export class StockfishProcess {
   }
 
   destroy(): void {
+    if (this.idleTimer) { clearTimeout(this.idleTimer); this.idleTimer = null; }
     if (this.proc) {
       this.proc.stdin.write("quit\n");
       this.proc.kill();

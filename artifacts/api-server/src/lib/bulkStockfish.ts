@@ -11,7 +11,7 @@ let bulkEngine: StockfishProcess | null = null;
 let bulkEngineInit: Promise<void> | null = null;
 
 async function getBulkEngine(): Promise<StockfishProcess> {
-  if (bulkEngine) return bulkEngine;
+  if (bulkEngine && !bulkEngine["dead"]) return bulkEngine;
   if (bulkEngineInit) { await bulkEngineInit; return bulkEngine!; }
   bulkEngine = new StockfishProcess(() => { bulkEngine = null; bulkEngineInit = null; }, { hashMB: SIDE_HASH_MB });
   bulkEngineInit = bulkEngine.init();
