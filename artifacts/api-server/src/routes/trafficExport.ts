@@ -254,7 +254,9 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
       WHERE h.user_id NOT IN (SELECT id FROM analytics_excluded_users)
       GROUP BY 1 ORDER BY all_time DESC`).catch(() => []);
     const t = rowsOf<Record<string, unknown>>(totals)[0] ?? {};
+    const catchup = await import("./games").then((m) => m.catchupReviewStatus()).catch(() => null);
     res.json({
+      catchupReviews: catchup ? { note: "Free catch-up reviews for every member (latest games, Stockfish), then one 'we reviewed your games' email each.", ...catchup } : null,
       heardFrom: {
         note: "Answers to 'Where did you find us?', asked once after a win or a puzzle streak (not at signup). allTime = everyone who answered; signedUpInRange = answers from users who signed up in this range.",
         answers: rowsOf<Record<string, unknown>>(heard).map((r) => ({ source: String(r.source), allTime: num(r.all_time), answeredInRange: num(r.in_range), signedUpInRange: num(r.signed_up_in_range) })),

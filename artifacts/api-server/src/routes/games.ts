@@ -1455,6 +1455,7 @@ let reviewServicesStarted = false;
 export async function startReviewServices(): Promise<void> {
   if (reviewServicesStarted) return;
   reviewServicesStarted = true;
+  void startCatchupReviews().catch((err) => appLogger.warn({ err }, "catch-up reviews failed to start"));
   await db.execute(sql`CREATE TABLE IF NOT EXISTS review_after_upgrade (
     user_id VARCHAR PRIMARY KEY,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -1496,6 +1497,103 @@ export async function startReviewServices(): Promise<void> {
   };
   setInterval(() => { void sweep(); }, 30_000).unref();
   void sweep();
+}
+
+// ── Catch-up reviews: free reviews for every member, then one email ─────────
+// Goes through every account (newest first), one person at a time: brings in
+// their recent games if they linked Chess.com / Lichess but have few games here,
+// reviews their latest CATCHUP_GAMES unreviewed games with Stockfish (no AI, so
+// no cost), then emails them once with links straight to their reviews
+// (lib/firstReviewEmail.ts). It's slow on purpose: one game at a time with a
+// pause between, so live play and people's own reviews always get the engine
+// quickly. Progress is kept in catchup_reviews, so a restart carries on where it
+// stopped, and new members are picked up as they join (after a couple of hours).
+// CATCHUP_REVIEWS=0 turns it off.
+const CATCHUP_GAMES = Math.max(1, parseInt(process.env.CATCHUP_REVIEW_GAMES || "") || 5);
+const CATCHUP_GAP_MS = 20_000;
+let catchupRunning = false;
+const rowsOfAny = <T,>(r: unknown): T[] => (Array.isArray(r) ? r : ((r as { rows?: T[] })?.rows ?? [])) as T[];
+
+export async function catchupReviewStatus() {
+  const [r] = rowsOfAny<Record<string, number>>(await db.execute(sql`SELECT
+      (SELECT COUNT(*)::int FROM users) AS members,
+      COUNT(*) FILTER (WHERE status = 'done')::int AS done,
+      COUNT(*) FILTER (WHERE status = 'no_games')::int AS "noGames",
+      COALESCE(SUM(reviewed), 0)::int AS "gamesReviewed",
+      COUNT(*) FILTER (WHERE emailed)::int AS emailed
+    FROM catchup_reviews`));
+  return { running: catchupRunning, ...r };
+}
+
+async function catchupOne(u: { id: string; chesscom_username: string | null; lichess_username: string | null; created_at: Date | string }): Promise<void> {
+  const owned = async () => Number(rowsOfAny<{ n: number }>(await db.execute(sql`SELECT COUNT(*)::int AS n FROM games WHERE user_id = ${u.id} AND platform IS DISTINCT FROM 'bot'`))[0]?.n ?? 0);
+  // Linked an account but have few games here: bring in the last month or so.
+  if ((await owned()) < CATCHUP_GAMES) {
+    for (const [platform, name] of [["chesscom", u.chesscom_username], ["lichess", u.lichess_username]] as const) {
+      if (!name) continue;
+      try { await runImportJob({ userId: u.id, platformUsername: name, platform, months: 1, forceUpdate: false, log: appLogger }); }
+      catch (err) { appLogger.warn({ err, userId: u.id, platform }, "[catchup] import failed"); }
+    }
+  }
+  if ((await owned()) === 0) {
+    await db.execute(sql`UPDATE catchup_reviews SET status = 'no_games', updated_at = now() WHERE user_id = ${u.id}`);
+    return;
+  }
+  const todo = await db.select().from(gamesTable)
+    .where(and(eq(gamesTable.userId, u.id), sql`${gamesTable.platform} IS DISTINCT FROM 'bot'`))
+    .orderBy(desc(gamesTable.playedAt)).limit(CATCHUP_GAMES);
+  let reviewed = 0;
+  for (const g of todo) {
+    if (g.reviewData) continue;
+    if (await hasActiveManualReview(u.id)) break; // their own "Review all" is on it
+    try { await reviewOneGame(g, undefined, u.id, false); reviewed++; }
+    catch (err) { appLogger.warn({ err, gameId: g.id }, "[catchup] review failed"); }
+    await db.execute(sql`UPDATE catchup_reviews SET reviewed = reviewed + 1, updated_at = now() WHERE user_id = ${u.id}`);
+    await new Promise((r) => setTimeout(r, CATCHUP_GAP_MS));
+  }
+  // Brand-new members get the day-after "your reviews are ready" email instead.
+  const isNew = Date.now() - new Date(u.created_at).getTime() < 72 * 3600_000;
+  let emailed = false;
+  if (!isNew) {
+    try { emailed = await (await import("../lib/firstReviewEmail")).sendGamesReviewedEmail(u.id); }
+    catch (err) { appLogger.warn({ err, userId: u.id }, "[catchup] email failed"); }
+  }
+  await db.execute(sql`UPDATE catchup_reviews SET status = 'done', emailed = ${emailed}, updated_at = now() WHERE user_id = ${u.id}`);
+  appLogger.info({ userId: u.id, reviewed, emailed }, "[catchup] member done");
+}
+
+async function catchupTick(): Promise<void> {
+  if (catchupRunning) return;
+  catchupRunning = true;
+  try {
+    for (;;) {
+      // Next member not done yet (joined 2+ hours ago, so they've had time to link an account).
+      const [u] = rowsOfAny<{ id: string; chesscom_username: string | null; lichess_username: string | null; created_at: Date | string }>(await db.execute(sql`
+        SELECT u.id, u.chesscom_username, u.lichess_username, u.created_at FROM users u
+        LEFT JOIN catchup_reviews c ON c.user_id = u.id
+        WHERE u.created_at < now() - interval '2 hours'
+          AND (c.user_id IS NULL OR (c.status = 'working' AND c.updated_at < now() - interval '30 minutes'))
+        ORDER BY u.created_at DESC LIMIT 1`));
+      if (!u) break;
+      await db.execute(sql`INSERT INTO catchup_reviews (user_id, status) VALUES (${u.id}, 'working')
+        ON CONFLICT (user_id) DO UPDATE SET status = 'working', updated_at = now()`);
+      try { await catchupOne(u); }
+      catch (err) {
+        appLogger.warn({ err, userId: u.id }, "[catchup] member failed");
+        await db.execute(sql`UPDATE catchup_reviews SET status = 'error', updated_at = now() WHERE user_id = ${u.id}`).catch(() => {});
+      }
+    }
+  } finally { catchupRunning = false; }
+}
+
+export async function startCatchupReviews(): Promise<void> {
+  if (process.env.CATCHUP_REVIEWS === "0") return;
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS catchup_reviews (
+    user_id VARCHAR PRIMARY KEY, status VARCHAR(16) NOT NULL DEFAULT 'working', reviewed INTEGER NOT NULL DEFAULT 0,
+    emailed BOOLEAN NOT NULL DEFAULT false, updated_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
+  // Starts a few minutes after boot (after the server has settled), then checks for new members hourly.
+  setTimeout(() => { void catchupTick(); }, 5 * 60_000).unref();
+  setInterval(() => { void catchupTick(); }, 60 * 60_000).unref();
 }
 
 router.get("/games/review-all-status/:jobId", requireAuth, async (req, res): Promise<void> => {
