@@ -1275,6 +1275,13 @@ Return ONLY a JSON object mapping each square to its color, nothing else. Exampl
       }
     }
     const agreementRatio = unanimous / 64;
+    // The squares the passes didn't agree on, so the app can ask the player to check them.
+    const unsure: string[] = [];
+    if (grids.length > 1) {
+      for (let r = 0; r < 8; r++) for (let f = 0; f < 8; f++) {
+        if (!grids.every(g => g[r][f] === grids[0][r][f])) unsure.push(`${String.fromCharCode(97 + f)}${8 - r}`);
+      }
+    }
     let confidence: string;
     if (agreementRatio >= 0.97) confidence = "high";
     else if (agreementRatio >= 0.9) confidence = "medium";
@@ -1290,6 +1297,7 @@ Return ONLY a JSON object mapping each square to its color, nothing else. Exampl
     res.json({
       fen: validatedFen,
       confidence,
+      unsure,
       notes: best.notes || "",
       croppedImage: croppedDataUrl,
       annotatedImage: annotatedDataUrl,

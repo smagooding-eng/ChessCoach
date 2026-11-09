@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'wouter';
-import { ArrowLeft, Trash2, Swords, Loader2, Archive as ArchiveIcon } from 'lucide-react';
+import { ArrowLeft, Trash2, Swords, Loader2, Archive as ArchiveIcon, Puzzle } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { ChessBoard } from '@/components/ChessBoard';
 
@@ -60,7 +60,7 @@ export default function ScanArchivePage() {
 
   return (
     <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
-      <Link href="/scan-position" className="inline-flex items-center gap-1.5 text-sm" style={{ color: TEXT_MUTED }}>
+      <Link href="/scan" className="inline-flex items-center gap-1.5 text-sm" style={{ color: TEXT_MUTED }}>
         <ArrowLeft className="w-4 h-4" /> Back to Scan
       </Link>
 
@@ -82,7 +82,7 @@ export default function ScanArchivePage() {
           <p className="text-xs mb-4" style={{ color: TEXT_MUTED }}>
             Scan a position and tap "Save to Archive" to keep it here
           </p>
-          <Link href="/scan-position" className="inline-block px-4 py-2 rounded-xl text-sm font-bold" style={{ background: CHESSCOM_GREEN, color: '#000' }}>
+          <Link href="/scan" className="inline-block px-4 py-2 rounded-xl text-sm font-bold" style={{ background: CHESSCOM_GREEN, color: '#000' }}>
             Scan a Position
           </Link>
         </div>
@@ -100,6 +100,14 @@ export default function ScanArchivePage() {
                 <p className="text-xs" style={{ color: TEXT_MUTED }}>{formatDate(p.createdAt)}</p>
               </div>
               <div className="flex flex-col gap-1.5 shrink-0">
+                <Link
+                  href={`/scan?fen=${encodeURIComponent(p.fen)}&solve=1`}
+                  className="p-2 rounded-lg transition-colors"
+                  style={{ background: 'rgba(255,255,255,0.08)', color: '#FFFFFF' }}
+                  title="Solve it: find the best move"
+                >
+                  <Puzzle className="w-4 h-4" />
+                </Link>
                 <button
                   onClick={() => playFrom(p.fen)}
                   className="p-2 rounded-lg transition-colors"

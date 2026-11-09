@@ -8,7 +8,9 @@ import { Chess } from 'chess.js';
 import { ChessBoard } from '@/components/ChessBoard';
 import { useBoardTheme } from '@/components/MiniBoard';
 import { apiFetch } from '@/lib/api';
-import { Camera, Upload, RotateCcw, Swords, Compass, AlertCircle, X, FlipVertical, Wand2, Trash2, ArrowLeft, Archive, Check, Loader2 } from 'lucide-react';
+import { Camera, Upload, RotateCcw, Swords, Compass, AlertCircle, X, FlipVertical, Wand2, Trash2, ArrowLeft, Archive, Check, Loader2, Puzzle, Pencil } from 'lucide-react';
+import { positionProblems, withCastling, setTurn } from '@/lib/positionCheck';
+import { SolvePosition } from '@/components/SolvePosition';
 
 const PIECE_GLYPH: Record<string, string> = {
   K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙',
@@ -46,7 +48,7 @@ function boardToFen(board: (string | null)[][], rest: string): string {
   return ranks.join('/') + ' ' + rest;
 }
 
-function EditableBoard({ fen, flipped, onFenChange }: { fen: string; flipped: boolean; onFenChange: (fen: string) => void }) {
+function EditableBoard({ fen, flipped, onFenChange, unsure = [] }: { fen: string; flipped: boolean; onFenChange: (fen: string) => void; unsure?: string[] }) {
   const board = fenToBoard(fen);
   const theme = useBoardTheme();
   const ranks = flipped ? [1, 2, 3, 4, 5, 6, 7, 8] : [8, 7, 6, 5, 4, 3, 2, 1];
@@ -91,6 +93,7 @@ function EditableBoard({ fen, flipped, onFenChange }: { fen: string; flipped: bo
               aria-label={`${file}${rank}${piece ? ` ${piece}` : ''}`}
             >
               {piece ? theme.renderPiece(piece) : null}
+              {unsure.includes(`${file}${rank}`) && <span className="pointer-events-none absolute inset-[2px] rounded-[3px]" style={{ boxShadow: 'inset 0 0 0 3px #E8B447' }} />}
             </button>
           );
         })
@@ -170,7 +173,8 @@ export function ScanPosition() {
   const [sandboxChess, setSandboxChess] = useState<Chess | null>(null);
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
   const [flipped, setFlipped] = useState(false);
-  const [mode, setMode] = useState<'preview' | 'explore'>('preview');
+  const [mode, setMode] = useState<'preview' | 'explore' | 'solve'>('preview');
+  const [unsure, setUnsure] = useState<string[]>([]);
   const [gameStatus, setGameStatus] = useState<string | null>(null);
   const [builderFen, setBuilderFen] = useState(START_FEN);
   const [builderPiece, setBuilderPiece] = useState<string | null>('P');
@@ -178,6 +182,14 @@ export function ScanPosition() {
   const [builderError, setBuilderError] = useState('');
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [isLimitReached, setIsLimitReached] = useState(false);
+  // Opened from Saved Positions with ?fen=…&solve=1: straight into solving it.
+  React.useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const f = q.get('fen');
+    if (!f) return;
+    if (positionProblems(f).length) { setBuilderFen(f); setState('builder'); return; }
+    setFen(f); setSaveState('saved'); setState('result'); setMode(q.get('solve') === '1' ? 'solve' : 'preview');
+  }, []);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -208,7 +220,7 @@ export function ScanPosition() {
           body: JSON.stringify({ image: dataUrl }),
         });
 
-        const data = await res.json() as { fen?: string; confidence?: string; notes?: string; croppedImage?: string; annotatedImage?: string; error?: string; message?: string };
+        const data = await res.json() as { fen?: string; confidence?: string; unsure?: string[]; notes?: string; croppedImage?: string; annotatedImage?: string; error?: string; message?: string };
 
         if (!res.ok || !data.fen) {
           setIsLimitReached(data.error === 'usage_limit' || data.error === 'pro_required');
@@ -220,6 +232,7 @@ export function ScanPosition() {
 
         setFen(data.fen);
         setConfidence(data.confidence || 'medium');
+        setUnsure(Array.isArray(data.unsure) ? data.unsure.slice(0, 64) : []);
         setNotes(data.notes || '');
         setCroppedImage(data.croppedImage || '');
         setAnnotatedImage(data.annotatedImage || '');
@@ -248,7 +261,7 @@ export function ScanPosition() {
   // Explore opens the Position Explorer at this position (Stockfish's swing on every move).
   const startExplore = useCallback(() => {
     try {
-      const chess = new Chess(fen);
+      const chess = new Chess(withCastling(fen));
       navigate(`/explore?from=scan&fen=${encodeURIComponent(chess.fen())}`);
     } catch {
       setError('Invalid position — cannot load this FEN.');
@@ -319,15 +332,26 @@ export function ScanPosition() {
     setGameStatus(null);
     setSaveState('idle');
     setIsLimitReached(false);
+    setUnsure([]);
   }, []);
 
   const goToPlayAI = useCallback((fromFen?: string) => {
-    const activeFen = fromFen || fen;
+    const activeFen = fromFen ? fromFen : fen ? withCastling(fen) : '';
     if (!activeFen) return;
     const turnChar = activeFen.split(' ')[1] || 'w';
     const color = turnChar === 'b' ? 'b' : 'w';
     window.location.href = `/practice?fen=${encodeURIComponent(activeFen)}&rating=1200&color=${color}`;
   }, [fen]);
+
+  const problems = state === 'result' && fen ? positionProblems(fen) : [];
+  // The full editor, starting from this position (to add, move or remove pieces).
+  const openEditor = (from: string) => {
+    setBuilderFen(from);
+    setBuilderTurn(from.split(' ')[1] === 'b' ? 'b' : 'w');
+    setBuilderPiece(null);
+    setBuilderError('');
+    setState('builder');
+  };
 
   const confidenceColor = confidence === 'high' ? 'text-emerald-400' : confidence === 'medium' ? 'text-amber-400' : 'text-rose-400';
   const confidenceBg = confidence === 'high' ? 'bg-emerald-500/20 border-emerald-500/50' : confidence === 'medium' ? 'bg-amber-500/20 border-amber-500/50' : 'bg-rose-500/20 border-rose-500/50';
@@ -498,7 +522,7 @@ export function ScanPosition() {
             <div className="space-y-1.5">
               <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">Detected — tap a piece to flip its color</p>
               <div className="relative">
-                <EditableBoard fen={fen} flipped={flipped} onFenChange={setFen} />
+                <EditableBoard fen={fen} flipped={flipped} onFenChange={(f) => { setFen(f); setSaveState('idle'); }} unsure={unsure} />
                 <button
                   onClick={() => setFlipped(f => !f)}
                   className="absolute top-2 left-2 z-10 p-1.5 rounded-xl bg-black/60 backdrop-blur-sm border border-white/10 hover:border-primary/30 transition-all"
@@ -517,10 +541,47 @@ export function ScanPosition() {
             {notes && <span className="text-white/40">— {notes}</span>}
           </div>
 
+          {unsure.length > 0 && (
+            <div className="rounded-xl px-3 py-2 text-xs" style={{ background: '#121B1D', border: '1px solid rgba(232,180,71,.5)' }}>
+              <span className="font-bold" style={{ color: '#E8B447' }}>Check {unsure.length === 1 ? 'this square' : `these ${unsure.length} squares`}:</span>{' '}
+              <span className="text-white/70">{unsure.join(', ')}. They’re outlined on the board. The scan wasn’t sure about them.</span>
+            </div>
+          )}
+
+          {problems.length > 0 && (
+            <div className="rounded-xl px-3 py-2.5 text-xs space-y-1" style={{ background: '#121B1D', border: '1px solid rgba(240,96,93,.55)' }}>
+              <p className="font-bold text-rose-400">This position can’t be played yet:</p>
+              {problems.map((p) => <p key={p} className="text-white/75">• {p}</p>)}
+              <p className="text-white/50">Tap a piece to switch its colour, or fix it in the editor.</p>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-white/40">To move</span>
+            {(['w', 'b'] as const).map((t) => (
+              <button key={t} onClick={() => setFen((f) => setTurn(f, t))} className="rounded-full px-3 py-1 text-xs font-bold"
+                style={(fen.split(' ')[1] || 'w') === t ? { background: t === 'w' ? '#fff' : '#1a1a1a', color: t === 'w' ? '#1a1a1a' : '#fff', border: '1px solid rgba(255,255,255,.25)' } : { color: 'rgba(255,255,255,.6)', border: '1px solid rgba(255,255,255,.1)' }}>
+                {t === 'w' ? 'White' : 'Black'}
+              </button>
+            ))}
+            <button onClick={() => openEditor(fen)} className="ml-auto flex items-center gap-1 rounded-full border border-white/10 px-3 py-1 text-xs font-bold text-white/70"><Pencil className="h-3 w-3" />Edit position</button>
+          </div>
+
+          <button
+            onClick={() => setMode('solve')}
+            disabled={problems.length > 0}
+            className="w-full py-3 rounded-xl font-black text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2 disabled:opacity-40"
+            style={{ background: '#81b64c', color: '#ffffff' }}
+          >
+            <Puzzle className="w-4 h-4" />
+            Solve it: find the best move
+          </button>
+
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={startExplore}
-              className="py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2"
+              disabled={problems.length > 0}
+              className="disabled:opacity-40 py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2"
               style={{ background: 'rgba(129,182,76,0.35)', color: '#ffffff', border: '1px solid rgba(129,182,76,0.3)' }}
             >
               <Compass className="w-4 h-4" />
@@ -528,7 +589,8 @@ export function ScanPosition() {
             </button>
             <button
               onClick={() => goToPlayAI()}
-              className="py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2"
+              disabled={problems.length > 0}
+              className="disabled:opacity-40 py-3 rounded-xl font-bold text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2"
               style={{ background: 'rgba(129,182,76,0.35)', color: '#ffffff', border: '1px solid rgba(129,182,76,0.3)' }}
             >
               <Swords className="w-4 h-4" />
@@ -558,6 +620,16 @@ export function ScanPosition() {
           >
             <X className="w-3.5 h-3.5" />
             Scan New Position
+          </button>
+        </div>
+      )}
+
+      {state === 'result' && mode === 'solve' && (
+        <div className="space-y-3">
+          <SolvePosition fen={withCastling(fen)} flipped={flipped} onExplore={startExplore} onPlay={() => goToPlayAI()} />
+          <button onClick={() => setMode('preview')} className="w-full py-2.5 rounded-xl text-xs font-bold text-white/40 hover:text-white/60 transition-all flex items-center justify-center gap-1.5">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Back to the position
           </button>
         </div>
       )}
@@ -794,8 +866,10 @@ export function ScanPosition() {
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => {
+                const issues = positionProblems(builderFen);
+                if (issues.length) { setBuilderError(issues.join(' ')); return; }
                 try {
-                  const chess = new Chess(builderFen);
+                  const chess = new Chess(withCastling(builderFen));
                   setFen(chess.fen());
                   setBuilderError('');
                   navigate(`/explore?from=scan&fen=${encodeURIComponent(chess.fen())}`);
@@ -811,8 +885,10 @@ export function ScanPosition() {
             </button>
             <button
               onClick={() => {
+                const issues = positionProblems(builderFen);
+                if (issues.length) { setBuilderError(issues.join(' ')); return; }
                 try {
-                  const chess = new Chess(builderFen);
+                  const chess = new Chess(withCastling(builderFen));
                   goToPlayAI(chess.fen());
                 } catch (e) {
                   setBuilderError(`Invalid position — ${(e as Error).message || 'check kings, pawn ranks, and side to move.'}`);
@@ -825,6 +901,28 @@ export function ScanPosition() {
               Play Bot
             </button>
           </div>
+
+          <button
+            onClick={() => {
+              const issues = positionProblems(builderFen);
+              if (issues.length) { setBuilderError(issues.join(' ')); return; }
+              setFen(withCastling(builderFen)); setUnsure([]); setSaveState('idle'); setState('result'); setMode('solve');
+            }}
+            className="w-full py-3 rounded-xl font-black text-sm transition-all active:scale-[0.97] flex items-center justify-center gap-2"
+            style={{ background: '#81b64c', color: '#ffffff' }}
+          >
+            <Puzzle className="w-4 h-4" />
+            Solve it: find the best move
+          </button>
+          {fen && (
+            <button
+              onClick={() => { setFen(builderFen); setUnsure([]); setSaveState('idle'); setState('result'); setMode('preview'); }}
+              className="w-full py-2.5 rounded-xl text-xs font-bold text-white/60 border border-white/10 transition-all flex items-center justify-center gap-1.5"
+            >
+              <Check className="w-3.5 h-3.5" />
+              Use this position
+            </button>
+          )}
 
           <button
             onClick={resetAll}
