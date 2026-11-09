@@ -16,6 +16,7 @@ import { routeSoundsTo } from '@/lib/sounds';
 import { apiFetch } from '@/lib/api';
 import { StudioMusic, type MusicStyle } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
+import { HookPicker } from './HookPicker';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
 
 const G = '#81B64C', BG = '#0B1112', TEXT = '#F5F7F6', MUTED = '#8E9996', GOLD = '#E8B447';
@@ -40,7 +41,7 @@ export interface PuzzleReelOpts {
 export const THEMES: { id: string; label: string; group: 'Mates' | 'Tactics' | 'Endgames'; headline: string; sub: string }[] = [
   { id: 'mateIn1', label: 'Mate in 1', group: 'Mates', headline: 'MATE IN 1', sub: 'Most people miss it.' },
   { id: 'mateIn2', label: 'Mate in 2', group: 'Mates', headline: 'MATE IN 2', sub: "Looks easy. It isn't." },
-  { id: 'mateIn3', label: 'Mate in 3', group: 'Mates', headline: 'MATE IN 3', sub: 'Only 1 in 10 find it.' },
+  { id: 'mateIn3', label: 'Mate in 3', group: 'Mates', headline: 'MATE IN 3', sub: 'Three moves. Find them all.' },
   { id: 'backRankMate', label: 'Back-rank mate', group: 'Mates', headline: 'BACK-RANK MATE', sub: 'Find the finish.' },
   { id: 'smotheredMate', label: 'Smothered mate', group: 'Mates', headline: 'SMOTHERED MATE', sub: 'The knight does it all.' },
   { id: 'fork', label: 'Fork', group: 'Tactics', headline: 'FIND THE FORK', sub: 'Two pieces, one move.' },
@@ -279,6 +280,7 @@ export function PuzzleReel({ opts: initial, render = false, onClose }: { opts?: 
           </div>
           {err && <p className="text-[12px] text-[#E5484D]">{err}</p>}
           {p && <p className="text-[12px] text-white/55">Puzzle #{p.id} · rated {p.rating}{opts.mode === 'abc' ? ` · answer: ${correctLetter}` : ''}</p>}
+          <HookPicker topics={opts.mode === 'abc' ? ['puzzle'] : themeOf(opts.theme).group === 'Endgames' ? ['endgame', 'puzzle'] : ['puzzle', 'tactics']} onPick={(h) => setOpts({ ...opts, headline: h.text, sub: h.sub ?? '' })} />
           <label className="block text-[12px] text-white/60">Headline<input value={opts.headline} onChange={(e) => setOpts({ ...opts, headline: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[14px] font-bold text-white ring-1 ring-white/10" /></label>
           <label className="block text-[12px] text-white/60">Second line<input value={opts.sub} onChange={(e) => setOpts({ ...opts, sub: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[14px] font-bold text-white ring-1 ring-white/10" /></label>
           <div className="flex flex-wrap items-center gap-3 text-[12.5px]">

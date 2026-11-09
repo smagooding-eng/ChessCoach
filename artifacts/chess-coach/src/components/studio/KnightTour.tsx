@@ -10,6 +10,7 @@ import { playMoveSound } from '@/context/SettingsContext';
 import { routeSoundsTo } from '@/lib/sounds';
 import { StudioMusic } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
+import { HookPicker, hookLine } from './HookPicker';
 
 // A complete knight's tour from b1 (checked: 64 different squares, every step a knight move).
 export const KNIGHT_TOUR = 'b1 a3 c2 a1 b3 c1 a2 b4 a6 b8 d7 f8 h7 g5 h3 g1 e2 g3 h1 f2 d1 b2 a4 c3 b5 a7 c8 b6 a8 c7 e8 g7 h5 f6 g8 h6 g4 h2 f1 d2 e4 c5 b7 a5 c4 d6 f7 h8 g6 h4 g2 e1 f3 e5 d3 f4 e6 d8 c6 d4 f5 e7 d5 e3'.split(' ');
@@ -171,6 +172,7 @@ export function KnightTour({ opts: initial = KNIGHT_TOUR_DEFAULT, render = false
             <button onClick={onClose} aria-label="Close" className="rounded-full bg-white/10 p-2"><X className="h-5 w-5" /></button>
           </div>
           <p className="text-[12.5px] text-white/60">The knight lands on all 64 squares once each, on your board with your move sound. Each square it lands on turns green or black, so the finished board is the ChessScout logo, then chessscout.net appears on it.</p>
+          <HookPicker topics={['riddle', 'puzzle']} onPick={(h) => setOpts({ ...opts, hook: hookLine(h) })} />
           <label className="block text-[12px] text-white/60">Hook<input value={opts.hook} onChange={(e) => setOpts({ ...opts, hook: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[14px] font-bold text-white ring-1 ring-white/10" /></label>
           <div className="flex flex-wrap gap-1.5">
             {(['fast', 'normal', 'slow'] as const).map((s) => (

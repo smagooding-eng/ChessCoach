@@ -13,6 +13,7 @@ import { LookOverride, randomLook, type BoardLook } from '@/context/SettingsCont
 import { routeSoundsTo } from '@/lib/sounds';
 import { StudioMusic, type MusicStyle } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
+import { HookPicker, hookLine } from './HookPicker';
 import { apiFetch } from '@/lib/api';
 
 const GREEN = '#81B64C';
@@ -536,6 +537,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
             <button onClick={onClose} aria-label="Close" className="rounded-full bg-white/10 p-2"><X className="h-5 w-5" /></button>
           </div>
           <p className="text-[12.5px] text-white/60">A fast cut through every feature: {SCENES.map((s) => s.title).join(', ')}. Ends on chessscout.net.</p>
+          <HookPicker topics={['app', 'improve']} onPick={(h) => setOpts({ ...opts, hook: hookLine(h) })} />
           <label className="block text-[12px] text-white/60">Hook (stays on top)<input value={opts.hook} onChange={(e) => setOpts({ ...opts, hook: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[14px] font-bold text-white ring-1 ring-white/10" /></label>
           <div className="flex flex-wrap gap-1.5">
             {["Use this app for a week and you'll never go back to Chess.com", 'Everything Chess.com charges for. Free.', '9 reasons I stopped opening Chess.com'].map((h) => (

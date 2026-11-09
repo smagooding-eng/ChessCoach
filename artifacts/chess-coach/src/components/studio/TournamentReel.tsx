@@ -10,6 +10,7 @@ import { playMoveSound } from '@/context/SettingsContext';
 import { routeSoundsTo } from '@/lib/sounds';
 import { StudioMusic, type MusicStyle } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
+import { HookPicker, hookLine } from './HookPicker';
 import { ThemedMiniBoard } from '@/components/ThemedMiniBoard';
 import { positionsFromSan } from '@/hooks/use-move-browser';
 
@@ -340,6 +341,7 @@ export function TournamentReel({ opts: initial = TOURNAMENT_REEL_DEFAULT, render
             <button onClick={onClose} aria-label="Close" className="rounded-full bg-white/10 p-2"><X className="h-5 w-5" /></button>
           </div>
           <p className="text-[12.5px] text-white/60">About 21 seconds: the hook, making a tournament (name, knockout, daily, logo), sharing the link while players join, the bracket playing out, four boards live for anyone to watch, the champion, then your closing line. The players are made-up demo names, not real users.</p>
+          <HookPicker topics={['tournament']} onPick={(h) => setOpts({ ...opts, hook: hookLine(h) })} />
           {field('hook', 'Hook')}
           {field('who', 'Who it’s for (comma-separated, they flip under the hook)')}
           {field('name', 'Tournament name in the demo')}

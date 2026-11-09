@@ -132,7 +132,7 @@ export function ContentStudio() {
   const togglePick = (x: StudioSource) => setPicked((cur) => (cur.some((c) => keyOf(c) === keyOf(x)) ? cur.filter((c) => keyOf(c) !== keyOf(x)) : [...cur, x]));
   const isPicked = (x: StudioSource) => picked.some((c) => keyOf(c) === keyOf(x));
   const choose = (x: StudioSource) => (picking ? togglePick(x) : setOpen(x));
-  const [view, setView] = useState<'plan' | 'moments' | 'traps' | 'puzzles' | 'reviews' | 'kids' | 'scout' | 'scan' | 'analyzer' | 'promo' | 'openings'>('moments');
+  const [view, setView] = useState<'plan' | 'moments' | 'traps' | 'puzzles' | 'reviews' | 'kids' | 'scout' | 'scan' | 'analyzer' | 'promo' | 'openings'>('plan');
   // Openings: main line, ideas, replies and variations, with real-game numbers and Stockfish.
   const [openings, setOpenings] = useState<{ id: string; name: string; side: 'white' | 'black'; line: string[]; lines: string[] }[] | null>(null);
   useEffect(() => {

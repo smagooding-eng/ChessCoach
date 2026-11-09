@@ -10,6 +10,7 @@ import { playMoveSound } from '@/context/SettingsContext';
 import { routeSoundsTo } from '@/lib/sounds';
 import { StudioMusic, type MusicStyle } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
+import { HookPicker, hookLine } from './HookPicker';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
 import { positionsFromSan } from '@/hooks/use-move-browser';
 import { MOTIFS } from '@/lib/tactics';
@@ -383,6 +384,7 @@ export function SectionReel({ opts: initial, render = false, onClose }: { opts?:
             ))}
           </div>
           <p className="text-[12.5px] text-white/60">About {total} seconds. Example data is labelled "Example" and players are made-up names. Everything it says matches what the app does today.</p>
+          <HookPicker topics={({ tactics: ['tactics', 'puzzle'], endgames: ['endgame'], puzzles: ['puzzle'], openings: ['opening', 'trap'] } as Record<string, ('tactics' | 'puzzle' | 'endgame' | 'opening' | 'trap' | 'app' | 'improve')[]>)[opts.section] ?? ['app', 'improve']} onPick={(h) => setOpts({ ...opts, hook: hookLine(h) })} />
           <label className="block text-[12px] text-white/60">Hook<input value={opts.hook} placeholder={def.scenes[0].type === 'hook' ? def.scenes[0].title : ''} onChange={(e) => setOpts({ ...opts, hook: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[14px] font-bold text-white ring-1 ring-white/10 placeholder:text-white/35" /></label>
           <label className="block text-[12px] text-white/60">Closing line<input value={opts.closer} placeholder={def.closer} onChange={(e) => setOpts({ ...opts, closer: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[14px] font-bold text-white ring-1 ring-white/10 placeholder:text-white/35" /></label>
           <label className="block text-[12px] text-white/60">Music
