@@ -11,13 +11,14 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Play, Maximize2, Shuffle, Loader2 } from 'lucide-react';
 import { Chess } from 'chess.js';
-import { playMoveSound } from '@/context/SettingsContext';
+import { playMoveSound, LookOverride } from '@/context/SettingsContext';
 import { routeSoundsTo } from '@/lib/sounds';
 import { apiFetch } from '@/lib/api';
 import { StudioMusic, type MusicStyle } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
 import { HookPicker } from './HookPicker';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook } from './reelKit';
 
 const G = '#81B64C', BG = '#0B1112', TEXT = '#F5F7F6', MUTED = '#8E9996', GOLD = '#E8B447';
 const ABC_COLORS = ['#3D8BFD', '#F2A93B', '#B05CE8'];
@@ -35,6 +36,8 @@ export interface PuzzleReelOpts {
   music: MusicStyle;
   /** For A/B/C: the letters' moves, fixed when the puzzle is picked. */
   choices?: { uci: string; san: string; correct: boolean }[];
+  /** Board look: your board, one random look, or a new one each scene / move. */
+  look?: ReelLook;
 }
 
 /** Puzzle themes to pull from (Lichess theme tags), with a headline for each. */
@@ -209,11 +212,12 @@ export function PuzzleReel({ opts: initial, render = false, onClose }: { opts?: 
       marks = Object.fromEntries(opts.choices.map((ch, i) => [ch.uci.slice(2, 4), { text: 'ABC'[i], color: ABC_COLORS[i], strong: true }]));
     }
   }
+  const look = useReelLook(opts.look, phase, ply);
   const correctLetter = opts.choices ? 'ABC'[opts.choices.findIndex((c) => c.correct)] : '';
   const flipped = toPlay === 'Black';
 
   const frame = (
-    <div className="relative overflow-hidden" style={{ fontFamily: 'Inter, system-ui, sans-serif', aspectRatio: '9 / 16', height: clean || render ? '100dvh' : 'min(78dvh, 820px)', maxWidth: '100%', containerType: 'size', background: `radial-gradient(ellipse at 50% 0%, #12301F 0%, ${BG} 60%)` }}
+    <div className="relative overflow-hidden" style={{ fontFamily: 'Inter, system-ui, sans-serif', ...reelFrameSize(clean || render), background: `radial-gradient(ellipse at 50% 0%, #12301F 0%, ${BG} 60%)` }}
       onClick={() => { if (clean && phase === 'end') setClean(false); }}>
       {p && (
         <div className="flex h-full flex-col items-center justify-center gap-[2.2cqh] px-[5cqw]">
@@ -224,13 +228,18 @@ export function PuzzleReel({ opts: initial, render = false, onClose }: { opts?: 
             <p className="mt-[0.8cqh] font-bold" style={{ fontSize: '2.2cqh', color: MUTED }}>{toPlay} to play</p>
           </div>
           <div className="relative w-full rounded-[1.6cqh] p-[1.2cqh]" style={{ background: '#141D1F', border: '1px solid #243033' }}>
-            <ChessBoard fen={fen} lastMove={lastMove} moveQuality={quality} arrows={arrows} squareMarks={marks} flipped={flipped} maxWidthOverride="100%" suppressConfirmMoves animationMs={260} />
+            <LookOverride look={look}><ChessBoard fen={fen} lastMove={lastMove} moveQuality={quality} arrows={arrows} squareMarks={marks} flipped={flipped} maxWidthOverride="100%" suppressConfirmMoves animationMs={260} /></LookOverride>
           </div>
           <div className="flex h-[9cqh] items-center justify-center">
             <AnimatePresence mode="wait">
               {phase === 'ask' && (
-                <motion.div key={`c${left}`} initial={{ scale: 1.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}
-                  className="grid place-items-center rounded-full font-black tabular-nums" style={{ width: '8.5cqh', height: '8.5cqh', fontSize: '4.4cqh', color: '#fff', background: left <= 3 ? '#E5484D' : G }}>{left}</motion.div>
+                <div className="flex items-center gap-[3cqw]">
+                  <motion.div key={`c${left}`} initial={{ scale: 1.4, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ duration: 0.25 }}
+                    className="grid shrink-0 place-items-center rounded-full font-black tabular-nums" style={{ width: '8.5cqh', height: '8.5cqh', fontSize: '4.4cqh', color: '#fff', background: left <= 3 ? '#E5484D' : G }}>{left}</motion.div>
+                  {/* Comments push a reel out the most, so the ask is on screen the whole countdown. */}
+                  <motion.p initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }}
+                    className="font-black leading-tight" style={{ fontSize: '3cqh', color: TEXT }}>{opts.mode === 'abc' ? <>Comment<br /><span style={{ color: GOLD }}>A, B or C</span> 👇</> : <>Comment<br /><span style={{ color: G }}>your move</span> 👇</>}</motion.p>
+                </div>
               )}
               {phase === 'answer' && opts.mode === 'abc' && (
                 <motion.p key="ans" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="font-black" style={{ fontSize: '3.6cqh', color: G }}>
@@ -256,8 +265,8 @@ export function PuzzleReel({ opts: initial, render = false, onClose }: { opts?: 
   const setMode = (mode: PuzzleReelOpts['mode']) => { if (mode !== opts.mode) void load(mode); };
   const theme = themeOf(opts.theme);
   const caption = opts.mode === 'mate2'
-    ? `${opts.headline.charAt(0) + opts.headline.slice(1).toLowerCase()}. ${opts.sub} ${toPlay} to play — drop your move below 👇\n\nUnlimited free puzzles at chessscout.net\n\n#chess #chesspuzzle #${theme.group === 'Endgames' ? 'chessendgame' : 'chesstactics'} #${theme.id.toLowerCase()}`
-    : `Which move is correct? A, B or C 👇\n${toPlay} to play.\n\nUnlimited free puzzles at chessscout.net\n\n#chess #chesspuzzle #chesstactics #chessgame`;
+    ? `${opts.headline.charAt(0) + opts.headline.slice(1).toLowerCase()}. ${opts.sub} ${toPlay} to play — drop your move below 👇${opts.reveal ? '' : '\nAnswer in tomorrow\'s reel 👀'}\n\nUnlimited free puzzles at chessscout.net\n\n#chess #chesspuzzle #${theme.group === 'Endgames' ? 'chessendgame' : 'chesstactics'} #${theme.id.toLowerCase()}`
+    : `Which move is correct? A, B or C 👇\n${toPlay} to play.${opts.reveal ? '' : ' Answer tomorrow 👀'}\n\nUnlimited free puzzles at chessscout.net\n\n#chess #chesspuzzle #chesstactics #chessgame`;
   return (
     <div className="fixed inset-0 z-[80] overflow-y-auto bg-[#0B1112]/95 text-white">
       <div className="mx-auto flex max-w-[1100px] flex-col items-center gap-4 p-4 lg:flex-row lg:items-start">
@@ -272,7 +281,7 @@ export function PuzzleReel({ opts: initial, render = false, onClose }: { opts?: 
             <button onClick={onClose} aria-label="Close" className="rounded-full bg-white/10 p-2"><X className="h-5 w-5" /></button>
           </div>
           <div className="flex gap-1.5">
-            {([['mate2', 'Find the move'], ['abc', 'A, B or C?']] as const).map(([m, l]) => (
+            {([['mate2', 'Find the move ★'], ['abc', 'A, B or C?']] as const).map(([m, l]) => (
               <button key={m} onClick={() => setMode(m)} className="rounded-lg px-3 py-1.5 text-[12.5px] font-black" style={{ background: opts.mode === m ? G : 'rgba(255,255,255,.08)' }}>{l}</button>
             ))}
             <button onClick={() => void load()} disabled={loading} className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-black">{loading ? <Loader2 size={14} className="animate-spin" /> : <Shuffle size={14} />} New puzzle</button>
@@ -313,13 +322,15 @@ export function PuzzleReel({ opts: initial, render = false, onClose }: { opts?: 
             </label>
             <label className="flex items-center gap-2"><input type="checkbox" checked={opts.reveal} onChange={(e) => setOpts({ ...opts, reveal: e.target.checked })} className="h-4 w-4 accent-[#81B64C]" /> Show the answer at the end</label>
           </div>
-          <p className="text-[11.5px] text-white/45">Answer hidden = "comment your move": it loops and gets comments, which is what the algorithm rewards. Answer shown = a satisfying payoff.</p>
+          <p className="text-[11.5px] text-white/45">Answer hidden = "comment your move": it loops and gets comments, which is what the algorithm rewards. Answer shown = a satisfying payoff. So far, "Find the move" (Mate in 2, 12s) has beaten A/B/C on views, rewatches and comments: keep the total around 12 seconds.</p>
           <label className="block text-[12px] text-white/60">Music
             <select value={opts.music} onChange={(e) => setOpts({ ...opts, music: e.target.value as MusicStyle })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[14px] font-bold text-white ring-1 ring-white/10">
               {(['hype', 'epic', 'playful', 'lofi', 'suspense', 'off'] as MusicStyle[]).map((m) => <option key={m} value={m} className="bg-[#0B1112]">{m === 'off' ? 'No music (add a trending sound in Instagram)' : m[0].toUpperCase() + m.slice(1)}</option>)}
             </select>
           </label>
-          <div className="whitespace-pre-line rounded-lg bg-white/5 p-2.5 text-[12px] text-white/75 ring-1 ring-white/10"><span className="font-bold text-white/50">Caption: </span>{caption}</div>
+          <LookPicker value={opts.look} onChange={(v) => setOpts({ ...opts, look: v })} />
+          <CaptionBox key={caption} text={caption} />
+          {!opts.reveal && <p className="text-[11.5px] text-white/45">Tip: post the answer as its own reel the next day ("Yesterday's puzzle: here's the answer"), with the same puzzle and "Show the answer" ticked.</p>}
           <div className="flex flex-wrap gap-2">
             <button onClick={() => play()} disabled={!p} className="inline-flex items-center gap-1.5 rounded-lg bg-[#81B64C] px-3 py-1.5 text-[12.5px] font-black text-white"><Play size={14} />Replay</button>
             <button onClick={() => { clear(); music.current?.stop(); setClean(true); setPhase('idle'); at(4000, () => play()); }} disabled={!p} className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-black"><Maximize2 size={14} />Clean view</button>

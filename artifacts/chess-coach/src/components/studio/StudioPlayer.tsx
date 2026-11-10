@@ -11,7 +11,8 @@ import { StudioBadge, Medallion, Rays, CountdownRing, EvalSwing, rankColor, shad
 import { StudioSplash } from './StudioSplash';
 import { RenderMp4 } from './RenderMp4';
 import { StudioMusic, MUSIC_STYLES, bpmOf, type MusicStyle } from './studioMusic';
-import { OPENING_MAP, mapTree, type MapEpisode } from './openingMap';
+import { mapTree, findEpisode, nextEpisode, partLabel, type MapEpisode } from './openingMap';
+import { reelFrameSize } from './reelKit';
 
 // Content Studio player: a game moment or a trap lesson as a 9:16 clip for
 // TikTok, Reels and Shorts. The clip is a script of frames: an intro with the
@@ -230,7 +231,7 @@ const DEFAULT_PREFS = {
   /** Said near the start of every clip in the Coach look (empty = none). */
   earlyCta: "Like, follow and share for more chess like this!",
   /** The same, for Family Tree parts. */
-  seriesCta: "Like and follow so you don't miss the rest of the series!",
+  seriesCta: "Count along, then comment your score!",
   split: true, voice: false, voiceName: 'ash', compTitle: 'Top moments this week',
   music: 'off' as MusicStyle, musicVol: 0.5, beatSync: true, musicFx: true, subs: true, pieceFx: true, trapBefore: 99, countdownSecs: 3, choices: false, zoom: false, splash: true, reviewMode: 'highlights' as 'highlights' | 'full',
 };
@@ -585,10 +586,10 @@ function openingClip(o0: StudioOpening, lineName?: string): Clip {
   };
 }
 function mapClip(no: number): Clip | null {
-  const e = OPENING_MAP.find((x) => x.no === no); if (!e) return null;
+  const e = findEpisode(no); if (!e) return null;
   return {
     plies: [], key: 0, tags: ['opening'], hook: `The ${e.family} family tree 🌳`, sub: e.title,
-    names: { w: null, b: null }, ratings: { w: null, b: null }, fileBase: `chessscout-family-tree-${e.no}`, label: `Family Tree · Part ${e.no}: ${e.title}`,
+    names: { w: null, b: null }, ratings: { w: null, b: null }, fileBase: `chessscout-family-tree-${partLabel(e)}`, label: `Family Tree · Part ${partLabel(e)}: ${e.title}`,
     isTrap: false, opening: null, isMap: true, map: e,
   };
 }
@@ -781,7 +782,7 @@ function Confetti({ fire }: { fire: number }) {
 }
 
 const srcKey = (x: StudioSource): string => (x.kind === 'map' ? `map-${x.episode}` : x.kind === 'opening' ? `o-${x.opening.id}${x.opening.line ? `-${x.opening.line}` : ''}` : x.kind === 'line' ? `line-${x.line.startFen}-${x.line.moves.map((m) => m.san).join(' ')}` : x.kind === 'promo' ? `promo-${x.promo.template}-${x.promo.hook}` : x.kind === 'scout' ? `s${x.scout.id}` : x.kind === 'lesson' ? `l${x.lesson.id}` : x.kind === 'scan' ? `x${x.fen}` : x.kind === 'trap' ? `t${x.trap.id}` : x.kind === 'puzzle' ? `p${x.puzzle.id}` : x.kind === 'review' ? `r${x.review.id}${x.showcase ? '-sc' : ''}` : `g${x.moment.gameId}-${x.moment.moveIndex}`);
-const srcLabel = (x: StudioSource): string => (x.kind === 'map' ? `Family Tree · Part ${x.episode}` : x.kind === 'opening' ? `Opening · ${x.opening.name}${x.opening.line ? ` · ${x.opening.line}` : ''}` : x.kind === 'line' ? `Analyzer · ${x.line.white} vs ${x.line.black}` : x.kind === 'promo' ? (x.promo.template === 'versus' ? `Promo · vs ${x.promo.rival}` : x.promo.template === 'live' ? 'Promo · live play' : x.promo.template === 'tour' ? 'Promo · app tour' : 'Promo · challenge friends') : x.kind === 'scout' ? `Scout · ${x.scout.username}` : x.kind === 'lesson' ? `Lesson · ${x.lesson.title}` : x.kind === 'scan' ? (x.label ? `Scan · ${x.label}` : 'Scanned position') : x.kind === 'trap' ? x.trap.name : x.kind === 'puzzle' ? `Puzzle · ${x.puzzle.rating}${x.puzzle.themes?.match(/mateIn\d/) ? ` · ${themeLabel(x.puzzle.themes.match(/mateIn\d/)![0])}` : ''}`
+const srcLabel = (x: StudioSource): string => (x.kind === 'map' ? `Family Tree · Part ${(() => { const e = findEpisode(x.episode); return e ? partLabel(e) : x.episode; })()}` : x.kind === 'opening' ? `Opening · ${x.opening.name}${x.opening.line ? ` · ${x.opening.line}` : ''}` : x.kind === 'line' ? `Analyzer · ${x.line.white} vs ${x.line.black}` : x.kind === 'promo' ? (x.promo.template === 'versus' ? `Promo · vs ${x.promo.rival}` : x.promo.template === 'live' ? 'Promo · live play' : x.promo.template === 'tour' ? 'Promo · app tour' : 'Promo · challenge friends') : x.kind === 'scout' ? `Scout · ${x.scout.username}` : x.kind === 'lesson' ? `Lesson · ${x.lesson.title}` : x.kind === 'scan' ? (x.label ? `Scan · ${x.label}` : 'Scanned position') : x.kind === 'trap' ? x.trap.name : x.kind === 'puzzle' ? `Puzzle · ${x.puzzle.rating}${x.puzzle.themes?.match(/mateIn\d/) ? ` · ${themeLabel(x.puzzle.themes.match(/mateIn\d/)![0])}` : ''}`
   : x.kind === 'review' ? `Review · ${x.review.white ?? 'White'} vs ${x.review.black ?? 'Black'}` : `${x.moment.san} · ${x.moment.opening ?? `game ${x.moment.gameId}`}`);
 type ClipLook = BoardLook | 'remix' | 'mine';
 
@@ -1701,7 +1702,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       if (f.kind === 'mapStep') return mapSay(e, e.steps[f.step]);
       if (f.kind === 'mapMove') return null;
       if (f.kind === 'mapEnd') {
-        const nx = OPENING_MAP.find((x) => x.no === e.no + 1);
+        const nx = nextEpisode(e);
         return `That's the whole tree: ${mapCount(e)} openings. So, how many did you know? Tell me in the comments.${nx ? ` Next up: ${nx.title.replace(/^The /, 'the ')}.` : ''}`;
       }
     }
@@ -2165,7 +2166,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     const emo = (hook.match(/\p{Extended_Pictographic}/u) ?? [''])[0];
     const plain = stripEmoji(hook.replace(/^#\d+ · /, '')).trim();
     const lastWord = (t: string) => t.replace(/(\S+)([.!?]*)$/, '*$1*$2');
-    if (clip.isMap && clip.map) { const n = clip.map.steps.filter((x) => x.name).length; return { kicker: `The Family Tree · Part ${clip.map.no}`, title: `*${n}* openings`, sub: `from ${clip.map.family}. How many do you know?`, emo: '🌳', big: true }; }
+    if (clip.isMap && clip.map) { const n = clip.map.steps.filter((x) => x.name).length; return { kicker: `The Family Tree · Part ${partLabel(clip.map)}`, title: `*${n}* openings`, sub: `from ${clip.map.family}. How many do you know?`, emo: '🌳', big: true }; }
     if (clip.lineMode && clip.openingData) { const l = clip.openingData.lines[0]; return { kicker: `${clip.openingData.name} · Line ${clip.lineMode.no}`, title: lastWord(`The ${l.name}`), sub: 'Every move, explained', emo: '♟️', big: false }; }
     if (clip.isOpening && clip.openingData) { const o = clip.openingData; const h = stripEmoji(o.hook).split(':'); return { kicker: 'Opening', title: lastWord(o.name), sub: (h[1] ?? h[0]).trim(), emo: '♟️', big: false }; }
     if (clip.isTrap) return { kicker: 'Trap alert', title: lastWord(plain.replace(/^The /, 'The ')), sub: 'Would you fall for it?', emo: emo || '🪤', big: false };
@@ -2193,7 +2194,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       {/* ── The 9:16 frame ── */}
       <div className={`flex min-h-0 flex-1 items-center justify-center ${clean ? 'p-0' : 'p-3'}`} onClick={() => { setSelected(null); if (clean) cleanTap(); }}>
         <div ref={frameRef} className="relative overflow-hidden"
-          style={{ aspectRatio: '9 / 16', height: clean ? '100dvh' : 'min(100%, 92dvh)', maxWidth: '100%', containerType: 'size', ...BACKGROUNDS[prefs.bg]?.css } as React.CSSProperties}>
+          style={{ ...(clean ? reelFrameSize(true) : { aspectRatio: '9 / 16', height: 'min(100%, 92dvh)', maxWidth: '100%', containerType: 'size' }), ...BACKGROUNDS[prefs.bg]?.css } as React.CSSProperties}>
           <motion.div key={shake} animate={shake ? { x: [0, -14, 12, -8, 6, 0] } : {}} transition={{ duration: 0.45 }} className="absolute inset-0">
             {prefs.progress && <div className="absolute inset-x-0 top-0 z-20 h-[0.6cqh] bg-white/15"><div className="h-full bg-[#81B64C] transition-all duration-300" style={{ width: `${progress * 100}%` }} /></div>}
             {/* Hook: pops in big on the intro, then sits at the top */}
@@ -2945,8 +2946,10 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               const moveList = (path: string) => path.split(' ').filter(Boolean).map((m, n) => (n % 2 === 0 ? `${n / 2 + 1}.${m}` : m)).join(' ');
               return (<>
                 <div className="pointer-events-none absolute inset-x-[5%] top-[2.4%] z-30 flex items-center justify-between font-black" style={{ fontSize: 'clamp(10px,1.65cqh,17px)' }}>
-                  <span className="text-white">🌳 The {e.family} family tree</span>
-                  <span className="rounded-full bg-white/10 px-[0.6em] py-[0.1em] text-white/70">Part {e.no}</span>
+                  <span className="text-white">🌳 The {e.family} family tree <span className="text-white/55">· Part {partLabel(e)}</span></span>
+                  {/* The running count: big enough to read, so people count along (and comment their score). */}
+                  <motion.span key={`cnt${shown.length}`} initial={{ scale: 1.35 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 400, damping: 14 }}
+                    className="rounded-full bg-[#81B64C] px-[0.7em] py-[0.15em] tabular-nums text-white" style={{ fontSize: '1.35em' }}>{shown.length}/{tree.length}</motion.span>
                 </div>
                 {!done && st && (
                   <AnimatePresence mode="wait">
@@ -2970,13 +2973,20 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
                     </motion.div>
                   )}
                 </AnimatePresence>
+                {stamping && shown.length === tree.length && (
+                  <motion.div key="save" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
+                    className="pointer-events-none absolute inset-x-0 top-[59%] z-30 flex justify-center" style={{ fontSize: 'clamp(12px,2.2cqh,24px)' }}>
+                    <span className="rounded-full bg-white px-[0.8em] py-[0.25em] font-black text-[#141A14] shadow-xl">🔖 Save this for your next game</span>
+                  </motion.div>
+                )}
                 {done && (
                   <motion.div key="score" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 20 }}
                     className="pointer-events-none absolute inset-x-[6%] top-[12%] z-30 text-center">
                     <p className="font-black leading-[1.05] text-white" style={{ fontSize: 'clamp(26px,5.6cqh,60px)' }}>How many did<br />you know?</p>
                     <motion.p initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.5, type: 'spring', stiffness: 300, damping: 14 }}
                       className="mx-auto mt-[1.4cqh] w-fit rounded-full bg-[#81B64C] px-[1em] py-[0.3em] font-black text-white" style={{ fontSize: 'clamp(15px,3cqh,32px)' }}>__ / {tree.length}</motion.p>
-                    <p className="mt-[1cqh] font-bold text-white/70" style={{ fontSize: 'clamp(12px,2.1cqh,22px)' }}>Comment your score 👇</p>
+                    <p className="mt-[1cqh] font-black text-white" style={{ fontSize: 'clamp(14px,2.8cqh,30px)' }}>Comment your score 👇</p>
+                    <p className="mt-[0.6cqh] font-bold text-white/65" style={{ fontSize: 'clamp(11px,1.9cqh,20px)' }}>🔖 Save it · next part soon</p>
                   </motion.div>
                 )}
                 <div className={`pointer-events-none absolute inset-x-[7%] z-20 ${done ? 'top-[37%]' : 'top-[72.6%]'}`} style={{ fontSize: `clamp(10px,${done && tree.length > 10 ? 1.5 : 1.65}cqh,18px)`, transition: 'top .5s' }}>

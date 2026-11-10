@@ -10,7 +10,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Play, Maximize2 } from 'lucide-react';
-import { playMoveSound } from '@/context/SettingsContext';
+import { playMoveSound, LookOverride } from '@/context/SettingsContext';
 import { routeSoundsTo } from '@/lib/sounds';
 import { StudioMusic, type MusicStyle } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
@@ -18,8 +18,9 @@ import { HookPicker, hookLine } from './HookPicker';
 import { ThemedMiniBoard } from '@/components/ThemedMiniBoard';
 import { positionsFromSan } from '@/hooks/use-move-browser';
 import { Chess } from 'chess.js';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook } from './reelKit';
 
-export interface NumbersReelOpts { hook: string; personal: string; twist: string; closer: string; question: string; music: MusicStyle }
+export interface NumbersReelOpts { hook: string; personal: string; twist: string; closer: string; question: string; music: MusicStyle; look?: ReelLook }
 export const NUMBERS_REEL_DEFAULT: NumbersReelOpts = {
   hook: 'ways a chess game can go in just 10 turns',
   personal: 'Your last game was probably never played before.',
@@ -254,13 +255,14 @@ export function NumbersReel({ opts: initial = NUMBERS_REEL_DEFAULT, render = fal
     </div>
   );
 
+  const look = useReelLook(opts.look, scene, step);
   const body = scene === 'cold' ? cold : scene === 'count' ? count : scene === 'versus' ? versus : scene === 'twist' ? twist : scene === 'end' ? end : null;
   const frame = (
-    <div ref={frameRef} className="relative overflow-hidden" style={{ ...font, aspectRatio: '9 / 16', height: clean || render ? '100dvh' : 'min(78dvh, 820px)', maxWidth: '100%', containerType: 'size', background: `radial-gradient(ellipse at 50% 30%, #10261A 0%, ${BG} 65%)` }}
+    <div ref={frameRef} className="relative overflow-hidden" style={{ ...font, ...reelFrameSize(clean || render), background: `radial-gradient(ellipse at 50% 30%, #10261A 0%, ${BG} 65%)` }}
       onClick={() => { if (clean && (scene === 'end' || scene === 'idle')) setClean(false); }}>
       {!blank && (
         <AnimatePresence mode="wait">
-          <motion.div key={scene} className="absolute inset-0" initial={{ opacity: 0, scale: 1.04 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97 }} transition={{ duration: 0.3 }}>{body}</motion.div>
+          <motion.div key={scene} className="absolute inset-0" initial={{ opacity: 0, scale: 1.04 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97 }} transition={{ duration: 0.3 }}><LookOverride look={look}>{body}</LookOverride></motion.div>
         </AnimatePresence>
       )}
       {!blank && scene !== 'idle' && scene !== 'end' && (
@@ -298,7 +300,8 @@ export function NumbersReel({ opts: initial = NUMBERS_REEL_DEFAULT, render = fal
               {(['suspense', 'epic', 'hype', 'lofi', 'playful', 'off'] as MusicStyle[]).map((m) => <option key={m} value={m} className="bg-[#0B1112]">{m === 'off' ? 'No music' : m[0].toUpperCase() + m.slice(1)}</option>)}
             </select>
           </label>
-          <div className="whitespace-pre-line rounded-lg bg-white/5 p-2.5 text-[12px] text-white/75 ring-1 ring-white/10"><span className="font-bold text-white/50">Caption: </span>{`There are about 10^120 possible chess games, and only about 10^80 atoms in the observable universe. After just five moves each there are already 69,352,859,712,417 ways the game could have gone.\n\nSo unless it ended early, your last game was probably a first. You can't memorise chess, but you can learn your own patterns. Free game reviews at chessscout.net ♟️\n\n#chess #chesstok #chessfacts #shannonnumber #chessscout`}</div>
+          <LookPicker value={opts.look} onChange={(v) => setOpts({ ...opts, look: v })} />
+          <CaptionBox text={`There are about 10^120 possible chess games, and only about 10^80 atoms in the observable universe. After just five moves each there are already 69,352,859,712,417 ways the game could have gone.\n\nSo unless it ended early, your last game was probably a first. You can't memorise chess, but you can learn your own patterns. Free game reviews at chessscout.net ♟️\n\n#chess #chesstok #chessfacts #shannonnumber #chessscout`} />
           <div className="flex flex-wrap gap-2">
             <button onClick={() => play()} className="inline-flex items-center gap-1.5 rounded-lg bg-[#81B64C] px-3 py-1.5 text-[12.5px] font-black text-white"><Play size={14} />Replay</button>
             <button onClick={enterClean} className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-black"><Maximize2 size={14} />Clean view</button>

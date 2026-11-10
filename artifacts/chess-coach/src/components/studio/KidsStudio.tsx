@@ -11,6 +11,7 @@ import { KidPiece, Cloud } from '@/components/kids/KidsArt';
 import { KID_FONT, INK, useKidFont } from '@/components/kids/KidsChrome';
 import { StudioMusic } from './studioMusic';
 import { kidsScript, type KidsVideo, type KidsScene } from './kidsVideos';
+import { reelFrameSize } from './reelKit';
 
 const VOICES = [{ id: 'nova', label: 'Nova (warm)' }, { id: 'coral', label: 'Coral (bright)' }, { id: 'shimmer', label: 'Shimmer (soft)' }, { id: 'fable', label: 'Fable (storyteller)' }];
 const PREF = 'cs_kids_studio';
@@ -174,7 +175,7 @@ export function KidsStudio({ video, onClose }: { video: KidsVideo; onClose: () =
   const bubble = scene.show ?? scene.say;
   const frame = (
     <div ref={frameRef} className="relative overflow-hidden" onClick={() => clean && setExitHint(Date.now())}
-      style={{ aspectRatio: '9 / 16', height: clean ? '100dvh' : 'min(78dvh, 820px)', maxWidth: '100%', containerType: 'size', fontFamily: KID_FONT, color: INK,
+      style={{ ...reelFrameSize(clean), fontFamily: KID_FONT, color: INK,
         background: `linear-gradient(180deg, #8FD0FF 0%, #B9DDFF 26%, ${w.color}66 70%, #FFE1EF 100%)`, borderRadius: clean ? 0 : 18 }}>
       {/* drifting clouds, like the kids app */}
       <motion.div className="pointer-events-none absolute" style={{ top: '3%', left: '-8%' }} animate={{ x: ['0cqh', '4cqh', '0cqh'] }} transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}><Cloud width={150} /></motion.div>

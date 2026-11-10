@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Play, Maximize2, Swords, Search, Target, BookOpen, Zap, Crown, Puzzle, Camera, Crosshair, Baby, Check, Lock, Radio } from 'lucide-react';
-import { playMoveSound } from '@/context/SettingsContext';
+import { playMoveSound, LookOverride } from '@/context/SettingsContext';
 import { routeSoundsTo } from '@/lib/sounds';
 import { StudioMusic, type MusicStyle } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
@@ -14,6 +14,7 @@ import { HookPicker, hookLine } from './HookPicker';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
 import { positionsFromSan } from '@/hooks/use-move-browser';
 import { MOTIFS } from '@/lib/tactics';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook } from './reelKit';
 
 const G = '#81B64C', BG = '#0B1112', CARD = '#141D1F', LINE = '#243033', TEXT = '#F5F7F6', MUTED = '#8E9996', GOLD = '#E8B447', RED = '#E5484D', ORANGE = '#F2A93B';
 
@@ -111,7 +112,7 @@ export const SECTIONS: SectionDef[] = [
     ] },
 ];
 
-export interface SectionReelOpts { section: string; hook: string; closer: string; music: MusicStyle }
+export interface SectionReelOpts { section: string; hook: string; closer: string; music: MusicStyle; look?: ReelLook }
 
 const brand = (t: string) => {
   const m = t.match(/^(.*?)(chess)(scout)(\.net)?(.*)$/i);
@@ -347,13 +348,14 @@ export function SectionReel({ opts: initial, render = false, onClose }: { opts?:
     </div>
   );
 
+  const look = useReelLook(opts.look, k, step);
   const body = k < 0 ? null : k >= scenes.length ? end : drawScene(scenes[k]);
   const frame = (
-    <div className="relative overflow-hidden" style={{ fontFamily: 'Inter, system-ui, sans-serif', aspectRatio: '9 / 16', height: clean || render ? '100dvh' : 'min(78dvh, 820px)', maxWidth: '100%', containerType: 'size', background: `radial-gradient(ellipse at 50% 0%, #12301F 0%, ${BG} 60%)` }}
+    <div className="relative overflow-hidden" style={{ fontFamily: 'Inter, system-ui, sans-serif', ...reelFrameSize(clean || render), background: `radial-gradient(ellipse at 50% 0%, #12301F 0%, ${BG} 60%)` }}
       onClick={() => { if (clean && (k < 0 || k >= scenes.length)) setClean(false); }}>
       {!blank && (
         <AnimatePresence mode="wait">
-          <motion.div key={`${opts.section}-${k}`} className="absolute inset-0" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }} transition={{ duration: 0.28 }}>{body}</motion.div>
+          <motion.div key={`${opts.section}-${k}`} className="absolute inset-0" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }} transition={{ duration: 0.28 }}><LookOverride look={look}>{body}</LookOverride></motion.div>
         </AnimatePresence>
       )}
       {!blank && k >= 0 && k < scenes.length && (
@@ -393,6 +395,8 @@ export function SectionReel({ opts: initial, render = false, onClose }: { opts?:
             </select>
           </label>
           <div className="rounded-lg bg-white/5 p-2.5 text-[12px] text-white/75 ring-1 ring-white/10"><span className="font-bold text-white/50">Caption: </span>{def.caption} {def.url}</div>
+          <LookPicker value={opts.look} onChange={(v) => setOpts({ ...opts, look: v })} />
+          <CaptionBox key={def.id} text={`${def.caption}\nWhich would you try first? 👇\n\n${def.url}\n\n#chess #chessapp #chesstraining #learnchess #chessscout`} />
           <div className="flex flex-wrap gap-2">
             <button onClick={() => play()} className="inline-flex items-center gap-1.5 rounded-lg bg-[#81B64C] px-3 py-1.5 text-[12.5px] font-black text-white"><Play size={14} />Replay</button>
             <button onClick={enterClean} className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-black"><Maximize2 size={14} />Clean view</button>

@@ -15,6 +15,7 @@ import { StudioMusic, type MusicStyle } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
 import { HookPicker, hookLine } from './HookPicker';
 import { apiFetch } from '@/lib/api';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook } from './reelKit';
 
 const GREEN = '#81B64C';
 type Kind = 'live' | 'review' | 'weak' | 'openings' | 'tactics' | 'endgames' | 'puzzles' | 'scan' | 'scout';
@@ -464,7 +465,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
   })();
 
   const frame = (
-    <div className="relative overflow-hidden" style={{ aspectRatio: '9 / 16', height: clean || render ? '100dvh' : 'min(78dvh, 820px)', maxWidth: '100%', containerType: 'size', background: 'radial-gradient(120% 80% at 50% 30%, #1d2a17 0%, #0d110c 55%, #070807 100%)', color: '#fff', fontFamily: 'Inter, system-ui, sans-serif' }}
+    <div className="relative overflow-hidden" style={{ ...reelFrameSize(clean || render), background: 'radial-gradient(120% 80% at 50% 30%, #1d2a17 0%, #0d110c 55%, #070807 100%)', color: '#fff', fontFamily: 'Inter, system-ui, sans-serif' }}
       onClick={() => { if (clean && (phase === 'done' || phase === 'idle')) setClean(false); }}>
       {/* Real app footage: every section's page stays loaded; the current one shows. */}
         {appFootage && showcase && (
@@ -587,6 +588,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
             <span className="text-white/60">Music:</span>
             {(['hype', 'epic', 'lofi', 'off'] as MusicStyle[]).map((v) => <button key={v} onClick={() => setOpts({ ...opts, music: v })} className="rounded-full px-2.5 py-1 font-bold capitalize" style={pill(opts.music === v)}>{v === 'off' ? 'None' : v}</button>)}
           </div>
+          <CaptionBox text={'Everything in one chess app ♞ Game reviews, your weaknesses, openings, puzzles, live play and more.\nWhich would you try first? 👇\n\nFree at chessscout.net\n\n#chess #chessapp #chesstraining #learnchess #chessscout'} />
           <div className="flex flex-wrap gap-2">
             <button onClick={() => play()} className="inline-flex items-center gap-1.5 rounded-lg bg-[#81B64C] px-3 py-1.5 text-[12.5px] font-black text-white"><Play size={14} />Replay</button>
             <button onClick={enterClean} className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-black"><Maximize2 size={14} />Clean view</button>

@@ -16,6 +16,8 @@ export interface MapStep {
 }
 export interface MapEpisode {
   id: string; no: number; title: string;
+  /** Short parts: the label shown, e.g. "3b". */
+  part?: string;
   /** Where the tree starts, e.g. "1.e4 e5". */
   family: string;
   steps: MapStep[];
@@ -149,3 +151,35 @@ export function mapTree(e: MapEpisode): { k: number; name: string; depth: number
   walk(null);
   return ordered;
 }
+
+
+// ── Short parts ─────────────────────────────────────────────────────────────
+// The full parts run 60–90 seconds and most viewers leave in the first 10. Each
+// part also comes split into short ones of about three openings (15–25 seconds):
+// Part 3a, 3b, 3c… Each opens with "how many of these 3 do you know?".
+export function shortEpisodes(e: MapEpisode, per = 3): MapEpisode[] {
+  const named = e.steps.map((st, k) => ({ st, k })).filter((x) => x.st.name);
+  const out: MapEpisode[] = [];
+  for (let c = 0; c * per < named.length; c++) {
+    const group = named.slice(c * per, c * per + per);
+    // From just after the previous group's last opening (skipping the full part's own intro).
+    const from = c === 0 ? 1 : named[c * per - 1].k + 1;
+    const to = group[group.length - 1].k;
+    const letter = String.fromCharCode(97 + c);
+    out.push({
+      id: `${e.id}${letter}`, no: e.no * 100 + c + 1, title: e.title, family: e.family, part: `${e.no}${letter}`,
+      steps: [{ path: '', caption: `How many of these {n} do you know? *Count as you watch* 👇` }, ...e.steps.slice(from, to + 1)],
+    });
+  }
+  return out;
+}
+export const OPENING_MAP_SHORT: MapEpisode[] = OPENING_MAP.flatMap((e) => shortEpisodes(e));
+/** A full part (1–6) or a short one (301 = Part 3a). */
+export const findEpisode = (no: number): MapEpisode | undefined => (no >= 100 ? OPENING_MAP_SHORT : OPENING_MAP).find((x) => x.no === no);
+/** The part after this one, in the same series (full or short). */
+export const nextEpisode = (e: MapEpisode): MapEpisode | undefined => {
+  const list = e.no >= 100 ? OPENING_MAP_SHORT : OPENING_MAP;
+  const i = list.findIndex((x) => x.no === e.no);
+  return i >= 0 ? list[i + 1] : undefined;
+};
+export const partLabel = (e: MapEpisode) => e.part ?? String(e.no);

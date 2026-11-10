@@ -6,11 +6,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Play, RotateCcw, Maximize2 } from 'lucide-react';
 import { ChessBoard } from '@/components/ChessBoard';
-import { playMoveSound } from '@/context/SettingsContext';
+import { playMoveSound, LookOverride } from '@/context/SettingsContext';
 import { routeSoundsTo } from '@/lib/sounds';
 import { StudioMusic } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
 import { HookPicker, hookLine } from './HookPicker';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook } from './reelKit';
 
 // A complete knight's tour from b1 (checked: 64 different squares, every step a knight move).
 export const KNIGHT_TOUR = 'b1 a3 c2 a1 b3 c1 a2 b4 a6 b8 d7 f8 h7 g5 h3 g1 e2 g3 h1 f2 d1 b2 a4 c3 b5 a7 c8 b6 a8 c7 e8 g7 h5 f6 g8 h6 g4 h2 f1 d2 e4 c5 b7 a5 c4 d6 f7 h8 g6 h4 g2 e1 f3 e5 d3 f4 e6 d8 c6 d4 f5 e7 d5 e3'.split(' ');
@@ -47,7 +48,7 @@ const fenWithKnight = (sq: string | null) => {
 
 const SPEEDS = { fast: 260, normal: 360, slow: 520 } as const;
 type Speed = keyof typeof SPEEDS;
-export interface KnightTourOpts { hook: string; speed: Speed }
+export interface KnightTourOpts { hook: string; speed: Speed; look?: ReelLook }
 export const KNIGHT_TOUR_DEFAULT: KnightTourOpts = { hook: 'Can a knight land on all 64 squares… only once each? ♞', speed: 'normal' };
 
 type Phase = 'idle' | 'tour' | 'logo' | 'site' | 'end';
@@ -114,12 +115,13 @@ export function KnightTour({ opts: initial = KNIGHT_TOUR_DEFAULT, render = false
 
   const visited = KNIGHT_TOUR.slice(0, painted);
   const knightOn = phase === 'tour' || phase === 'idle' ? KNIGHT_TOUR[Math.max(0, step - 1)] : null;
+  const look = useReelLook(opts.look, phase, step);
   const marks = useMemo(() => Object.fromEntries(visited.map((sq) => [sq, { text: '', color: 'transparent', tint: colorOf(sq) }])), [painted]); // eslint-disable-line react-hooks/exhaustive-deps
   const done = phase === 'logo' || phase === 'site' || phase === 'end';
 
   const frame = (
     <div className="relative flex flex-col items-center justify-center overflow-hidden"
-      style={{ aspectRatio: '9 / 16', height: clean || render ? '100dvh' : 'min(78dvh, 820px)', maxWidth: '100%', containerType: 'size', background: 'radial-gradient(120% 80% at 50% 35%, #1d2a17 0%, #0d110c 55%, #070807 100%)', color: '#fff' }}
+      style={{ ...reelFrameSize(clean || render), background: 'radial-gradient(120% 80% at 50% 35%, #1d2a17 0%, #0d110c 55%, #070807 100%)', color: '#fff' }}
       onClick={() => { if (clean && (phase === 'end' || phase === 'idle')) setClean(false); }}>
       {blank ? null : (<>
         <div className="absolute inset-x-0 top-[9cqh] px-[6cqw] text-center">
@@ -135,7 +137,7 @@ export function KnightTour({ opts: initial = KNIGHT_TOUR_DEFAULT, render = false
         </div>
 
         <motion.div className="relative w-[92cqw]" animate={{ scale: phase === 'logo' ? 1.04 : 1 }} transition={{ duration: 0.6 }}>
-          <ChessBoard fen={fenWithKnight(knightOn)} practiceMode={false} expectedMoveSan={null} maxWidthOverride="100%" moveFx={Math.min(320, SPEEDS[opts.speed] - 40)} suppressConfirmMoves squareMarks={marks} />
+          <LookOverride look={look}><ChessBoard fen={fenWithKnight(knightOn)} practiceMode={false} expectedMoveSan={null} maxWidthOverride="100%" moveFx={Math.min(320, SPEEDS[opts.speed] - 40)} suppressConfirmMoves squareMarks={marks} /></LookOverride>
           {/* chessscout.net on the board */}
           <AnimatePresence>
             {(phase === 'site' || phase === 'end') && (
@@ -181,6 +183,8 @@ export function KnightTour({ opts: initial = KNIGHT_TOUR_DEFAULT, render = false
               </button>
             ))}
           </div>
+          <LookPicker value={opts.look} onChange={(v) => setOpts({ ...opts, look: v })} />
+          <CaptionBox text={'A knight lands on all 64 squares, once each… and draws our logo ♞\nCould you do it without help? 👇\n\nchessscout.net\n\n#chess #knightstour #chesspuzzle #chessart #chessscout'} />
           <div className="flex flex-wrap gap-2">
             <button onClick={() => play()} className="inline-flex items-center gap-1.5 rounded-lg bg-[#81B64C] px-3 py-1.5 text-[12.5px] font-black text-white">{phase === 'idle' ? <Play size={14} /> : <RotateCcw size={14} />}{phase === 'idle' ? 'Play' : 'Replay'}</button>
             <button onClick={reset} className="rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-black">Reset</button>

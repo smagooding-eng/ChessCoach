@@ -5,7 +5,7 @@ import { ArrowLeft, Loader2, RefreshCw, Search, Clapperboard, Shuffle } from 'lu
 import { apiFetch } from '@/lib/api';
 import { MiniBoard } from '@/components/MiniBoard';
 import { useUser } from '@/hooks/use-user';
-import { OPENING_MAP } from '@/components/studio/openingMap';
+import { OPENING_MAP, OPENING_MAP_SHORT } from '@/components/studio/openingMap';
 import { StudioPlayer, themeLabel, comebackHook, type StudioMoment, type StudioTrap, type StudioSource, type StudioPuzzle, type StudioReview, type StudioScout, type StudioLesson, type StudioPromo } from '@/components/studio/StudioPlayer';
 import { Chess } from 'chess.js';
 import { KidsStudio } from '@/components/studio/KidsStudio';
@@ -624,6 +624,27 @@ export function ContentStudio() {
         <p className="mb-3 max-w-2xl text-[13px] text-white/65">Tap an opening for the full clip: the ideas, who wins in real games, "what would you play?", the replies with how often they're played and Stockfish's verdict, every main line and a trap when there's one. Or tap one of its lines underneath for a video on just that line: every move explained, why it works, its real-game numbers and Stockfish's best next move. The first open of each opening takes a few seconds while Stockfish looks at it.</p>
         <div className="mb-5">
           <p className="mb-1 text-[12px] font-black uppercase tracking-wide text-[#B8E08C]">🌳 The Family Tree series</p>
+          <p className="mb-1 text-[12px] font-black text-white">Short parts ★ <span className="font-bold text-white/55">about 3 openings, 15–25 seconds each</span></p>
+          <p className="mb-2 max-w-2xl text-[12px] text-white/55">Recommended: on the full Part 3 most viewers left before 0:15 and almost nobody saw the end. Each short part opens with "how many of these 3 do you know?", counts up as each opening is stamped (1/3, 2/3…), asks for the save on the last one, and ends on "comment your score".</p>
+          <div className="mb-4 space-y-1.5">
+            {OPENING_MAP.map((full) => (
+              <div key={full.id} className="flex flex-wrap items-center gap-1.5">
+                <span className="w-[120px] truncate text-[11.5px] font-bold text-white/55">{full.no}. {full.title}</span>
+                {OPENING_MAP_SHORT.filter((x) => Math.floor(x.no / 100) === full.no).map((e) => {
+                  const src: StudioSource = { kind: 'map', episode: e.no };
+                  const on = isPicked(src);
+                  const names = e.steps.filter((x) => x.name).map((x) => x.name);
+                  return (
+                    <button key={e.id} onClick={() => choose(src)} title={names.join(' · ')} className="rounded-lg bg-white/5 px-2.5 py-1.5 text-left ring-1 ring-white/10 transition hover:ring-[#81B64C]" style={on ? { boxShadow: '0 0 0 2px #81B64C' } : undefined}>
+                      <span className="text-[12px] font-black text-[#9BD35A]">{on ? `${picked.findIndex((c) => keyOf(c) === keyOf(src)) + 1} · ` : ''}{e.part}</span>
+                      <span className="ml-1 text-[11px] text-white/55">{names.length}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+          <p className="mb-1 text-[12px] font-black text-white">Full parts <span className="font-bold text-white/55">60–90 seconds</span></p>
           <p className="mb-2 max-w-2xl text-[12.5px] text-white/60">Six parts. "How many of these do you know?" The coach asks which road to take at each fork, the board plays it, the opening's name is stamped on and its branch grows on the family tree. It ends with the whole tree and "comment your score".</p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {OPENING_MAP.map((e) => {
