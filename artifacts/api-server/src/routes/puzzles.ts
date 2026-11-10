@@ -3,6 +3,7 @@ import { db, puzzlesTable, puzzleAttemptsTable, gamesTable } from "@workspace/db
 import { eq, count, desc, sql, and, gte, inArray } from "drizzle-orm";
 import { requireAuth, requirePremium } from "../middlewares/authMiddleware";
 import { Chess } from "chess.js";
+import { withSetupMove, markSetupFixed } from "../lib/puzzleSetup";
 
 const router: IRouter = Router();
 
@@ -761,15 +762,19 @@ router.post("/puzzles/generate-from-games", requireAuth, async (req: Request, re
         const claimed = src.classification === "blunder" ? ["blunder"] : ["mistake"];
         const themesCsv = Array.from(new Set([...claimed, ...detected, "tactical"])).join(",");
 
-        await db.insert(puzzlesTable).values({
-          fen: result.candidate.fen,
-          moves: result.candidate.solutionUci.join(" "),
+        // Stored like every other puzzle: from just before the opponent's move that set it up.
+        const shaped = withSetupMove(game.pgn, result.candidate.fen, result.candidate.solutionUci.join(" "));
+        if (!shaped) continue;
+        const [ins] = await db.insert(puzzlesTable).values({
+          fen: shaped.fen,
+          moves: shaped.moves,
           rating: game.whiteRating || game.blackRating || 1200,
           themes: themesCsv,
           source: "game",
           gameId: game.id,
           moveNumber: src.moveNumber ?? null,
-        });
+        }).returning({ id: puzzlesTable.id });
+        if (ins) await markSetupFixed(ins.id);
         generated++;
       }
     }

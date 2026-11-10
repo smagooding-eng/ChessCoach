@@ -557,3 +557,8 @@ import("./lib/puzzleSeed").then(({ seedPuzzlesIfNeeded }) => {
     logger.error({ err }, "Puzzle seed failed");
   });
 }).catch(() => {});
+// Puzzles from members' games stored without their setup move came up from the wrong side.
+setTimeout(() => {
+  import("./lib/puzzleSetup").then(({ fixGamePuzzleSetups }) => fixGamePuzzleSetups())
+    .catch((err) => logger.warn({ err }, "Fixing game puzzles failed"));
+}, 90_000).unref();
