@@ -311,9 +311,16 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
   } else if (status === 'preparing' && !rev) {
     top = (
       <>
-        <p className={H}>Reviewing your game…</p>
-        <p className={`mt-0.5 ${P}`}>{progress ? `Move ${Math.ceil(progress.done / 2)} of ${Math.ceil(progress.total / 2)}` : 'Starting the engine'}. You can look through the moves meanwhile.</p>
-        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.max(5, pct)}%`, background: GREEN }} /></div>
+        {progress && progress.total > 0 && progress.done >= progress.total ? (<>
+          {/* The engine has finished every move; what's left is the coach writing its notes. */}
+          <p className={H}>Almost there…</p>
+          <p className={`mt-0.5 ${P}`}>Stockfish has checked every move. {canFullAnalysis ? 'Your coach is writing the notes, usually under a minute.' : 'Putting your review together.'}</p>
+          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full w-full animate-pulse rounded-full" style={{ background: GREEN }} /></div>
+        </>) : (<>
+          <p className={H}>Reviewing your game…</p>
+          <p className={`mt-0.5 ${P}`}>{progress ? `Move ${Math.ceil(progress.done / 2)} of ${Math.ceil(progress.total / 2)}` : 'Starting the engine'}. You can look through the moves meanwhile.</p>
+          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.max(5, pct)}%`, background: GREEN }} /></div>
+        </>)}
       </>
     );
   } else if (status === 'error' && !rev) {

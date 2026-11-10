@@ -746,12 +746,19 @@ export function GameReplay() {
   const moves    = game?.moves || [];
   const maxMoves = moves.length;
 
-  // Auto-flip for player's color
+  // Auto-flip for the player's colour: the game's own owner name first, then any of
+  // their linked Chess.com / Lichess names (the app's current username can be a
+  // different account from the one this game was imported under).
+  const flippedFor = useRef<number | null>(null);
   useEffect(() => {
-    if (game && username) {
-      setFlipped(game.blackUsername.toLowerCase() === username.toLowerCase());
-    }
-  }, [game, username]);
+    if (!game || flippedFor.current === game.id) return;
+    const names = [(game as { username?: string }).username, username, authUser?.chesscomUsername, authUser?.lichessUsername]
+      .filter(Boolean).map((n) => String(n).toLowerCase());
+    if (!names.length) return;
+    const black = (game.blackUsername ?? '').toLowerCase(), white = (game.whiteUsername ?? '').toLowerCase();
+    if (names.includes(black) && !names.includes(white)) { setFlipped(true); flippedFor.current = game.id; }
+    else if (names.includes(white)) { setFlipped(false); flippedFor.current = game.id; }
+  }, [game, username, authUser?.chesscomUsername, authUser?.lichessUsername]);
 
   // Auto-play timer
   useEffect(() => {
@@ -1054,7 +1061,7 @@ export function GameReplay() {
   // Share the review as a picture (accuracy, best moves, your best moment on the board).
   const shareSpec = (): ShareSpec | null => {
     if (!game || reviewMoves.length === 0) return null;
-    const mineNames = [username, authUser?.chesscomUsername, authUser?.lichessUsername].filter(Boolean).map((n) => String(n).toLowerCase());
+    const mineNames = [(game as { username?: string }).username, username, authUser?.chesscomUsername, authUser?.lichessUsername].filter(Boolean).map((n) => String(n).toLowerCase());
     const me: 'w' | 'b' = mineNames.includes((game.blackUsername ?? '').toLowerCase()) ? 'b' : 'w';
     const mine = reviewMoves.filter((m) => m.color === (me === 'w' ? 'white' : 'black'));
     const count = (...c: string[]) => mine.filter((m) => c.includes(m.classification)).length;
@@ -1606,6 +1613,8 @@ export function GameReplay() {
             const phase = reviewProgress ? getPhase(reviewProgress.done) : 'Opening';
             const narrativeMsg = !reviewProgress
               ? 'Starting engine analysis…'
+              : reviewProgress.total > 0 && reviewProgress.done >= reviewProgress.total
+                ? 'Stockfish is done. Your coach is writing the notes…'
               : phase === 'Opening' && game.opening
                 ? `Analyzing ${game.opening}… move ${currentSan}`
                 : `${phase} · analyzing move ${Math.ceil(reviewProgress.done / 2)} of ${Math.ceil(reviewProgress.total / 2)}${currentSan ? ` (${currentSan})` : ''}`;
