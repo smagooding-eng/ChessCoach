@@ -700,7 +700,7 @@ export function ContentStudio() {
           </div>
         ) : promoT === 'numbers' ? (
           <div className="max-w-2xl space-y-2 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
-            <p className="text-[12px] text-white/55">"Your last game was probably never played before": a real opening plays move by move while the count of possible games climbs through the exact totals (20, 400, 8,902 … 69 trillion after five moves each), then Shannon's 10¹²⁰ possible games against the 10⁸⁰ atoms in the universe, then the turn: nobody can memorise chess, you learn your own patterns, and ChessScout finds yours. About 24 seconds; every line is editable.</p>
+            <p className="text-[12px] text-white/55">Opens on 69,352,859,712,417 slamming onto the screen, "ways a chess game can go in just 10 turns", then "Watch it happen": the start board, all 20 real first moves on their own boards, then a field of boards zooming out while the count speeds up through the exact totals. Then Shannon's 10¹²⁰ possible games against the 10⁸⁰ atoms in the universe, "Your last game was probably never played before", your patterns, ChessScout, and a comment question. About 20 seconds; every line is editable.</p>
             <button onClick={() => setNumbersOpen(true)} className="rounded-lg bg-[#81B64C] px-4 py-2 text-[13px] font-black text-white">🎬 Make the clip</button>
           </div>
         ) : promoT === 'tournament' ? (
