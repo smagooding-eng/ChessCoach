@@ -11,7 +11,7 @@ import { routeSoundsTo } from '@/lib/sounds';
 import { StudioMusic } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
 import { HookPicker, hookLine } from './HookPicker';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage } from './reelKit';
 
 // A complete knight's tour from b1 (checked: 64 different squares, every step a knight move).
 export const KNIGHT_TOUR = 'b1 a3 c2 a1 b3 c1 a2 b4 a6 b8 d7 f8 h7 g5 h3 g1 e2 g3 h1 f2 d1 b2 a4 c3 b5 a7 c8 b6 a8 c7 e8 g7 h5 f6 g8 h6 g4 h2 f1 d2 e4 c5 b7 a5 c4 d6 f7 h8 g6 h4 g2 e1 f3 e5 d3 f4 e6 d8 c6 d4 f5 e7 d5 e3'.split(' ');
@@ -48,7 +48,7 @@ const fenWithKnight = (sq: string | null) => {
 
 const SPEEDS = { fast: 260, normal: 360, slow: 520 } as const;
 type Speed = keyof typeof SPEEDS;
-export interface KnightTourOpts { hook: string; speed: Speed; look?: ReelLook }
+export interface KnightTourOpts { hook: string; speed: Speed; look?: ReelLook; engage?: string }
 export const KNIGHT_TOUR_DEFAULT: KnightTourOpts = { hook: 'Can a knight land on all 64 squares… only once each? ♞', speed: 'normal' };
 
 type Phase = 'idle' | 'tour' | 'logo' | 'site' | 'end';
@@ -123,6 +123,7 @@ export function KnightTour({ opts: initial = KNIGHT_TOUR_DEFAULT, render = false
     <div className="relative flex flex-col items-center justify-center overflow-hidden"
       style={{ ...reelFrameSize(clean || render), background: 'radial-gradient(120% 80% at 50% 35%, #1d2a17 0%, #0d110c 55%, #070807 100%)', color: '#fff' }}
       onClick={() => { if (clean && (phase === 'end' || phase === 'idle')) setClean(false); }}>
+      <EngageOverlay text={opts.engage} show={phase === 'site' || phase === 'end'} />
       {blank ? null : (<>
         <div className="absolute inset-x-0 top-[9cqh] px-[6cqw] text-center">
           <AnimatePresence mode="wait">
@@ -184,7 +185,8 @@ export function KnightTour({ opts: initial = KNIGHT_TOUR_DEFAULT, render = false
             ))}
           </div>
           <LookPicker value={opts.look} onChange={(v) => setOpts({ ...opts, look: v })} />
-          <CaptionBox text={'A knight lands on all 64 squares, once each… and draws our logo ♞\nCould you do it without help? 👇\n\nchessscout.net\n\n#chess #knightstour #chesspuzzle #chessart #chessscout'} />
+          <EngagePicker kind="promo" value={opts.engage} onChange={(v) => setOpts({ ...opts, engage: v })} />
+          <CaptionBox key={opts.engage ?? ''} text={withEngage(opts.engage, 'A knight lands on all 64 squares, once each… and draws our logo ♞\nCould you do it without help? 👇\n\nchessscout.net\n\n#chess #knightstour #chesspuzzle #chessart #chessscout')} />
           <div className="flex flex-wrap gap-2">
             <button onClick={() => play()} className="inline-flex items-center gap-1.5 rounded-lg bg-[#81B64C] px-3 py-1.5 text-[12.5px] font-black text-white">{phase === 'idle' ? <Play size={14} /> : <RotateCcw size={14} />}{phase === 'idle' ? 'Play' : 'Replay'}</button>
             <button onClick={reset} className="rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-black">Reset</button>

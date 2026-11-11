@@ -18,7 +18,7 @@ import { StudioMusic, type MusicStyle } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
 import { HookPicker } from './HookPicker';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, PinnedBox, hiddenAnswer } from './reelKit';
 
 const G = '#81B64C', BG = '#0B1112', TEXT = '#F5F7F6', MUTED = '#8E9996', GOLD = '#E8B447';
 const ABC_COLORS = ['#3D8BFD', '#F2A93B', '#B05CE8'];
@@ -38,6 +38,8 @@ export interface PuzzleReelOpts {
   choices?: { uci: string; san: string; correct: boolean }[];
   /** Board look: your board, one random look, or a new one each scene / move. */
   look?: ReelLook;
+  /** One-tap comment prompt shown beside the countdown (empty = the default). */
+  engage?: string;
 }
 
 /** Puzzle themes to pull from (Lichess theme tags), with a headline for each. */
@@ -238,7 +240,7 @@ export function PuzzleReel({ opts: initial, render = false, onClose }: { opts?: 
                     className="grid shrink-0 place-items-center rounded-full font-black tabular-nums" style={{ width: '8.5cqh', height: '8.5cqh', fontSize: '4.4cqh', color: '#fff', background: left <= 3 ? '#E5484D' : G }}>{left}</motion.div>
                   {/* Comments push a reel out the most, so the ask is on screen the whole countdown. */}
                   <motion.p initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }}
-                    className="font-black leading-tight" style={{ fontSize: '3cqh', color: TEXT }}>{opts.mode === 'abc' ? <>Comment<br /><span style={{ color: GOLD }}>A, B or C</span> 👇</> : <>Comment<br /><span style={{ color: G }}>your move</span> 👇</>}</motion.p>
+                    className="font-black leading-tight" style={{ fontSize: '3cqh', color: TEXT }}>{opts.engage ? opts.engage : opts.mode === 'abc' ? <>Comment<br /><span style={{ color: GOLD }}>A, B or C</span> 👇</> : <>Comment<br /><span style={{ color: G }}>your move</span> 👇</>}</motion.p>
                 </div>
               )}
               {phase === 'answer' && opts.mode === 'abc' && (
@@ -264,6 +266,8 @@ export function PuzzleReel({ opts: initial, render = false, onClose }: { opts?: 
   if (render || clean) return <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black">{frame}</div>;
   const setMode = (mode: PuzzleReelOpts['mode']) => { if (mode !== opts.mode) void load(mode); };
   const theme = themeOf(opts.theme);
+  // The answer in plain moves, for the pinned comment.
+  const answerSan = (() => { if (!p) return ''; try { const c = new Chess(p.fen); const mv = opts.mode === 'abc' ? [opts.choices?.find((x) => x.correct)?.uci ?? solution[0]] : solution.slice(0, answerPlies); return mv.map((u) => uciMove(c, u)?.san).filter(Boolean).join(' '); } catch { return ''; } })();
   const caption = opts.mode === 'mate2'
     ? `${opts.headline.charAt(0) + opts.headline.slice(1).toLowerCase()}. ${opts.sub} ${toPlay} to play — drop your move below 👇${opts.reveal ? '' : '\nAnswer in tomorrow\'s reel 👀'}\n\nUnlimited free puzzles at chessscout.net\n\n#chess #chesspuzzle #${theme.group === 'Endgames' ? 'chessendgame' : 'chesstactics'} #${theme.id.toLowerCase()}`
     : `Which move is correct? A, B or C 👇\n${toPlay} to play.${opts.reveal ? '' : ' Answer tomorrow 👀'}\n\nUnlimited free puzzles at chessscout.net\n\n#chess #chesspuzzle #chesstactics #chessgame`;
@@ -329,7 +333,9 @@ export function PuzzleReel({ opts: initial, render = false, onClose }: { opts?: 
             </select>
           </label>
           <LookPicker value={opts.look} onChange={(v) => setOpts({ ...opts, look: v })} />
-          <CaptionBox key={caption} text={caption} />
+          <EngagePicker kind="puzzle" value={opts.engage} onChange={(v) => setOpts({ ...opts, engage: v })} label="Comment prompt beside the countdown (and first line of the caption)" />
+          <CaptionBox key={caption + (opts.engage ?? '')} text={withEngage(opts.engage, caption)} />
+          {p && <PinnedBox text={hiddenAnswer(answerSan || 'see tomorrow’s reel')} />}
           {!opts.reveal && <p className="text-[11.5px] text-white/45">Tip: post the answer as its own reel the next day ("Yesterday's puzzle: here's the answer"), with the same puzzle and "Show the answer" ticked.</p>}
           <div className="flex flex-wrap gap-2">
             <button onClick={() => play()} disabled={!p} className="inline-flex items-center gap-1.5 rounded-lg bg-[#81B64C] px-3 py-1.5 text-[12.5px] font-black text-white"><Play size={14} />Replay</button>

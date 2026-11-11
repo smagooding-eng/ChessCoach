@@ -18,7 +18,7 @@ import { HookPicker, hookLine } from './HookPicker';
 import { ThemedMiniBoard } from '@/components/ThemedMiniBoard';
 import { positionsFromSan } from '@/hooks/use-move-browser';
 import { Chess } from 'chess.js';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, PinnedBox, hiddenAnswer } from './reelKit';
 
 export interface NumbersReelOpts { hook: string; personal: string; twist: string; closer: string; question: string; music: MusicStyle; look?: ReelLook }
 export const NUMBERS_REEL_DEFAULT: NumbersReelOpts = {
@@ -294,14 +294,15 @@ export function NumbersReel({ opts: initial = NUMBERS_REEL_DEFAULT, render = fal
           {input('personal', 'The personal turn')}
           {input('twist', 'The lesson')}
           {input('closer', 'Closing line')}
-          {input('question', 'Comment question at the end')}
+          <EngagePicker kind="crowd" value={opts.question} onChange={(v) => setOpts({ ...opts, question: v })} label="Engagement line at the end (and first line of the caption)" />
           <label className="block text-[12px] text-white/60">Music
             <select value={opts.music} onChange={(e) => setOpts({ ...opts, music: e.target.value as MusicStyle })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[14px] font-bold text-white ring-1 ring-white/10">
               {(['suspense', 'epic', 'hype', 'lofi', 'playful', 'off'] as MusicStyle[]).map((m) => <option key={m} value={m} className="bg-[#0B1112]">{m === 'off' ? 'No music' : m[0].toUpperCase() + m.slice(1)}</option>)}
             </select>
           </label>
           <LookPicker value={opts.look} onChange={(v) => setOpts({ ...opts, look: v })} />
-          <CaptionBox text={`There are about 10^120 possible chess games, and only about 10^80 atoms in the observable universe. After just five moves each there are already 69,352,859,712,417 ways the game could have gone.\n\nSo unless it ended early, your last game was probably a first. You can't memorise chess, but you can learn your own patterns. Free game reviews at chessscout.net ♟️\n\n#chess #chesstok #chessfacts #shannonnumber #chessscout`} />
+          <CaptionBox key={opts.question} text={withEngage(opts.question, `There are about 10^120 possible chess games, and only about 10^80 atoms in the observable universe. After just five moves each there are already 69,352,859,712,417 ways the game could have gone.\n\nSo unless it ended early, your last game was probably a first. You can't memorise chess, but you can learn your own patterns. Free game reviews at chessscout.net ♟️\n\n#chess #chesstok #chessfacts #shannonnumber #chessscout`)} />
+          <PinnedBox text={'Fun fact: after just 3 moves each there are already 119,060,324 possible games ♟️ What was your first move today?'} />
           <div className="flex flex-wrap gap-2">
             <button onClick={() => play()} className="inline-flex items-center gap-1.5 rounded-lg bg-[#81B64C] px-3 py-1.5 text-[12.5px] font-black text-white"><Play size={14} />Replay</button>
             <button onClick={enterClean} className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-black"><Maximize2 size={14} />Clean view</button>

@@ -15,7 +15,7 @@ import { StudioMusic, type MusicStyle } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
 import { HookPicker, hookLine } from './HookPicker';
 import { apiFetch } from '@/lib/api';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage } from './reelKit';
 
 const GREEN = '#81B64C';
 type Kind = 'live' | 'review' | 'weak' | 'openings' | 'tactics' | 'endgames' | 'puzzles' | 'scan' | 'scout';
@@ -38,7 +38,7 @@ const SCENES: Scene[] = [
   { kind: 'scout', title: 'Opponent Scout', line: 'See what they play before the game starts.', fen: '' },
 ];
 
-export interface FeatureBlitzOpts { hook: string; beat: number; music: MusicStyle; looks: 'mine' | 'scene' | 'move'; footage?: 'app' | 'boards' }
+export interface FeatureBlitzOpts { hook: string; beat: number; music: MusicStyle; looks: 'mine' | 'scene' | 'move'; footage?: 'app' | 'boards'; engage?: string }
 export const FEATURE_BLITZ_DEFAULT: FeatureBlitzOpts = { hook: "Use this app for a week and you'll never go back to Chess.com", beat: 3.6, music: 'hype', looks: 'scene', footage: 'app' };
 
 /** The real app page in a phone-sized frame, scrolled a little while it's on screen. */
@@ -467,6 +467,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
   const frame = (
     <div className="relative overflow-hidden" style={{ ...reelFrameSize(clean || render), background: 'radial-gradient(120% 80% at 50% 30%, #1d2a17 0%, #0d110c 55%, #070807 100%)', color: '#fff', fontFamily: 'Inter, system-ui, sans-serif' }}
       onClick={() => { if (clean && (phase === 'done' || phase === 'idle')) setClean(false); }}>
+      <EngageOverlay text={opts.engage} show={phase === 'end' || phase === 'done'} />
       {/* Real app footage: every section's page stays loaded; the current one shows. */}
         {appFootage && showcase && (
           <div className="pointer-events-none absolute left-1/2 z-10 h-[60cqh] w-[30cqh] -translate-x-1/2 rounded-[5cqw]"
@@ -588,7 +589,8 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
             <span className="text-white/60">Music:</span>
             {(['hype', 'epic', 'lofi', 'off'] as MusicStyle[]).map((v) => <button key={v} onClick={() => setOpts({ ...opts, music: v })} className="rounded-full px-2.5 py-1 font-bold capitalize" style={pill(opts.music === v)}>{v === 'off' ? 'None' : v}</button>)}
           </div>
-          <CaptionBox text={'Everything in one chess app ♞ Game reviews, your weaknesses, openings, puzzles, live play and more.\nWhich would you try first? 👇\n\nFree at chessscout.net\n\n#chess #chessapp #chesstraining #learnchess #chessscout'} />
+          <EngagePicker kind="promo" value={opts.engage} onChange={(v) => setOpts({ ...opts, engage: v })} />
+          <CaptionBox key={opts.engage ?? ''} text={withEngage(opts.engage, 'Everything in one chess app ♞ Game reviews, your weaknesses, openings, puzzles, live play and more.\nWhich would you try first? 👇\n\nFree at chessscout.net\n\n#chess #chessapp #chesstraining #learnchess #chessscout')} />
           <div className="flex flex-wrap gap-2">
             <button onClick={() => play()} className="inline-flex items-center gap-1.5 rounded-lg bg-[#81B64C] px-3 py-1.5 text-[12.5px] font-black text-white"><Play size={14} />Replay</button>
             <button onClick={enterClean} className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-black"><Maximize2 size={14} />Clean view</button>

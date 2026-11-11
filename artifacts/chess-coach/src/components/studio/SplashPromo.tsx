@@ -9,9 +9,9 @@ import { routeSoundsTo } from '@/lib/sounds';
 import { StudioMusic } from './studioMusic';
 import { StudioSplash } from './StudioSplash';
 import { RenderMp4 } from './RenderMp4';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage } from './reelKit';
 
-export interface SplashPromoOpts { line1: string; line2: string; tag: string }
+export interface SplashPromoOpts { line1: string; line2: string; tag: string; engage?: string }
 export const SPLASH_PROMO_DEFAULT: SplashPromoOpts = { line1: 'Chess.com is dead.', line2: 'ChessScout.net', tag: '' };
 const GREEN = '#81B64C';
 
@@ -100,6 +100,7 @@ export function SplashPromo({ opts: initial = SPLASH_PROMO_DEFAULT, render = fal
   const frame = (
     <div className="relative overflow-hidden" style={{ ...reelFrameSize(clean || render), background: '#141413' }}
       onClick={() => { if (clean && (phase === 'end' || phase === 'idle')) setClean(false); }}>
+      <EngageOverlay text={opts.engage} show={phase === 'end'} />
       {!blank && phase !== 'idle' && <StudioSplash key={run} pawn="green" delay={4} above={above} below={below} />}
     </div>
   );
@@ -125,7 +126,8 @@ export function SplashPromo({ opts: initial = SPLASH_PROMO_DEFAULT, render = fal
           {field('line1', 'First line (over the board, before the smash)')}
           {field('line2', 'Second line (after the smash)')}
           {field('tag', 'Small line under it (optional)')}
-          <CaptionBox key={opts.line1} text={`${opts.line1} ${opts.line2}`.trim() + '\nTry it free: chessscout.net ♜\n\n#chess #chessapp #chesscom #chessscout'} />
+          <EngagePicker kind="promo" value={opts.engage} onChange={(v) => setOpts({ ...opts, engage: v })} />
+          <CaptionBox key={opts.engage ?? ''} text={withEngage(opts.engage, `${opts.line1} ${opts.line2}`.trim() + '\nTry it free: chessscout.net ♜\n\n#chess #chessapp #chesscom #chessscout')} />
           <div className="flex flex-wrap gap-2">
             <button onClick={() => play()} className="inline-flex items-center gap-1.5 rounded-lg bg-[#81B64C] px-3 py-1.5 text-[12.5px] font-black text-white"><Play size={14} />Replay</button>
             <button onClick={enterClean} className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-black"><Maximize2 size={14} />Clean view</button>

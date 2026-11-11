@@ -12,7 +12,7 @@ import { StudioSplash } from './StudioSplash';
 import { RenderMp4 } from './RenderMp4';
 import { StudioMusic, MUSIC_STYLES, bpmOf, type MusicStyle } from './studioMusic';
 import { mapTree, findEpisode, nextEpisode, partLabel, type MapEpisode } from './openingMap';
-import { reelFrameSize } from './reelKit';
+import { reelFrameSize, EngagePicker } from './reelKit';
 
 // Content Studio player: a game moment or a trap lesson as a 9:16 clip for
 // TikTok, Reels and Shorts. The clip is a script of frames: an intro with the
@@ -2047,7 +2047,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   };
 
   // ── Post kit ────────────────────────────────────────────────────────────
-  const postText = clip ? `${isComp ? stripEmoji(compTitle) : hook}\n\n${clip.isTrap ? 'Would you fall for it? 👇' : clip.isPuzzle ? 'Did you solve it? Drop the first move in the comments 👇' : clip.isReview ? 'Which move would you have played differently? 👇' : clip.isLesson ? 'Learning chess? Save this one and share it with a friend 👇' : clip.isMap ? 'Which of these do you play? Drop it in the comments 👇' : clip.isOpening ? 'Which line do you play? Drop it in the comments 👇' : clip.isScout ? 'Who should I scout next? Drop a username 👇' : clip.isScan ? 'Want me to scan your board? Drop a photo in the comments 👇' : clip.isPromo ? (clip.promo?.template === 'versus' ? 'Would you switch? 👇' : clip.promo?.template === 'live' ? 'Blitz or rapid? Tell me below 👇' : clip.promo?.template === 'tour' ? 'Which one are you trying first? 👇' : 'Tag the friend you want to beat 👇') : 'Would you have found it? Comment your move 👇'}\nReview your own games free at chessscout.net${clip.isPromo ? '\nOn Lichess? Join our team: lichess.org/team/chessscoutnet' : ''}\n\n${hashtagsFor(clip)}` : '';
+  const postText = clip ? `${earlyText ? `${earlyText}\n` : ''}${isComp ? stripEmoji(compTitle) : hook}\n\n${clip.isTrap ? 'Would you fall for it? 👇' : clip.isPuzzle ? 'Did you solve it? Drop the first move in the comments 👇' : clip.isReview ? 'Which move would you have played differently? 👇' : clip.isLesson ? 'Learning chess? Save this one and share it with a friend 👇' : clip.isMap ? 'Which of these do you play? Drop it in the comments 👇' : clip.isOpening ? 'Which line do you play? Drop it in the comments 👇' : clip.isScout ? 'Who should I scout next? Drop a username 👇' : clip.isScan ? 'Want me to scan your board? Drop a photo in the comments 👇' : clip.isPromo ? (clip.promo?.template === 'versus' ? 'Would you switch? 👇' : clip.promo?.template === 'live' ? 'Blitz or rapid? Tell me below 👇' : clip.promo?.template === 'tour' ? 'Which one are you trying first? 👇' : 'Tag the friend you want to beat 👇') : 'Would you have found it? Comment your move 👇'}\nReview your own games free at chessscout.net${clip.isPromo ? '\nOn Lichess? Join our team: lichess.org/team/chessscoutnet' : ''}\n\n${hashtagsFor(clip)}` : '';
   const [copied, setCopied] = useState(false);
   const copyPost = () => { navigator.clipboard?.writeText(postText).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {}); };
 
@@ -3463,6 +3463,13 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               <label className="mt-1.5 block text-[12px] text-white/60">{clip.isMap ? 'Call to action at the start of each part' : 'Call to action near the start'} (empty = none)
                 <input value={clip.isMap ? prefs.seriesCta : prefs.earlyCta} onChange={(e) => set(clip.isMap ? 'seriesCta' : 'earlyCta', e.target.value)} className="mt-0.5 w-full rounded bg-white/5 px-2 py-1 text-white" />
               </label>
+            )}
+            {prefs.theme !== 'classic' && !clip.lineMode && (
+              <div className="mt-2">
+                <EngagePicker kind={clip.isMap || clip.isOpening ? 'opening' : clip.isPuzzle || clip.isLesson ? 'puzzle' : clip.isTrap ? 'trap' : 'promo'}
+                  value={clip.isMap ? prefs.seriesCta : prefs.earlyCta} onChange={(v) => set(clip.isMap ? 'seriesCta' : 'earlyCta', v)}
+                  label="One-tap engagement lines (sets the call to action above, and leads the caption)" />
+              </div>
             )}
           </div>
           {clip.isMap && <div className="mb-3 flex flex-wrap gap-1.5">{toggle('tilt', '3D tilted board')}</div>}

@@ -15,7 +15,7 @@ import { StudioMusic, type MusicStyle } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
 import { HookPicker, hookLine } from './HookPicker';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, PinnedBox } from './reelKit';
 import { TRAPS, trapById, type TrapStepKind } from './traps';
 
 type Speed = 'fast' | 'normal' | 'slow';
@@ -181,7 +181,7 @@ export function TrapReel({ opts: initial, render = false, onClose }: { opts?: Tr
   if (render || clean) return <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black">{frame}</div>;
 
   const pgn = trap.san.map((m, i) => (i % 2 === 0 ? `${i / 2 + 1}.${m}` : m)).join(' ');
-  const caption = `${trap.name} (${trap.opening}) 🪤 ${opts.hook}\n\n${pgn}\n\nSave it for your next game 🔖\n${opts.question}\n\nchessscout.net\n\n#chess #chesstraps #chessopenings #learnchess #chessscout`;
+  const caption = `${opts.question ? `${opts.question}\n` : ''}${trap.name} (${trap.opening}) 🪤 ${opts.hook}\n\n${pgn}\n\nSave it for your next game 🔖\n\nchessscout.net\n\n#chess #chesstraps #chessopenings #learnchess #chessscout`;
   const pick = (id: string) => { const o = { ...opts, ...trapReelDefaults(id), speed: opts.speed, music: opts.music, look: opts.look, question: opts.question }; setOpts(o); play(undefined, o); };
   return (
     <div className="fixed inset-0 z-[80] overflow-y-auto bg-[#0B1112]/95 text-white">
@@ -207,7 +207,7 @@ export function TrapReel({ opts: initial, render = false, onClose }: { opts?: Tr
           </div>
           <HookPicker topics={['trap', 'opening']} onPick={(h) => setOpts({ ...opts, hook: hookLine(h) })} />
           <label className="block text-[12px] text-white/60">Hook<input value={opts.hook} onChange={(e) => setOpts({ ...opts, hook: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[14px] font-bold text-white ring-1 ring-white/10" /></label>
-          <label className="block text-[12px] text-white/60">Comment question at the end<input value={opts.question} onChange={(e) => setOpts({ ...opts, question: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[14px] font-bold text-white ring-1 ring-white/10" /></label>
+          <EngagePicker kind="trap" value={opts.question} onChange={(v) => setOpts({ ...opts, question: v })} label="Engagement line on the end card (and in the caption)" />
           <div className="flex flex-wrap items-center gap-1">
             <span className="w-[56px] text-[11px] font-bold uppercase tracking-wider text-white/40">Speed</span>
             {(['fast', 'normal', 'slow'] as Speed[]).map((sp) => <button key={sp} onClick={() => setOpts({ ...opts, speed: sp })} className="rounded-md px-2.5 py-1 text-[12px] font-bold capitalize" style={{ background: opts.speed === sp ? G : 'rgba(255,255,255,.07)' }}>{sp}</button>)}
@@ -219,6 +219,7 @@ export function TrapReel({ opts: initial, render = false, onClose }: { opts?: Tr
           </label>
           <LookPicker value={opts.look} onChange={(v) => setOpts({ ...opts, look: v })} />
           <CaptionBox key={caption} text={caption} />
+          <PinnedBox text={`Have you ever fallen for the ${trap.name}? 😅\nFull line: ${pgn}`} />
           <div className="flex flex-wrap gap-2">
             <button onClick={() => play()} className="inline-flex items-center gap-1.5 rounded-lg bg-[#81B64C] px-3 py-1.5 text-[12.5px] font-black text-white"><Play size={14} />Replay</button>
             <button onClick={enterClean} className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-black"><Maximize2 size={14} />Clean view</button>

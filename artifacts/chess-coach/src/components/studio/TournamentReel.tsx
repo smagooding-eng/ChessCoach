@@ -13,9 +13,9 @@ import { RenderMp4 } from './RenderMp4';
 import { HookPicker, hookLine } from './HookPicker';
 import { ThemedMiniBoard } from '@/components/ThemedMiniBoard';
 import { positionsFromSan } from '@/hooks/use-move-browser';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage } from './reelKit';
 
-export interface TournamentReelOpts { hook: string; who: string; name: string; closer: string; music: MusicStyle; look?: ReelLook }
+export interface TournamentReelOpts { hook: string; who: string; name: string; closer: string; music: MusicStyle; look?: ReelLook; engage?: string }
 export const TOURNAMENT_REEL_DEFAULT: TournamentReelOpts = {
   hook: 'Run a chess tournament',
   who: 'for your club, for your school, for your office, for your friends',
@@ -314,6 +314,7 @@ export function TournamentReel({ opts: initial = TOURNAMENT_REEL_DEFAULT, render
   const frame = (
     <div ref={frameRef} className="relative overflow-hidden" style={{ ...font, ...reelFrameSize(clean || render), background: `radial-gradient(ellipse at 50% 0%, #12301F 0%, ${BG} 60%)` }}
       onClick={() => { if (clean && (scene === 'end' || scene === 'idle')) setClean(false); }}>
+      <EngageOverlay text={opts.engage} show={scene === 'end'} />
       {!blank && (
         <AnimatePresence mode="wait">
           <motion.div key={scene} className="absolute inset-0" initial={{ opacity: 0, x: 40 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -40 }} transition={{ duration: 0.28 }}><LookOverride look={look}>{body}</LookOverride></motion.div>
@@ -354,7 +355,8 @@ export function TournamentReel({ opts: initial = TOURNAMENT_REEL_DEFAULT, render
             </select>
           </label>
           <LookPicker value={opts.look} onChange={(v) => setOpts({ ...opts, look: v })} />
-          <CaptionBox text={`Run a chess tournament for your ${whoList.slice(0, 3).join(', ') || 'club or friends'}, free 🏆\nMake it, share one link, everyone joins. Anyone can watch the boards live.\n\nHost yours at chessscout.net/tournaments\n\n#chess #chesstournament #chessclub #chesscommunity #chessscout`} />
+          <EngagePicker kind="promo" value={opts.engage} onChange={(v) => setOpts({ ...opts, engage: v })} />
+          <CaptionBox key={opts.engage ?? ''} text={withEngage(opts.engage, `Run a chess tournament for your ${whoList.slice(0, 3).join(', ') || 'club or friends'}, free 🏆\nMake it, share one link, everyone joins. Anyone can watch the boards live.\n\nHost yours at chessscout.net/tournaments\n\n#chess #chesstournament #chessclub #chesscommunity #chessscout`)} />
           <div className="flex flex-wrap gap-2">
             <button onClick={() => play()} className="inline-flex items-center gap-1.5 rounded-lg bg-[#81B64C] px-3 py-1.5 text-[12.5px] font-black text-white"><Play size={14} />Replay</button>
             <button onClick={enterClean} className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-black"><Maximize2 size={14} />Clean view</button>

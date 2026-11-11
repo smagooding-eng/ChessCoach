@@ -15,6 +15,7 @@ import { TournamentReel } from '@/components/studio/TournamentReel';
 import { NumbersReel } from '@/components/studio/NumbersReel';
 import { TrapReel, trapReelDefaults } from '@/components/studio/TrapReel';
 import { TRAPS } from '@/components/studio/traps';
+import { CrowdReel } from '@/components/studio/CrowdReel';
 import { SectionReel, SECTIONS } from '@/components/studio/SectionReels';
 import { PuzzleReel, puzzleOptsFor, type PuzzleReelOpts } from '@/components/studio/PuzzleReel';
 import { ReelsPlan, type PlanAction } from '@/components/studio/ReelsPlan';
@@ -212,11 +213,12 @@ export function ContentStudio() {
     } catch { setScanBusy("Couldn't read that photo."); }
   };
   // Promos
-  const [promoT, setPromoT] = useState<'versus' | 'challenge' | 'live' | 'tour' | 'knight' | 'splash' | 'blitz' | 'tournament' | 'sections' | 'puzzles' | 'numbers' | 'traps'>('blitz');
+  const [promoT, setPromoT] = useState<'versus' | 'challenge' | 'live' | 'tour' | 'knight' | 'splash' | 'blitz' | 'tournament' | 'sections' | 'puzzles' | 'numbers' | 'traps' | 'crowd'>('blitz');
   const [puzzleOpen, setPuzzleOpen] = useState<Partial<PuzzleReelOpts> | null>(null);
   const [tournamentOpen, setTournamentOpen] = useState(false);
   const [numbersOpen, setNumbersOpen] = useState(false);
   const [trapOpen, setTrapOpen] = useState<string | null>(null);
+  const [crowdOpen, setCrowdOpen] = useState(false);
   const [sectionOpen, setSectionOpen] = useState<string | null>(null);
   const [blitzOpen, setBlitzOpen] = useState(false);
   const [knightOpen, setKnightOpen] = useState(false);
@@ -701,7 +703,7 @@ export function ContentStudio() {
         )}
       </>) : view === 'promo' ? (<>
         <div className="mb-3 inline-flex flex-wrap rounded-xl bg-white/5 p-1">
-          {([['blitz', 'App in 20 seconds ⚡'], ['puzzles', 'Puzzle reels 🧩'], ['traps', 'Trap reels 🪤'], ['numbers', 'Chess by numbers 🌌'], ['sections', 'Section promos 🎬'], ['tournament', 'Host a tournament 🏆'], ['tour', 'App tour 🧭'], ['live', 'Live play ⚡'], ['knight', "Knight's tour → logo ♞"], ['splash', 'Splash smash ♜'], ['versus', 'ChessScout vs …'], ['challenge', 'Challenge your friends']] as const).map(([k, t]) => (
+          {([['blitz', 'App in 20 seconds ⚡'], ['crowd', 'Crowd chess 👥'], ['puzzles', 'Puzzle reels 🧩'], ['traps', 'Trap reels 🪤'], ['numbers', 'Chess by numbers 🌌'], ['sections', 'Section promos 🎬'], ['tournament', 'Host a tournament 🏆'], ['tour', 'App tour 🧭'], ['live', 'Live play ⚡'], ['knight', "Knight's tour → logo ♞"], ['splash', 'Splash smash ♜'], ['versus', 'ChessScout vs …'], ['challenge', 'Challenge your friends']] as const).map(([k, t]) => (
             <button key={k} onClick={() => setPromoT(k)} className="rounded-lg px-3.5 py-1.5 text-[13px] font-black" style={{ background: promoT === k ? '#81B64C' : 'transparent', color: promoT === k ? '#fff' : '#C9CFCD' }}>{t}</button>
           ))}
         </div>
@@ -721,6 +723,11 @@ export function ContentStudio() {
             <div className="flex flex-wrap gap-1.5">
               {SECTIONS.map((s) => <button key={s.id} onClick={() => setSectionOpen(s.id)} className="rounded-lg bg-[#81B64C] px-3 py-1.5 text-[12.5px] font-black text-white">{s.label}</button>)}
             </div>
+          </div>
+        ) : promoT === 'crowd' ? (
+          <div className="max-w-2xl space-y-2 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
+            <p className="text-[12px] text-white/55">Your followers play a game, one move a day, from the starting position: followers vs ChessScout's engine, or followers picking every move. Each day's reel shows yesterday's chosen move (and the engine's reply), then asks "Your move" with a one-tap engagement line. Next day, play the most-liked comment's move here and post the new reel. The game is saved on the server, so it's the same on your phone and computer.</p>
+            <button onClick={() => setCrowdOpen(true)} className="rounded-lg bg-[#81B64C] px-4 py-2 text-[13px] font-black text-white">👥 Open today's reel</button>
           </div>
         ) : promoT === 'traps' ? (
           <div className="max-w-2xl space-y-2 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
@@ -1030,6 +1037,7 @@ export function ContentStudio() {
       {splashOpen && <SplashPromo onClose={() => setSplashOpen(false)} />}
       {tournamentOpen && <TournamentReel onClose={() => setTournamentOpen(false)} />}
       {numbersOpen && <NumbersReel onClose={() => setNumbersOpen(false)} />}
+      {crowdOpen && <CrowdReel onClose={() => setCrowdOpen(false)} />}
       {trapOpen && <TrapReel opts={trapReelDefaults(trapOpen)} onClose={() => setTrapOpen(null)} />}
       {puzzleOpen && <PuzzleReel opts={puzzleOptsFor(puzzleOpen)} onClose={() => setPuzzleOpen(null)} />}
       {sectionOpen && <SectionReel opts={{ section: sectionOpen, hook: '', closer: '', music: 'hype' }} onClose={() => setSectionOpen(null)} />}

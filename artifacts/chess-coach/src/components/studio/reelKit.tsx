@@ -28,7 +28,7 @@ export function CaptionBox({ text, label = 'Caption' }: { text: string; label?: 
         <span className="text-[11.5px] font-bold uppercase tracking-wide text-white/50">{label}</span>
         <div className="flex gap-1.5">
           {edit != null && edit !== text && <button onClick={() => setEdit(null)} className="rounded-md px-2 py-1 text-[11.5px] font-bold text-white/55">Reset</button>}
-          <button onClick={() => void copy()} className="inline-flex items-center gap-1 rounded-md bg-[#81B64C] px-2.5 py-1 text-[12px] font-black text-white">{copied ? <Check size={13} /> : <Copy size={13} />}{copied ? 'Copied' : 'Copy caption'}</button>
+          <button onClick={() => void copy()} className="inline-flex items-center gap-1 rounded-md bg-[#81B64C] px-2.5 py-1 text-[12px] font-black text-white">{copied ? <Check size={13} /> : <Copy size={13} />}{copied ? 'Copied' : 'Copy'}</button>
         </div>
       </div>
       <textarea value={value} onChange={(e) => setEdit(e.target.value)} rows={Math.min(9, value.split('\n').length + 2)}
@@ -71,3 +71,66 @@ export function LookPicker({ value, onChange }: { value: ReelLook | undefined; o
     </div>
   );
 }
+
+// ── Engagement: one-tap comment prompts, share lines, pinned comments ──────
+// Strangers rarely type chess notation mid-scroll; a one-tap answer (an emoji, a
+// colour, a number) still counts as a comment. Pick one per reel; it shows on
+// screen and leads the caption.
+export type EngageKind = 'puzzle' | 'trap' | 'opening' | 'crowd' | 'promo';
+export const ENGAGE_PROMPTS: { text: string; kinds: EngageKind[] }[] = [
+  { text: 'Got it? Comment ✅ or ❌', kinds: ['puzzle', 'trap'] },
+  { text: 'Comment 🔥 if you saw it', kinds: ['puzzle', 'trap'] },
+  { text: 'Comment your move 👇', kinds: ['puzzle', 'crowd'] },
+  { text: 'What would you play? 👇', kinds: ['puzzle', 'crowd', 'opening'] },
+  { text: 'Most-liked comment gets played 👇', kinds: ['crowd'] },
+  { text: 'White or Black? Who’s winning? 👇', kinds: ['crowd', 'trap', 'opening'] },
+  { text: 'Rate yourself 1–10 👇', kinds: ['opening', 'puzzle'] },
+  { text: 'Have you fallen for this? 👇', kinds: ['trap'] },
+  { text: 'Which trap should we do next? 👇', kinds: ['trap'] },
+  { text: 'Which would you try first? 👇', kinds: ['promo'] },
+  { text: 'Tag a friend who falls for this 👀', kinds: ['trap', 'puzzle', 'opening'] },
+  { text: 'Send this to your chess friend 👀', kinds: ['trap', 'puzzle', 'opening', 'promo', 'crowd'] },
+  { text: '🔖 Save it for your next game', kinds: ['trap', 'opening'] },
+  { text: 'Follow to play the next move 👇', kinds: ['crowd'] },
+];
+
+/** Pick a one-tap engagement line (or write your own). */
+export function EngagePicker({ value, onChange, kind, label = 'Engagement line (on screen + first line of the caption)' }: { value: string | undefined; onChange: (v: string) => void; kind: EngageKind; label?: string }) {
+  const list = ENGAGE_PROMPTS.filter((p) => p.kinds.includes(kind));
+  return (
+    <div className="space-y-1">
+      <p className="text-[12px] text-white/60">{label}</p>
+      <div className="flex flex-wrap gap-1">
+        {list.map((p) => (
+          <button key={p.text} onClick={() => onChange(p.text)} className="rounded-md px-2 py-1 text-left text-[11.5px] font-bold"
+            style={{ background: value === p.text ? '#81B64C' : 'rgba(255,255,255,.07)', color: '#fff' }}>{p.text}</button>
+        ))}
+        <button onClick={() => onChange('')} className="rounded-md px-2 py-1 text-[11.5px] font-bold text-white/55" style={{ background: !value ? 'rgba(255,255,255,.14)' : 'rgba(255,255,255,.04)' }}>None</button>
+      </div>
+      <input value={value ?? ''} onChange={(e) => onChange(e.target.value)} placeholder="…or write your own"
+        className="w-full rounded-lg bg-white/5 px-3 py-1.5 text-[13px] font-bold text-white ring-1 ring-white/10" />
+    </div>
+  );
+}
+
+/** The engagement line as a pill near the bottom of the frame (end of the reel). */
+export function EngageOverlay({ text, show }: { text?: string; show: boolean }) {
+  if (!text || !show) return null;
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-[7.5cqh] z-40 flex justify-center px-[5cqw]">
+      <span className="rounded-full px-[4.5cqw] py-[1.2cqh] text-center font-black leading-tight shadow-2xl"
+        style={{ fontSize: '2.8cqh', background: '#81B64C', color: '#fff', animation: 'csEngagePop .45s cubic-bezier(.2,1.4,.4,1) both' }}>{text}</span>
+      <style>{'@keyframes csEngagePop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}'}</style>
+    </div>
+  );
+}
+
+/** The caption with the engagement line first (where it shows under the reel). */
+export const withEngage = (engage: string | undefined, caption: string) => (engage ? `${engage}\n${caption}` : caption);
+
+/** A pinned comment to post yourself right after the reel goes up. */
+export function PinnedBox({ text }: { text: string }) {
+  return <CaptionBox key={text} text={text} label="Pinned comment (post it, then pin it)" />;
+}
+/** "Answer 👇" with the answer pushed out of sight, so people tap to see it. */
+export const hiddenAnswer = (answer: string) => `Answer 👇 (don't peek)\n.\n.\n.\n.\n.\n${answer}`;

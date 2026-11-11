@@ -3,6 +3,9 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { listMoments, tagCounts, contentScanProgress, scanContentBatch, studioGame, ensureContentTables, studioTraps, studioPuzzles, puzzleThemes, studioReviews, reviewGameForStudio, studioScouts, studioScout, studioLessons, studioScans } from "../lib/contentMoments";
 
+import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
+
 const router: IRouter = Router();
 
 function requireAdmin(req: Request, res: Response, next: NextFunction) {
@@ -180,6 +183,30 @@ router.post("/admin/studio/best-line", requireAdmin, async (req: Request, res: R
     req.log.error({ err }, "[studio] best line failed");
     res.status(500).json({ error: "The engine couldn't look at this position right now." });
   }
+});
+
+// ── Crowd chess: the followers' running game (one current game, kept on the server
+// so it's the same on every device). The app works out positions from the moves.
+let crowdReady: Promise<unknown> | null = null;
+const crowdTable = () => (crowdReady ??= db.execute(sql`CREATE TABLE IF NOT EXISTS studio_crowd (id VARCHAR(32) PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT now())`));
+router.get("/admin/studio/crowd", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    await crowdTable();
+    const r = await db.execute(sql`SELECT data FROM studio_crowd WHERE id = 'current'`);
+    const rows = (Array.isArray(r) ? r : (r as { rows?: unknown[] }).rows ?? []) as { data: unknown }[];
+    res.json({ game: rows[0]?.data ?? null });
+  } catch (err) { req.log.error({ err }, "[studio] crowd load failed"); res.status(500).json({ error: "Couldn't load the crowd game." }); }
+});
+router.put("/admin/studio/crowd", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const game = req.body?.game ?? null;
+    if (game !== null && (typeof game !== "object" || JSON.stringify(game).length > 50_000)) { res.status(400).json({ error: "Bad game" }); return; }
+    await crowdTable();
+    if (game === null) await db.execute(sql`DELETE FROM studio_crowd WHERE id = 'current'`);
+    else await db.execute(sql`INSERT INTO studio_crowd (id, data) VALUES ('current', ${JSON.stringify(game)}::jsonb)
+      ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`);
+    res.json({ ok: true });
+  } catch (err) { req.log.error({ err }, "[studio] crowd save failed"); res.status(500).json({ error: "Couldn't save the crowd game." }); }
 });
 
 export default router;
