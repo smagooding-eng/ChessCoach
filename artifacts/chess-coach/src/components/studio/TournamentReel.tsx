@@ -13,7 +13,7 @@ import { RenderMp4 } from './RenderMp4';
 import { HookPicker, hookLine } from './HookPicker';
 import { ThemedMiniBoard } from '@/components/ThemedMiniBoard';
 import { positionsFromSan } from '@/hooks/use-move-browser';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, useBackToClose } from './reelKit';
 
 export interface TournamentReelOpts { hook: string; who: string; name: string; closer: string; music: MusicStyle; look?: ReelLook; engage?: string }
 export const TOURNAMENT_REEL_DEFAULT: TournamentReelOpts = {
@@ -63,6 +63,7 @@ function Caption({ text }: { text: string }) {
 }
 
 export function TournamentReel({ opts: initial = TOURNAMENT_REEL_DEFAULT, render = false, onClose }: { opts?: TournamentReelOpts; render?: boolean; onClose: () => void }) {
+  useBackToClose(onClose, !render);
   const [opts, setOpts] = useState<TournamentReelOpts>(initial);
   const [scene, setScene] = useState<Scene>('idle');
   const [step, setStep] = useState(0); // progress inside a scene

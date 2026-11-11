@@ -12,7 +12,7 @@ import { StudioSplash } from './StudioSplash';
 import { RenderMp4 } from './RenderMp4';
 import { StudioMusic, MUSIC_STYLES, bpmOf, type MusicStyle } from './studioMusic';
 import { mapTree, findEpisode, nextEpisode, partLabel, type MapEpisode } from './openingMap';
-import { reelFrameSize, EngagePicker } from './reelKit';
+import { reelFrameSize, EngagePicker, useBackToClose } from './reelKit';
 
 // Content Studio player: a game moment or a trap lesson as a 9:16 clip for
 // TikTok, Reels and Shorts. The clip is a script of frames: an intro with the
@@ -796,6 +796,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   queue?: StudioSource[];
   onClose: () => void; onNext?: () => void; onPrev?: () => void;
 }) {
+  useBackToClose(onClose, !render);
   // The compilation's clips: removable and reorderable from the player.
   const [queue, setQueue] = useState<StudioSource[] | undefined>(initialQueue);
   const isComp = !!queue && queue.length > 1;

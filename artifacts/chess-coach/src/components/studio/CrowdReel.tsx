@@ -14,7 +14,7 @@ import { apiFetch } from '@/lib/api';
 import { StudioMusic, type MusicStyle } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
 import { ChessBoard } from '@/components/ChessBoard';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, PinnedBox } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, PinnedBox, useBackToClose } from './reelKit';
 
 export interface CrowdMove { san: string; by: 'crowd' | 'engine'; day: number; note?: string }
 export interface CrowdGame { mode: 'engine' | 'both'; crowd: 'w' | 'b'; day: number; moves: CrowdMove[]; startedAt: string }
@@ -29,6 +29,7 @@ type Scene = 'idle' | 'hook' | 'recap1' | 'recap2' | 'ask' | 'end';
 
 /** The reel itself (also what the MP4 renderer plays). */
 export function CrowdReel({ opts: initial, render = false, onClose }: { opts?: CrowdReelOpts; render?: boolean; onClose: () => void }) {
+  useBackToClose(onClose, !render);
   const [opts, setOpts] = useState<CrowdReelOpts | null>(initial ?? null);
   const [scene, setScene] = useState<Scene>('idle');
   const [shownPlies, setShownPlies] = useState(0);

@@ -14,7 +14,7 @@ import { HookPicker, hookLine } from './HookPicker';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
 import { positionsFromSan } from '@/hooks/use-move-browser';
 import { MOTIFS } from '@/lib/tactics';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, useBackToClose } from './reelKit';
 
 const G = '#81B64C', BG = '#0B1112', CARD = '#141D1F', LINE = '#243033', TEXT = '#F5F7F6', MUTED = '#8E9996', GOLD = '#E8B447', RED = '#E5484D', ORANGE = '#F2A93B';
 
@@ -141,6 +141,7 @@ const firstStepAt = (s: ReelScene) => (s.type === 'hook' ? 700 : s.type === 'boa
 const stepGap = (s: ReelScene) => (s.type === 'hook' ? 650 : s.type === 'board' ? (s.stepMs ?? 900) : s.type === 'list' ? 380 : s.type === 'chips' ? 600 : 1100);
 
 export function SectionReel({ opts: initial, render = false, onClose }: { opts?: SectionReelOpts; render?: boolean; onClose: () => void }) {
+  useBackToClose(onClose, !render);
   const [opts, setOpts] = useState<SectionReelOpts>(initial ?? { section: 'live', hook: '', closer: '', music: 'hype' });
   const def = SECTIONS.find((s) => s.id === opts.section) ?? SECTIONS[0];
   const scenes: ReelScene[] = def.scenes.map((s, k) => (k === 0 && s.type === 'hook' && opts.hook.trim() ? { ...s, title: opts.hook } : s));

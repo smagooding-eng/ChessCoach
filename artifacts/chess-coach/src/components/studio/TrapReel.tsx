@@ -7,7 +7,8 @@
 // faces the viewer. Also played by the video maker (kind "trapReel").
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Play, Maximize2 } from 'lucide-react';
+import { X, Play, Maximize2, Loader2 } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 import { Chess } from 'chess.js';
 import { playMoveSound, LookOverride } from '@/context/SettingsContext';
 import { routeSoundsTo } from '@/lib/sounds';
@@ -15,11 +16,11 @@ import { StudioMusic, type MusicStyle } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
 import { HookPicker, hookLine } from './HookPicker';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, PinnedBox } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, PinnedBox, useBackToClose } from './reelKit';
 import { TRAPS, trapById, type TrapStepKind } from './traps';
 
 type Speed = 'fast' | 'normal' | 'slow';
-export interface TrapReelOpts { trap: string; hook: string; question: string; speed: Speed; music: MusicStyle; look?: ReelLook; coldOpen?: boolean; pauses?: boolean }
+export interface TrapReelOpts { trap: string; hook: string; question: string; speed: Speed; music: MusicStyle; look?: ReelLook; coldOpen?: boolean; pauses?: boolean; voice?: boolean; voiceName?: string }
 export const trapReelDefaults = (id: string): TrapReelOpts => ({ trap: id, hook: trapById(id).hook, question: 'Have you fallen for this? 👇', speed: 'normal', music: 'suspense', coldOpen: true, pauses: true });
 
 const G = '#81B64C', BG = '#0B1112', TEXT = '#F5F7F6', MUTED = '#8E9996', GOLD = '#E8B447', RED = '#E5484D';
@@ -40,6 +41,35 @@ type Scene = 'idle' | 'cold' | 'play' | 'stamp' | 'end';
 const TONE: Record<string, string> = { red: '#E5484D', gold: '#E8B447', green: '#81B64C', blue: '#5FA8E8' };
 const SAN_RE = /(?:\d+\.{1,3})?(?:O-O(?:-O)?|[KQRBN]?[a-h]?[1-8]?x?[a-h][1-8](?:=[QRBN])?[+#]?)(?:!!|\?\?|!\?|\?!|!|\?)?/g;
 /** The explanation with its moves in colour. */
+// ── Voiceover: the narrator reads each step, with the moves said in words ──
+const PIECE: Record<string, string> = { K: 'king', Q: 'queen', R: 'rook', B: 'bishop', N: 'knight' };
+function sayMove(tok: string): string {
+  let m = tok.replace(/^\d+\.{1,3}/, '').replace(/[!?]+$/, '');
+  const end = m.endsWith('#') ? ', checkmate' : m.endsWith('+') ? ', check' : '';
+  m = m.replace(/[+#]$/, '');
+  if (m === 'O-O') return `castles${end}`;
+  if (m === 'O-O-O') return `castles queenside${end}`;
+  const promo = m.match(/=([QRBN])$/); m = m.replace(/=[QRBN]$/, '');
+  const piece = PIECE[m[0]] ?? '';
+  const body = piece ? m.slice(1) : m;
+  const cap = body.includes('x');
+  const to = (body.match(/[a-h][1-8]$/) ?? [body])[0];
+  const who = piece || (cap ? `${body[0]} pawn` : 'pawn');
+  return `${who} ${cap ? 'takes' : 'to'} ${to}${promo ? `, promotes to a ${PIECE[promo[1]]}` : ''}${end}`;
+}
+/** A line for the narrator: moves in words, no emoji. */
+export function speakable(text: string): string {
+  SAN_RE.lastIndex = 0;
+  return text.replace(SAN_RE, (t) => {
+    // A bare square ("aims at f7") stays a square; anything with a piece, capture, check or number is a move.
+    if (!/O-O|[KQRBNx+#=!?]|^\d/.test(t) || !/[a-h][1-8]|O-O/.test(t)) return t;
+    return sayMove(t) + (/[!?]$/.test(t) ? '.' : '');
+  })
+    .replace(/(check|checkmate|[a-h][1-8]) (?=(?:pawn|knight|bishop|rook|queen|king|castles|[a-h] pawn)\b)/g, '$1, ')
+    .replace(/\.\./g, '.')
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, '').replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim();
+}
+
 function richText(text: string, color: string) {
   const out: ReactNode[] = []; let last = 0; let m: RegExpExecArray | null;
   SAN_RE.lastIndex = 0;
@@ -49,6 +79,7 @@ function richText(text: string, color: string) {
 }
 
 export function TrapReel({ opts: initial, render = false, onClose }: { opts?: TrapReelOpts; render?: boolean; onClose: () => void }) {
+  useBackToClose(onClose, !render);
   const [opts, setOpts] = useState<TrapReelOpts>(initial ?? trapReelDefaults(TRAPS[0].id));
   const trap = trapById(opts.trap);
   const [scene, setScene] = useState<Scene>('idle');
@@ -57,6 +88,45 @@ export function TrapReel({ opts: initial, render = false, onClose }: { opts?: Tr
   const [pauseLeft, setPauseLeft] = useState(0); // >0: frozen, asking the viewer
   const [callout, setCallout] = useState<{ san: string; kind: TrapStepKind } | null>(null);
   const [shake, setShake] = useState(0);
+  const voiceMap = useRef(new Map<string, { url: string; len: number }>());
+  const [voicePrep, setVoicePrep] = useState<{ done: number; total: number } | null>(null);
+  const [voiceNote, setVoiceNote] = useState<string | null>(null);
+  const [premium, setPremium] = useState(false);
+  useEffect(() => { apiFetch('/api/tts/voices').then((x) => (x.ok ? x.json() : null)).then((d) => { if (d?.premium) setPremium(true); }).catch(() => {}); }, []);
+  const voiceAudio = useRef<HTMLAudioElement | null>(null);
+  const linesFor = (o: TrapReelOpts) => {
+    const tr = trapById(o.trap);
+    const out: string[] = [];
+    if (o.coldOpen !== false) out.push(`${tr.result === 'CHECKMATE' ? 'Checkmate' : tr.result.toLowerCase()} in ${Math.ceil(tr.san.length / 2)} moves. Here's how.`);
+    tr.steps.forEach((st) => { if (st.pause && o.pauses !== false) out.push(speakable(`${st.pause} Comment your guess.`)); out.push(speakable(st.text)); });
+    out.push(speakable(`Save it for your next game. ${o.question}`));
+    return out;
+  };
+  const vName = (o: TrapReelOpts) => o.voiceName ?? (premium ? 'premium' : 'ash');
+  const prepareVoice = async (o: TrapReelOpts) => {
+    const lines = [...new Set(linesFor(o))];
+    const key = (t: string) => `${vName(o)}|${t}`;
+    const todo = lines.filter((t) => !voiceMap.current.has(key(t)));
+    let done = lines.length - todo.length, failed = 0;
+    setVoicePrep({ done, total: lines.length });
+    const one = async (t: string) => {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const res = await apiFetch('/api/tts/speak', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: t, voice: vName(o), style: 'creator' }) });
+          if (!res.ok) throw new Error('tts');
+          const url = URL.createObjectURL(await res.blob());
+          const len = await new Promise<number>((ok) => { const a = new Audio(url); a.onloadedmetadata = () => ok(a.duration || 0); a.onerror = () => ok(0); });
+          voiceMap.current.set(key(t), { url, len });
+          return;
+        } catch { await new Promise((ok) => setTimeout(ok, 700 * (attempt + 1))); }
+      }
+      failed++;
+    };
+    const queue = [...todo];
+    await Promise.all(Array.from({ length: 3 }, async () => { while (queue.length) { await one(queue.shift()!); done++; setVoicePrep({ done, total: lines.length }); } }));
+    setVoicePrep(null);
+    setVoiceNote(failed ? `${failed} line${failed > 1 ? 's' : ''} of the voiceover couldn't be made, so ${failed > 1 ? 'they play' : 'it plays'} silently.` : null);
+  };
   const [clean, setClean] = useState(false);
   const [blank, setBlank] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -68,8 +138,16 @@ export function TrapReel({ opts: initial, render = false, onClose }: { opts?: Tr
   useEffect(() => () => { clear(); music.current?.stop(); routeSoundsTo(null, null); }, []);
 
   const play = (onDone?: () => void, o: TrapReelOpts = opts) => {
+    clear(); voiceAudio.current?.pause();
+    if (o.voice !== false) { setScene('idle'); void prepareVoice(o).then(() => run(onDone, o)); return; }
+    run(onDone, o);
+  };
+  const run = (onDone?: () => void, o: TrapReelOpts = opts) => {
     clear();
     const tr = trapById(o.trap);
+    // Speak a line now; returns how long it lasts (ms), 0 without the voiceover.
+    const vlen = (text: string) => (o.voice !== false ? Math.round((voiceMap.current.get(`${vName(o)}|${text}`)?.len ?? 0) * 1000) : 0);
+    const say = (text: string) => { const v = o.voice !== false ? voiceMap.current.get(`${vName(o)}|${text}`) : undefined; if (v) { voiceAudio.current?.pause(); voiceAudio.current = mus().playVoice(v.url); } };
     setStepIdx(0); setPauseLeft(0); setCallout(null);
     try { const m = mus(); routeSoundsTo(m.unlock(), m.sfx); m.stop(); if (o.music !== 'off') m.start(o.music); } catch { /* ignore */ }
     const c = new Chess(); const vm = tr.san.map((san) => c.move(san));
@@ -77,23 +155,31 @@ export function TrapReel({ opts: initial, render = false, onClose }: { opts?: Tr
     // Cold open: the ending first ("CHECKMATE in 7"), then "here's how".
     if (o.coldOpen !== false) {
       setScene('cold'); setPly(tr.san.length);
-      at(60, () => mus().accent('impact'));
-      t = 2600;
+      const coldLine = `${tr.result === 'CHECKMATE' ? 'Checkmate' : tr.result.toLowerCase()} in ${Math.ceil(tr.san.length / 2)} moves. Here's how.`;
+      at(60, () => { mus().accent('impact'); say(coldLine); });
+      t = Math.max(2600, vlen(coldLine) + 500);
       at(t, () => { setScene('play'); setPly(0); mus().accent('whoosh'); });
     } else { setScene('play'); setPly(0); at(80, () => mus().accent('riser')); }
-    t += Math.max(1900, tr.steps[0].text.length * READ_MS[o.speed] * 0.8);
+    const intro = speakable(tr.steps[0].text);
+    at(t + 50, () => say(intro));
+    t += Math.max(1900, tr.steps[0].text.length * READ_MS[o.speed] * 0.8, vlen(intro) + 350);
     let prev = 0;
     tr.steps.forEach((st, i) => {
       if (i === 0) return;
       at(t, () => { setStepIdx(i); setCallout(null); if (st.kind === 'bait') mus().accent('whoosh'); });
       // Pause and ask before the trap: "What's the trick? 3, 2, 1…"
       if (st.pause && o.pauses !== false) {
-        at(t, () => { setPauseLeft(3); mus().accent('riser'); });
-        at(t + 1000, () => { setPauseLeft(2); mus().accent('tick'); });
-        at(t + 2000, () => { setPauseLeft(1); mus().accent('tick'); });
-        at(t + 3000, () => setPauseLeft(0));
-        t += 3150;
+        const q = speakable(`${st.pause} Comment your guess.`);
+        const span = Math.max(3000, vlen(q) + 400);
+        const tick = span / 3;
+        at(t, () => { setPauseLeft(3); mus().accent('riser'); say(q); });
+        at(t + tick, () => { setPauseLeft(2); mus().accent('tick'); });
+        at(t + tick * 2, () => { setPauseLeft(1); mus().accent('tick'); });
+        at(t + span, () => setPauseLeft(0));
+        t += span + 150;
       }
+      const line = speakable(st.text);
+      at(t + 100, () => say(line));
       const key = st.kind === 'bait' || st.kind === 'trap' || st.kind === 'win';
       const ms = key ? MOVE_MS[o.speed] + 120 : Math.round(MOVE_MS[o.speed] * 0.8);
       for (let p = prev; p < st.upto; p++) {
@@ -112,12 +198,13 @@ export function TrapReel({ opts: initial, render = false, onClose }: { opts?: Tr
       }
       const moving = (st.upto - prev) * ms;
       const hold = Math.max(key ? 2000 : 1150, st.text.length * READ_MS[o.speed] - moving * 0.5);
-      t += 250 + moving + hold;
+      t += Math.max(250 + moving + hold, vlen(line) + 450);
       prev = st.upto;
     });
     at(t, () => { setScene('stamp'); setCallout(null); mus().accent('impact'); });
-    at(t + 1900, () => { setScene('end'); mus().accent('chime'); });
-    at(t + 1900 + 3400, () => { music.current?.stop(); onDone?.(); });
+    const outro = speakable(`Save it for your next game. ${o.question}`);
+    at(t + 1900, () => { setScene('end'); mus().accent('chime'); say(outro); });
+    at(t + 1900 + Math.max(3400, vlen(outro) + 600), () => { music.current?.stop(); onDone?.(); });
   };
   useEffect(() => { if (!render) play(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const enterClean = () => { clear(); music.current?.stop(); setClean(true); setBlank(true); setScene('idle'); at(5000, () => { setBlank(false); play(); }); };
@@ -125,7 +212,7 @@ export function TrapReel({ opts: initial, render = false, onClose }: { opts?: Tr
   useEffect(() => {
     if (!render) return;
     const w = window as unknown as { __studioRender?: Record<string, unknown> };
-    w.__studioRender = { ready: true, done: false, start: () => {
+    w.__studioRender = { ready: opts.voice === false, done: false, start: () => {
       const m = mus(); routeSoundsTo(m.unlock(), m.sfx);
       const type = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'].find((x) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(x)) ?? '';
       const chunks: Blob[] = [];
@@ -140,12 +227,15 @@ export function TrapReel({ opts: initial, render = false, onClose }: { opts?: Tr
         r.start(500); rec.current = r;
       } catch { /* finish without audio */ }
       (w.__studioRender as Record<string, unknown>).startedAt = Date.now();
-      play(() => setTimeout(() => {
+      run(() => setTimeout(() => {
         if (rec.current?.state === 'recording') rec.current.stop();
         else w.__studioRender = { ...(w.__studioRender ?? {}), endedAt: Date.now(), done: true };
       }, 300));
     } };
+    // The renderer waits for "ready": the whole voiceover is made first.
+    if (opts.voice !== false) void prepareVoice(opts).then(() => { if (w.__studioRender) w.__studioRender.ready = true; });
   }, [render]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => { voiceAudio.current?.pause(); }, []);
 
   // ── The board at the current ply ──────────────────────────────────────────
   const game = new Chess();
@@ -240,7 +330,7 @@ export function TrapReel({ opts: initial, render = false, onClose }: { opts?: Tr
   const frame = (
     <div className="relative overflow-hidden" style={{ fontFamily: 'Inter, system-ui, sans-serif', ...reelFrameSize(clean || render), background: `radial-gradient(ellipse at 50% 0%, #15301F 0%, ${BG} 60%)` }}
       onClick={() => { if (clean && (scene === 'end' || scene === 'idle')) setClean(false); }}>
-      {!blank && (showing ? playScene : scene === 'end' ? end : null)}
+      {!blank && (showing ? playScene : scene === 'end' ? end : voicePrep ? <div className="grid h-full place-items-center"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div> : null)}
       {!blank && showing && <p className="absolute inset-x-0 bottom-[2cqh] text-center font-black" style={{ fontSize: '2cqh', color: 'rgba(245,247,246,.55)' }}>Chess<span style={{ color: G }}>Scout</span>.net</p>}
     </div>
   );
@@ -276,10 +366,12 @@ export function TrapReel({ opts: initial, render = false, onClose }: { opts?: Tr
           <label className="block text-[12px] text-white/60">Hook<input value={opts.hook} onChange={(e) => setOpts({ ...opts, hook: e.target.value })} className="mt-0.5 w-full rounded-lg bg-white/5 px-3 py-2 text-[14px] font-bold text-white ring-1 ring-white/10" /></label>
           <EngagePicker kind="trap" value={opts.question} onChange={(v) => setOpts({ ...opts, question: v })} label="Engagement line on the end card (and in the caption)" />
           <div className="flex flex-wrap gap-1.5">
-            {([['coldOpen', 'Open on the ending'], ['pauses', 'Pause & guess before the trap']] as const).map(([key, label]) => (
+            {([['voice', 'Voiceover explains it 🎙️'], ['coldOpen', 'Open on the ending'], ['pauses', 'Pause & guess before the trap']] as const).map(([key, label]) => (
               <button key={key} onClick={() => setOpts({ ...opts, [key]: opts[key] === false })} className="rounded-md px-2.5 py-1 text-[12px] font-bold" style={{ background: opts[key] !== false ? G : 'rgba(255,255,255,.07)' }}>{opts[key] !== false ? '✓ ' : ''}{label}</button>
             ))}
           </div>
+          {voicePrep && <p className="flex items-center gap-1.5 text-[12px] text-white/60"><Loader2 size={13} className="animate-spin" />Making the voiceover… {voicePrep.done}/{voicePrep.total}</p>}
+          {voiceNote && <p className="text-[12px] text-[#E8B447]">{voiceNote}</p>}
           <div className="flex flex-wrap items-center gap-1">
             <span className="w-[56px] text-[11px] font-bold uppercase tracking-wider text-white/40">Speed</span>
             {(['fast', 'normal', 'slow'] as Speed[]).map((sp) => <button key={sp} onClick={() => setOpts({ ...opts, speed: sp })} className="rounded-md px-2.5 py-1 text-[12px] font-bold capitalize" style={{ background: opts.speed === sp ? G : 'rgba(255,255,255,.07)' }}>{sp}</button>)}

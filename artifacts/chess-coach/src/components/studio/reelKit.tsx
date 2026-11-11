@@ -1,7 +1,7 @@
 // Shared pieces for the promo reel makers: the 9:16 frame size (clean view and
 // MP4 renders fit the screen instead of being cut off on tall phones), the
 // caption box with a Copy button, and the board look ("remix the board").
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Copy, Check, Shuffle } from 'lucide-react';
 import { randomLook, lookLabel, type BoardLook } from '@/context/SettingsContext';
 
@@ -134,3 +134,26 @@ export function PinnedBox({ text }: { text: string }) {
 }
 /** "Answer 👇" with the answer pushed out of sight, so people tap to see it. */
 export const hiddenAnswer = (answer: string) => `Answer 👇 (don't peek)\n.\n.\n.\n.\n.\n${answer}`;
+
+// ── Back button ─────────────────────────────────────────────────────────────
+// The makers open over the Content Studio without changing the page address, so
+// the phone's back button used to leave the Studio (to the home page). While a
+// maker is open it now adds a history step, and back just closes the maker.
+export function useBackToClose(onClose: () => void, active = true) {
+  const ref = useRef(onClose);
+  ref.current = onClose;
+  useEffect(() => {
+    if (!active || typeof window === 'undefined') return;
+    const id = `cs${Math.random().toString(36).slice(2)}`;
+    const prev = (window.history.state ?? {}) as Record<string, unknown>;
+    window.history.pushState({ ...prev, csOverlay: id }, '');
+    let popped = false;
+    const onPop = () => { popped = true; ref.current(); };
+    window.addEventListener('popstate', onPop);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      // Closed with the X: take our history step back off.
+      if (!popped && (window.history.state as Record<string, unknown> | null)?.csOverlay === id) window.history.back();
+    };
+  }, [active]);
+}

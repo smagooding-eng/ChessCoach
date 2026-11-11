@@ -11,7 +11,7 @@ import { KidPiece, Cloud } from '@/components/kids/KidsArt';
 import { KID_FONT, INK, useKidFont } from '@/components/kids/KidsChrome';
 import { StudioMusic } from './studioMusic';
 import { kidsScript, type KidsVideo, type KidsScene } from './kidsVideos';
-import { reelFrameSize } from './reelKit';
+import { reelFrameSize, useBackToClose } from './reelKit';
 
 const VOICES = [{ id: 'nova', label: 'Nova (warm)' }, { id: 'coral', label: 'Coral (bright)' }, { id: 'shimmer', label: 'Shimmer (soft)' }, { id: 'fable', label: 'Fable (storyteller)' }];
 const PREF = 'cs_kids_studio';
@@ -35,6 +35,7 @@ function Burst({ run }: { run: number }) {
 }
 
 export function KidsStudio({ video, onClose }: { video: KidsVideo; onClose: () => void }) {
+  useBackToClose(onClose, true);
   useKidFont();
   const script = useMemo(() => kidsScript(video), [video]);
   const scenes = script?.scenes ?? [];

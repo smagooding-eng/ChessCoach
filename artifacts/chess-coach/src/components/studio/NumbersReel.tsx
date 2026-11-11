@@ -18,7 +18,7 @@ import { HookPicker, hookLine } from './HookPicker';
 import { ThemedMiniBoard } from '@/components/ThemedMiniBoard';
 import { positionsFromSan } from '@/hooks/use-move-browser';
 import { Chess } from 'chess.js';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, PinnedBox, hiddenAnswer } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, PinnedBox, hiddenAnswer, useBackToClose } from './reelKit';
 
 export interface NumbersReelOpts { hook: string; personal: string; twist: string; closer: string; question: string; music: MusicStyle; look?: ReelLook }
 export const NUMBERS_REEL_DEFAULT: NumbersReelOpts = {
@@ -57,6 +57,7 @@ const Pow = ({ b = 10, e }: { b?: number; e: number }) => <>{b}<sup style={{ fon
 const Digits = ({ text }: { text: string }) => <>{text.split('').map((ch, k) => <span key={k} style={{ display: 'inline-block', width: ch === ',' ? '0.28em' : '0.6em', textAlign: 'center' }}>{ch}</span>)}</>;
 
 export function NumbersReel({ opts: initial = NUMBERS_REEL_DEFAULT, render = false, onClose }: { opts?: NumbersReelOpts; render?: boolean; onClose: () => void }) {
+  useBackToClose(onClose, !render);
   const [opts, setOpts] = useState<NumbersReelOpts>({ ...NUMBERS_REEL_DEFAULT, ...initial });
   const [scene, setScene] = useState<Scene>('idle');
   const [step, setStep] = useState(0);

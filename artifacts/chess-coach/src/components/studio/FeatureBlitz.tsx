@@ -15,7 +15,7 @@ import { StudioMusic, type MusicStyle } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
 import { HookPicker, hookLine } from './HookPicker';
 import { apiFetch } from '@/lib/api';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, useBackToClose } from './reelKit';
 
 const GREEN = '#81B64C';
 type Kind = 'live' | 'review' | 'weak' | 'openings' | 'tactics' | 'endgames' | 'puzzles' | 'scan' | 'scout';
@@ -205,6 +205,7 @@ function afterMove(fen: string, san?: string) {
 }
 
 export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = false, onClose }: { opts?: FeatureBlitzOpts; render?: boolean; onClose: () => void }) {
+  useBackToClose(onClose, !render);
   const [opts, setOpts] = useState<FeatureBlitzOpts>(initial);
   const [phase, setPhase] = useState<Phase>('idle');
   const [k, setK] = useState(0); // scene

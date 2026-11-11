@@ -18,7 +18,7 @@ import { StudioMusic, type MusicStyle } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
 import { HookPicker } from './HookPicker';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, PinnedBox, hiddenAnswer } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, PinnedBox, hiddenAnswer, useBackToClose } from './reelKit';
 
 const G = '#81B64C', BG = '#0B1112', TEXT = '#F5F7F6', MUTED = '#8E9996', GOLD = '#E8B447';
 const ABC_COLORS = ['#3D8BFD', '#F2A93B', '#B05CE8'];
@@ -102,6 +102,7 @@ function pickChoices(p: PuzzleData): PuzzleReelOpts['choices'] {
 }
 
 export function PuzzleReel({ opts: initial, render = false, onClose }: { opts?: PuzzleReelOpts; render?: boolean; onClose: () => void }) {
+  useBackToClose(onClose, !render);
   const [opts, setOpts] = useState<PuzzleReelOpts>(initial ?? { mode: 'mate2', puzzle: null, seconds: 7, reveal: false, ...DEFAULTS.mate2, music: 'hype' });
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);

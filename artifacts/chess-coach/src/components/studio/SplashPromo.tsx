@@ -9,7 +9,7 @@ import { routeSoundsTo } from '@/lib/sounds';
 import { StudioMusic } from './studioMusic';
 import { StudioSplash } from './StudioSplash';
 import { RenderMp4 } from './RenderMp4';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, useBackToClose } from './reelKit';
 
 export interface SplashPromoOpts { line1: string; line2: string; tag: string; engage?: string }
 export const SPLASH_PROMO_DEFAULT: SplashPromoOpts = { line1: 'Chess.com is dead.', line2: 'ChessScout.net', tag: '' };
@@ -24,6 +24,7 @@ const brand = (t: string) => {
 type Phase = 'idle' | 'smash' | 'line1' | 'line2' | 'end';
 
 export function SplashPromo({ opts: initial = SPLASH_PROMO_DEFAULT, render = false, onClose }: { opts?: SplashPromoOpts; render?: boolean; onClose: () => void }) {
+  useBackToClose(onClose, !render);
   const [opts, setOpts] = useState<SplashPromoOpts>(initial);
   const [phase, setPhase] = useState<Phase>('idle');
   const [run, setRun] = useState(0); // remounts the splash so its animation replays

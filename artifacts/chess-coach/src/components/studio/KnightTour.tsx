@@ -11,7 +11,7 @@ import { routeSoundsTo } from '@/lib/sounds';
 import { StudioMusic } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
 import { HookPicker, hookLine } from './HookPicker';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, useBackToClose } from './reelKit';
 
 // A complete knight's tour from b1 (checked: 64 different squares, every step a knight move).
 export const KNIGHT_TOUR = 'b1 a3 c2 a1 b3 c1 a2 b4 a6 b8 d7 f8 h7 g5 h3 g1 e2 g3 h1 f2 d1 b2 a4 c3 b5 a7 c8 b6 a8 c7 e8 g7 h5 f6 g8 h6 g4 h2 f1 d2 e4 c5 b7 a5 c4 d6 f7 h8 g6 h4 g2 e1 f3 e5 d3 f4 e6 d8 c6 d4 f5 e7 d5 e3'.split(' ');
@@ -54,6 +54,7 @@ export const KNIGHT_TOUR_DEFAULT: KnightTourOpts = { hook: 'Can a knight land on
 type Phase = 'idle' | 'tour' | 'logo' | 'site' | 'end';
 
 export function KnightTour({ opts: initial = KNIGHT_TOUR_DEFAULT, render = false, onClose }: { opts?: KnightTourOpts; render?: boolean; onClose: () => void }) {
+  useBackToClose(onClose, !render);
   const [opts, setOpts] = useState<KnightTourOpts>(initial);
   const [step, setStep] = useState(0); // squares landed on so far (1 = the starting square)
   const [phase, setPhase] = useState<Phase>('idle');
