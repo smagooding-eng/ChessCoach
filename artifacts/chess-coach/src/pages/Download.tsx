@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Link } from 'wouter';
 import { GooglePlayBadge } from '@/components/GooglePlayBadge';
+import { TeacherApprovedBadge } from '@/components/TeacherApprovedBadge';
 import { ArrowLeft, Smartphone, ShieldCheck, Sparkles, Check } from 'lucide-react';
 
 const G = '#81b64c';
@@ -68,6 +69,7 @@ export default function DownloadPage() {
               </p>
             </div>
             <GooglePlayBadge force height={54} />
+            <TeacherApprovedBadge className="ml-0 mt-3 sm:ml-3 sm:mt-0" />
           </div>
 
           <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3">

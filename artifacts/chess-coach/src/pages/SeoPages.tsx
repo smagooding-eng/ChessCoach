@@ -11,6 +11,7 @@ import { FenThumb } from '@/components/FenThumb';
 import { getLang, LANGUAGES } from '@/lib/i18n';
 import { MOTIFS as TACTIC_MOTIFS, GROUPS as TACTIC_GROUPS } from '@/lib/tactics';
 import { MotifDemo as TacticDemo } from '@/pages/Tactics';
+import { TeacherApprovedBadge, TeacherApprovedStrip } from '@/components/TeacherApprovedBadge';
 
 // Public, search-friendly pages: /play-chess-online, /chess-for-kids, ...,
 // their translations at /es/..., and the opening and trap pages. Open to
@@ -43,10 +44,13 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
 function TopBar() {
   const { isAuthenticated } = useUser();
   return (
-    <div className="mx-auto flex w-full max-w-3xl items-center justify-between px-4 pt-4">
-      <Link href="/" className="text-[15px] font-black" style={{ color: RD.text }}>ChessScout<span style={{ color: RD.green }}>.net</span></Link>
-      {!isAuthenticated && <a href={`${import.meta.env.BASE_URL}setup?signup=login`} className="text-[13px] font-bold" style={{ color: RD.muted }}>Sign in</a>}
-    </div>
+    <>
+      {!isAuthenticated && <TeacherApprovedStrip />}
+      <div className="mx-auto flex w-full max-w-3xl items-center justify-between px-4 pt-4">
+        <Link href="/" className="text-[15px] font-black" style={{ color: RD.text }}>ChessScout<span style={{ color: RD.green }}>.net</span></Link>
+        {!isAuthenticated && <a href={`${import.meta.env.BASE_URL}setup?signup=login`} className="text-[13px] font-bold" style={{ color: RD.muted }}>Sign in</a>}
+      </div>
+    </>
   );
 }
 
@@ -122,7 +126,7 @@ export function SeoLanding({ pageKey, lang }: { pageKey?: string; lang?: string 
       <main className="mx-auto w-full max-w-3xl space-y-3 px-4 pb-28 pt-5 md:pb-12">
         <h1 className="text-[28px] font-black leading-tight sm:text-[34px]" style={{ color: RD.text }}>{page.h1}</h1>
         <p className="text-[15px] leading-relaxed" style={{ color: RD.muted }}>{page.intro}</p>
-        <div className="pt-1"><CtaButton label={page.cta.label} inApp={IN_APP[page.key] ?? '/'} title={page.h1} /></div>
+        <div className="flex flex-wrap items-center gap-3 pt-1"><CtaButton label={page.cta.label} inApp={IN_APP[page.key] ?? '/'} title={page.h1} /><TeacherApprovedBadge size="sm" /></div>
         <div className="grid gap-3 pt-2 sm:grid-cols-2">
           {page.sections.map((s) => (
             <Card key={s.h}>

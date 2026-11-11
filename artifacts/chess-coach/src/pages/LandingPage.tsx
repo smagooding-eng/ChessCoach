@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch, setAuthToken } from '@/lib/api';
 import { useSiteImg } from '@/hooks/use-app-config';
 import { GooglePlayBadge } from '@/components/GooglePlayBadge';
+import { TeacherApprovedBadge } from '@/components/TeacherApprovedBadge';
 import { SiteStatsLine, HappeningNow } from '@/components/SiteStats';
 import { t, tn, noGT } from '@/lib/i18n';
 import { LanguageSelect } from '@/components/LanguagePicker';
@@ -629,6 +630,7 @@ export function LandingPage() {
 
       <main data-track-section="hero" className="relative z-10 mx-auto flex w-full max-w-7xl flex-1 flex-col justify-center gap-3 px-4 pb-3 sm:px-8 lg:grid lg:grid-cols-2 lg:gap-12 lg:pb-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="lg:self-center">
+          <TeacherApprovedBadge className="mb-3 sm:mb-4" />
           <h1 className="font-black leading-[1.04] tracking-tight text-[clamp(2.1rem,11vw,3.2rem)] sm:text-[3.8rem] lg:text-[5rem]" style={{ color: TEXT, fontFamily: "Georgia, 'Times New Roman', serif" }}>
             {t('Play.')}<br />
             {t('Scout.')}<br />
