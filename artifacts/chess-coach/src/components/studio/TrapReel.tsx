@@ -94,6 +94,7 @@ export function TrapReel({ opts: initial, render = false, onClose }: { opts?: Tr
   const [premium, setPremium] = useState(false);
   useEffect(() => { apiFetch('/api/tts/voices').then((x) => (x.ok ? x.json() : null)).then((d) => { if (d?.premium) setPremium(true); }).catch(() => {}); }, []);
   const voiceAudio = useRef<HTMLAudioElement | null>(null);
+  const playId = useRef(0); // a newer Replay cancels a start still waiting for the voice
   const linesFor = (o: TrapReelOpts) => {
     const tr = trapById(o.trap);
     const out: string[] = [];
@@ -112,13 +113,14 @@ export function TrapReel({ opts: initial, render = false, onClose }: { opts?: Tr
     const one = async (t: string) => {
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          const res = await apiFetch('/api/tts/speak', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: t, voice: vName(o), style: 'creator' }) });
+          const ac = new AbortController(); const to = setTimeout(() => ac.abort(), 15_000);
+          const res = await apiFetch('/api/tts/speak', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: t, voice: vName(o), style: 'creator' }), signal: ac.signal }).finally(() => clearTimeout(to));
           if (!res.ok) throw new Error('tts');
           const url = URL.createObjectURL(await res.blob());
           const len = await new Promise<number>((ok) => { const a = new Audio(url); a.onloadedmetadata = () => ok(a.duration || 0); a.onerror = () => ok(0); });
           voiceMap.current.set(key(t), { url, len });
           return;
-        } catch { await new Promise((ok) => setTimeout(ok, 700 * (attempt + 1))); }
+        } catch { await new Promise((ok) => setTimeout(ok, 500 * (attempt + 1))); }
       }
       failed++;
     };
@@ -139,14 +141,28 @@ export function TrapReel({ opts: initial, render = false, onClose }: { opts?: Tr
 
   const play = (onDone?: () => void, o: TrapReelOpts = opts) => {
     clear(); voiceAudio.current?.pause();
-    if (o.voice !== false) { setScene('idle'); void prepareVoice(o).then(() => run(onDone, o)); return; }
-    run(onDone, o);
+    const id = ++playId.current;
+    if (o.voice === false) { run(onDone, o); return; }
+    // Start as soon as the first lines are ready (or after 4 seconds at most); the rest
+    // keep coming in while it plays, and the timing leaves room for them.
+    const lines = linesFor(o);
+    const ready = (n: number) => lines.slice(0, n).every((t) => voiceMap.current.has(`${vName(o)}|${t}`));
+    if (ready(lines.length)) { run(onDone, o); return; }
+    setScene('idle');
+    const prep = prepareVoice(o);
+    let started = false;
+    const go = () => { if (started || id !== playId.current) return; started = true; run(onDone, o); };
+    const poll = setInterval(() => { if (id !== playId.current) { clearInterval(poll); return; } if (ready(2)) { clearInterval(poll); go(); } }, 150);
+    timers.current.push(setTimeout(() => { clearInterval(poll); go(); }, render ? 60_000 : 4000));
+    void prep.then(() => { clearInterval(poll); go(); });
   };
   const run = (onDone?: () => void, o: TrapReelOpts = opts) => {
     clear();
     const tr = trapById(o.trap);
     // Speak a line now; returns how long it lasts (ms), 0 without the voiceover.
-    const vlen = (text: string) => (o.voice !== false ? Math.round((voiceMap.current.get(`${vName(o)}|${text}`)?.len ?? 0) * 1000) : 0);
+    // How long a line lasts: its real length when made, otherwise an estimate (so a line that
+    // arrives a moment late still fits).
+    const vlen = (text: string) => { if (o.voice === false) return 0; const v = voiceMap.current.get(`${vName(o)}|${text}`); return v ? Math.round(v.len * 1000) : text.length * 62; };
     const say = (text: string) => { const v = o.voice !== false ? voiceMap.current.get(`${vName(o)}|${text}`) : undefined; if (v) { voiceAudio.current?.pause(); voiceAudio.current = mus().playVoice(v.url); } };
     setStepIdx(0); setPauseLeft(0); setCallout(null);
     try { const m = mus(); routeSoundsTo(m.unlock(), m.sfx); m.stop(); if (o.music !== 'off') m.start(o.music); } catch { /* ignore */ }
