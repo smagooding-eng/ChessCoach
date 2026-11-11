@@ -13,6 +13,8 @@ import { KnightTour } from '@/components/studio/KnightTour';
 import { SplashPromo } from '@/components/studio/SplashPromo';
 import { TournamentReel } from '@/components/studio/TournamentReel';
 import { NumbersReel } from '@/components/studio/NumbersReel';
+import { TrapReel, trapReelDefaults } from '@/components/studio/TrapReel';
+import { TRAPS } from '@/components/studio/traps';
 import { SectionReel, SECTIONS } from '@/components/studio/SectionReels';
 import { PuzzleReel, puzzleOptsFor, type PuzzleReelOpts } from '@/components/studio/PuzzleReel';
 import { ReelsPlan, type PlanAction } from '@/components/studio/ReelsPlan';
@@ -210,10 +212,11 @@ export function ContentStudio() {
     } catch { setScanBusy("Couldn't read that photo."); }
   };
   // Promos
-  const [promoT, setPromoT] = useState<'versus' | 'challenge' | 'live' | 'tour' | 'knight' | 'splash' | 'blitz' | 'tournament' | 'sections' | 'puzzles' | 'numbers'>('blitz');
+  const [promoT, setPromoT] = useState<'versus' | 'challenge' | 'live' | 'tour' | 'knight' | 'splash' | 'blitz' | 'tournament' | 'sections' | 'puzzles' | 'numbers' | 'traps'>('blitz');
   const [puzzleOpen, setPuzzleOpen] = useState<Partial<PuzzleReelOpts> | null>(null);
   const [tournamentOpen, setTournamentOpen] = useState(false);
   const [numbersOpen, setNumbersOpen] = useState(false);
+  const [trapOpen, setTrapOpen] = useState<string | null>(null);
   const [sectionOpen, setSectionOpen] = useState<string | null>(null);
   const [blitzOpen, setBlitzOpen] = useState(false);
   const [knightOpen, setKnightOpen] = useState(false);
@@ -698,7 +701,7 @@ export function ContentStudio() {
         )}
       </>) : view === 'promo' ? (<>
         <div className="mb-3 inline-flex flex-wrap rounded-xl bg-white/5 p-1">
-          {([['blitz', 'App in 20 seconds ⚡'], ['puzzles', 'Puzzle reels 🧩'], ['numbers', 'Chess by numbers 🌌'], ['sections', 'Section promos 🎬'], ['tournament', 'Host a tournament 🏆'], ['tour', 'App tour 🧭'], ['live', 'Live play ⚡'], ['knight', "Knight's tour → logo ♞"], ['splash', 'Splash smash ♜'], ['versus', 'ChessScout vs …'], ['challenge', 'Challenge your friends']] as const).map(([k, t]) => (
+          {([['blitz', 'App in 20 seconds ⚡'], ['puzzles', 'Puzzle reels 🧩'], ['traps', 'Trap reels 🪤'], ['numbers', 'Chess by numbers 🌌'], ['sections', 'Section promos 🎬'], ['tournament', 'Host a tournament 🏆'], ['tour', 'App tour 🧭'], ['live', 'Live play ⚡'], ['knight', "Knight's tour → logo ♞"], ['splash', 'Splash smash ♜'], ['versus', 'ChessScout vs …'], ['challenge', 'Challenge your friends']] as const).map(([k, t]) => (
             <button key={k} onClick={() => setPromoT(k)} className="rounded-lg px-3.5 py-1.5 text-[13px] font-black" style={{ background: promoT === k ? '#81B64C' : 'transparent', color: promoT === k ? '#fff' : '#C9CFCD' }}>{t}</button>
           ))}
         </div>
@@ -717,6 +720,18 @@ export function ContentStudio() {
             <p className="text-[12px] text-white/55">One short promo for each part of the app, in the same style as the tournament reel: a hook with flipping words, the feature on the real board, then the closing line and its link. Each one has a ready caption. Example data is labelled "Example".</p>
             <div className="flex flex-wrap gap-1.5">
               {SECTIONS.map((s) => <button key={s.id} onClick={() => setSectionOpen(s.id)} className="rounded-lg bg-[#81B64C] px-3 py-1.5 text-[12.5px] font-black text-white">{s.label}</button>)}
+            </div>
+          </div>
+        ) : promoT === 'traps' ? (
+          <div className="max-w-2xl space-y-2 rounded-xl bg-white/5 p-3 ring-1 ring-white/10">
+            <p className="text-[12px] text-white/55">Opening traps explained step by step, like the Family Tree: the setup, the mistake (red), the trap (green) and the win (gold), with the side that springs it facing the viewer. Ends on "Save it for your next game 🔖" and "Which trap should we do next? 👇". Pick one:</p>
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+              {TRAPS.map((t) => (
+                <button key={t.id} onClick={() => setTrapOpen(t.id)} className="rounded-lg bg-white/5 px-2.5 py-2 text-left ring-1 ring-white/10 hover:ring-[#81B64C]">
+                  <span className="block text-[12.5px] font-black text-white">{t.name}</span>
+                  <span className="block text-[11px] text-white/50">{t.opening} · {t.trapper === 'w' ? 'for White' : 'for Black'}</span>
+                </button>
+              ))}
             </div>
           </div>
         ) : promoT === 'numbers' ? (
@@ -1015,6 +1030,7 @@ export function ContentStudio() {
       {splashOpen && <SplashPromo onClose={() => setSplashOpen(false)} />}
       {tournamentOpen && <TournamentReel onClose={() => setTournamentOpen(false)} />}
       {numbersOpen && <NumbersReel onClose={() => setNumbersOpen(false)} />}
+      {trapOpen && <TrapReel opts={trapReelDefaults(trapOpen)} onClose={() => setTrapOpen(null)} />}
       {puzzleOpen && <PuzzleReel opts={puzzleOptsFor(puzzleOpen)} onClose={() => setPuzzleOpen(null)} />}
       {sectionOpen && <SectionReel opts={{ section: sectionOpen, hook: '', closer: '', music: 'hype' }} onClose={() => setSectionOpen(null)} />}
       {blitzOpen && <FeatureBlitz onClose={() => setBlitzOpen(false)} />}

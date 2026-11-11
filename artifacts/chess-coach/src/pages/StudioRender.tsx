@@ -9,6 +9,7 @@ import { SplashPromo, type SplashPromoOpts } from '@/components/studio/SplashPro
 import { FeatureBlitz, type FeatureBlitzOpts } from '@/components/studio/FeatureBlitz';
 import { TournamentReel, type TournamentReelOpts } from '@/components/studio/TournamentReel';
 import { NumbersReel, type NumbersReelOpts } from '@/components/studio/NumbersReel';
+import { TrapReel, type TrapReelOpts } from '@/components/studio/TrapReel';
 import { SectionReel, type SectionReelOpts } from '@/components/studio/SectionReels';
 import { PuzzleReel, type PuzzleReelOpts } from '@/components/studio/PuzzleReel';
 
@@ -41,6 +42,7 @@ export function StudioRender() {
   const src = job.source as unknown as { kind: string; opts?: KnightTourOpts };
   if (src.kind === 'knightTour') return <KnightTour render opts={src.opts as KnightTourOpts} onClose={() => {}} />;
   if (src.kind === 'featureBlitz') return <FeatureBlitz render opts={src.opts as unknown as FeatureBlitzOpts} onClose={() => {}} />;
+  if (src.kind === 'trapReel') return <TrapReel render opts={src.opts as unknown as TrapReelOpts} onClose={() => {}} />;
   if (src.kind === 'numbersReel') return <NumbersReel render opts={src.opts as unknown as NumbersReelOpts} onClose={() => {}} />;
   if (src.kind === 'tournamentReel') return <TournamentReel render opts={src.opts as unknown as TournamentReelOpts} onClose={() => {}} />;
   if (src.kind === 'puzzleReel') return <PuzzleReel render opts={src.opts as unknown as PuzzleReelOpts} onClose={() => {}} />;
