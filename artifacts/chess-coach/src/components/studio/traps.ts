@@ -3,7 +3,15 @@
 // Every line was played through chess.js move by move; the ones marked as mate
 // really end in checkmate.
 export type TrapStepKind = 'intro' | 'setup' | 'bait' | 'trap' | 'win';
-export interface TrapStep { upto: number; kind: TrapStepKind; text: string }
+export interface TrapStep {
+  upto: number; kind: TrapStepKind; text: string;
+  /** Drawn on the board once this step's moves are played: "c4f7" or "c4f7:red". */
+  arrows?: string[];
+  /** Squares to light up: "f7:red:weak" (square, colour, optional label). */
+  marks?: string[];
+  /** Freeze before this step's moves and ask the viewer (comment bait). */
+  pause?: string;
+}
 export interface Trap {
   id: string; name: string; opening: string;
   /** The side that springs the trap (and faces the viewer). */
@@ -23,13 +31,13 @@ export const TRAPS: Trap[] = [
     hook: 'Give up your queen… and mate in 7',
     steps: [
       { upto: 0, kind: 'intro', text: "Legal's Mate: a queen sacrifice that has been catching players since 1750." },
-      { upto: 5, kind: 'setup', text: "1.e4 e5 2.Nf3 d6 3.Bc4. White's bishop aims at f7, Black's weakest square." },
-      { upto: 6, kind: 'setup', text: 'Bg4 pins the knight to the queen. Or does it?' },
+      { upto: 5, kind: 'setup', text: "1.e4 e5 2.Nf3 d6 3.Bc4. White's bishop aims at f7, Black's weakest square.", arrows: ['c4f7:gold'], marks: ['f7:gold:weak'] },
+      { upto: 6, kind: 'setup', text: 'Bg4 pins the knight to the queen. Or does it?', arrows: ['g4d1:red'], marks: ['f3:red:pinned'] },
       { upto: 8, kind: 'setup', text: 'Nc3, and Black plays g6. Too slow.' },
-      { upto: 9, kind: 'trap', text: 'Nxe5!! White ignores the pin and leaves the queen hanging.' },
-      { upto: 10, kind: 'bait', text: 'Bxd1?? Black grabs the queen. This is the mistake.' },
-      { upto: 11, kind: 'setup', text: 'Bxf7+! The king is forced to e7.' },
-      { upto: 13, kind: 'win', text: 'Nd5#. Three minor pieces mate the king.' },
+      { upto: 9, kind: 'trap', text: 'Nxe5!! White ignores the pin and leaves the queen hanging.', arrows: ['e5f7:green', 'c4f7:green'], marks: ['d1:red:free?'], pause: "White's knight is pinned to the queen. What's the trick? 🤔" },
+      { upto: 10, kind: 'bait', text: 'Bxd1?? Black grabs the queen. This is the mistake.', marks: ['d1:red:queen gone'] },
+      { upto: 11, kind: 'setup', text: 'Bxf7+! The king is forced to e7.', arrows: ['f7e8:green'], marks: ['e7:red:forced'] },
+      { upto: 13, kind: 'win', text: 'Nd5#. Three minor pieces mate the king.', arrows: ['d5e7:green', 'e5d7:green', 'f7e6:green'], marks: ['e7:red:#'] },
     ],
   },
   {
@@ -39,13 +47,13 @@ export const TRAPS: Trap[] = [
     steps: [
       { upto: 0, kind: 'intro', text: 'The Fishing Pole: Black puts bait on a hook in the Ruy Lopez.' },
       { upto: 7, kind: 'setup', text: 'Ruy Lopez. White castles, everything looks normal.' },
-      { upto: 8, kind: 'setup', text: 'Ng4!? The knight jumps forward. This is the bait.' },
-      { upto: 10, kind: 'setup', text: 'h3 kicks it… and h5! Black just leaves it there.' },
+      { upto: 8, kind: 'setup', text: 'Ng4!? The knight jumps forward. This is the bait.', marks: ['g4:gold:bait'] },
+      { upto: 10, kind: 'setup', text: 'h3 kicks it… and h5! Black just leaves it there.', arrows: ['h5g4:gold'], marks: ['g4:gold:bait'] },
       { upto: 11, kind: 'bait', text: 'hxg4?? White takes the free knight.' },
-      { upto: 12, kind: 'trap', text: 'hxg4! The h-file opens straight at White’s king.' },
-      { upto: 14, kind: 'setup', text: 'Ne1 Qh4. The queen joins the rook on the h-file.' },
-      { upto: 16, kind: 'setup', text: 'f3 g3! Mate on h2 can’t be stopped.' },
-      { upto: 18, kind: 'win', text: 'Qh2#. Hooked.' },
+      { upto: 12, kind: 'trap', text: 'hxg4! The h-file opens straight at White’s king.', arrows: ['h8h2:green'], marks: ['h2:red'], pause: "White took the knight. Now what? 🤔" },
+      { upto: 14, kind: 'setup', text: 'Ne1 Qh4. The queen joins the rook on the h-file.', arrows: ['h4h2:green', 'h8h2:green'], marks: ['h2:red:target'] },
+      { upto: 16, kind: 'setup', text: 'f3 g3! Mate on h2 can’t be stopped.', arrows: ['g3h2:green', 'h4h2:green'], marks: ['h2:red:mate'] },
+      { upto: 18, kind: 'win', text: 'Qh2#. Hooked.', arrows: ['h2g1:green'], marks: ['g1:red:#'] },
     ],
   },
   {
@@ -54,13 +62,13 @@ export const TRAPS: Trap[] = [
     hook: 'Leave a pawn hanging… on purpose',
     steps: [
       { upto: 0, kind: 'intro', text: 'The Blackburne Shilling Gambit: Black leaves a pawn hanging on purpose.' },
-      { upto: 6, kind: 'setup', text: '3...Nd4!? looks like a beginner’s move. The e5 pawn is left undefended.' },
+      { upto: 6, kind: 'setup', text: '3...Nd4!? looks like a beginner’s move. The e5 pawn is left undefended.', marks: ['e5:red:hanging?'] },
       { upto: 7, kind: 'setup', text: 'Nxe5. White takes the free pawn.' },
-      { upto: 8, kind: 'trap', text: 'Qg5! The queen hits the knight AND the g2 pawn.' },
-      { upto: 9, kind: 'bait', text: 'Nxf7?? White forks the queen and rook… and ignores g2.' },
-      { upto: 10, kind: 'setup', text: 'Qxg2! Now the rook on h1 is attacked.' },
-      { upto: 12, kind: 'setup', text: 'Rf1 Qxe4+. Check, and the bishop has to block.' },
-      { upto: 14, kind: 'win', text: 'Be2 Nf3#. Smothered mate in 7 moves.' },
+      { upto: 8, kind: 'trap', text: 'Qg5! The queen hits the knight AND the g2 pawn.', arrows: ['g5e5:green', 'g5g2:green'], marks: ['g2:red', 'e5:red'], pause: "White grabbed the pawn. Black's move? 🤔" },
+      { upto: 9, kind: 'bait', text: 'Nxf7?? White forks the queen and rook… and ignores g2.', arrows: ['f7g5:red', 'f7h8:red'] },
+      { upto: 10, kind: 'setup', text: 'Qxg2! Now the rook on h1 is attacked.', arrows: ['g2h1:green'], marks: ['h1:red'] },
+      { upto: 12, kind: 'setup', text: 'Rf1 Qxe4+. Check, and the bishop has to block.', arrows: ['e4e1:green'], marks: ['e1:red:check'] },
+      { upto: 14, kind: 'win', text: 'Be2 Nf3#. Smothered mate in 7 moves.', arrows: ['f3e1:green', 'e4e2:green'], marks: ['e1:red:#', 'e2:gold:pinned'] },
     ],
   },
   {
@@ -70,11 +78,11 @@ export const TRAPS: Trap[] = [
     steps: [
       { upto: 0, kind: 'intro', text: 'The Siberian Trap: how Black punishes the Smith-Morra Gambit.' },
       { upto: 7, kind: 'setup', text: 'White gives up a pawn for fast development.' },
-      { upto: 14, kind: 'setup', text: 'Black develops calmly. The queen on c7 is already eyeing h2.' },
-      { upto: 16, kind: 'setup', text: 'Qe2 Ng4! The knight joins the queen on h2.' },
-      { upto: 17, kind: 'bait', text: 'h3?? White kicks the knight. Natural… and losing.' },
-      { upto: 18, kind: 'trap', text: 'Nd4!! It attacks the queen and lures away the knight that guards h2.' },
-      { upto: 20, kind: 'win', text: 'Nxd4 Qh2#. Checkmate.' },
+      { upto: 14, kind: 'setup', text: 'Black develops calmly. The queen on c7 is already eyeing h2.', arrows: ['c7h2:gold'], marks: ['h2:gold:target'] },
+      { upto: 16, kind: 'setup', text: 'Qe2 Ng4! The knight joins the queen on h2.', arrows: ['g4h2:green', 'c7h2:green'], marks: ['h2:red'] },
+      { upto: 17, kind: 'bait', text: 'h3?? White kicks the knight. Natural… and losing.', arrows: ['h3g4:red'] },
+      { upto: 18, kind: 'trap', text: 'Nd4!! It attacks the queen and lures away the knight that guards h2.', arrows: ['d4e2:green', 'd4f3:green', 'c7h2:green'], marks: ['f3:gold:defender', 'h2:red'], pause: "White kicked the knight. Black's killer move? 🤔" },
+      { upto: 20, kind: 'win', text: 'Nxd4 Qh2#. Checkmate.', arrows: ['h2g1:green'], marks: ['g1:red:#'] },
     ],
   },
   {
@@ -83,13 +91,13 @@ export const TRAPS: Trap[] = [
     hook: 'Let them take your queen',
     steps: [
       { upto: 0, kind: 'intro', text: 'The Stafford Gambit: Black gives up a pawn and sets traps everywhere.' },
-      { upto: 8, kind: 'setup', text: 'Black lets White take the knight and gets open lines for both bishops.' },
-      { upto: 10, kind: 'setup', text: 'd3 Bc5. The bishop is already aiming at f2.' },
-      { upto: 11, kind: 'bait', text: 'Bg5?? Pinning the knight to the queen. Looks strong.' },
-      { upto: 12, kind: 'trap', text: 'Nxe4!! Black ignores the pin and gives up the queen.' },
-      { upto: 13, kind: 'setup', text: 'Bxd8. White takes the queen…' },
-      { upto: 15, kind: 'setup', text: 'Bxf2+! The king has to go to e2.' },
-      { upto: 16, kind: 'win', text: 'Bg4#. Checkmate with two bishops and a knight.' },
+      { upto: 8, kind: 'setup', text: 'Black lets White take the knight and gets open lines for both bishops.', arrows: ['f8c5:gold', 'c8g4:gold'] },
+      { upto: 10, kind: 'setup', text: 'd3 Bc5. The bishop is already aiming at f2.', arrows: ['c5f2:gold'], marks: ['f2:gold:weak'] },
+      { upto: 11, kind: 'bait', text: 'Bg5?? Pinning the knight to the queen. Looks strong.', arrows: ['g5d8:red'], marks: ['f6:red:pinned?'] },
+      { upto: 12, kind: 'trap', text: 'Nxe4!! Black ignores the pin and gives up the queen.', arrows: ['c5f2:green'], marks: ['d8:red:free?'], pause: "Black's knight is pinned… or is it? 🤔" },
+      { upto: 13, kind: 'setup', text: 'Bxd8. White takes the queen…', marks: ['d8:red:queen gone'] },
+      { upto: 15, kind: 'setup', text: 'Bxf2+! The king has to go to e2.', arrows: ['f2e1:green'], marks: ['e2:red:forced'] },
+      { upto: 16, kind: 'win', text: 'Bg4#. Checkmate with two bishops and a knight.', arrows: ['g4e2:green'], marks: ['e2:red:#'] },
     ],
   },
   {
@@ -99,11 +107,11 @@ export const TRAPS: Trap[] = [
     steps: [
       { upto: 0, kind: 'intro', text: 'The Kieninger Trap: checkmate in 8 from the Budapest Gambit.' },
       { upto: 6, kind: 'setup', text: 'Black gives a pawn with e5 and goes after it with the knight.' },
-      { upto: 10, kind: 'setup', text: 'Both sides develop. Black’s bishop comes out with check.' },
-      { upto: 12, kind: 'setup', text: 'Nbd2 Qe7. The queen lines up on the e-file.' },
-      { upto: 14, kind: 'trap', text: 'a3 Ngxe5! Black ignores the attacked bishop.' },
-      { upto: 15, kind: 'bait', text: 'axb4?? White takes the free bishop.' },
-      { upto: 16, kind: 'win', text: 'Nd3#! The e2 pawn can’t take: it’s pinned by the queen.' },
+      { upto: 10, kind: 'setup', text: 'Both sides develop. Black’s bishop comes out with check.', arrows: ['b4e1:green'] },
+      { upto: 12, kind: 'setup', text: 'Nbd2 Qe7. The queen lines up on the e-file.', arrows: ['e7e2:gold'] },
+      { upto: 14, kind: 'trap', text: 'a3 Ngxe5! Black ignores the attacked bishop.', arrows: ['a3b4:red', 'e5d3:green'], pause: "White attacks the bishop. What does Black do? 🤔" },
+      { upto: 15, kind: 'bait', text: 'axb4?? White takes the free bishop.', marks: ['b4:red:free?'] },
+      { upto: 16, kind: 'win', text: 'Nd3#! The e2 pawn can’t take: it’s pinned by the queen.', arrows: ['d3e1:green', 'e7e2:green'], marks: ['e1:red:#', 'e2:gold:pinned'] },
     ],
   },
   {
@@ -112,11 +120,11 @@ export const TRAPS: Trap[] = [
     hook: 'Checkmate in 6 moves from the Caro-Kann',
     steps: [
       { upto: 0, kind: 'intro', text: 'A 6-move checkmate hiding in the main line of the Caro-Kann.' },
-      { upto: 7, kind: 'setup', text: 'Main-line Caro-Kann. White’s knight takes over e4.' },
+      { upto: 7, kind: 'setup', text: 'Main-line Caro-Kann. White’s knight takes over e4.', marks: ['e4:gold'] },
       { upto: 8, kind: 'setup', text: 'Nd7, a completely normal move.' },
-      { upto: 9, kind: 'trap', text: 'Qe2!? A quiet move: the queen lines up behind the knight on the e-file.' },
-      { upto: 10, kind: 'bait', text: 'Ngf6?? The most natural move in the world.' },
-      { upto: 11, kind: 'win', text: 'Nd6#! The knight steps aside: the e7 pawn is pinned and the king is smothered.' },
+      { upto: 9, kind: 'trap', text: 'Qe2!? A quiet move: the queen lines up behind the knight on the e-file.', arrows: ['e2e7:gold'], marks: ['e7:gold'] },
+      { upto: 10, kind: 'bait', text: 'Ngf6?? The most natural move in the world.', marks: ['f6:red:?', 'd6:gold:hole'] },
+      { upto: 11, kind: 'win', text: 'Nd6#! The knight steps aside: the e7 pawn is pinned and the king is smothered.', arrows: ['d6e8:green', 'e2e7:green'], marks: ['e8:red:#', 'e7:gold:pinned'], pause: "That was a blunder. Mate in one for White! 🤔" },
     ],
   },
   {
@@ -125,12 +133,12 @@ export const TRAPS: Trap[] = [
     hook: 'One pawn move opens the king',
     steps: [
       { upto: 0, kind: 'intro', text: 'Owen’s Defense: the trap that punishes …f5.' },
-      { upto: 5, kind: 'setup', text: 'Black fianchettoes the bishop. It aims straight at the rook on h1.' },
-      { upto: 6, kind: 'bait', text: 'f5?? Black attacks e4… and opens up the king.' },
-      { upto: 8, kind: 'setup', text: 'exf5 Bxg2. Black goes for the rook.' },
-      { upto: 9, kind: 'trap', text: 'Qh5+! The weakened kingside is wide open.' },
-      { upto: 12, kind: 'setup', text: 'g6 fxg6 Nf6. Black attacks the queen…' },
-      { upto: 15, kind: 'win', text: 'gxh7+ Nxh5 Bg6#! White gives up the queen and mates anyway.' },
+      { upto: 5, kind: 'setup', text: 'Black fianchettoes the bishop. It aims straight at the rook on h1.', arrows: ['b7h1:gold'] },
+      { upto: 6, kind: 'bait', text: 'f5?? Black attacks e4… and opens up the king.', arrows: ['d1h5:gold'], marks: ['e8:red:open'] },
+      { upto: 8, kind: 'setup', text: 'exf5 Bxg2. Black goes for the rook.', arrows: ['g2h1:red'], marks: ['h1:red'] },
+      { upto: 9, kind: 'trap', text: 'Qh5+! The weakened kingside is wide open.', arrows: ['h5e8:green'], marks: ['e8:red:check'], pause: "Black is about to take the rook. White's move? 🤔" },
+      { upto: 12, kind: 'setup', text: 'g6 fxg6 Nf6. Black attacks the queen…', arrows: ['f6h5:red'] },
+      { upto: 15, kind: 'win', text: 'gxh7+ Nxh5 Bg6#! White gives up the queen and mates anyway.', arrows: ['g6e8:green', 'h7g8:green'], marks: ['e8:red:#'] },
     ],
   },
   {
@@ -139,14 +147,14 @@ export const TRAPS: Trap[] = [
     hook: 'Checkmate in 8 against 1.d4',
     steps: [
       { upto: 0, kind: 'intro', text: 'The Englund Gambit Trap: checkmate in 8 against 1.d4.' },
-      { upto: 6, kind: 'setup', text: 'Black gives a pawn, then puts the queen on e7 to win it back.' },
+      { upto: 6, kind: 'setup', text: 'Black gives a pawn, then puts the queen on e7 to win it back.', arrows: ['e7e5:gold'] },
       { upto: 7, kind: 'setup', text: 'Bf4 defends the pawn. Natural.' },
-      { upto: 8, kind: 'setup', text: 'Qb4+! Check, and the b2 pawn is attacked too.' },
-      { upto: 10, kind: 'setup', text: 'Bd2 Qxb2. Now the rook on a1 is in trouble.' },
-      { upto: 11, kind: 'bait', text: 'Bc3?? White attacks the queen.' },
-      { upto: 12, kind: 'trap', text: 'Bb4!! Black pins the bishop instead of running.' },
+      { upto: 8, kind: 'setup', text: 'Qb4+! Check, and the b2 pawn is attacked too.', arrows: ['b4e1:green', 'b4b2:green'], marks: ['b2:red'] },
+      { upto: 10, kind: 'setup', text: 'Bd2 Qxb2. Now the rook on a1 is in trouble.', arrows: ['b2a1:green'], marks: ['a1:red'] },
+      { upto: 11, kind: 'bait', text: 'Bc3?? White attacks the queen.', arrows: ['c3b2:red'] },
+      { upto: 12, kind: 'trap', text: 'Bb4!! Black pins the bishop instead of running.', arrows: ['b4e1:green'], marks: ['c3:gold:pinned'], pause: "White attacks the queen. Black's reply? 🤔" },
       { upto: 15, kind: 'setup', text: 'Qd2 Bxc3 Qxc3…' },
-      { upto: 16, kind: 'win', text: 'Qc1#! Checkmate on the back rank.' },
+      { upto: 16, kind: 'win', text: 'Qc1#! Checkmate on the back rank.', arrows: ['c1e1:green'], marks: ['e1:red:#'] },
     ],
   },
   {
@@ -155,13 +163,13 @@ export const TRAPS: Trap[] = [
     hook: 'The pinned knight that isn’t pinned',
     steps: [
       { upto: 0, kind: 'intro', text: 'The Elephant Trap: Black “hangs” a pawn in the Queen’s Gambit.' },
-      { upto: 7, kind: 'setup', text: 'Queen’s Gambit Declined. White pins the knight on f6.' },
-      { upto: 10, kind: 'setup', text: 'Nbd7, then the center opens: cxd5 exd5.' },
-      { upto: 11, kind: 'bait', text: 'Nxd5?? The knight on f6 is pinned, so it can’t take back… can it?' },
-      { upto: 12, kind: 'trap', text: 'Nxd5!! It can. Black gives up the queen.' },
-      { upto: 13, kind: 'setup', text: 'Bxd8. White takes the queen…' },
-      { upto: 14, kind: 'setup', text: 'Bb4+! Check, and White has to give the queen back.' },
-      { upto: 18, kind: 'win', text: 'Qd2 Bxd2+ Kxd2 Kxd8. Black is a whole piece up.' },
+      { upto: 7, kind: 'setup', text: 'Queen’s Gambit Declined. White pins the knight on f6.', arrows: ['g5d8:gold'], marks: ['f6:gold:pinned'] },
+      { upto: 10, kind: 'setup', text: 'Nbd7, then the center opens: cxd5 exd5.', marks: ['d5:gold'] },
+      { upto: 11, kind: 'bait', text: 'Nxd5?? The knight on f6 is pinned, so it can’t take back… can it?', marks: ['d5:red:free?'] },
+      { upto: 12, kind: 'trap', text: 'Nxd5!! It can. Black gives up the queen.', marks: ['d8:red:queen?'], pause: "The f6 knight is pinned… so is d5 really free? 🤔" },
+      { upto: 13, kind: 'setup', text: 'Bxd8. White takes the queen…', marks: ['d8:red'] },
+      { upto: 14, kind: 'setup', text: 'Bb4+! Check, and White has to give the queen back.', arrows: ['b4e1:green'], marks: ['e1:red:check'] },
+      { upto: 18, kind: 'win', text: 'Qd2 Bxd2+ Kxd2 Kxd8. Black is a whole piece up.', marks: ['d8:green:+1 piece'] },
     ],
   },
   {
@@ -170,13 +178,13 @@ export const TRAPS: Trap[] = [
     hook: 'Promote to a knight. Win the queen.',
     steps: [
       { upto: 0, kind: 'intro', text: 'The Lasker Trap: the famous trap with a knight promotion.' },
-      { upto: 6, kind: 'setup', text: 'The Albin Countergambit. Black’s pawn on d4 cramps White.' },
+      { upto: 6, kind: 'setup', text: 'The Albin Countergambit. Black’s pawn on d4 cramps White.', marks: ['d4:gold:cramp'] },
       { upto: 7, kind: 'setup', text: 'e3, trying to break up the pawn.' },
-      { upto: 10, kind: 'setup', text: 'Bb4+ Bd2 dxe3! The pawn keeps marching.' },
-      { upto: 11, kind: 'bait', text: 'Bxb4?? White grabs the bishop.' },
-      { upto: 12, kind: 'setup', text: 'exf2+! The king has to move.' },
-      { upto: 14, kind: 'trap', text: 'Ke2 fxg1=N+!! Promoting to a KNIGHT, with check.' },
-      { upto: 16, kind: 'win', text: 'Rxg1 Bg4+. The queen on d1 is lost.' },
+      { upto: 10, kind: 'setup', text: 'Bb4+ Bd2 dxe3! The pawn keeps marching.', arrows: ['e3f2:green'], marks: ['f2:red'] },
+      { upto: 11, kind: 'bait', text: 'Bxb4?? White grabs the bishop.', marks: ['b4:red'] },
+      { upto: 12, kind: 'setup', text: 'exf2+! The king has to move.', arrows: ['f2e1:green'], marks: ['e2:gold'] },
+      { upto: 14, kind: 'trap', text: 'Ke2 fxg1=N+!! Promoting to a KNIGHT, with check.', arrows: ['g1e2:green'], marks: ['g1:green:♞!!', 'e2:red:check'], pause: "The pawn is on f2. Promote to a queen? 🤔" },
+      { upto: 16, kind: 'win', text: 'Rxg1 Bg4+. The queen on d1 is lost.', arrows: ['g4d1:green'], marks: ['d1:red:lost', 'e2:red:check'] },
     ],
   },
   {
@@ -185,12 +193,12 @@ export const TRAPS: Trap[] = [
     hook: 'A trap as old as the ark',
     steps: [
       { upto: 0, kind: 'intro', text: 'Noah’s Ark Trap: as old as the ark, and it still works.' },
-      { upto: 9, kind: 'setup', text: 'Ruy Lopez. White strikes in the center with d4.' },
-      { upto: 11, kind: 'setup', text: 'b5 Bb3. The bishop retreats into the corner.' },
-      { upto: 15, kind: 'bait', text: 'Nxd4 Nxd4 exd4 Qxd4?? Taking back with the queen is the mistake.' },
-      { upto: 16, kind: 'trap', text: 'c5! The queen is hit.' },
+      { upto: 9, kind: 'setup', text: 'Ruy Lopez. White strikes in the center with d4.', arrows: ['d4e5:gold'] },
+      { upto: 11, kind: 'setup', text: 'b5 Bb3. The bishop retreats into the corner.', marks: ['b3:gold'] },
+      { upto: 15, kind: 'bait', text: 'Nxd4 Nxd4 exd4 Qxd4?? Taking back with the queen is the mistake.', marks: ['d4:red:?'] },
+      { upto: 16, kind: 'trap', text: 'c5! The queen is hit.', arrows: ['c5d4:green'], marks: ['d4:red'] },
       { upto: 21, kind: 'setup', text: 'The queen runs, Black keeps chasing it with tempo.' },
-      { upto: 22, kind: 'win', text: 'c4! The bishop on b3 is trapped in an “ark” of pawns.' },
+      { upto: 22, kind: 'win', text: 'c4! The bishop on b3 is trapped in an “ark” of pawns.', arrows: ['c4b3:green'], marks: ['b3:red:trapped', 'a4:gold', 'c2:gold'], pause: "How does Black trap the bishop? 🤔" },
     ],
   },
 ];
