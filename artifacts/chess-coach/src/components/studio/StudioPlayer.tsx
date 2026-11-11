@@ -1797,13 +1797,13 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
     const vkey = (t: string) => `${voiceKey}|${t}`;
     const lines = [...new Set(frames.map(narration).filter((x): x is string => !!x))];
     const todo = lines.filter((t) => !voiceUrl.current.has(vkey(t)));
-    let done = lines.length - todo.length, failed = 0;
+    let done = lines.length - todo.length, failed = 0, why = '';
     setVoicePrep({ done, total: lines.length });
     const one = async (t: string) => {
       for (let attempt = 0; attempt < 3 && live; attempt++) {
         try {
           const r = await apiFetch('/api/tts/speak', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: t, voice: prefs.voiceName, style: prefs.tone === 'teacher' || clip?.isLesson ? 'studio' : 'creator' }) });
-          if (!r.ok) throw new Error('tts');
+          if (!r.ok) { const d = await r.json().catch(() => null); why = d?.reason || `server error ${r.status}`; throw new Error('tts'); }
           const url = URL.createObjectURL(await r.blob());
           await new Promise<void>((res) => { const a = new Audio(url); a.onloadedmetadata = () => { voiceLen.current.set(vkey(t), a.duration || 0); res(); }; a.onerror = () => res(); });
           voiceUrl.current.set(vkey(t), url);
@@ -1819,7 +1819,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
       }));
       if (!live) return;
       setVoiceTick((x) => x + 1);
-      setVoiceNote(failed ? `${failed} line${failed > 1 ? 's' : ''} of the voiceover couldn't be made (it uses OpenAI), so ${failed > 1 ? 'they play' : 'it plays'} silently. Try again in a moment.` : null);
+      setVoiceNote(failed ? `${failed} line${failed > 1 ? 's' : ''} of the voiceover couldn't be made${why ? `: ${why}` : ' (it uses OpenAI)'}, so ${failed > 1 ? 'they play' : 'it plays'} silently.` : null);
     })();
     return () => { live = false; };
   }, [prefs.voice, prefs.voiceName, frames, hook, prefs.outroLine, compTitle, prefs.captions, prefs.splashCta, ctaText, prefs.openCut, prefs.tone]); // eslint-disable-line react-hooks/exhaustive-deps

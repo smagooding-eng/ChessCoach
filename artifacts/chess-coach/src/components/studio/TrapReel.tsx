@@ -108,26 +108,26 @@ export function TrapReel({ opts: initial, render = false, onClose }: { opts?: Tr
     const lines = [...new Set(linesFor(o))];
     const key = (t: string) => `${vName(o)}|${t}`;
     const todo = lines.filter((t) => !voiceMap.current.has(key(t)));
-    let done = lines.length - todo.length, failed = 0;
+    let done = lines.length - todo.length, failed = 0, why = '';
     setVoicePrep({ done, total: lines.length });
     const one = async (t: string) => {
       for (let attempt = 0; attempt < 3; attempt++) {
         try {
-          const ac = new AbortController(); const to = setTimeout(() => ac.abort(), 15_000);
+          const ac = new AbortController(); const to = setTimeout(() => ac.abort(), 30_000);
           const res = await apiFetch('/api/tts/speak', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: t, voice: vName(o), style: 'creator' }), signal: ac.signal }).finally(() => clearTimeout(to));
-          if (!res.ok) throw new Error('tts');
+          if (!res.ok) { const d = await res.json().catch(() => null); why = d?.reason || `server error ${res.status}`; if (res.status === 502 && attempt >= 1) break; throw new Error('tts'); }
           const url = URL.createObjectURL(await res.blob());
           const len = await new Promise<number>((ok) => { const a = new Audio(url); a.onloadedmetadata = () => ok(a.duration || 0); a.onerror = () => ok(0); });
           voiceMap.current.set(key(t), { url, len });
           return;
-        } catch { await new Promise((ok) => setTimeout(ok, 500 * (attempt + 1))); }
+        } catch (e) { if ((e as Error)?.name === 'AbortError') why = 'the voice service took too long'; await new Promise((ok) => setTimeout(ok, 500 * (attempt + 1))); }
       }
       failed++;
     };
     const queue = [...todo];
     await Promise.all(Array.from({ length: 3 }, async () => { while (queue.length) { await one(queue.shift()!); done++; setVoicePrep({ done, total: lines.length }); } }));
     setVoicePrep(null);
-    setVoiceNote(failed ? `${failed} line${failed > 1 ? 's' : ''} of the voiceover couldn't be made, so ${failed > 1 ? 'they play' : 'it plays'} silently.` : null);
+    setVoiceNote(failed ? `${failed} of ${lines.length} voice lines couldn't be made${why ? ` (${why})` : ''}.${render ? '' : ' The preview reads those with your phone’s own voice; MP4s will be silent there.'}` : null);
   };
   const [clean, setClean] = useState(false);
   const [blank, setBlank] = useState(false);
@@ -163,7 +163,15 @@ export function TrapReel({ opts: initial, render = false, onClose }: { opts?: Tr
     // How long a line lasts: its real length when made, otherwise an estimate (so a line that
     // arrives a moment late still fits).
     const vlen = (text: string) => { if (o.voice === false) return 0; const v = voiceMap.current.get(`${vName(o)}|${text}`); return v ? Math.round(v.len * 1000) : text.length * 62; };
-    const say = (text: string) => { const v = o.voice !== false ? voiceMap.current.get(`${vName(o)}|${text}`) : undefined; if (v) { voiceAudio.current?.pause(); voiceAudio.current = mus().playVoice(v.url); } };
+    const say = (text: string) => {
+      if (o.voice === false) return;
+      const v = voiceMap.current.get(`${vName(o)}|${text}`);
+      if (v) { voiceAudio.current?.pause(); try { window.speechSynthesis?.cancel(); } catch { /* ignore */ } voiceAudio.current = mus().playVoice(v.url); return; }
+      // The narrator couldn't make this line: in the preview, read it with the device's voice.
+      if (!render && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.rate = 1.05; window.speechSynthesis.speak(u); } catch { /* no voice */ }
+      }
+    };
     setStepIdx(0); setPauseLeft(0); setCallout(null);
     try { const m = mus(); routeSoundsTo(m.unlock(), m.sfx); m.stop(); if (o.music !== 'off') m.start(o.music); } catch { /* ignore */ }
     const c = new Chess(); const vm = tr.san.map((san) => c.move(san));
@@ -251,7 +259,7 @@ export function TrapReel({ opts: initial, render = false, onClose }: { opts?: Tr
     // The renderer waits for "ready": the whole voiceover is made first.
     if (opts.voice !== false) void prepareVoice(opts).then(() => { if (w.__studioRender) w.__studioRender.ready = true; });
   }, [render]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => () => { voiceAudio.current?.pause(); }, []);
+  useEffect(() => () => { voiceAudio.current?.pause(); try { window.speechSynthesis?.cancel(); } catch { /* ignore */ } }, []);
 
   // ── The board at the current ply ──────────────────────────────────────────
   const game = new Chess();

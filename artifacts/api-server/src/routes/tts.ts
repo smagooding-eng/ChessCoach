@@ -49,7 +49,7 @@ router.get("/tts/voices", (_req, res) => {
 });
 
 const CACHE_MAX_ENTRIES = 400;
-const CACHE_MAX_BYTES = 80 * 1024 * 1024;
+const CACHE_MAX_BYTES = 24 * 1024 * 1024; // the server has 512MB in all
 const audioCache = new Map<string, Buffer>();
 let cacheBytes = 0;
 
@@ -100,6 +100,7 @@ async function speakLegacy(text: string, voice: string): Promise<Buffer> {
 }
 
 router.post("/tts/speak", async (req, res): Promise<void> => {
+  let elevenReason = "";
   try {
     const { text, voice, style } = req.body as { text?: string; voice?: string; style?: string };
     const kids = style === "kids";
@@ -124,7 +125,7 @@ router.post("/tts/speak", async (req, res): Promise<void> => {
       try {
         if (premium) {
           try { buffer = await speakEleven(trimmed, creator); }
-          catch (err) { logger.warn({ err }, "Premium TTS failed, using OpenAI"); buffer = await speakFast(trimmed, "ash", creator ? CREATOR_STYLE : STUDIO_STYLE); }
+          catch (err) { elevenReason = (err as Error)?.message ?? "ElevenLabs failed"; logger.warn({ err }, "Premium TTS failed, using OpenAI"); buffer = await speakFast(trimmed, "ash", creator ? CREATOR_STYLE : STUDIO_STYLE); }
         } else buffer = await speakFast(trimmed, selectedVoice, kids ? KIDS_STYLE : creator ? CREATOR_STYLE : studio ? STUDIO_STYLE : NARRATION_STYLE);
       } catch (err) {
         logger.warn({ err }, "Fast TTS failed, falling back to gpt-audio");
@@ -145,7 +146,13 @@ router.post("/tts/speak", async (req, res): Promise<void> => {
     res.send(buffer);
   } catch (err) {
     logger.error({ err }, "TTS generation failed");
-    res.status(500).json({ error: "TTS generation failed" });
+    // Say why, so the Studio can show it (e.g. OpenAI out of credit, or the key missing).
+    const e = err as { status?: number; code?: string; message?: string };
+    const reason = !process.env.OPENAI_API_KEY ? "OPENAI_API_KEY isn't set on the server"
+      : e?.status === 429 || e?.code === "insufficient_quota" ? "OpenAI says the account is out of credit or over its limit (429)"
+      : e?.status === 401 ? "OpenAI rejected the API key (401)"
+      : `${e?.status ?? ""} ${e?.code ?? e?.message ?? "unknown error"}`.trim();
+    res.status(502).json({ error: "TTS generation failed", reason: elevenReason ? `${elevenReason}; then ${reason}` : reason });
   }
 });
 
