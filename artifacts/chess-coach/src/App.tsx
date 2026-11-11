@@ -4,6 +4,7 @@ import { isInPlayApp } from '@/lib/playApp';
 import { pathLang } from "@/lib/i18n";
 import { ChallengeToast } from '@/components/ChallengeToast';
 import { LichessChallengeToast } from '@/components/LichessChallengeToast';
+import { TournamentWelcome } from '@/components/TournamentWelcome';
 import { ChallengeNotifyPrompt } from '@/components/ChallengeNotifyPrompt';
 import { rememberReturnTo } from '@/components/QuickSignup';
 import { BoardStyleTipHost } from '@/components/BoardStyleTip';
@@ -732,6 +733,7 @@ function App() {
                     <ImportStatusWatcher />
                     <ChallengeToast />
                     <LichessChallengeToast />
+                    <TournamentWelcome />
                     <ChallengeNotifyPrompt />
                     <BackgroundJobsWatcher />
                     <AutoPushPrompt />
