@@ -15,6 +15,10 @@ import {
   type AvatarId, type AvatarPose, type Hat, type Eyewear, type PersonLook,
 } from '@/lib/streamer/avatars';
 import { cartoonFromCamera } from '@/lib/streamer/cartoonMe';
+import {
+  TOON_STYLES, TOON_CREDITS, TOON_TOPS, TOON_FACIAL, TOON_CLOTHES, TOON_GLASSES, TOON_SKINS, DEFAULT_TOON_CUSTOM,
+  loadToons, toonThumb, warmToon, drawToon, toonFromPerson, type ToonPick, type ToonCustom,
+} from '@/lib/streamer/toonAvatars';
 import { drawComposite, type BoardFeed } from '@/lib/streamer/compositor';
 import { CloudRecorder, type RecStatus } from '@/lib/streamer/recorder';
 import { LiveHost } from '@/lib/streamer/live';
@@ -34,7 +38,7 @@ interface Settings {
   boardSource: 'app' | 'screen'; appPath: string; zoom: number; panX: number; panY: number;
   frame: 'auto' | 'manual'; framePad: 'board' | 'players';
   camOn: boolean; camId: string; facing: 'user' | 'environment'; mirror: boolean;
-  disguise: Disguise; avatar: AvatarId; bg: Bg; bgColor: string; avatarScale: number;
+  disguise: Disguise; avatar: AvatarId | 'toon'; toon: ToonPick; toonShuffle: number; bg: Bg; bgColor: string; avatarScale: number;
   hat: Hat; eyewear: Eyewear; person: PersonLook; customVoice: CustomVoice; personStyle: 'cartoon' | 'real';
   voice: VoicePreset; pitch: number; micId: string; output: string;
   name: string; subtitle: string;
@@ -68,7 +72,7 @@ const DEFAULTS: Settings = {
   boardSource: 'app', appPath: '/live', zoom: 1, panX: 0, panY: 0,
   frame: 'auto', framePad: 'players',
   camOn: false, camId: '', facing: 'user', mirror: true,
-  disguise: 'avatar', avatar: 'wN', hat: 'none', eyewear: 'none', person: DEFAULT_PERSON, customVoice: DEFAULT_CUSTOM, personStyle: 'cartoon', bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3,
+  disguise: 'avatar', avatar: 'toon', toon: { style: 'avataaars', seed: 'avataaars-0-3', custom: null }, toonShuffle: 0, hat: 'none', eyewear: 'none', person: DEFAULT_PERSON, customVoice: DEFAULT_CUSTOM, personStyle: 'cartoon', bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3,
   voice: 'off', pitch: 0, micId: '', output: 'none',
   name: 'Anonymous Knight', subtitle: 'Playing on chessscout.net',
   broadcast: true, recordLive: true, title: '',
@@ -82,7 +86,12 @@ const IS_PHONE = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i
 function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { ...DEFAULTS, ...(JSON.parse(raw) as Partial<Settings>) };
+    if (raw) {
+      const saved = JSON.parse(raw) as Partial<Settings>;
+      const merged = { ...DEFAULTS, ...saved };
+      if (!saved.toon) merged.avatar = 'toon'; // first time with the new cartoon characters
+      return merged;
+    }
   } catch { /* ignore */ }
   return DEFAULTS;
 }
@@ -159,6 +168,9 @@ export default function StreamerStudio() {
     };
   }
   useEffect(() => { preloadPieceAvatars(); }, []);
+  const [toonsReady, setToonsReady] = useState(false);
+  useEffect(() => { void loadToons().then((l) => setToonsReady(!!l)); }, []);
+  useEffect(() => { if (toonsReady) warmToon(s.toon); }, [toonsReady, s.toon]);
 
   const flash = useCallback((m: string) => { setMsg(m); window.setTimeout(() => setMsg((x) => (x === m ? null : x)), 6000); }, []);
 
@@ -252,7 +264,12 @@ export default function StreamerStudio() {
         if (tr.lastLandmarks && performance.now() - tr.lastAt < 400 && camVideo.current && camVideo.current.videoWidth) {
           await new Promise((r) => window.setTimeout(r, 600)); // let the camera settle its exposure
           const look = cartoonFromCamera(camVideo.current, tr.lastLandmarks, sRef.current.person);
-          if (look) { set({ person: look, avatar: 'me' }); flash('Made an avatar from your camera. Tweak it under “Make your own”.'); return; }
+          if (look) {
+            const custom = toonFromPerson(look, sRef.current.toon.custom ?? DEFAULT_TOON_CUSTOM);
+            set({ person: look, avatar: 'toon', toon: { style: 'avataaars', seed: sRef.current.toon.style === 'avataaars' ? sRef.current.toon.seed : 'avataaars-me', custom } });
+            flash('Made a cartoon of you. Fine-tune it under “Customise”.');
+            return;
+          }
         }
       }
       flash('Couldn’t see your face clearly. Face the camera in good light and try again.');
@@ -465,7 +482,8 @@ export default function StreamerStudio() {
           pose.mouth = Math.min(1, vlevel * 1.8);
         } else if (pose.mouth < 0.1 && vlevel > 0.15) pose.mouth = Math.min(1, vlevel * 1.5);
         pose.t = t / 1000;
-        drawAvatar(c, st.avatar, pose, { person: st.person, hat: st.hat, eyewear: st.eyewear, style: st.personStyle });
+        if (st.avatar === 'toon') drawToon(c, st.toon, pose);
+        else drawAvatar(c, st.avatar, pose, { person: st.person, hat: st.hat, eyewear: st.eyewear, style: st.personStyle });
       }
 
       if (!hasVideo && st.disguise !== 'avatar') {
@@ -846,6 +864,25 @@ export default function StreamerStudio() {
             )}
 
             {s.disguise === 'avatar' && (<>
+              <Label>Cartoon characters</Label>
+              <div className="flex flex-wrap gap-1.5">
+                {TOON_STYLES.map((t) => <Chip key={t.id} on={s.avatar === 'toon' && s.toon.style === t.id} onClick={() => set({ avatar: 'toon', toon: { style: t.id, seed: `${t.id}-${s.toonShuffle}-0`, custom: t.id === 'avataaars' ? s.toon.custom ?? null : null } })}>{t.label}</Chip>)}
+              </div>
+              <ToonGrid ready={toonsReady} style={s.toon.style} shuffle={s.toonShuffle} current={s.avatar === 'toon' ? s.toon : null}
+                onPick={(seed) => set({ avatar: 'toon', toon: { style: s.toon.style, seed, custom: s.toon.style === 'avataaars' ? s.toon.custom ?? null : null } })}
+                onShuffle={() => set({ toonShuffle: s.toonShuffle + 1 })} />
+              <button onClick={() => void cartoonMe()} disabled={making} className="mt-3 w-full py-3 rounded-xl font-extrabold text-sm"
+                style={{ background: making ? CARD_LIGHT : RD.gold, color: making ? RD.text : '#050A0B' }}>
+                {making ? 'Looking at you… hold still' : '✨ Make a cartoon of me from my camera'}
+              </button>
+              <Note>Looks at your camera once and draws you as a cartoon: skin, hair, beard and clothes. The picture never leaves your device.</Note>
+              {s.avatar === 'toon' && s.toon.style === 'avataaars' && (
+                <ToonCustomiser value={s.toon.custom ?? DEFAULT_TOON_CUSTOM} on={!!s.toon.custom}
+                  onToggle={(on) => set({ toon: { ...s.toon, custom: on ? (s.toon.custom ?? DEFAULT_TOON_CUSTOM) : null } })}
+                  onChange={(c) => set({ toon: { ...s.toon, custom: c } })} />
+              )}
+              <details className="mt-4">
+              <summary className="cursor-pointer text-[13px] font-bold py-2" style={{ color: RD.text }}>More avatars: chess pieces, classic cartoons, people</summary>
               <Label>Chess pieces</Label>
               <div className="grid grid-cols-6 gap-2">
                 {AVATARS.filter((a) => a.group === 'piece').map((a) => <AvatarBtn key={a.id} id={a.id} label={a.label.split(' ')[1]} on={s.avatar === a.id} onClick={() => set({ avatar: a.id })} />)}
@@ -890,8 +927,10 @@ export default function StreamerStudio() {
               <div className="flex flex-wrap gap-1.5">{HATS.map((h) => <Chip key={h.id} on={s.hat === h.id} onClick={() => set({ hat: h.id })}>{h.emoji} {h.label}</Chip>)}</div>
               <Label>Glasses</Label>
               <div className="flex flex-wrap gap-1.5">{EYEWEAR.map((h) => <Chip key={h.id} on={s.eyewear === h.id} onClick={() => set({ eyewear: h.id })}>{h.emoji} {h.label}</Chip>)}</div>
-              <Note>Hats and glasses work on every avatar, the chess pieces too.</Note>
+              <Note>Hats and glasses work on these avatars, the chess pieces too.</Note>
+              </details>
               <Slider label="Avatar size" min={0.8} max={2.2} step={0.05} value={s.avatarScale} onChange={(v) => set({ avatarScale: v })} />
+              <p className="text-[10px] mt-2 leading-snug" style={{ color: RD.muted }}>{TOON_CREDITS}</p>
               <Label>Behind the avatar</Label>
               <div className="flex flex-wrap gap-2">
                 <Chip on={s.bg === 'brand'} onClick={() => set({ bg: 'brand' })}>ChessScout</Chip>
@@ -1082,6 +1121,52 @@ function Swatches({ label, colors, value, onPick }: { label: string; colors: str
             style={{ background: c, border: `3px solid ${value === c ? RD.green : 'rgba(255,255,255,.12)'}` }} />
         ))}
       </div>
+    </div>
+  );
+}
+
+function ToonGrid({ ready, style, shuffle, current, onPick, onShuffle }: { ready: boolean; style: ToonPick['style']; shuffle: number; current: ToonPick | null; onPick: (seed: string) => void; onShuffle: () => void }) {
+  if (!ready) return <Note>Loading characters…</Note>;
+  const seeds = Array.from({ length: 12 }, (_, i) => `${style}-${shuffle}-${i}`);
+  return (
+    <div className="mt-2">
+      <div className="grid grid-cols-4 gap-2">
+        {seeds.map((seed) => {
+          const on = !!current && current.style === style && current.seed === seed;
+          const src = toonThumb({ style, seed, custom: on ? current?.custom : null });
+          return (
+            <button key={seed} onClick={() => onPick(seed)} className="rounded-xl overflow-hidden aspect-square"
+              style={{ background: '#e9edf2', border: `3px solid ${on ? RD.green : 'transparent'}` }}>
+              {src && <img src={src} alt="" className="w-full h-full" />}
+            </button>
+          );
+        })}
+      </div>
+      <button onClick={onShuffle} className="mt-2 w-full py-2 rounded-xl text-[13px] font-bold" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }}>🔀 Show me more</button>
+    </div>
+  );
+}
+
+function ToonCustomiser({ value, on, onToggle, onChange }: { value: ToonCustom; on: boolean; onToggle: (on: boolean) => void; onChange: (c: ToonCustom) => void }) {
+  return (
+    <div className="mt-3 p-3 rounded-xl" style={{ background: CARD_LIGHT, border: `1px solid ${RD.border}` }}>
+      <div className="flex items-center gap-2">
+        <p className="text-[13px] font-bold flex-1">Customise</p>
+        <Chip on={on} onClick={() => onToggle(!on)}>{on ? 'On' : 'Off'}</Chip>
+      </div>
+      {on && (<>
+        <Swatches label="Skin" colors={TOON_SKINS} value={value.skinColor} onPick={(v) => onChange({ ...value, skinColor: v })} />
+        <Label>Hair</Label>
+        <div className="flex flex-wrap gap-1.5">{TOON_TOPS.map((h) => <Chip key={h.id} on={value.top === h.id} onClick={() => onChange({ ...value, top: h.id })}>{h.label}</Chip>)}</div>
+        <Swatches label="Hair colour" colors={HAIR_COLORS} value={value.hairColor} onPick={(v) => onChange({ ...value, hairColor: v })} />
+        <Label>Facial hair</Label>
+        <div className="flex flex-wrap gap-1.5">{TOON_FACIAL.map((h) => <Chip key={h.id} on={value.facialHair === h.id} onClick={() => onChange({ ...value, facialHair: h.id })}>{h.label}</Chip>)}</div>
+        <Label>Glasses</Label>
+        <div className="flex flex-wrap gap-1.5">{TOON_GLASSES.map((h) => <Chip key={h.id} on={value.accessories === h.id} onClick={() => onChange({ ...value, accessories: h.id })}>{h.label}</Chip>)}</div>
+        <Label>Clothes</Label>
+        <div className="flex flex-wrap gap-1.5">{TOON_CLOTHES.map((h) => <Chip key={h.id} on={value.clothing === h.id} onClick={() => onChange({ ...value, clothing: h.id })}>{h.label}</Chip>)}</div>
+        <Swatches label="Clothes colour" colors={SHIRT_COLORS} value={value.clothesColor} onPick={(v) => onChange({ ...value, clothesColor: v })} />
+      </>)}
     </div>
   );
 }
