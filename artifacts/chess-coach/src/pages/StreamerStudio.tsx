@@ -13,7 +13,7 @@ import { FaceTracker, type FacePose } from '@/lib/streamer/faceTracker';
 import { AVATARS, drawAvatar, type AvatarId, type AvatarPose } from '@/lib/streamer/avatars';
 
 type PanelId = 'board' | 'cam' | 'tag';
-interface Rect { x: number; y: number; w: number; h: number; z: number; hidden?: boolean }
+interface Rect { x: number; y: number; w: number; h: number; z: number; hidden?: boolean; round?: boolean }
 type Layout = Record<PanelId, Rect>;
 type Aspect = '9:16' | '16:9';
 type Disguise = 'none' | 'avatar' | 'pixelate' | 'blur';
@@ -23,6 +23,7 @@ type Tab = 'layout' | 'board' | 'camera' | 'voice' | 'live';
 interface Settings {
   aspect: Aspect; preset: string; layout: Layout;
   boardSource: 'app' | 'screen'; appPath: string; zoom: number; panX: number; panY: number;
+  frame: 'auto' | 'manual'; framePad: 'board' | 'players';
   camOn: boolean; camId: string; facing: 'user' | 'environment'; mirror: boolean;
   disguise: Disguise; avatar: AvatarId; bg: Bg; bgColor: string; avatarScale: number;
   voice: VoicePreset; pitch: number; micId: string; output: string;
@@ -33,7 +34,7 @@ const PRESETS: Record<Aspect, { id: string; label: string; layout: Layout }[]> =
   '9:16': [
     { id: 'board-top', label: 'Board top · camera bottom', layout: { board: { x: 0, y: 0, w: 100, h: 56.25, z: 1 }, cam: { x: 0, y: 56.25, w: 100, h: 36.75, z: 2 }, tag: { x: 0, y: 93, w: 100, h: 7, z: 3 } } },
     { id: 'board-bottom', label: 'Camera top · board bottom', layout: { tag: { x: 0, y: 0, w: 100, h: 7, z: 3 }, cam: { x: 0, y: 7, w: 100, h: 36.75, z: 2 }, board: { x: 0, y: 43.75, w: 100, h: 56.25, z: 1 } } },
-    { id: 'pip', label: 'Big board · camera bubble', layout: { board: { x: 0, y: 21.875, w: 100, h: 56.25, z: 1 }, cam: { x: 3, y: 2, w: 44, h: 18, z: 2 }, tag: { x: 50, y: 7, w: 47, h: 8, z: 3 } } },
+    { id: 'pip', label: 'Big board · round camera', layout: { cam: { x: 4, y: 2.5, w: 40, h: 22.5, z: 2, round: true }, tag: { x: 47, y: 9.5, w: 50, h: 8.5, z: 3 }, board: { x: 0, y: 28, w: 100, h: 56.25, z: 1 } } },
   ],
   '16:9': [
     { id: 'board-left', label: 'Board left · camera right', layout: { board: { x: 0, y: 0, w: 56.25, h: 100, z: 1 }, cam: { x: 56.25, y: 0, w: 43.75, h: 86, z: 2 }, tag: { x: 56.25, y: 86, w: 43.75, h: 14, z: 3 } } },
@@ -53,13 +54,16 @@ const APP_PAGES: { path: string; label: string }[] = [
 const DEFAULTS: Settings = {
   aspect: '9:16', preset: 'board-top', layout: PRESETS['9:16'][0].layout,
   boardSource: 'app', appPath: '/play-now', zoom: 1, panX: 0, panY: 0,
+  frame: 'auto', framePad: 'players',
   camOn: false, camId: '', facing: 'user', mirror: true,
   disguise: 'avatar', avatar: 'knight', bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3,
   voice: 'off', pitch: 0, micId: '', output: 'none',
   name: 'Anonymous Knight', subtitle: 'Playing on chessscout.net',
 };
-const KEY = 'cs_streamer_v1';
-const VIRTUAL_W = 430; // the app is laid out at phone width inside the board panel
+const KEY = 'cs_streamer_v2';
+const VIRTUAL_W = 430; // the app is laid out like a phone inside the board panel
+const VIRTUAL_H = 1000;
+const BG = '#050A0B', CARD = '#0D1516', CARD_LIGHT = '#121B1D'; // solid, never see-through
 const IS_PHONE = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 function loadSettings(): Settings {
@@ -70,12 +74,12 @@ function loadSettings(): Settings {
   return DEFAULTS;
 }
 
-const card: CSSProperties = { background: RD.cardSolid, border: `1px solid ${RD.border}`, borderRadius: 14 };
+const card: CSSProperties = { background: CARD, border: `1px solid ${RD.border}`, borderRadius: 14 };
 
 function Chip({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button onClick={onClick} className="px-3 py-2 rounded-xl text-[13px] font-semibold transition-colors"
-      style={on ? { background: RD.green, color: '#06110A' } : { background: RD.cardLight, color: RD.text, border: `1px solid ${RD.border}` }}>
+      style={on ? { background: RD.green, color: '#06110A' } : { background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }}>
       {children}
     </button>
   );
@@ -114,6 +118,8 @@ export default function StreamerStudio() {
   const camCanvas = useRef<HTMLCanvasElement>(null);
   const screenVideo = useRef<HTMLVideoElement>(null);
   const camStream = useRef<MediaStream | null>(null);
+  const boardFrame = useRef<HTMLIFrameElement>(null);
+  const [boardBox, setBoardBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const screenStream = useRef<MediaStream | null>(null);
   const tracker = useRef(new FaceTracker());
   const voice = useRef(new VoiceChanger());
@@ -214,6 +220,30 @@ export default function StreamerStudio() {
       screenVideo.current.srcObject = screenStream.current; void screenVideo.current.play().catch(() => undefined);
     }
   });
+
+  // ---- auto-frame: find the chessboard inside the ChessScout page and fit it to the panel ----
+  useEffect(() => {
+    if (s.boardSource !== 'app' || s.frame !== 'auto') { setBoardBox(null); return undefined; }
+    const id = window.setInterval(() => {
+      try {
+        const doc = boardFrame.current?.contentDocument;
+        if (!doc) return;
+        let best: { x: number; y: number; w: number; h: number } | null = null;
+        doc.querySelectorAll('.cs-board-fit, [data-boardid]').forEach((el) => {
+          const r = el.getBoundingClientRect();
+          if (r.width < 120) return;
+          if (!best || r.width > best.w) best = { x: r.left, y: r.top, w: r.width, h: r.width };
+        });
+        setBoardBox((prev) => {
+          const b = best as { x: number; y: number; w: number; h: number } | null;
+          if (!b) return null;
+          if (prev && Math.abs(prev.x - b.x) < 1 && Math.abs(prev.y - b.y) < 1 && Math.abs(prev.w - b.w) < 1) return prev;
+          return b;
+        });
+      } catch { /* not loaded yet */ }
+    }, 400);
+    return () => window.clearInterval(id);
+  }, [s.boardSource, s.frame, s.appPath]);
 
   // ---- camera canvas render loop ----
   useEffect(() => {
@@ -405,22 +435,34 @@ export default function StreamerStudio() {
   // ---- the stage ----
   const px = (r: Rect) => ({ left: (r.x / 100) * stage.w, top: (r.y / 100) * stage.h, width: (r.w / 100) * stage.w, height: (r.h / 100) * stage.h });
   const boardRect = px(s.layout.board);
-  const z = s.zoom, iframeScale = (boardRect.width / VIRTUAL_W) * z;
-  const virtualH = VIRTUAL_W * (boardRect.height / Math.max(1, boardRect.width));
+  const z = s.zoom;
+  // screen capture: zoom + pan inside the panel
   const offX = -(boardRect.width * z - boardRect.width) * s.panX, offY = -(boardRect.height * z - boardRect.height) * s.panY;
+  // ChessScout page: auto-fit the board (plus the player bars), or zoom/pan by hand
+  let ifScale = (boardRect.width / VIRTUAL_W) * z, ifLeft = 0, ifTop = 0;
+  if (s.frame === 'auto' && boardBox) {
+    const pad = s.framePad === 'players' ? boardBox.w * 0.17 : 0;
+    const r = { x: boardBox.x, y: boardBox.y - pad, w: boardBox.w, h: boardBox.h + pad * 2 };
+    ifScale = Math.min(boardRect.width / r.w, boardRect.height / r.h);
+    ifLeft = boardRect.width / 2 - (r.x + r.w / 2) * ifScale;
+    ifTop = boardRect.height / 2 - (r.y + r.h / 2) * ifScale;
+  } else {
+    ifLeft = Math.min(0, -(VIRTUAL_W * ifScale - boardRect.width) * s.panX);
+    ifTop = Math.min(0, -(VIRTUAL_H * ifScale - boardRect.height) * s.panY);
+  }
   const panel = (id: PanelId, label: string, children: ReactNode) => {
     const r = s.layout[id];
     if (r.hidden && !edit) return null;
     return (
-      <div key={id} className="absolute overflow-hidden" style={{ ...px(r), zIndex: r.z, opacity: r.hidden ? 0.35 : 1 }}>
+      <div key={id} className="absolute overflow-hidden" style={{ ...px(r), zIndex: r.z, opacity: r.hidden ? 0.35 : 1, borderRadius: r.round ? '50%' : 0, boxShadow: r.round ? `0 0 0 3px ${RD.green}, 0 8px 24px rgba(0,0,0,.6)` : undefined }}>
         {children}
         {edit && (
           <div className="absolute inset-0" style={{ outline: `2px dashed ${RD.green}`, outlineOffset: -2, background: 'rgba(5,10,11,.25)', cursor: 'move', touchAction: 'none' }}
             onPointerDown={onDown(id, 'move')}>
             <div className="absolute top-1 left-1 flex gap-1" onPointerDown={(e) => e.stopPropagation()}>
               <span className="px-2 py-0.5 rounded-md text-[11px] font-bold" style={{ background: RD.green, color: '#06110A' }}>{label}</span>
-              <button className="px-2 py-0.5 rounded-md text-[11px] font-bold" style={{ background: RD.cardLight, color: RD.text }} onClick={() => toFront(id)}>Front</button>
-              <button className="px-2 py-0.5 rounded-md text-[11px] font-bold" style={{ background: RD.cardLight, color: RD.text }} onClick={() => toggleHidden(id)}>{r.hidden ? 'Show' : 'Hide'}</button>
+              <button className="px-2 py-0.5 rounded-md text-[11px] font-bold" style={{ background: CARD_LIGHT, color: RD.text }} onClick={() => toFront(id)}>Front</button>
+              <button className="px-2 py-0.5 rounded-md text-[11px] font-bold" style={{ background: CARD_LIGHT, color: RD.text }} onClick={() => toggleHidden(id)}>{r.hidden ? 'Show' : 'Hide'}</button>
             </div>
             <div className="absolute right-0 bottom-0 w-6 h-6" style={{ background: RD.green, borderTopLeftRadius: 8, cursor: 'nwse-resize', touchAction: 'none' }}
               onPointerDown={onDown(id, 'size')} />
@@ -431,11 +473,15 @@ export default function StreamerStudio() {
   };
 
   const stageEl = (
-    <div ref={stageRef} className="relative overflow-hidden" style={{ width: stage.w, height: stage.h, background: '#050A0B', borderRadius: clean ? 0 : 12, boxShadow: clean ? 'none' : `0 0 0 1px ${RD.border}` }}>
+    <div ref={stageRef} className="relative overflow-hidden" style={{ width: stage.w, height: stage.h, background: `radial-gradient(120% 60% at 50% 0%, #16302a 0%, ${BG} 60%)`, borderRadius: clean ? 0 : 12, boxShadow: clean ? 'none' : `0 0 0 1px ${RD.border}` }}>
+      <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 pointer-events-none" style={{ height: Math.max(28, stage.h * 0.07), color: RD.text, fontWeight: 800, fontSize: Math.max(12, stage.w * 0.045) }}>
+        <img src="/icons/icon-192.png" alt="" style={{ height: '62%', borderRadius: '22%' }} />
+        <span>chess<span style={{ color: RD.green }}>scout</span>.net</span>
+      </div>
       {panel('board', 'Board', s.boardSource === 'app' ? (
         <div className="absolute inset-0 overflow-hidden" style={{ background: '#050A0B' }}>
-          <iframe title="Board" src={s.appPath} allow="autoplay; clipboard-write"
-            style={{ position: 'absolute', left: offX, top: offY, width: VIRTUAL_W, height: virtualH, border: 0, transform: `scale(${iframeScale})`, transformOrigin: '0 0', pointerEvents: edit ? 'none' : 'auto' }} />
+          <iframe ref={boardFrame} title="Board" src={s.appPath} allow="autoplay; clipboard-write"
+            style={{ position: 'absolute', left: ifLeft, top: ifTop, width: VIRTUAL_W, height: VIRTUAL_H, border: 0, transform: `scale(${ifScale})`, transformOrigin: '0 0', pointerEvents: edit ? 'none' : 'auto' }} />
         </div>
       ) : (
         <div className="absolute inset-0 overflow-hidden flex items-center justify-center" style={{ background: '#050A0B' }}>
@@ -450,11 +496,11 @@ export default function StreamerStudio() {
         </div>
       ))}
       {panel('tag', 'Name tag', (
-        <div className="absolute inset-0 flex items-center gap-[3%] px-[4%]" style={{ background: RD.cardSolid, borderTop: `2px solid ${RD.green}` }}>
+        <div className="absolute inset-0 flex items-center gap-[3%] px-[4%]" style={{ background: CARD, borderTop: `2px solid ${RD.green}` }}>
           <img src="/icons/icon-192.png" alt="" className="rounded-[22%] shrink-0" style={{ height: '62%', aspectRatio: '1' }} />
           <div className="min-w-0 leading-tight">
-            <p className="font-extrabold truncate" style={{ color: RD.text, fontSize: Math.max(11, px(s.layout.tag).height * 0.3) }}>{s.name}</p>
-            <p className="font-semibold truncate" style={{ color: RD.green, fontSize: Math.max(9, px(s.layout.tag).height * 0.2) }}>{s.subtitle}</p>
+            <p className="font-extrabold truncate" style={{ color: RD.text, fontSize: Math.max(11, Math.min(px(s.layout.tag).height * 0.3, px(s.layout.tag).width * 0.07)) }}>{s.name}</p>
+            <p className="font-semibold truncate" style={{ color: RD.green, fontSize: Math.max(9, Math.min(px(s.layout.tag).height * 0.2, px(s.layout.tag).width * 0.05)) }}>{s.subtitle}</p>
           </div>
           {recording && <span className="ml-auto shrink-0 w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: RD.red }} />}
         </div>
@@ -481,16 +527,16 @@ export default function StreamerStudio() {
   ];
 
   return (
-    <div className="min-h-screen lg:h-screen flex flex-col lg:flex-row" style={{ background: RD.bg, color: RD.text }}>
+    <div className="min-h-screen lg:h-screen flex flex-col lg:flex-row relative z-0" style={{ background: BG, color: RD.text }}>
       {hiddenVideo}
       <div className="flex flex-col lg:flex-1 min-w-0 p-3 gap-3">
-        <div className="flex items-center gap-2">
-          <Link href="/admin" className="text-sm font-semibold px-3 py-1.5 rounded-lg" style={{ background: RD.cardLight, color: RD.text }}>← Admin</Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href="/admin" className="text-sm font-semibold px-3 py-1.5 rounded-lg" style={{ background: CARD_LIGHT, color: RD.text }}>← Admin</Link>
           <h1 className="font-extrabold text-lg">Streamer Studio</h1>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: RD.gold, color: '#050A0B' }}>IN DEVELOPMENT</span>
-          <div className="ml-auto flex gap-2">
-            <button onClick={() => setEdit((v) => !v)} className="px-3 py-1.5 rounded-lg text-sm font-bold" style={edit ? { background: RD.green, color: '#06110A' } : { background: RD.cardLight, color: RD.text }}>{edit ? 'Done' : 'Move & resize'}</button>
-            <button onClick={() => { setEdit(false); setClean(true); flash('Clean view: press Esc or double-tap the top-right corner to exit.'); }} className="px-3 py-1.5 rounded-lg text-sm font-bold" style={{ background: RD.cardLight, color: RD.text }}>Clean view</button>
+          <div className="w-full sm:w-auto sm:ml-auto flex gap-2">
+            <button onClick={() => setEdit((v) => !v)} className="px-3 py-1.5 rounded-lg text-sm font-bold" style={edit ? { background: RD.green, color: '#06110A' } : { background: CARD_LIGHT, color: RD.text }}>{edit ? 'Done' : 'Move & resize'}</button>
+            <button onClick={() => { setEdit(false); setClean(true); flash('Clean view: press Esc or double-tap the top-right corner to exit.'); }} className="px-3 py-1.5 rounded-lg text-sm font-bold" style={{ background: CARD_LIGHT, color: RD.text }}>Clean view</button>
             {recording
               ? <button onClick={stopRecording} className="px-3 py-1.5 rounded-lg text-sm font-bold" style={{ background: RD.red, color: '#fff' }}>■ Stop {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, '0')}</button>
               : <button onClick={() => void startRecording(false)} className="px-3 py-1.5 rounded-lg text-sm font-bold" style={{ background: RD.green, color: '#06110A' }}>● Record</button>}
@@ -520,10 +566,13 @@ export default function StreamerStudio() {
               {PRESETS[s.aspect].map((p) => <Chip key={p.id} on={s.preset === p.id} onClick={() => set({ preset: p.id, layout: p.layout })}>{p.label}</Chip>)}
               {s.preset === 'custom' && <Chip on onClick={() => undefined}>✋ Your own arrangement</Chip>}
             </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Chip on={!!s.layout.cam.round} onClick={() => set({ preset: 'custom', layout: { ...s.layout, cam: { ...s.layout.cam, round: !s.layout.cam.round } } })}>◯ Round camera</Chip>
+            </div>
             <Note>Tap <b>Move &amp; resize</b> to drag the board, camera and name tag anywhere, resize them from the corner, bring one to the front, or hide one.</Note>
             <Label>Name tag</Label>
-            <input value={s.name} onChange={(e) => set({ name: e.target.value.slice(0, 40) })} placeholder="Stream name" className="w-full px-3 py-2 rounded-lg text-sm mb-2" style={{ background: RD.cardLight, color: RD.text, border: `1px solid ${RD.border}` }} />
-            <input value={s.subtitle} onChange={(e) => set({ subtitle: e.target.value.slice(0, 60) })} placeholder="Subtitle" className="w-full px-3 py-2 rounded-lg text-sm" style={{ background: RD.cardLight, color: RD.text, border: `1px solid ${RD.border}` }} />
+            <input value={s.name} onChange={(e) => set({ name: e.target.value.slice(0, 40) })} placeholder="Stream name" className="w-full px-3 py-2 rounded-lg text-sm mb-2" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }} />
+            <input value={s.subtitle} onChange={(e) => set({ subtitle: e.target.value.slice(0, 60) })} placeholder="Subtitle" className="w-full px-3 py-2 rounded-lg text-sm" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }} />
             <Note>Use a stream name, not your real one, to stay anonymous.</Note>
           </>)}
 
@@ -539,14 +588,23 @@ export default function StreamerStudio() {
                 {APP_PAGES.map((p) => <Chip key={p.path} on={s.appPath === p.path} onClick={() => set({ appPath: p.path })}>{p.label}</Chip>)}
               </div>
               <Note>You play right inside the panel. It’s your normal ChessScout account.</Note>
+              <Label>Framing</Label>
+              <div className="flex flex-wrap gap-2">
+                <Chip on={s.frame === 'auto' && s.framePad === 'players'} onClick={() => set({ frame: 'auto', framePad: 'players' })}>Board + names</Chip>
+                <Chip on={s.frame === 'auto' && s.framePad === 'board'} onClick={() => set({ frame: 'auto', framePad: 'board' })}>Board only</Chip>
+                <Chip on={s.frame === 'manual'} onClick={() => set({ frame: 'manual' })}>Whole page</Chip>
+              </div>
+              <Note>{s.frame === 'auto' ? (boardBox ? 'The board is found and fitted automatically, even when it moves.' : 'Looking for a board on this page… start a game, or pick Whole page.') : 'Zoom and move below to show the part of the page you want.'}</Note>
             </>) : (<>
               <button onClick={pickScreen} className="mt-3 w-full py-2.5 rounded-xl font-bold text-sm" style={{ background: RD.green, color: '#06110A' }}>{screenOn ? 'Pick a different window' : 'Pick a window or tab'}</button>
               <Note>Show any chess site or app window (computer only). Zoom and move below to frame just the board.</Note>
             </>)}
-            <Label>Zoom &amp; frame</Label>
-            <Slider label="Zoom" min={1} max={3} step={0.05} value={s.zoom} onChange={(v) => set({ zoom: v })} />
-            <Slider label="Left ↔ right" min={0} max={1} step={0.01} value={s.panX} onChange={(v) => set({ panX: v })} />
-            <Slider label="Up ↕ down" min={0} max={1} step={0.01} value={s.panY} onChange={(v) => set({ panY: v })} />
+            {(s.boardSource === 'screen' || s.frame === 'manual') && (<>
+              <Label>Zoom &amp; frame</Label>
+              <Slider label="Zoom" min={s.boardSource === 'app' ? 0.5 : 1} max={3} step={0.05} value={s.zoom} onChange={(v) => set({ zoom: v })} />
+              <Slider label="Left ↔ right" min={0} max={1} step={0.01} value={s.panX} onChange={(v) => set({ panX: v })} />
+              <Slider label="Up ↕ down" min={0} max={1} step={0.01} value={s.panY} onChange={(v) => set({ panY: v })} />
+            </>)}
           </>)}
 
           {tab === 'camera' && (<>
@@ -558,7 +616,7 @@ export default function StreamerStudio() {
                 : <Chip on={s.mirror} onClick={() => set({ mirror: !s.mirror })}>↔ Mirror</Chip>}
             </div>
             {!IS_PHONE && cams.length > 1 && (
-              <select value={s.camId} onChange={(e) => set({ camId: e.target.value })} className="mt-2 w-full px-3 py-2 rounded-lg text-sm" style={{ background: RD.cardLight, color: RD.text, border: `1px solid ${RD.border}` }}>
+              <select value={s.camId} onChange={(e) => set({ camId: e.target.value })} className="mt-2 w-full px-3 py-2 rounded-lg text-sm" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }}>
                 <option value="">Default camera</option>
                 {cams.map((d, i) => <option key={d.deviceId} value={d.deviceId}>{d.label || `Camera ${i + 1}`}</option>)}
               </select>
@@ -608,12 +666,12 @@ export default function StreamerStudio() {
               {voiceOn ? <Chip on onClick={stopVoice}>🎙️ Mic on: tap to stop</Chip> : <Chip on={false} onClick={() => void startVoice()}>🎙️ Turn mic on</Chip>}
             </div>
             {mics.length > 1 && (
-              <select value={s.micId} onChange={(e) => set({ micId: e.target.value })} className="mt-2 w-full px-3 py-2 rounded-lg text-sm" style={{ background: RD.cardLight, color: RD.text, border: `1px solid ${RD.border}` }}>
+              <select value={s.micId} onChange={(e) => set({ micId: e.target.value })} className="mt-2 w-full px-3 py-2 rounded-lg text-sm" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }}>
                 <option value="">Default microphone</option>
                 {mics.map((d, i) => <option key={d.deviceId} value={d.deviceId}>{d.label || `Mic ${i + 1}`}</option>)}
               </select>
             )}
-            <div className="mt-3 h-2 rounded-full overflow-hidden" style={{ background: RD.cardLight }}>
+            <div className="mt-3 h-2 rounded-full overflow-hidden" style={{ background: CARD_LIGHT }}>
               <div className="h-full transition-[width] duration-100" style={{ width: `${Math.round(level * 100)}%`, background: RD.green }} />
             </div>
             <Label>Voice</Label>
@@ -622,7 +680,7 @@ export default function StreamerStudio() {
             </div>
             {s.voice === 'custom' && <Slider label="Pitch" min={-1} max={1} step={0.05} value={s.pitch} onChange={(v) => set({ pitch: v })} />}
             <Label>Send my changed voice to</Label>
-            <select value={s.output} onChange={(e) => set({ output: e.target.value })} className="w-full px-3 py-2 rounded-lg text-sm" style={{ background: RD.cardLight, color: RD.text, border: `1px solid ${RD.border}` }}>
+            <select value={s.output} onChange={(e) => set({ output: e.target.value })} className="w-full px-3 py-2 rounded-lg text-sm" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }}>
               <option value="none">Recordings only</option>
               <option value="default">My speakers / headphones (hear myself)</option>
               {outs.filter((d) => d.deviceId !== 'default').map((d, i) => <option key={d.deviceId} value={d.deviceId}>{d.label || `Output ${i + 1}`}</option>)}
@@ -672,7 +730,7 @@ function AvatarBtn({ id, label, on, onClick }: { id: AvatarId; label: string; on
   }, [id]);
   return (
     <button onClick={onClick} title={label} className="rounded-xl overflow-hidden flex flex-col items-center pb-1"
-      style={{ background: RD.cardLight, border: `2px solid ${on ? RD.green : 'transparent'}` }}>
+      style={{ background: CARD_LIGHT, border: `2px solid ${on ? RD.green : 'transparent'}` }}>
       <canvas ref={ref} width={96} height={96} className="w-full aspect-square" />
       <span className="text-[10px] font-semibold truncate w-full text-center" style={{ color: on ? RD.green : RD.muted }}>{label}</span>
     </button>
