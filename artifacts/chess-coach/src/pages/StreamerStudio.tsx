@@ -10,7 +10,12 @@ import { Link } from 'wouter';
 import { RD } from '@/lib/redesignTheme';
 import { VoiceChanger, VOICE_PRESETS, type VoicePreset } from '@/lib/streamer/voiceChanger';
 import { FaceTracker, type FacePose } from '@/lib/streamer/faceTracker';
-import { AVATARS, drawAvatar, type AvatarId, type AvatarPose } from '@/lib/streamer/avatars';
+import { AVATARS, drawAvatar, preloadPieceAvatars, type AvatarId, type AvatarPose } from '@/lib/streamer/avatars';
+import { drawComposite, type BoardFeed } from '@/lib/streamer/compositor';
+import { CloudRecorder, type RecStatus } from '@/lib/streamer/recorder';
+import { LiveHost } from '@/lib/streamer/live';
+import { apiFetch } from '@/lib/api';
+import { useSettings, PIECE_SHAPES } from '@/context/SettingsContext';
 
 type PanelId = 'board' | 'cam' | 'tag';
 interface Rect { x: number; y: number; w: number; h: number; z: number; hidden?: boolean; round?: boolean }
@@ -18,7 +23,7 @@ type Layout = Record<PanelId, Rect>;
 type Aspect = '9:16' | '16:9';
 type Disguise = 'none' | 'avatar' | 'pixelate' | 'blur';
 type Bg = 'brand' | 'blur' | 'room' | 'color';
-type Tab = 'layout' | 'board' | 'camera' | 'voice' | 'live';
+type Tab = 'layout' | 'board' | 'camera' | 'voice' | 'videos' | 'live';
 
 interface Settings {
   aspect: Aspect; preset: string; layout: Layout;
@@ -28,6 +33,7 @@ interface Settings {
   disguise: Disguise; avatar: AvatarId; bg: Bg; bgColor: string; avatarScale: number;
   voice: VoicePreset; pitch: number; micId: string; output: string;
   name: string; subtitle: string;
+  broadcast: boolean; recordLive: boolean; title: string;
 }
 
 const PRESETS: Record<Aspect, { id: string; label: string; layout: Layout }[]> = {
@@ -57,9 +63,10 @@ const DEFAULTS: Settings = {
   boardSource: 'app', appPath: '/live', zoom: 1, panX: 0, panY: 0,
   frame: 'auto', framePad: 'players',
   camOn: false, camId: '', facing: 'user', mirror: true,
-  disguise: 'avatar', avatar: 'knight', bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3,
+  disguise: 'avatar', avatar: 'wN', bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3,
   voice: 'off', pitch: 0, micId: '', output: 'none',
   name: 'Anonymous Knight', subtitle: 'Playing on chessscout.net',
+  broadcast: true, recordLive: true, title: '',
 };
 const KEY = 'cs_streamer_v2';
 const VIRTUAL_W = 430; // the app is laid out like a phone inside the board panel
@@ -127,6 +134,26 @@ export default function StreamerStudio() {
   const tracker = useRef(new FaceTracker());
   const voice = useRef(new VoiceChanger());
   const recRef = useRef<{ rec: MediaRecorder; streams: MediaStream[]; ctx: AudioContext | null } | null>(null);
+  const cloudRec = useRef<CloudRecorder | null>(null);
+  const [cloud, setCloud] = useState<(RecStatus & { start: number }) | null>(null);
+  const host = useRef(new LiveHost());
+  const [watching, setWatching] = useState<number | null>(null);
+  const feed = useRef<{ fen: string; flipped: boolean; last: string } | null>(null);
+  const outCanvas = useRef<HTMLCanvasElement>(null);
+  const { boardColors, pieceShape } = useSettings();
+  const looks = useRef({ light: '#eeeed2', dark: '#769656', pieceSrc: (k: string) => `/pieces/ink-cream/${k}.webp?v=1` });
+  {
+    const hex = (v: unknown) => typeof v === 'string' && /^#[0-9a-f]{3,8}$/i.test(v);
+    const info = PIECE_SHAPES[pieceShape];
+    looks.current = {
+      light: hex(boardColors?.light) ? boardColors.light : '#eeeed2',
+      dark: hex(boardColors?.dark) ? boardColors.dark : '#769656',
+      pieceSrc: !info || pieceShape === 'default'
+        ? (k: string) => `/pieces/ink-cream/${k}.webp?v=1`
+        : info.raster ? (k: string) => `/pieces/${pieceShape}/${k}.webp?v=${info.version ?? 1}` : (k: string) => `/pieces/${pieceShape}/${k}.svg`,
+    };
+  }
+  useEffect(() => { preloadPieceAvatars(); }, []);
 
   const flash = useCallback((m: string) => { setMsg(m); window.setTimeout(() => setMsg((x) => (x === m ? null : x)), 6000); }, []);
 
@@ -182,7 +209,10 @@ export default function StreamerStudio() {
     })();
     return () => { cancelled = true; };
   }, [s.camOn, s.camId, s.facing, stopCam, refreshDevices, flash, set]);
-  useEffect(() => () => { stopCam(); voice.current.stop(); tracker.current.close(); screenStream.current?.getTracks().forEach((t) => t.stop()); }, [stopCam]);
+  useEffect(() => () => {
+    stopCam(); host.current.stop(); void cloudRec.current?.stop();
+    voice.current.stop(); tracker.current.close(); screenStream.current?.getTracks().forEach((t) => t.stop());
+  }, [stopCam]);
 
   // ---- face tracker: only loaded when a disguise needs it ----
   useEffect(() => {
@@ -226,7 +256,7 @@ export default function StreamerStudio() {
 
   // ---- auto-frame: find the chessboard inside the ChessScout page and fit it to the panel ----
   useEffect(() => {
-    if (s.boardSource !== 'app' || s.frame !== 'auto') { setBoardBox(null); return undefined; }
+    if (s.boardSource !== 'app') { setBoardBox(null); feed.current = null; return undefined; }
     const id = window.setInterval(() => {
       try {
         const doc = boardFrame.current?.contentDocument;
@@ -238,6 +268,17 @@ export default function StreamerStudio() {
           if (r.width < 120) return;
           if (!best || r.width > best.w) { best = { x: r.left, y: r.top, w: r.width, h: r.width }; bestEl = el; }
         });
+        // the live position, for the recorded / broadcast board (and its move sounds)
+        const be = bestEl as HTMLElement | null;
+        const fen = be?.getAttribute('data-fen');
+        if (be && fen) {
+          const prev = feed.current, place = fen.split(' ')[0];
+          if (prev && prev.fen.split(' ')[0] !== place && voice.current.running) {
+            const count = (f: string) => f.split(' ')[0].replace(/[^a-z]/gi, '').length;
+            voice.current.sfx(count(fen) < count(prev.fen) ? 'capture' : 'move');
+          }
+          feed.current = { fen, flipped: be.getAttribute('data-flipped') === '1', last: be.getAttribute('data-last') || '' };
+        } else feed.current = null;
         // keep the board inside the page's view when we're fitting it
         const found = best as { x: number; y: number; w: number; h: number } | null;
         const vh = boardFrame.current?.clientHeight ?? VIRTUAL_H;
@@ -245,6 +286,7 @@ export default function StreamerStudio() {
           (bestEl as Element).scrollIntoView({ block: 'center' });
           return;
         }
+        if (sRef.current.frame !== 'auto') { setBoardBox(null); return; }
         setBoardBox((prev) => {
           const b = best as { x: number; y: number; w: number; h: number } | null;
           if (!b) return null;
@@ -252,9 +294,45 @@ export default function StreamerStudio() {
           return b;
         });
       } catch { /* not loaded yet */ }
-    }, 400);
+    }, 250);
     return () => window.clearInterval(id);
   }, [s.boardSource, s.frame, s.appPath]);
+
+  // ---- the composite stage canvas (what's recorded and broadcast) ----
+  useEffect(() => {
+    let raf = 0, lastDraw = 0;
+    const loop = (t: number) => {
+      raf = requestAnimationFrame(loop);
+      if (t - lastDraw < 32) return; // ~30 fps
+      lastDraw = t;
+      const cv = outCanvas.current; if (!cv) return;
+      const st = sRef.current;
+      const W = st.aspect === '9:16' ? 720 : 1280, H = st.aspect === '9:16' ? 1280 : 720;
+      if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+      const c = cv.getContext('2d'); if (!c) return;
+      let board: BoardFeed = { kind: 'none' };
+      if (st.boardSource === 'screen' && screenVideo.current && screenVideo.current.videoWidth) board = { kind: 'video', video: screenVideo.current, zoom: st.zoom, panX: st.panX, panY: st.panY };
+      else if (st.boardSource === 'app' && feed.current) board = { kind: 'fen', ...feed.current };
+      drawComposite(c, W, H, {
+        layout: st.layout, board, cam: camCanvas.current, name: st.name, subtitle: st.subtitle,
+        light: looks.current.light, dark: looks.current.dark, pieceSrc: looks.current.pieceSrc,
+        live: host.current.live,
+      });
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  /** Stage video + the changed voice (turns the mic on if it's off). */
+  const stageStream = useCallback(async (): Promise<MediaStream | null> => {
+    const cv = outCanvas.current as (HTMLCanvasElement & { captureStream?: (fps?: number) => MediaStream }) | null;
+    if (!cv?.captureStream) { flash('This browser can’t record the stage. Try Chrome.'); return null; }
+    if (!voice.current.running) await startVoice();
+    const ms = cv.captureStream(30);
+    const a = voice.current.stream?.getAudioTracks()[0];
+    if (a) ms.addTrack(a); else flash('No microphone: recording without sound. Allow the mic in the Voice tab.');
+    return ms;
+  }, [flash, startVoice]);
 
   // ---- camera canvas render loop ----
   useEffect(() => {
@@ -310,6 +388,8 @@ export default function StreamerStudio() {
         pose.x += (tx - pose.x) * k; pose.y += (fy - pose.y) * k; pose.size += (face.size * sc * st.avatarScale - pose.size) * k;
         pose.roll += (roll - pose.roll) * k; pose.yaw += (yaw - pose.yaw) * k; pose.pitch += (face.pitch - pose.pitch) * k;
         pose.mouth = face.mouth; pose.blinkL = face.blinkL; pose.blinkR = face.blinkR; pose.smile = face.smile;
+        pose.brow = (pose.brow ?? 0) + (face.brow - (pose.brow ?? 0)) * 0.5;
+        pose.lookX = mirror ? -face.lookX : face.lookX; pose.lookY = face.lookY;
       }
       const tracked = t - lastSeen < 450;
       const vlevel = voice.current.running ? voice.current.level() : 0;
@@ -361,6 +441,30 @@ export default function StreamerStudio() {
     const id = window.setInterval(() => { setLevel(voice.current.running ? voice.current.level() : 0); setNow(Date.now()); }, 120);
     return () => window.clearInterval(id);
   }, []);
+
+  // ---- recording to chessscout.net (stage canvas + voice; works on phones too) ----
+  const [videosKey, setVideosKey] = useState(0);
+  const startCloudRecording = useCallback(async () => {
+    if (cloudRec.current) return;
+    if (typeof MediaRecorder === 'undefined') { flash('This browser can’t record. Try Chrome.'); return; }
+    setEdit(false);
+    const ms = await stageStream(); if (!ms) return;
+    const start = Date.now();
+    const title = sRef.current.title || `${sRef.current.name} · ${new Date().toLocaleString()}`;
+    const r = new CloudRecorder(ms, title, (st) => {
+      setCloud({ ...st, start });
+      if (st.message) flash(st.message);
+      if (st.phase === 'saved' || st.phase === 'downloaded' || st.phase === 'error') {
+        cloudRec.current = null; ms.getVideoTracks().forEach((t) => t.stop());
+        window.setTimeout(() => setCloud(null), 4000);
+        setVideosKey((k) => k + 1);
+        if (st.phase === 'saved') flash('Saved to chessscout.net: find it in the Videos tab.');
+      }
+    });
+    cloudRec.current = r;
+    await r.start();
+  }, [flash, stageStream]);
+  const stopCloudRecording = useCallback(async () => { const r = cloudRec.current; if (r) await r.stop(); }, []);
 
   // ---- recording (Chrome/Edge: this tab, cropped to the stage) ----
   const stopRecording = useCallback(() => { const r = recRef.current; if (r && r.rec.state !== 'inactive') r.rec.stop(); }, []);
@@ -420,20 +524,36 @@ export default function StreamerStudio() {
   const goLive = useCallback(async () => {
     setEdit(false); setPeek(false); setClean(true); setHint(true);
     window.setTimeout(() => setHint(false), 3000);
+    const st = sRef.current;
+    if (st.broadcast || st.recordLive) {
+      void (async () => {
+        if (st.broadcast && !host.current.live) {
+          const ms = await stageStream();
+          if (ms) {
+            host.current.onChange = (n) => setWatching(n);
+            try { await host.current.start(ms, st.name, st.title); setWatching(0); }
+            catch { flash('Couldn’t go live on chessscout.net right now.'); }
+          }
+        }
+        if (st.recordLive) await startCloudRecording();
+      })();
+    }
     try {
       if (!document.fullscreenElement && document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
       const o = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
       if (IS_PHONE && o?.lock) await o.lock(sRef.current.aspect === '16:9' ? 'landscape' : 'portrait').catch(() => undefined);
     } catch { /* fullscreen not allowed here: the stage still fills the window */ }
-  }, []);
+  }, [stageStream, startCloudRecording, flash]);
   const endLive = useCallback(() => {
     setClean(false);
+    if (host.current.live) { host.current.stop(); setWatching(null); }
+    if (cloudRec.current && sRef.current.recordLive) void cloudRec.current.stop();
     try { (screen.orientation as ScreenOrientation & { unlock?: () => void })?.unlock?.(); } catch { /* ignore */ }
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
   }, []);
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === 'Escape') endLive(); };
-    const fs = () => { if (!document.fullscreenElement) setClean(false); };
+    const fs = () => { if (!document.fullscreenElement) endLive(); };
     window.addEventListener('keydown', k); document.addEventListener('fullscreenchange', fs);
     return () => { window.removeEventListener('keydown', k); document.removeEventListener('fullscreenchange', fs); };
   }, [endLive]);
@@ -548,12 +668,16 @@ export default function StreamerStudio() {
   );
 
   // hidden video element that feeds the camera canvas
-  const hiddenVideo = <video ref={camVideo} muted playsInline style={{ position: 'fixed', width: 1, height: 1, opacity: 0, pointerEvents: 'none', left: -10, top: -10 }} />;
+  const hiddenVideo = (<>
+    <video ref={camVideo} muted playsInline style={{ position: 'fixed', width: 1, height: 1, opacity: 0, pointerEvents: 'none', left: -10, top: -10 }} />
+    <canvas ref={outCanvas} width={720} height={1280} style={{ position: 'fixed', width: 2, height: 2, opacity: 0.01, pointerEvents: 'none', left: 0, top: 0 }} />
+  </>);
 
 
   const elapsed = recording ? Math.floor((now - recording.start) / 1000) : 0;
+  const cloudElapsed = cloud ? Math.floor((now - cloud.start) / 1000) : 0;
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'layout', label: 'Layout' }, { id: 'board', label: 'Board' }, { id: 'camera', label: 'Face' }, { id: 'voice', label: 'Voice' }, { id: 'live', label: 'Go live' },
+    { id: 'layout', label: 'Layout' }, { id: 'board', label: 'Board' }, { id: 'camera', label: 'Face' }, { id: 'voice', label: 'Voice' }, { id: 'videos', label: 'Videos' }, { id: 'live', label: 'Go live' },
   ];
 
   return (
@@ -569,19 +693,29 @@ export default function StreamerStudio() {
             <button onClick={() => void goLive()} className="px-3 py-1.5 rounded-lg text-sm font-bold" style={{ background: RD.red, color: '#fff' }}>◉ Go live</button>
             {recording
               ? <button onClick={stopRecording} className="px-3 py-1.5 rounded-lg text-sm font-bold" style={{ background: RD.red, color: '#fff' }}>■ Stop {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, '0')}</button>
-              : <button onClick={() => void startRecording(false)} className="px-3 py-1.5 rounded-lg text-sm font-bold" style={{ background: RD.green, color: '#06110A' }}>● Record</button>}
+              : cloud && cloud.phase === 'recording'
+                ? <button onClick={() => void stopCloudRecording()} className="px-3 py-1.5 rounded-lg text-sm font-bold" style={{ background: RD.red, color: '#fff' }}>■ Stop {Math.floor(cloudElapsed / 60)}:{String(cloudElapsed % 60).padStart(2, '0')}</button>
+                : cloud && cloud.phase === 'saving'
+                  ? <span className="px-3 py-1.5 rounded-lg text-sm font-bold" style={{ background: CARD_LIGHT, color: RD.text }}>Saving… {cloud.uploadedMB.toFixed(1)} MB</span>
+                  : <button onClick={() => void startCloudRecording()} className="px-3 py-1.5 rounded-lg text-sm font-bold" style={{ background: RD.green, color: '#06110A' }}>● Record</button>}
           </div>
         </div>}
         {!clean && msg && <div className="text-sm px-3 py-2 rounded-lg" style={card}>{msg}</div>}
         <div ref={areaRef} className={clean ? 'flex-1 flex items-center justify-center' : 'flex-1 flex items-center justify-center min-h-[60vh] lg:min-h-0'}>{stageEl}</div>
       </div>
       {clean && <button aria-label="Exit" onDoubleClick={endLive} className="absolute top-0 right-0 w-20 h-20 opacity-0" />}
+      {clean && (watching !== null || (cloud && cloud.phase === 'recording')) && (
+        <div className="absolute top-2 left-2 flex gap-1.5 pointer-events-none">
+          {watching !== null && <span className="px-2 py-1 rounded-md text-[11px] font-extrabold" style={{ background: RD.red, color: '#fff' }}>● LIVE · {watching} watching</span>}
+          {cloud && cloud.phase === 'recording' && <span className="px-2 py-1 rounded-md text-[11px] font-extrabold" style={{ background: CARD, color: RD.text }}>REC {Math.floor(cloudElapsed / 60)}:{String(cloudElapsed % 60).padStart(2, '0')}</span>}
+        </div>
+      )}
       {clean && hint && <div className="absolute top-3 inset-x-0 mx-auto w-fit max-w-[90%] text-center text-[13px] font-semibold px-3 py-2 rounded-lg pointer-events-none" style={{ background: CARD, color: RD.text, border: `1px solid ${RD.border}` }}>You’re in Go live view. To leave: swipe back, press Esc, or double-tap the top-right corner.</div>}
 
       {!clean && <aside className="lg:w-[380px] lg:h-screen lg:overflow-y-auto p-3 pt-0 lg:pt-3 shrink-0">
         <div className="flex gap-1 p-1 mb-3" style={card}>
           {tabs.map((t) => (
-            <button key={t.id} onClick={() => { setTab(t.id); if (t.id === 'live') void goLive(); }} className="flex-1 py-2 rounded-[10px] text-[13px] font-bold"
+            <button key={t.id} onClick={() => { setTab(t.id); if (t.id === 'live') void goLive(); }} className="flex-1 py-2 rounded-[10px] text-[12px] font-bold whitespace-nowrap"
               style={tab === t.id ? { background: RD.green, color: '#06110A' } : { color: RD.muted }}>{t.label}</button>
           ))}
         </div>
@@ -671,6 +805,10 @@ export default function StreamerStudio() {
             )}
 
             {s.disguise === 'avatar' && (<>
+              <Label>Chess pieces</Label>
+              <div className="grid grid-cols-6 gap-2">
+                {AVATARS.filter((a) => a.group === 'piece').map((a) => <AvatarBtn key={a.id} id={a.id} label={a.label.split(' ')[1]} on={s.avatar === a.id} onClick={() => set({ avatar: a.id })} />)}
+              </div>
               <Label>Cartoon</Label>
               <div className="grid grid-cols-5 gap-2">
                 {AVATARS.filter((a) => a.group === 'cartoon').map((a) => <AvatarBtn key={a.id} id={a.id} label={a.label} on={s.avatar === a.id} onClick={() => set({ avatar: a.id })} />)}
@@ -724,14 +862,23 @@ export default function StreamerStudio() {
             </Note>
           </>)}
 
+          {tab === 'videos' && <VideosPanel refreshKey={videosKey} onError={flash} />}
+
           {tab === 'live' && (<>
             <button onClick={() => void goLive()} className="w-full py-3 rounded-xl font-extrabold text-base" style={{ background: RD.red, color: '#fff' }}>◉ Go live (full screen)</button>
-            <Label>Record</Label>
+            <Label>When I go live</Label>
             <div className="flex flex-wrap gap-2">
-              <Chip on={false} onClick={() => void startRecording(false)}>● Record stage + voice</Chip>
-              <Chip on={false} onClick={() => void startRecording(true)}>● Record with game sounds</Chip>
+              <Chip on={s.broadcast} onClick={() => set({ broadcast: !s.broadcast })}>📡 Stream on chessscout.net</Chip>
+              <Chip on={s.recordLive} onClick={() => set({ recordLive: !s.recordLive })}>● Save a recording</Chip>
             </div>
-            <Note>Chrome or Edge on a computer: pick <b>this tab</b> when asked. The video saves when you press Stop. On a phone: tap Go live (full screen) and use the phone’s own screen recorder.</Note>
+            <input value={s.title} onChange={(e) => set({ title: e.target.value.slice(0, 80) })} placeholder="Stream title (optional)" className="mt-2 w-full px-3 py-2 rounded-lg text-sm" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }} />
+            <Note>Viewers watch on chessscout.net (Admin → Live streams while this is in development). They see your stage and hear your changed voice; your mic turns on automatically. Recordings are saved to chessscout.net with sound and show up in the Videos tab.</Note>
+            <Label>Record without going live</Label>
+            <div className="flex flex-wrap gap-2">
+              <Chip on={false} onClick={() => void startCloudRecording()}>● Record to chessscout.net</Chip>
+              <Chip on={false} onClick={() => void startRecording(true)}>● Record this browser tab (computer)</Chip>
+            </div>
+            <Note>The browser-tab option downloads to your computer (Chrome or Edge: pick this tab when asked).</Note>
             <Label>Stream to YouTube or Twitch (works today)</Label>
             <Note>1. Tap <b>Go live</b> here (full screen). 2. In OBS add a <b>Window Capture</b> of this browser window. 3. Set OBS’s mic to the virtual cable (Voice tab). 4. Stream from OBS with your YouTube or Twitch key.</Note>
             <Label>Discord</Label>
@@ -767,5 +914,65 @@ function AvatarBtn({ id, label, on, onClick }: { id: AvatarId; label: string; on
       <canvas ref={ref} width={96} height={96} className="w-full aspect-square" />
       <span className="text-[10px] font-semibold truncate w-full text-center" style={{ color: on ? RD.green : RD.muted }}>{label}</span>
     </button>
+  );
+}
+
+interface SavedVideo { id: string; title: string; mime: string; size_bytes: number | string; duration_ms: number; status: string; created_at: string; username?: string | null }
+
+function VideosPanel({ refreshKey, onError }: { refreshKey: number; onError: (m: string) => void }) {
+  const [list, setList] = useState<SavedVideo[] | null>(null);
+  const [playing, setPlaying] = useState<{ id: string; url: string } | null>(null);
+  const [confirmDel, setConfirmDel] = useState<string | null>(null);
+  const load = useCallback(async () => {
+    try {
+      const r = await apiFetch('/api/admin/stream-recordings', { credentials: 'include' });
+      const j = (await r.json()) as { recordings?: SavedVideo[]; error?: string };
+      if (!r.ok) throw new Error(j.error || 'failed');
+      setList(j.recordings ?? []);
+    } catch { setList([]); onError('Couldn’t load your saved videos.'); }
+  }, [onError]);
+  useEffect(() => { void load(); }, [load, refreshKey]);
+  const open = async (id: string, download: boolean) => {
+    try {
+      const r = await apiFetch(`/api/admin/stream-recordings/${id}/url${download ? '?download=1' : ''}`, { credentials: 'include' });
+      const j = (await r.json()) as { url?: string; error?: string };
+      if (!r.ok || !j.url) throw new Error(j.error || 'failed');
+      if (download) { const a = document.createElement('a'); a.href = j.url; document.body.appendChild(a); a.click(); a.remove(); }
+      else setPlaying({ id, url: j.url });
+    } catch { onError('Couldn’t open that video.'); }
+  };
+  const del = async (id: string) => {
+    try { await apiFetch(`/api/admin/stream-recordings/${id}`, { method: 'DELETE', credentials: 'include' }); } catch { /* ignore */ }
+    setConfirmDel(null); if (playing?.id === id) setPlaying(null); void load();
+  };
+  const fmt = (ms: number) => { const sec = Math.round(ms / 1000); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
+  return (
+    <div>
+      <Label>Saved on chessscout.net</Label>
+      {playing && (
+        <video key={playing.url} src={playing.url} controls autoPlay playsInline className="w-full rounded-xl mb-3" style={{ background: '#000', maxHeight: '60vh' }} />
+      )}
+      {list === null && <Note>Loading…</Note>}
+      {list && list.length === 0 && <Note>No videos yet. Press ● Record, or turn on “Save a recording” in Go live.</Note>}
+      <div className="flex flex-col gap-2">
+        {(list ?? []).map((v) => (
+          <div key={v.id} className="p-3 rounded-xl" style={{ background: CARD_LIGHT, border: `1px solid ${RD.border}` }}>
+            <p className="text-[13px] font-bold truncate">{v.title || 'Stream recording'}</p>
+            <p className="text-[11px]" style={{ color: RD.muted }}>
+              {new Date(v.created_at).toLocaleString()} · {v.status === 'ready' ? `${fmt(v.duration_ms)} · ${(Number(v.size_bytes) / 1048576).toFixed(1)} MB` : 'still uploading'}
+            </p>
+            {v.status === 'ready' && (
+              <div className="flex gap-2 mt-2">
+                <button onClick={() => void open(v.id, false)} className="px-3 py-1.5 rounded-lg text-[12px] font-bold" style={{ background: RD.green, color: '#06110A' }}>▶ Play</button>
+                <button onClick={() => void open(v.id, true)} className="px-3 py-1.5 rounded-lg text-[12px] font-bold" style={{ background: CARD, color: RD.text }}>⬇ Download</button>
+                {confirmDel === v.id
+                  ? <button onClick={() => void del(v.id)} className="px-3 py-1.5 rounded-lg text-[12px] font-bold ml-auto" style={{ background: RD.red, color: '#fff' }}>Tap again to delete</button>
+                  : <button onClick={() => setConfirmDel(v.id)} className="px-3 py-1.5 rounded-lg text-[12px] font-bold ml-auto" style={{ background: CARD, color: RD.muted }}>Delete</button>}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

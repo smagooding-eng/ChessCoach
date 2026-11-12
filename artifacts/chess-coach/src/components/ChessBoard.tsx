@@ -567,7 +567,7 @@ export function ChessBoard({
   const boardKeyRef = useRef(0);
 
   const boardEl = (
-    <div data-no-swipe className={`cs-board-fit relative w-full mx-auto ${sidePanel ? 'cs-board-side lg:mx-0 lg:min-w-0 lg:flex-1' : ''}`}
+    <div data-no-swipe data-fen={position} data-flipped={flipped ? '1' : '0'} data-last={lastMove ? `${lastMove.from}${lastMove.to}` : ''} className={`cs-board-fit relative w-full mx-auto ${sidePanel ? 'cs-board-side lg:mx-0 lg:min-w-0 lg:flex-1' : ''}`}
       style={{ maxWidth: boardMaxWidth, ['--board-max' as string]: typeof boardMaxWidth === 'number' ? `${boardMaxWidth}px` : boardMaxWidth }}>
       {/* Static gradient presets (Shaded/3D Wood/3D Marble/Chrome/Gold/
           Copper/Obsidian/Ivory) now live in the shared PieceGradientDefs

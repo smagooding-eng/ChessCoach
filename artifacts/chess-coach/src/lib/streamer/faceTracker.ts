@@ -11,6 +11,7 @@ export interface FacePose {
   x: number; y: number; size: number;   // face centre and forehead-to-chin height
   roll: number; yaw: number; pitch: number; // radians / -1..1 / -1..1
   mouth: number; blinkL: number; blinkR: number; smile: number; // 0..1
+  brow: number; lookX: number; lookY: number; // -1..1
 }
 
 type Landmark = { x: number; y: number; z: number };
@@ -75,6 +76,10 @@ export class FaceTracker {
       mouth: Math.min(1, (bs.jawOpen ?? 0) * 1.6),
       blinkL: bs.eyeBlinkLeft ?? 0, blinkR: bs.eyeBlinkRight ?? 0,
       smile: ((bs.mouthSmileLeft ?? 0) + (bs.mouthSmileRight ?? 0)) / 2,
+      brow: Math.max(-1, Math.min(1, (bs.browInnerUp ?? 0) * 1.4 + ((bs.browOuterUpLeft ?? 0) + (bs.browOuterUpRight ?? 0)) * 0.4 - ((bs.browDownLeft ?? 0) + (bs.browDownRight ?? 0)) * 0.9)),
+      // in the camera image: + = the person looks toward image-right
+      lookX: Math.max(-1, Math.min(1, ((bs.eyeLookOutLeft ?? 0) + (bs.eyeLookInRight ?? 0) - (bs.eyeLookInLeft ?? 0) - (bs.eyeLookOutRight ?? 0)) * 0.9)),
+      lookY: Math.max(-1, Math.min(1, ((bs.eyeLookDownLeft ?? 0) + (bs.eyeLookDownRight ?? 0) - (bs.eyeLookUpLeft ?? 0) - (bs.eyeLookUpRight ?? 0)) * 0.7)),
     };
   }
 

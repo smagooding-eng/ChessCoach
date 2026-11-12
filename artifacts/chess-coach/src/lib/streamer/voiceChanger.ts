@@ -134,6 +134,23 @@ export class VoiceChanger {
     void pl.play().catch(() => undefined);
   }
 
+  /** A board sound mixed into the recording / live audio (and what you hear). */
+  sfx(kind: 'move' | 'capture') {
+    const ctx = this.ctx, d = this.dest;
+    if (!ctx || !d) return;
+    const t = ctx.currentTime;
+    const len = Math.round(ctx.sampleRate * 0.09), buf = ctx.createBuffer(1, len, ctx.sampleRate), ch = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 6);
+    const n = ctx.createBufferSource(); n.buffer = buf;
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = kind === 'capture' ? 900 : 1500; f.Q.value = 1.2;
+    const g = ctx.createGain(); g.gain.value = kind === 'capture' ? 0.9 : 0.6;
+    n.connect(f); f.connect(g); g.connect(d); n.start(t);
+    const o = ctx.createOscillator(), og = ctx.createGain();
+    o.frequency.setValueAtTime(kind === 'capture' ? 180 : 240, t); o.frequency.exponentialRampToValueAtTime(90, t + 0.08);
+    og.gain.setValueAtTime(0.35, t); og.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+    o.connect(og); og.connect(d); o.start(t); o.stop(t + 0.12);
+  }
+
   /** 0..1 loudness of the changed voice */
   level(): number {
     if (!this.analyser || !this.levelBuf) return 0;

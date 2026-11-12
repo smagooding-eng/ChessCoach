@@ -140,6 +140,7 @@ const AffiliatePage = lazyRetry(() => import("@/pages/Affiliate"));
 const TrapsPage = lazyRetry(() => import("@/pages/Traps"));
 const BeginnerCoursesPage = lazyRetry(() => import("@/pages/BeginnerCourses"));
 const StreamerStudioPage = lazyRetry(() => import("@/pages/StreamerStudio"));
+const LiveStreamsPage = lazyRetry(() => import("@/pages/LiveStreams"));
 const KidsHomePage = lazyRetry(() => import("@/pages/kids/KidsHome"));
 const BeginnerPathPage = lazyRetry(() => import("@/pages/learn/BeginnerPath"));
 const BeginnerLessonPlayPage = lazyRetry(() => import("@/pages/learn/BeginnerLessonPlay"));
@@ -354,6 +355,7 @@ const PTacticsMissed = () => <ProtectedRoute component={TacticsMissedPage} />;
 const PTrapTraining  = () => <ProtectedRoute component={TrapTrainingPage} />;
 const PBeginnerCourses = () => <ProtectedRoute component={BeginnerCoursesPage} requireAdmin />;
 const PStreamerStudio = () => <ProtectedRoute component={StreamerStudioPage} requireAdmin fullscreen />;
+const PLiveStreams = () => <ProtectedRoute component={LiveStreamsPage} requireAdmin fullscreen />;
 // Chess for Kids works without signing in (progress stays on the device), so
 // a child locked in Kid Mode is never bounced to a login screen.
 const kidsPage = (C: React.ComponentType) => () => <ErrorBoundary fallbackNav="/kids"><C /></ErrorBoundary>;
@@ -646,6 +648,7 @@ function Router() {
 <Route path="/admin/beginner-courses/:id" component={PBeginnerCourseDetail} />
 <Route path="/admin/beginner-courses" component={PBeginnerCourses} />
 <Route path="/admin/streamer" component={PStreamerStudio} />
+<Route path="/admin/live-streams" component={PLiveStreams} />
       <Route path="/beginner/:unit/:lesson" component={PBeginnerLessonPlay} />
       <Route path="/beginner" component={PBeginnerPath} />
       <Route path="/kids/benny" component={PKidsGame} />
