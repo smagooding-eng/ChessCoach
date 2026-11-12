@@ -8,9 +8,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as RPointerEvent, ReactNode } from 'react';
 import { Link } from 'wouter';
 import { RD } from '@/lib/redesignTheme';
-import { VoiceChanger, VOICE_PRESETS, type VoicePreset } from '@/lib/streamer/voiceChanger';
+import { VoiceChanger, VOICE_PRESETS, VOICE_GROUPS, DEFAULT_CUSTOM, type VoicePreset, type CustomVoice } from '@/lib/streamer/voiceChanger';
 import { FaceTracker, type FacePose } from '@/lib/streamer/faceTracker';
-import { AVATARS, drawAvatar, preloadPieceAvatars, type AvatarId, type AvatarPose } from '@/lib/streamer/avatars';
+import {
+  AVATARS, drawAvatar, preloadPieceAvatars, HATS, EYEWEAR, HAIR_STYLES, FACIAL_HAIR, SKIN_TONES, HAIR_COLORS, EYE_COLORS, SHIRT_COLORS, DEFAULT_PERSON,
+  type AvatarId, type AvatarPose, type Hat, type Eyewear, type PersonLook,
+} from '@/lib/streamer/avatars';
 import { drawComposite, type BoardFeed } from '@/lib/streamer/compositor';
 import { CloudRecorder, type RecStatus } from '@/lib/streamer/recorder';
 import { LiveHost } from '@/lib/streamer/live';
@@ -31,6 +34,7 @@ interface Settings {
   frame: 'auto' | 'manual'; framePad: 'board' | 'players';
   camOn: boolean; camId: string; facing: 'user' | 'environment'; mirror: boolean;
   disguise: Disguise; avatar: AvatarId; bg: Bg; bgColor: string; avatarScale: number;
+  hat: Hat; eyewear: Eyewear; person: PersonLook; customVoice: CustomVoice;
   voice: VoicePreset; pitch: number; micId: string; output: string;
   name: string; subtitle: string;
   broadcast: boolean; recordLive: boolean; title: string;
@@ -63,7 +67,7 @@ const DEFAULTS: Settings = {
   boardSource: 'app', appPath: '/live', zoom: 1, panX: 0, panY: 0,
   frame: 'auto', framePad: 'players',
   camOn: false, camId: '', facing: 'user', mirror: true,
-  disguise: 'avatar', avatar: 'wN', bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3,
+  disguise: 'avatar', avatar: 'wN', hat: 'none', eyewear: 'none', person: DEFAULT_PERSON, customVoice: DEFAULT_CUSTOM, bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3,
   voice: 'off', pitch: 0, micId: '', output: 'none',
   name: 'Anonymous Knight', subtitle: 'Playing on chessscout.net',
   broadcast: true, recordLive: true, title: '',
@@ -225,14 +229,30 @@ export default function StreamerStudio() {
   // ---- voice ----
   const startVoice = useCallback(async () => {
     try {
-      voice.current.setPreset(sRef.current.voice, sRef.current.pitch);
+      voice.current.setPreset(sRef.current.voice, sRef.current.pitch, sRef.current.customVoice);
       await voice.current.start(sRef.current.micId || undefined);
       await voice.current.setOutput(sRef.current.output);
       setVoiceOn(true); void refreshDevices();
     } catch { flash('Microphone blocked or not found. Allow mic access in the browser and try again.'); setVoiceOn(false); }
   }, [flash, refreshDevices]);
   const stopVoice = useCallback(() => { voice.current.stop(); setVoiceOn(false); }, []);
-  useEffect(() => { voice.current.setPreset(s.voice, s.pitch); }, [s.voice, s.pitch]);
+  const [testing, setTesting] = useState<'rec' | 'play' | null>(null);
+  const testVoice = useCallback(async () => {
+    if (!voice.current.running) await startVoice();
+    const track = voice.current.stream?.getAudioTracks()[0];
+    if (!track || typeof MediaRecorder === 'undefined') return;
+    const rec = new MediaRecorder(new MediaStream([track]));
+    const parts: Blob[] = [];
+    rec.ondataavailable = (e) => { if (e.data.size) parts.push(e.data); };
+    rec.onstop = () => {
+      const url = URL.createObjectURL(new Blob(parts, { type: rec.mimeType || 'audio/webm' }));
+      const a = new Audio(url); setTesting('play');
+      a.onended = () => { setTesting(null); URL.revokeObjectURL(url); };
+      void a.play().catch(() => setTesting(null));
+    };
+    setTesting('rec'); rec.start(); window.setTimeout(() => { if (rec.state !== 'inactive') rec.stop(); }, 4000);
+  }, [startVoice]);
+  useEffect(() => { voice.current.setPreset(s.voice, s.pitch, s.customVoice); }, [s.voice, s.pitch, s.customVoice]);
   useEffect(() => { void voice.current.setOutput(s.output); }, [s.output, voiceOn]);
   useEffect(() => { if (voiceOn) void startVoice(); }, [s.micId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -424,7 +444,7 @@ export default function StreamerStudio() {
           pose.mouth = Math.min(1, vlevel * 1.8);
         } else if (pose.mouth < 0.1 && vlevel > 0.15) pose.mouth = Math.min(1, vlevel * 1.5);
         pose.t = t / 1000;
-        drawAvatar(c, st.avatar, pose);
+        drawAvatar(c, st.avatar, pose, { person: st.person, hat: st.hat, eyewear: st.eyewear });
       }
 
       if (!hasVideo && st.disguise !== 'avatar') {
@@ -815,8 +835,24 @@ export default function StreamerStudio() {
               </div>
               <Label>Person</Label>
               <div className="grid grid-cols-5 gap-2">
-                {AVATARS.filter((a) => a.group === 'person').map((a) => <AvatarBtn key={a.id} id={a.id} label={a.label} on={s.avatar === a.id} onClick={() => set({ avatar: a.id })} />)}
+                {AVATARS.filter((a) => a.group === 'person').map((a) => <AvatarBtn key={a.id} id={a.id} label={a.label} person={a.id === 'me' ? s.person : undefined} on={s.avatar === a.id} onClick={() => set({ avatar: a.id })} />)}
               </div>
+              {s.avatar === 'me' && (<div className="mt-3 p-3 rounded-xl" style={{ background: CARD_LIGHT, border: `1px solid ${RD.border}` }}>
+                <p className="text-[12px] font-bold mb-1">Make your own</p>
+                <Swatches label="Skin" colors={SKIN_TONES} value={s.person.skin} onPick={(v) => set({ person: { ...s.person, skin: v } })} />
+                <Label>Hair</Label>
+                <div className="flex flex-wrap gap-1.5">{HAIR_STYLES.map((h) => <Chip key={h.id} on={s.person.hair === h.id} onClick={() => set({ person: { ...s.person, hair: h.id } })}>{h.label}</Chip>)}</div>
+                <Swatches label="Hair colour" colors={HAIR_COLORS} value={s.person.hairColor} onPick={(v) => set({ person: { ...s.person, hairColor: v } })} />
+                <Label>Facial hair</Label>
+                <div className="flex flex-wrap gap-1.5">{FACIAL_HAIR.map((h) => <Chip key={h.id} on={s.person.facial === h.id} onClick={() => set({ person: { ...s.person, facial: h.id } })}>{h.label}</Chip>)}</div>
+                <Swatches label="Eyes" colors={EYE_COLORS} value={s.person.eyes} onPick={(v) => set({ person: { ...s.person, eyes: v } })} />
+                <Swatches label="Shirt" colors={SHIRT_COLORS} value={s.person.shirt} onPick={(v) => set({ person: { ...s.person, shirt: v } })} />
+              </div>)}
+              <Label>Hat</Label>
+              <div className="flex flex-wrap gap-1.5">{HATS.map((h) => <Chip key={h.id} on={s.hat === h.id} onClick={() => set({ hat: h.id })}>{h.emoji} {h.label}</Chip>)}</div>
+              <Label>Glasses</Label>
+              <div className="flex flex-wrap gap-1.5">{EYEWEAR.map((h) => <Chip key={h.id} on={s.eyewear === h.id} onClick={() => set({ eyewear: h.id })}>{h.emoji} {h.label}</Chip>)}</div>
+              <Note>Hats and glasses work on every avatar, the chess pieces too.</Note>
               <Slider label="Avatar size" min={0.8} max={2.2} step={0.05} value={s.avatarScale} onChange={(v) => set({ avatarScale: v })} />
               <Label>Behind the avatar</Label>
               <div className="flex flex-wrap gap-2">
@@ -845,10 +881,28 @@ export default function StreamerStudio() {
               <div className="h-full transition-[width] duration-100" style={{ width: `${Math.round(level * 100)}%`, background: RD.green }} />
             </div>
             <Label>Voice</Label>
-            <div className="grid grid-cols-3 gap-2">
-              {VOICE_PRESETS.map((v) => <Chip key={v.id} on={s.voice === v.id} onClick={() => set({ voice: v.id })}>{v.emoji} {v.label}</Chip>)}
-            </div>
-            {s.voice === 'custom' && <Slider label="Pitch" min={-1} max={1} step={0.05} value={s.pitch} onChange={(v) => set({ pitch: v })} />}
+            {VOICE_GROUPS.map((g) => (
+              <div key={g.title} className="mb-2">
+                <p className="text-[11px] font-semibold mb-1.5" style={{ color: RD.muted }}>{g.title}</p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {g.ids.map((id) => { const v = VOICE_PRESETS.find((x) => x.id === id); return v ? <Chip key={id} on={s.voice === id} onClick={() => set({ voice: id })}>{v.emoji} {v.label}</Chip> : null; })}
+                </div>
+              </div>
+            ))}
+            {s.voice === 'custom' && (<div className="p-3 rounded-xl" style={{ background: CARD_LIGHT, border: `1px solid ${RD.border}` }}>
+              <Slider label="Pitch (low ↔ high)" min={-1} max={1} step={0.05} value={s.customVoice.pitch} onChange={(v) => set({ customVoice: { ...s.customVoice, pitch: v } })} />
+              <Slider label="Robot" min={0} max={1} step={0.05} value={s.customVoice.robot} onChange={(v) => set({ customVoice: { ...s.customVoice, robot: v } })} />
+              <Slider label="Echo" min={0} max={1} step={0.05} value={s.customVoice.echo} onChange={(v) => set({ customVoice: { ...s.customVoice, echo: v } })} />
+              <Slider label="Big room" min={0} max={1} step={0.05} value={s.customVoice.reverb} onChange={(v) => set({ customVoice: { ...s.customVoice, reverb: v } })} />
+              <Slider label="Warble" min={0} max={1} step={0.05} value={s.customVoice.warble} onChange={(v) => set({ customVoice: { ...s.customVoice, warble: v } })} />
+              <Slider label="Grit" min={0} max={1} step={0.05} value={s.customVoice.grit} onChange={(v) => set({ customVoice: { ...s.customVoice, grit: v } })} />
+              <Slider label="Tone (warm ↔ bright)" min={-1} max={1} step={0.05} value={s.customVoice.tone} onChange={(v) => set({ customVoice: { ...s.customVoice, tone: v } })} />
+            </div>)}
+            <button onClick={() => void testVoice()} disabled={testing !== null} className="mt-3 w-full py-2.5 rounded-xl font-bold text-sm"
+              style={{ background: testing ? CARD_LIGHT : RD.green, color: testing ? RD.text : '#06110A' }}>
+              {testing === 'rec' ? '🔴 Say something… (4 seconds)' : testing === 'play' ? '🔊 Playing it back…' : '🎧 Test my voice'}
+            </button>
+            <Note>Records 4 seconds with the voice you picked and plays it back, so you can hear how you’ll sound without an echo.</Note>
             <Label>Send my changed voice to</Label>
             <select value={s.output} onChange={(e) => set({ output: e.target.value })} className="w-full px-3 py-2 rounded-lg text-sm" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }}>
               <option value="none">Recordings only</option>
@@ -901,13 +955,16 @@ function Slider({ label, min, max, step, value, onChange }: { label: string; min
   );
 }
 
-function AvatarBtn({ id, label, on, onClick }: { id: AvatarId; label: string; on: boolean; onClick: () => void }) {
+function AvatarBtn({ id, label, on, onClick, person }: { id: AvatarId; label: string; on: boolean; onClick: () => void; person?: PersonLook }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const cv = ref.current; const c = cv?.getContext('2d'); if (!cv || !c) return;
     c.clearRect(0, 0, cv.width, cv.height);
-    drawAvatar(c, id, { x: 48, y: 50, size: 44, roll: 0, yaw: 0, pitch: 0, mouth: 0, blinkL: 0, blinkR: 0, smile: 0.4, t: 0 });
-  }, [id]);
+    const draw = () => { c.clearRect(0, 0, cv.width, cv.height); drawAvatar(c, id, { x: 48, y: 50, size: 44, roll: 0, yaw: 0, pitch: 0, mouth: 0, blinkL: 0, blinkR: 0, smile: 0.4, t: 0 }, { person }); };
+    draw();
+    const tm = window.setTimeout(draw, 700); // piece images may still be loading
+    return () => window.clearTimeout(tm);
+  }, [id, person]);
   return (
     <button onClick={onClick} title={label} className="rounded-xl overflow-hidden flex flex-col items-center pb-1"
       style={{ background: CARD_LIGHT, border: `2px solid ${on ? RD.green : 'transparent'}` }}>
@@ -971,6 +1028,20 @@ function VideosPanel({ refreshKey, onError }: { refreshKey: number; onError: (m:
               </div>
             )}
           </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Swatches({ label, colors, value, onPick }: { label: string; colors: string[]; value: string; onPick: (v: string) => void }) {
+  return (
+    <div>
+      <p className="text-[11px] font-bold uppercase tracking-wider mt-3 mb-1.5" style={{ color: RD.muted }}>{label}</p>
+      <div className="flex flex-wrap gap-1.5">
+        {colors.map((c) => (
+          <button key={c} onClick={() => onPick(c)} aria-label={c} className="w-8 h-8 rounded-full"
+            style={{ background: c, border: `3px solid ${value === c ? RD.green : 'rgba(255,255,255,.12)'}` }} />
         ))}
       </div>
     </div>

@@ -4,19 +4,104 @@
 // (VB-Cable on Windows, BlackHole on Mac) and pick that as their mic in
 // Discord / OBS / YouTube, so only the changed voice ever leaves the computer.
 
-export type VoicePreset = 'off' | 'deep' | 'high' | 'robot' | 'monster' | 'alien' | 'radio' | 'cave' | 'custom';
+export type VoicePreset =
+  | 'off' | 'deep' | 'high' | 'anonymous' | 'giant' | 'chipmunk' | 'child' | 'elder'
+  | 'robot' | 'cyborg' | 'alien' | 'monster' | 'villain' | 'ghost' | 'dragon'
+  | 'radio' | 'telephone' | 'walkie' | 'megaphone' | 'underwater' | 'stadium' | 'cave' | 'announcer'
+  | 'custom';
+
+export const VOICE_GROUPS: { title: string; ids: VoicePreset[] }[] = [
+  { title: 'Hide my voice', ids: ['off', 'anonymous', 'deep', 'high', 'giant', 'chipmunk', 'child', 'elder'] },
+  { title: 'Characters', ids: ['robot', 'cyborg', 'alien', 'monster', 'villain', 'ghost', 'dragon', 'announcer'] },
+  { title: 'Places & gear', ids: ['radio', 'telephone', 'walkie', 'megaphone', 'underwater', 'stadium', 'cave'] },
+  { title: 'Make your own', ids: ['custom'] },
+];
 
 export const VOICE_PRESETS: { id: VoicePreset; label: string; emoji: string }[] = [
   { id: 'off', label: 'My voice', emoji: '🎙️' },
+  { id: 'anonymous', label: 'Anonymous', emoji: '🕶️' },
   { id: 'deep', label: 'Deep', emoji: '🐻' },
-  { id: 'high', label: 'High', emoji: '🐿️' },
+  { id: 'high', label: 'High', emoji: '🎈' },
+  { id: 'giant', label: 'Giant', emoji: '🗿' },
+  { id: 'chipmunk', label: 'Chipmunk', emoji: '🐿️' },
+  { id: 'child', label: 'Kid', emoji: '🧒' },
+  { id: 'elder', label: 'Old wizard', emoji: '🧙' },
   { id: 'robot', label: 'Robot', emoji: '🤖' },
-  { id: 'monster', label: 'Monster', emoji: '👹' },
+  { id: 'cyborg', label: 'Cyborg', emoji: '🦾' },
   { id: 'alien', label: 'Alien', emoji: '👽' },
-  { id: 'radio', label: 'Radio', emoji: '📻' },
+  { id: 'monster', label: 'Monster', emoji: '👹' },
+  { id: 'villain', label: 'Villain', emoji: '😈' },
+  { id: 'ghost', label: 'Ghost', emoji: '👻' },
+  { id: 'dragon', label: 'Dragon', emoji: '🐲' },
+  { id: 'announcer', label: 'Announcer', emoji: '🏟️' },
+  { id: 'radio', label: 'Old radio', emoji: '📻' },
+  { id: 'telephone', label: 'Phone call', emoji: '☎️' },
+  { id: 'walkie', label: 'Walkie-talkie', emoji: '📟' },
+  { id: 'megaphone', label: 'Megaphone', emoji: '📣' },
+  { id: 'underwater', label: 'Underwater', emoji: '🫧' },
+  { id: 'stadium', label: 'Big hall', emoji: '🏛️' },
   { id: 'cave', label: 'Cave echo', emoji: '🕳️' },
-  { id: 'custom', label: 'Custom pitch', emoji: '🎚️' },
+  { id: 'custom', label: 'Custom', emoji: '🎚️' },
 ];
+
+/** Everything a voice is made of. The presets and the Custom sliders all build one of these. */
+export interface VoiceRecipe {
+  pitch: number;            // -1 .. +1
+  low?: number;             // lowpass Hz
+  high?: number;            // highpass Hz
+  band?: [number, number];  // bandpass centre Hz, Q
+  bass?: number;            // low-shelf boost dB
+  treble?: number;          // high-shelf boost dB
+  drive?: number;           // distortion amount
+  ring?: [number, number];  // ring-mod Hz, depth 0..1
+  vibrato?: [number, number]; // Hz, depth seconds
+  wobble?: number;          // lowpass sweeping Hz (underwater)
+  echo?: [number, number, number]; // time s, feedback, mix
+  reverb?: [number, number]; // seconds, mix
+  gain?: number;
+}
+
+export const RECIPES: Record<Exclude<VoicePreset, 'custom'>, VoiceRecipe> = {
+  off: { pitch: 0 },
+  anonymous: { pitch: -0.55, ring: [32, 0.28], low: 3400, bass: 4, drive: 4 },
+  deep: { pitch: -0.45, bass: 6 },
+  high: { pitch: 0.55, treble: 2 },
+  giant: { pitch: -0.9, bass: 8, reverb: [1.4, 0.22], gain: 1.2 },
+  chipmunk: { pitch: 0.95, treble: 3 },
+  child: { pitch: 0.42, treble: 5, high: 180 },
+  elder: { pitch: -0.12, vibrato: [5.5, 0.0035], high: 160, reverb: [1.2, 0.15] },
+  robot: { pitch: -0.12, ring: [55, 0.9], high: 180 },
+  cyborg: { pitch: -0.2, ring: [110, 0.5], echo: [0.012, 0.65, 0.5], high: 150 },
+  alien: { pitch: 0.35, ring: [28, 0.6], vibrato: [7, 0.002] },
+  monster: { pitch: -0.8, drive: 18, low: 2400, bass: 6 },
+  villain: { pitch: -0.6, bass: 7, reverb: [2.2, 0.28], drive: 3 },
+  ghost: { pitch: 0.15, vibrato: [4, 0.006], reverb: [3, 0.5], high: 250 },
+  dragon: { pitch: -0.7, drive: 25, ring: [18, 0.25], reverb: [1.6, 0.2], bass: 5 },
+  announcer: { pitch: -0.15, bass: 4, treble: 2, reverb: [2.6, 0.22], echo: [0.32, 0.25, 0.18] },
+  radio: { pitch: 0, high: 500, low: 3000, drive: 6 },
+  telephone: { pitch: 0, band: [1700, 1.6], drive: 2, gain: 1.6 },
+  walkie: { pitch: 0.05, band: [1900, 2.2], drive: 22, gain: 1.3 },
+  megaphone: { pitch: 0, high: 700, low: 3800, drive: 26, band: [2000, 0.7], gain: 0.9 },
+  underwater: { pitch: -0.1, wobble: 520, vibrato: [1.6, 0.004], reverb: [1.2, 0.3] },
+  stadium: { pitch: 0, reverb: [3.5, 0.45], echo: [0.38, 0.28, 0.25] },
+  cave: { pitch: -0.2, echo: [0.19, 0.42, 0.5], reverb: [2, 0.2] },
+};
+
+/** Custom voice sliders -> recipe */
+export interface CustomVoice { pitch: number; robot: number; echo: number; reverb: number; warble: number; grit: number; tone: number }
+export const DEFAULT_CUSTOM: CustomVoice = { pitch: -0.3, robot: 0, echo: 0, reverb: 0.2, warble: 0, grit: 0, tone: 0 };
+export function customRecipe(v: CustomVoice): VoiceRecipe {
+  return {
+    pitch: v.pitch,
+    ring: v.robot > 0.02 ? [40 + v.robot * 80, Math.min(0.95, v.robot)] : undefined,
+    echo: v.echo > 0.02 ? [0.12 + v.echo * 0.25, 0.25 + v.echo * 0.35, v.echo * 0.6] : undefined,
+    reverb: v.reverb > 0.02 ? [0.8 + v.reverb * 3, v.reverb * 0.55] : undefined,
+    vibrato: v.warble > 0.02 ? [3 + v.warble * 5, 0.001 + v.warble * 0.006] : undefined,
+    drive: v.grit > 0.02 ? v.grit * 30 : undefined,
+    bass: v.tone < 0 ? -v.tone * 8 : undefined,
+    treble: v.tone > 0 ? v.tone * 8 : undefined,
+  };
+}
 
 // Delay-line pitch shifter (two crossfaded, modulated delay lines). Works with
 // plain Web Audio nodes, so no worklet files are needed.
@@ -88,6 +173,7 @@ export class VoiceChanger {
   private levelBuf: Uint8Array<ArrayBuffer> | null = null;
   preset: VoicePreset = 'off';
   pitch = 0;
+  custom: CustomVoice = { ...DEFAULT_CUSTOM };
 
   get running() { return !!this.mic; }
   /** The changed voice, for recording. */
@@ -121,7 +207,11 @@ export class VoiceChanger {
     this.mic = null; this.src = null; this.player = null; this.dest = null;
   }
 
-  setPreset(p: VoicePreset, pitch = this.pitch) { this.preset = p; this.pitch = pitch; if (this.running) this.build(); }
+  setPreset(p: VoicePreset, pitch = this.pitch, custom?: CustomVoice) {
+    this.preset = p; this.pitch = pitch;
+    if (custom) this.custom = { ...custom };
+    if (this.running) this.build();
+  }
 
   /** 'none' = only recorded; 'default' = your speakers/headphones; anything else = an output device id (e.g. a virtual cable). */
   async setOutput(target: string) {
@@ -171,42 +261,83 @@ export class VoiceChanger {
     const ctx = this.ctx, inG = this.inGain, out = this.outGain;
     if (!ctx || !inG || !out) return;
     this.teardownChain();
+    const r: VoiceRecipe = this.preset === 'custom' ? customRecipe(this.custom) : RECIPES[this.preset];
     const keep = <T extends AudioNode>(n: T) => { this.chain.push(n); return n; };
-    const shifter = (m: number) => {
-      const s = new PitchShifter(ctx); s.set(m); this.stoppers.push(() => s.stop());
-      keep(s.input); keep(s.output); return s;
-    };
-    const ring = (hz: number, depth: number) => {
-      // signal * (1-depth + depth*sin)
-      const g = keep(ctx.createGain()); g.gain.value = 1 - depth;
-      const osc = ctx.createOscillator(); osc.frequency.value = hz;
-      const og = keep(ctx.createGain()); og.gain.value = depth;
-      osc.connect(og); og.connect(g.gain); osc.start();
-      this.stoppers.push(() => { try { osc.stop(); } catch { /* ignore */ } osc.disconnect(); });
-      return g;
-    };
+    const nodes: AudioNode[] = [];
     const filter = (type: BiquadFilterType, f: number, q = 0.7, gain = 0) => {
       const b = keep(ctx.createBiquadFilter()); b.type = type; b.frequency.value = f; b.Q.value = q; b.gain.value = gain; return b;
     };
-    const series = (nodes: AudioNode[]) => { let prev: AudioNode = inG; for (const n of nodes) { prev.connect(n); prev = n; } prev.connect(out); };
-
-    switch (this.preset) {
-      case 'off': inG.connect(out); break;
-      case 'deep': { const s = shifter(-0.45); series([s.input]); s.output.connect(filter('lowshelf', 250, 0.7, 6)).connect(out); break; }
-      case 'high': { const s = shifter(0.6); series([s.input]); s.output.connect(out); break; }
-      case 'robot': { const s = shifter(-0.12); const r = ring(55, 0.9); inG.connect(s.input); s.output.connect(r); r.connect(filter('highpass', 180)).connect(out); break; }
-      case 'monster': { const s = shifter(-0.8); const d = keep(distortion(ctx, 18)); inG.connect(s.input); s.output.connect(d); d.connect(filter('lowpass', 2400)).connect(out); break; }
-      case 'alien': { const s = shifter(0.35); const r = ring(28, 0.6); inG.connect(s.input); s.output.connect(r); r.connect(out); break; }
-      case 'radio': { const d = keep(distortion(ctx, 6)); series([filter('highpass', 500), filter('lowpass', 3000), d]); break; }
-      case 'cave': {
-        const s = shifter(-0.2); inG.connect(s.input); s.output.connect(out);
-        const dl = keep(ctx.createDelay(1)); dl.delayTime.value = 0.19;
-        const fb = keep(ctx.createGain()); fb.gain.value = 0.42;
-        const wet = keep(ctx.createGain()); wet.gain.value = 0.5;
-        s.output.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(out);
-        break;
-      }
-      case 'custom': { const s = shifter(Math.max(-1, Math.min(1, this.pitch))); inG.connect(s.input); s.output.connect(out); break; }
+    if (r.high) nodes.push(filter('highpass', r.high));
+    if (Math.abs(r.pitch) > 0.01) {
+      const s = new PitchShifter(ctx); s.set(Math.max(-1, Math.min(1, r.pitch))); this.stoppers.push(() => s.stop());
+      keep(s.input); keep(s.output); nodes.push(new SeriesPair(s.input, s.output) as unknown as AudioNode);
     }
+    if (r.vibrato) {
+      const d = keep(ctx.createDelay(0.1)); d.delayTime.value = 0.01;
+      const osc = ctx.createOscillator(); osc.frequency.value = r.vibrato[0];
+      const og = keep(ctx.createGain()); og.gain.value = r.vibrato[1];
+      osc.connect(og); og.connect(d.delayTime); osc.start();
+      this.stoppers.push(() => { try { osc.stop(); } catch { /* ignore */ } osc.disconnect(); });
+      nodes.push(d);
+    }
+    if (r.ring) {
+      const g = keep(ctx.createGain()); g.gain.value = 1 - r.ring[1];
+      const osc = ctx.createOscillator(); osc.frequency.value = r.ring[0];
+      const og = keep(ctx.createGain()); og.gain.value = r.ring[1];
+      osc.connect(og); og.connect(g.gain); osc.start();
+      this.stoppers.push(() => { try { osc.stop(); } catch { /* ignore */ } osc.disconnect(); });
+      nodes.push(g);
+    }
+    if (r.drive) nodes.push(keep(distortion(ctx, r.drive)));
+    if (r.band) nodes.push(filter('bandpass', r.band[0], r.band[1]));
+    if (r.low) nodes.push(filter('lowpass', r.low));
+    if (r.wobble) {
+      const f = filter('lowpass', r.wobble, 4);
+      const osc = ctx.createOscillator(); osc.frequency.value = 0.7;
+      const og = keep(ctx.createGain()); og.gain.value = r.wobble * 0.45;
+      osc.connect(og); og.connect(f.frequency); osc.start();
+      this.stoppers.push(() => { try { osc.stop(); } catch { /* ignore */ } osc.disconnect(); });
+      nodes.push(f);
+    }
+    if (r.bass) nodes.push(filter('lowshelf', 220, 0.7, r.bass));
+    if (r.treble) nodes.push(filter('highshelf', 3200, 0.7, r.treble));
+    // a gentle compressor keeps every voice at an even, streamable level
+    const comp = keep(ctx.createDynamicsCompressor());
+    comp.threshold.value = -24; comp.knee.value = 18; comp.ratio.value = 3.5; comp.attack.value = 0.005; comp.release.value = 0.2;
+    const makeup = keep(ctx.createGain()); makeup.gain.value = (r.gain ?? 1) * 1.15;
+
+    // wire the series chain
+    let prev: AudioNode = inG;
+    for (const n of nodes) {
+      if (n instanceof SeriesPair) { prev.connect(n.input); prev = n.output; }
+      else { prev.connect(n); prev = n; }
+    }
+    const dry = prev;
+    dry.connect(comp);
+    if (r.echo) {
+      const dl = keep(ctx.createDelay(1)); dl.delayTime.value = r.echo[0];
+      const fb = keep(ctx.createGain()); fb.gain.value = r.echo[1];
+      const wet = keep(ctx.createGain()); wet.gain.value = r.echo[2];
+      dry.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(comp);
+    }
+    if (r.reverb) {
+      const cv = keep(ctx.createConvolver()); cv.buffer = impulse(ctx, r.reverb[0]);
+      const wet = keep(ctx.createGain()); wet.gain.value = r.reverb[1] * 1.6;
+      dry.connect(cv); cv.connect(wet); wet.connect(comp);
+    }
+    comp.connect(makeup); makeup.connect(out);
   }
+}
+
+/** A two-ended effect (input + output node) inside the series chain. */
+class SeriesPair { constructor(public input: AudioNode, public output: AudioNode) {} }
+
+/** Room sound: decaying stereo noise. */
+function impulse(ctx: BaseAudioContext, seconds: number): AudioBuffer {
+  const len = Math.max(1, Math.round(ctx.sampleRate * seconds)), b = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = b.getChannelData(ch);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6);
+  }
+  return b;
 }
