@@ -1,7 +1,7 @@
 // Streamer Studio (admin-only, Features in Development).
 // A stage the streamer arranges: board (a ChessScout page or any captured window),
 // camera (raw, face-hidden or a live avatar), and a name tag. Voice changer on the mic.
-// Record to a file here; stream through OBS / Discord using Clean view.
+// Record to a file here; stream through OBS / Discord using Go live (full screen).
 // Everything runs in the browser: no server changes.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -356,7 +356,7 @@ export default function StreamerStudio() {
   const startRecording = useCallback(async (withTabAudio: boolean) => {
     const md = navigator.mediaDevices as unknown as { getDisplayMedia?: (c: object) => Promise<MediaStream> };
     if (!md.getDisplayMedia || typeof MediaRecorder === 'undefined') {
-      flash('Recording here needs Chrome or Edge on a computer. On a phone: open Clean view and use your phone’s screen recorder.');
+      flash('Recording here needs Chrome or Edge on a computer. On a phone: tap Go live and use your phone’s screen recorder.');
       return;
     }
     setEdit(false);
@@ -404,11 +404,28 @@ export default function StreamerStudio() {
     setRecording({ start: Date.now() });
   }, [flash]);
 
-  // ---- clean view: Esc exits ----
-  useEffect(() => {
-    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') setClean(false); };
-    window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
+  // ---- Go live: stage only, full screen. Esc, the back gesture or a double-tap top-right exits ----
+  const [hint, setHint] = useState(false);
+  const goLive = useCallback(async () => {
+    setEdit(false); setClean(true); setHint(true);
+    window.setTimeout(() => setHint(false), 3000);
+    try {
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+      const o = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
+      if (IS_PHONE && o?.lock) await o.lock(sRef.current.aspect === '16:9' ? 'landscape' : 'portrait').catch(() => undefined);
+    } catch { /* fullscreen not allowed here: the stage still fills the window */ }
   }, []);
+  const endLive = useCallback(() => {
+    setClean(false);
+    try { (screen.orientation as ScreenOrientation & { unlock?: () => void })?.unlock?.(); } catch { /* ignore */ }
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => { if (e.key === 'Escape') endLive(); };
+    const fs = () => { if (!document.fullscreenElement) setClean(false); };
+    window.addEventListener('keydown', k); document.addEventListener('fullscreenchange', fs);
+    return () => { window.removeEventListener('keydown', k); document.removeEventListener('fullscreenchange', fs); };
+  }, [endLive]);
 
   // ---- layout editing (drag / resize in % of the stage) ----
   const drag = useRef<{ id: PanelId; mode: 'move' | 'size'; sx: number; sy: number; r: Rect } | null>(null);
@@ -511,15 +528,6 @@ export default function StreamerStudio() {
   // hidden video element that feeds the camera canvas
   const hiddenVideo = <video ref={camVideo} muted playsInline style={{ position: 'fixed', width: 1, height: 1, opacity: 0, pointerEvents: 'none', left: -10, top: -10 }} />;
 
-  if (clean) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center" style={{ background: '#000' }}>
-        {hiddenVideo}
-        <div ref={areaRef} className="absolute inset-0 flex items-center justify-center">{stageEl}</div>
-        <button aria-label="Exit clean view" onDoubleClick={() => setClean(false)} className="absolute top-0 right-0 w-16 h-16 opacity-0" />
-      </div>
-    );
-  }
 
   const elapsed = recording ? Math.floor((now - recording.start) / 1000) : 0;
   const tabs: { id: Tab; label: string }[] = [
@@ -527,29 +535,31 @@ export default function StreamerStudio() {
   ];
 
   return (
-    <div className="min-h-screen lg:h-screen flex flex-col lg:flex-row relative z-0" style={{ background: BG, color: RD.text }}>
+    <div className={clean ? 'fixed inset-0 z-[200] flex' : 'min-h-screen lg:h-screen flex flex-col lg:flex-row relative z-0'} style={{ background: clean ? '#000' : BG, color: RD.text }}>
       {hiddenVideo}
-      <div className="flex flex-col lg:flex-1 min-w-0 p-3 gap-3">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className={clean ? 'flex-1 flex flex-col min-w-0' : 'flex flex-col lg:flex-1 min-w-0 p-3 gap-3'}>
+        {!clean && <div className="flex flex-wrap items-center gap-2">
           <Link href="/admin" className="text-sm font-semibold px-3 py-1.5 rounded-lg" style={{ background: CARD_LIGHT, color: RD.text }}>← Admin</Link>
           <h1 className="font-extrabold text-lg">Streamer Studio</h1>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: RD.gold, color: '#050A0B' }}>IN DEVELOPMENT</span>
           <div className="w-full sm:w-auto sm:ml-auto flex gap-2">
             <button onClick={() => setEdit((v) => !v)} className="px-3 py-1.5 rounded-lg text-sm font-bold" style={edit ? { background: RD.green, color: '#06110A' } : { background: CARD_LIGHT, color: RD.text }}>{edit ? 'Done' : 'Move & resize'}</button>
-            <button onClick={() => { setEdit(false); setClean(true); flash('Clean view: press Esc or double-tap the top-right corner to exit.'); }} className="px-3 py-1.5 rounded-lg text-sm font-bold" style={{ background: CARD_LIGHT, color: RD.text }}>Clean view</button>
+            <button onClick={() => void goLive()} className="px-3 py-1.5 rounded-lg text-sm font-bold" style={{ background: RD.red, color: '#fff' }}>◉ Go live</button>
             {recording
               ? <button onClick={stopRecording} className="px-3 py-1.5 rounded-lg text-sm font-bold" style={{ background: RD.red, color: '#fff' }}>■ Stop {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, '0')}</button>
               : <button onClick={() => void startRecording(false)} className="px-3 py-1.5 rounded-lg text-sm font-bold" style={{ background: RD.green, color: '#06110A' }}>● Record</button>}
           </div>
-        </div>
-        {msg && <div className="text-sm px-3 py-2 rounded-lg" style={card}>{msg}</div>}
-        <div ref={areaRef} className="flex-1 flex items-center justify-center min-h-[60vh] lg:min-h-0">{stageEl}</div>
+        </div>}
+        {!clean && msg && <div className="text-sm px-3 py-2 rounded-lg" style={card}>{msg}</div>}
+        <div ref={areaRef} className={clean ? 'flex-1 flex items-center justify-center' : 'flex-1 flex items-center justify-center min-h-[60vh] lg:min-h-0'}>{stageEl}</div>
       </div>
+      {clean && <button aria-label="Exit" onDoubleClick={endLive} className="absolute top-0 right-0 w-20 h-20 opacity-0" />}
+      {clean && hint && <div className="absolute top-3 inset-x-0 mx-auto w-fit max-w-[90%] text-center text-[13px] font-semibold px-3 py-2 rounded-lg pointer-events-none" style={{ background: CARD, color: RD.text, border: `1px solid ${RD.border}` }}>You’re in Go live view. To leave: swipe back, press Esc, or double-tap the top-right corner.</div>}
 
-      <aside className="lg:w-[380px] lg:h-screen lg:overflow-y-auto p-3 pt-0 lg:pt-3 shrink-0">
+      {!clean && <aside className="lg:w-[380px] lg:h-screen lg:overflow-y-auto p-3 pt-0 lg:pt-3 shrink-0">
         <div className="flex gap-1 p-1 mb-3" style={card}>
           {tabs.map((t) => (
-            <button key={t.id} onClick={() => setTab(t.id)} className="flex-1 py-2 rounded-[10px] text-[13px] font-bold"
+            <button key={t.id} onClick={() => { setTab(t.id); if (t.id === 'live') void goLive(); }} className="flex-1 py-2 rounded-[10px] text-[13px] font-bold"
               style={tab === t.id ? { background: RD.green, color: '#06110A' } : { color: RD.muted }}>{t.label}</button>
           ))}
         </div>
@@ -693,21 +703,22 @@ export default function StreamerStudio() {
           </>)}
 
           {tab === 'live' && (<>
+            <button onClick={() => void goLive()} className="w-full py-3 rounded-xl font-extrabold text-base" style={{ background: RD.red, color: '#fff' }}>◉ Go live (full screen)</button>
             <Label>Record</Label>
             <div className="flex flex-wrap gap-2">
               <Chip on={false} onClick={() => void startRecording(false)}>● Record stage + voice</Chip>
               <Chip on={false} onClick={() => void startRecording(true)}>● Record with game sounds</Chip>
             </div>
-            <Note>Chrome or Edge on a computer: pick <b>this tab</b> when asked. The video saves when you press Stop. On a phone: open Clean view and use the phone’s own screen recorder.</Note>
+            <Note>Chrome or Edge on a computer: pick <b>this tab</b> when asked. The video saves when you press Stop. On a phone: tap Go live (full screen) and use the phone’s own screen recorder.</Note>
             <Label>Stream to YouTube or Twitch (works today)</Label>
-            <Note>1. Open <b>Clean view</b> here. 2. In OBS add a <b>Window Capture</b> of this browser window. 3. Set OBS’s mic to the virtual cable (Voice tab). 4. Stream from OBS with your YouTube or Twitch key.</Note>
+            <Note>1. Tap <b>Go live</b> here (full screen). 2. In OBS add a <b>Window Capture</b> of this browser window. 3. Set OBS’s mic to the virtual cable (Voice tab). 4. Stream from OBS with your YouTube or Twitch key.</Note>
             <Label>Discord</Label>
-            <Note>Open <b>Clean view</b>, then in Discord press <b>Share your screen</b> and pick this browser window. Set Discord’s input device to the virtual cable so friends hear the changed voice.</Note>
+            <Note>Tap <b>Go live</b>, then in Discord press <b>Share your screen</b> and pick this browser window. Set Discord’s input device to the virtual cable so friends hear the changed voice.</Note>
             <Label>Live straight from here: next phase</Label>
             <Note>Going live on chessscout.net, and to a connected YouTube channel without OBS, needs a streaming service (for example LiveKit or Cloudflare Stream). It isn’t connected yet.</Note>
           </>)}
         </div>
-      </aside>
+      </aside>}
     </div>
   );
 }
