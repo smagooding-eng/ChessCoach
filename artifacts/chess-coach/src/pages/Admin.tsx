@@ -967,6 +967,14 @@ export function Admin() {
               <p className="text-[11px] text-muted-foreground mt-0.5">Admin-only for now &mdash; not linked anywhere in the regular app.</p>
             </div>
             <div className="p-4 space-y-2">
+              <Link href="/admin/streamer" className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:bg-white/5 text-left border border-white/10">
+                <span className="text-lg">🎥</span>
+                <div className="flex-1">
+                  <p className="text-foreground font-bold">Streamer Studio</p>
+                  <p className="text-xs text-muted-foreground">Split-screen board + camera, avatars to stay anonymous, voice changer, record &mdash; in progress</p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </Link>
               <Link href="/admin/traps" className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all hover:bg-white/5 text-left border border-white/10">
                 <span className="text-lg">🗡️</span>
                 <div className="flex-1">
