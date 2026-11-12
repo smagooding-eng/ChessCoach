@@ -11,9 +11,10 @@ import { RD } from '@/lib/redesignTheme';
 import { VoiceChanger, VOICE_PRESETS, VOICE_GROUPS, DEFAULT_CUSTOM, type VoicePreset, type CustomVoice } from '@/lib/streamer/voiceChanger';
 import { FaceTracker, type FacePose } from '@/lib/streamer/faceTracker';
 import {
-  AVATARS, drawAvatar, preloadPieceAvatars, HATS, EYEWEAR, HAIR_STYLES, FACIAL_HAIR, SKIN_TONES, HAIR_COLORS, EYE_COLORS, SHIRT_COLORS, DEFAULT_PERSON,
+  AVATARS, drawAvatar, preloadPieceAvatars, HATS, EYEWEAR, HAIR_STYLES, FACIAL_HAIR, SKIN_TONES, HAIR_COLORS, EYE_COLORS, SHIRT_COLORS, DEFAULT_PERSON, OUTFITS, CHARACTER_EXTRAS,
   type AvatarId, type AvatarPose, type Hat, type Eyewear, type PersonLook,
 } from '@/lib/streamer/avatars';
+import { cartoonFromCamera } from '@/lib/streamer/cartoonMe';
 import { drawComposite, type BoardFeed } from '@/lib/streamer/compositor';
 import { CloudRecorder, type RecStatus } from '@/lib/streamer/recorder';
 import { LiveHost } from '@/lib/streamer/live';
@@ -34,7 +35,7 @@ interface Settings {
   frame: 'auto' | 'manual'; framePad: 'board' | 'players';
   camOn: boolean; camId: string; facing: 'user' | 'environment'; mirror: boolean;
   disguise: Disguise; avatar: AvatarId; bg: Bg; bgColor: string; avatarScale: number;
-  hat: Hat; eyewear: Eyewear; person: PersonLook; customVoice: CustomVoice;
+  hat: Hat; eyewear: Eyewear; person: PersonLook; customVoice: CustomVoice; personStyle: 'cartoon' | 'real';
   voice: VoicePreset; pitch: number; micId: string; output: string;
   name: string; subtitle: string;
   broadcast: boolean; recordLive: boolean; title: string;
@@ -67,7 +68,7 @@ const DEFAULTS: Settings = {
   boardSource: 'app', appPath: '/live', zoom: 1, panX: 0, panY: 0,
   frame: 'auto', framePad: 'players',
   camOn: false, camId: '', facing: 'user', mirror: true,
-  disguise: 'avatar', avatar: 'wN', hat: 'none', eyewear: 'none', person: DEFAULT_PERSON, customVoice: DEFAULT_CUSTOM, bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3,
+  disguise: 'avatar', avatar: 'wN', hat: 'none', eyewear: 'none', person: DEFAULT_PERSON, customVoice: DEFAULT_CUSTOM, personStyle: 'cartoon', bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3,
   voice: 'off', pitch: 0, micId: '', output: 'none',
   name: 'Anonymous Knight', subtitle: 'Playing on chessscout.net',
   broadcast: true, recordLive: true, title: '',
@@ -237,6 +238,26 @@ export default function StreamerStudio() {
   }, [flash, refreshDevices]);
   const stopVoice = useCallback(() => { voice.current.stop(); setVoiceOn(false); }, []);
   const [testing, setTesting] = useState<'rec' | 'play' | null>(null);
+  const [making, setMaking] = useState(false);
+  const cartoonMe = useCallback(async () => {
+    setMaking(true);
+    try {
+      if (!sRef.current.camOn || sRef.current.disguise !== 'avatar') set({ camOn: true, disguise: 'avatar' });
+      const t0 = performance.now();
+      // wait for the camera and face tracking, then a fresh look at the face
+      while (performance.now() - t0 < 15000) {
+        await new Promise((r) => window.setTimeout(r, 300));
+        const tr = tracker.current;
+        if (tr.status === 'failed') break;
+        if (tr.lastLandmarks && performance.now() - tr.lastAt < 400 && camVideo.current && camVideo.current.videoWidth) {
+          await new Promise((r) => window.setTimeout(r, 600)); // let the camera settle its exposure
+          const look = cartoonFromCamera(camVideo.current, tr.lastLandmarks, sRef.current.person);
+          if (look) { set({ person: look, avatar: 'me' }); flash('Made an avatar from your camera. Tweak it under “Make your own”.'); return; }
+        }
+      }
+      flash('Couldn’t see your face clearly. Face the camera in good light and try again.');
+    } finally { setMaking(false); }
+  }, [set, flash]);
   const testVoice = useCallback(async () => {
     if (!voice.current.running) await startVoice();
     const track = voice.current.stream?.getAudioTracks()[0];
@@ -444,7 +465,7 @@ export default function StreamerStudio() {
           pose.mouth = Math.min(1, vlevel * 1.8);
         } else if (pose.mouth < 0.1 && vlevel > 0.15) pose.mouth = Math.min(1, vlevel * 1.5);
         pose.t = t / 1000;
-        drawAvatar(c, st.avatar, pose, { person: st.person, hat: st.hat, eyewear: st.eyewear });
+        drawAvatar(c, st.avatar, pose, { person: st.person, hat: st.hat, eyewear: st.eyewear, style: st.personStyle });
       }
 
       if (!hasVideo && st.disguise !== 'avatar') {
@@ -835,8 +856,23 @@ export default function StreamerStudio() {
               </div>
               <Label>Person</Label>
               <div className="grid grid-cols-5 gap-2">
-                {AVATARS.filter((a) => a.group === 'person').map((a) => <AvatarBtn key={a.id} id={a.id} label={a.label} person={a.id === 'me' ? s.person : undefined} on={s.avatar === a.id} onClick={() => set({ avatar: a.id })} />)}
+                {AVATARS.filter((a) => a.group === 'person').map((a) => <AvatarBtn key={a.id} id={a.id} label={a.label} style={s.personStyle} person={a.id === 'me' ? s.person : undefined} on={s.avatar === a.id} onClick={() => set({ avatar: a.id })} />)}
               </div>
+              <Label>Chess characters</Label>
+              <div className="grid grid-cols-6 gap-2">
+                {AVATARS.filter((a) => a.group === 'character').map((a) => <AvatarBtn key={a.id} id={a.id} label={a.label} style={s.personStyle} on={s.avatar === a.id}
+                  onClick={() => set({ avatar: a.id, ...(CHARACTER_EXTRAS[a.id] ?? {}) })} />)}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2 items-center">
+                <span className="text-[12px] font-semibold" style={{ color: RD.muted }}>People style:</span>
+                <Chip on={s.personStyle === 'cartoon'} onClick={() => set({ personStyle: 'cartoon' })}>✏️ Cartoon</Chip>
+                <Chip on={s.personStyle === 'real'} onClick={() => set({ personStyle: 'real' })}>🖌️ Realistic</Chip>
+              </div>
+              <button onClick={() => void cartoonMe()} disabled={making} className="mt-3 w-full py-2.5 rounded-xl font-bold text-sm"
+                style={{ background: making ? CARD_LIGHT : RD.gold, color: making ? RD.text : '#050A0B' }}>
+                {making ? 'Looking at you… hold still' : '✨ Make an avatar from my camera'}
+              </button>
+              <Note>Looks at your camera once and builds a matching person (skin, hair, beard, eyes, shirt), cartoon or realistic. You can tweak it after. The picture never leaves your device.</Note>
               {s.avatar === 'me' && (<div className="mt-3 p-3 rounded-xl" style={{ background: CARD_LIGHT, border: `1px solid ${RD.border}` }}>
                 <p className="text-[12px] font-bold mb-1">Make your own</p>
                 <Swatches label="Skin" colors={SKIN_TONES} value={s.person.skin} onPick={(v) => set({ person: { ...s.person, skin: v } })} />
@@ -846,7 +882,9 @@ export default function StreamerStudio() {
                 <Label>Facial hair</Label>
                 <div className="flex flex-wrap gap-1.5">{FACIAL_HAIR.map((h) => <Chip key={h.id} on={s.person.facial === h.id} onClick={() => set({ person: { ...s.person, facial: h.id } })}>{h.label}</Chip>)}</div>
                 <Swatches label="Eyes" colors={EYE_COLORS} value={s.person.eyes} onPick={(v) => set({ person: { ...s.person, eyes: v } })} />
-                <Swatches label="Shirt" colors={SHIRT_COLORS} value={s.person.shirt} onPick={(v) => set({ person: { ...s.person, shirt: v } })} />
+                <Label>Outfit</Label>
+                <div className="flex flex-wrap gap-1.5">{OUTFITS.map((h) => <Chip key={h.id} on={(s.person.outfit ?? 'tee') === h.id} onClick={() => set({ person: { ...s.person, outfit: h.id } })}>{h.label}</Chip>)}</div>
+                <Swatches label="Outfit colour" colors={SHIRT_COLORS} value={s.person.shirt} onPick={(v) => set({ person: { ...s.person, shirt: v } })} />
               </div>)}
               <Label>Hat</Label>
               <div className="flex flex-wrap gap-1.5">{HATS.map((h) => <Chip key={h.id} on={s.hat === h.id} onClick={() => set({ hat: h.id })}>{h.emoji} {h.label}</Chip>)}</div>
@@ -955,16 +993,16 @@ function Slider({ label, min, max, step, value, onChange }: { label: string; min
   );
 }
 
-function AvatarBtn({ id, label, on, onClick, person }: { id: AvatarId; label: string; on: boolean; onClick: () => void; person?: PersonLook }) {
+function AvatarBtn({ id, label, on, onClick, person, style }: { id: AvatarId; label: string; on: boolean; onClick: () => void; person?: PersonLook; style?: 'cartoon' | 'real' }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const cv = ref.current; const c = cv?.getContext('2d'); if (!cv || !c) return;
     c.clearRect(0, 0, cv.width, cv.height);
-    const draw = () => { c.clearRect(0, 0, cv.width, cv.height); drawAvatar(c, id, { x: 48, y: 50, size: 44, roll: 0, yaw: 0, pitch: 0, mouth: 0, blinkL: 0, blinkR: 0, smile: 0.4, t: 0 }, { person }); };
+    const draw = () => { c.clearRect(0, 0, cv.width, cv.height); drawAvatar(c, id, { x: 48, y: 50, size: 44, roll: 0, yaw: 0, pitch: 0, mouth: 0, blinkL: 0, blinkR: 0, smile: 0.4, t: 0 }, { person, style }); };
     draw();
     const tm = window.setTimeout(draw, 700); // piece images may still be loading
     return () => window.clearTimeout(tm);
-  }, [id, person]);
+  }, [id, person, style]);
   return (
     <button onClick={onClick} title={label} className="rounded-xl overflow-hidden flex flex-col items-center pb-1"
       style={{ background: CARD_LIGHT, border: `2px solid ${on ? RD.green : 'transparent'}` }}>

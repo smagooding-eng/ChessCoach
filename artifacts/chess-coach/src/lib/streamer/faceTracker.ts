@@ -24,6 +24,9 @@ export class FaceTracker {
   private lm: Landmarker | null = null;
   private loading: Promise<boolean> | null = null;
   private lastTs = 0;
+  /** Latest face points (0..1 of the video) and when they were seen. */
+  lastLandmarks: { x: number; y: number }[] | null = null;
+  lastAt = 0;
 
   load(): Promise<boolean> {
     if (this.loading) return this.loading;
@@ -60,6 +63,7 @@ export class FaceTracker {
     try { res = this.lm.detectForVideo(video, ts); } catch { return null; }
     const f = res.faceLandmarks?.[0];
     if (!f || f.length < 455) return null;
+    this.lastLandmarks = f.map((q) => ({ x: q.x, y: q.y })); this.lastAt = performance.now();
     const W = video.videoWidth, H = video.videoHeight;
     const P = (i: number) => ({ x: f[i].x * W, y: f[i].y * H });
     const top = P(10), chin = P(152), l = P(234), r = P(454), eyeL = P(33), eyeR = P(263), nose = P(1);
