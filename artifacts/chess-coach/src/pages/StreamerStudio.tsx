@@ -44,7 +44,8 @@ const PRESETS: Record<Aspect, { id: string; label: string; layout: Layout }[]> =
 };
 
 const APP_PAGES: { path: string; label: string }[] = [
-  { path: '/play-now', label: 'Play online' },
+  { path: '/live', label: 'Live game' },
+  { path: '/play-now', label: 'Quick bot game' },
   { path: '/lichess', label: 'Lichess' },
   { path: '/play', label: 'Play the computer' },
   { path: '/tournaments', label: 'Tournaments' },
@@ -53,7 +54,7 @@ const APP_PAGES: { path: string; label: string }[] = [
 
 const DEFAULTS: Settings = {
   aspect: '9:16', preset: 'board-top', layout: PRESETS['9:16'][0].layout,
-  boardSource: 'app', appPath: '/play-now', zoom: 1, panX: 0, panY: 0,
+  boardSource: 'app', appPath: '/live', zoom: 1, panX: 0, panY: 0,
   frame: 'auto', framePad: 'players',
   camOn: false, camId: '', facing: 'user', mirror: true,
   disguise: 'avatar', avatar: 'knight', bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3,
@@ -120,6 +121,8 @@ export default function StreamerStudio() {
   const camStream = useRef<MediaStream | null>(null);
   const boardFrame = useRef<HTMLIFrameElement>(null);
   const [boardBox, setBoardBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [peek, setPeek] = useState(false); // show the whole page for a moment (pick a game, change opponent)
+  const peekRef = useRef(peek); peekRef.current = peek;
   const screenStream = useRef<MediaStream | null>(null);
   const tracker = useRef(new FaceTracker());
   const voice = useRef(new VoiceChanger());
@@ -229,11 +232,19 @@ export default function StreamerStudio() {
         const doc = boardFrame.current?.contentDocument;
         if (!doc) return;
         let best: { x: number; y: number; w: number; h: number } | null = null;
+        let bestEl: Element | null = null;
         doc.querySelectorAll('.cs-board-fit, [data-boardid]').forEach((el) => {
           const r = el.getBoundingClientRect();
           if (r.width < 120) return;
-          if (!best || r.width > best.w) best = { x: r.left, y: r.top, w: r.width, h: r.width };
+          if (!best || r.width > best.w) { best = { x: r.left, y: r.top, w: r.width, h: r.width }; bestEl = el; }
         });
+        // keep the board inside the page's view when we're fitting it
+        const found = best as { x: number; y: number; w: number; h: number } | null;
+        const vh = boardFrame.current?.clientHeight ?? VIRTUAL_H;
+        if (found && bestEl && !peekRef.current && vh >= VIRTUAL_H - 1 && (found.y < 0 || found.y + found.h > vh)) {
+          (bestEl as Element).scrollIntoView({ block: 'center' });
+          return;
+        }
         setBoardBox((prev) => {
           const b = best as { x: number; y: number; w: number; h: number } | null;
           if (!b) return null;
@@ -407,7 +418,7 @@ export default function StreamerStudio() {
   // ---- Go live: stage only, full screen. Esc, the back gesture or a double-tap top-right exits ----
   const [hint, setHint] = useState(false);
   const goLive = useCallback(async () => {
-    setEdit(false); setClean(true); setHint(true);
+    setEdit(false); setPeek(false); setClean(true); setHint(true);
     window.setTimeout(() => setHint(false), 3000);
     try {
       if (!document.fullscreenElement && document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
@@ -456,8 +467,13 @@ export default function StreamerStudio() {
   // screen capture: zoom + pan inside the panel
   const offX = -(boardRect.width * z - boardRect.width) * s.panX, offY = -(boardRect.height * z - boardRect.height) * s.panY;
   // ChessScout page: auto-fit the board (plus the player bars), or zoom/pan by hand
-  let ifScale = (boardRect.width / VIRTUAL_W) * z, ifLeft = 0, ifTop = 0;
-  if (s.frame === 'auto' && boardBox) {
+  let ifScale = (boardRect.width / VIRTUAL_W) * z, ifLeft = 0, ifTop = 0, ifH = VIRTUAL_H;
+  const fitBoard = s.frame === 'auto' && !!boardBox && !peek;
+  if (s.frame === 'auto' && !fitBoard) {
+    // no game on screen (lobby, picking an opponent) or peeking: show the page itself, scrollable, at phone width
+    ifScale = boardRect.width / VIRTUAL_W;
+    ifH = VIRTUAL_W * (boardRect.height / Math.max(1, boardRect.width));
+  } else if (fitBoard && boardBox) {
     const pad = s.framePad === 'players' ? boardBox.w * 0.17 : 0;
     const r = { x: boardBox.x, y: boardBox.y - pad, w: boardBox.w, h: boardBox.h + pad * 2 };
     ifScale = Math.min(boardRect.width / r.w, boardRect.height / r.h);
@@ -497,8 +513,14 @@ export default function StreamerStudio() {
       </div>
       {panel('board', 'Board', s.boardSource === 'app' ? (
         <div className="absolute inset-0 overflow-hidden" style={{ background: '#050A0B' }}>
+          {s.frame === 'auto' && boardBox && !clean && !recording && !edit && (
+            <button onClick={() => setPeek((v) => !v)} className="absolute top-1.5 right-1.5 z-10 px-2.5 py-1 rounded-lg text-[11px] font-bold"
+              style={{ background: peek ? RD.green : CARD, color: peek ? '#06110A' : RD.text, border: `1px solid ${RD.border}` }}>
+              {peek ? '⊡ Fit board' : '⤢ Whole page'}
+            </button>
+          )}
           <iframe ref={boardFrame} title="Board" src={s.appPath} allow="autoplay; clipboard-write"
-            style={{ position: 'absolute', left: ifLeft, top: ifTop, width: VIRTUAL_W, height: VIRTUAL_H, border: 0, transform: `scale(${ifScale})`, transformOrigin: '0 0', pointerEvents: edit ? 'none' : 'auto' }} />
+            style={{ position: 'absolute', left: ifLeft, top: ifTop, width: VIRTUAL_W, height: ifH, border: 0, transform: `scale(${ifScale})`, transformOrigin: '0 0', pointerEvents: edit ? 'none' : 'auto' }} />
         </div>
       ) : (
         <div className="absolute inset-0 overflow-hidden flex items-center justify-center" style={{ background: '#050A0B' }}>
@@ -604,7 +626,7 @@ export default function StreamerStudio() {
                 <Chip on={s.frame === 'auto' && s.framePad === 'board'} onClick={() => set({ frame: 'auto', framePad: 'board' })}>Board only</Chip>
                 <Chip on={s.frame === 'manual'} onClick={() => set({ frame: 'manual' })}>Whole page</Chip>
               </div>
-              <Note>{s.frame === 'auto' ? (boardBox ? 'The board is found and fitted automatically, even when it moves.' : 'Looking for a board on this page… start a game, or pick Whole page.') : 'Zoom and move below to show the part of the page you want.'}</Note>
+              <Note>{s.frame === 'auto' ? (boardBox ? 'The board is found and fitted automatically, even when it moves.' : 'No game on screen yet: pick or start a game right in the panel, and the board fills the panel as soon as it starts. Use ⤢ Whole page on the panel any time to get back to the page.') : 'Zoom and move below to show the part of the page you want.'}</Note>
             </>) : (<>
               <button onClick={pickScreen} className="mt-3 w-full py-2.5 rounded-xl font-bold text-sm" style={{ background: RD.green, color: '#06110A' }}>{screenOn ? 'Pick a different window' : 'Pick a window or tab'}</button>
               <Note>Show any chess site or app window (computer only). Zoom and move below to frame just the board.</Note>
