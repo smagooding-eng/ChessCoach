@@ -30,10 +30,10 @@ export function FreeAiPanel() {
     setBusy(p); setMsg(null);
     try {
       const r = await apiFetch('/api/admin/free-ai', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: p, key: keys[p] }) });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error || 'Could not save');
+      const d = await r.json().catch(() => ({ error: `The server answered ${r.status}` }));
+      if (!r.ok) throw new Error(d.error || `Could not save (${r.status})`);
       setStatus(d.status); setKeys((k) => ({ ...k, [p]: '' }));
-      setMsg({ p, ok: true, text: `Working. Using ${d.model}.` });
+      setMsg(d.warning ? { p, ok: false, text: d.warning } : { p, ok: true, text: `Working. Using ${d.model}.` });
     } catch (e) { setMsg({ p, ok: false, text: e instanceof Error ? e.message : 'Could not save' }); }
     finally { setBusy(null); }
   };

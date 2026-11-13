@@ -1311,7 +1311,7 @@ router.post("/admin/free-ai", requireAdmin, async (req: Request, res: Response):
   if (provider !== "gemini" && provider !== "groq") { res.status(400).json({ error: "Pick Gemini or Groq" }); return; }
   try {
     const r = await saveFreeAiKey(provider, String(req.body?.key ?? ""));
-    res.json({ ok: true, model: r.model, status: await freeAiStatus() });
+    res.json({ ok: true, model: r.model, warning: r.warning ?? null, status: await freeAiStatus() });
   } catch (err: any) {
     res.status(400).json({ error: String(err?.message ?? err).slice(0, 300) });
   }
