@@ -341,7 +341,7 @@ export function LichessPlay() {
     void (async () => {
       let got: { w?: number; b?: number } = {};
       for (let k = 0; k < 40 && !gone; k++) {
-        await new Promise((r) => setTimeout(r, k ? 2500 : 600));
+        if (k) await new Promise((r) => setTimeout(r, k < 10 ? 600 : 2500));
         if (got[mine] === undefined && start) {
           const now = await myLichessRating(speed).catch(() => null);
           if (now && now.rating !== start) { got = { ...got, [mine]: now.rating - start }; if (!gone) setDiffs({ ...got }); }
@@ -358,6 +358,14 @@ export function LichessPlay() {
     })();
     return () => { gone = true; };
   }, [phase, gameId, full?.rated]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The result card waits (up to 3s) for the rating change, so both show together.
+  const [ratingWaitOver, setRatingWaitOver] = useState(false);
+  useEffect(() => {
+    setRatingWaitOver(false);
+    if (phase !== 'over') return;
+    const t = window.setTimeout(() => setRatingWaitOver(true), 3000);
+    return () => window.clearTimeout(t);
+  }, [phase, gameId]);
   const myDiff = diffs ? (myColor === 'w' ? diffs.w : diffs.b) : undefined;
   const myStart = (myColor === 'w' ? full?.white : full?.black)?.rating;
   const ratingLine = phase !== 'over' || !full ? null
@@ -421,7 +429,7 @@ export function LichessPlay() {
             },
             status: phase !== 'playing' ? 'Game over' : myTurn ? 'Your move' : 'Opponent to move',
           } : undefined}
-          boardOverlay={phase === 'over' ? (
+          boardOverlay={phase === 'over' && (!full.rated || typeof myDiff === 'number' || ratingWaitOver) ? (
             <GameOverOverlay gameKey={full.id} outcome={outcome} yourColor={myColor === 'w' ? 'white' : 'black'} ratingDelta={myDiff ?? null} subtitle={ratingLine ? `${LICHESS_STATUS_TEXT[st.status] ?? ''}${LICHESS_STATUS_TEXT[st.status] ? ' · ' : ''}${ratingLine}` : LICHESS_STATUS_TEXT[st.status]}
               actions={<>
                 {saving === 'saved' && <OverlayButton primary onClick={() => navigate(savedId ? `/games/${savedId}` : '/games')}><Sparkles size={15} /> Review this game</OverlayButton>}
