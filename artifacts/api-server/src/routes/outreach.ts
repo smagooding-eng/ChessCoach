@@ -1,4 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
+import { askFreeAi, freeAiAvailable } from "../lib/freeAi";
 import { db, outreachLeadsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import OpenAI from "openai";
@@ -175,7 +176,9 @@ Return plain text only — just the reply itself, no preamble, no markdown forma
 
     // Claude when ANTHROPIC_API_KEY is set; OpenAI only as the fallback.
     let draft = "";
-    if (claudeAvailable()) {
+    if (await freeAiAvailable()) {
+      draft = (await askFreeAi(prompt, { feature: AI_FEATURES.OUTREACH_DRAFT, maxTokens: 800, userId: req.user?.id })).text.trim();
+    } else if (claudeAvailable()) {
       const r = await askClaude(prompt, { maxTokens: 800 });
       void trackAiUsage({ userId: req.user?.id, feature: AI_FEATURES.OUTREACH_DRAFT, model: r.model, usage: { prompt_tokens: r.inputTokens, completion_tokens: r.outputTokens, total_tokens: r.inputTokens + r.outputTokens } });
       draft = r.text.trim();

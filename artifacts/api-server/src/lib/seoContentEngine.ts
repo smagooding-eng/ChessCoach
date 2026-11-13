@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { askFreeAi, freeAiAvailable, stripFence } from "./freeAi";
 import { db, seoArticlesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { logger } from "./logger";
@@ -126,14 +127,20 @@ Return valid JSON only:
 }`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-5.6-luna",
-      max_completion_tokens: 2000,
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-    });
-    void trackAiUsage({ userId: undefined, feature: AI_FEATURES.SEO_ARTICLE, model: "gpt-5.6-luna", usage: response.usage });
-    const parsed = JSON.parse(response.choices[0]?.message?.content ?? "{}") as Partial<GeneratedArticle>;
+    let raw: string;
+    if (await freeAiAvailable()) {
+      raw = stripFence((await askFreeAi(prompt, { feature: AI_FEATURES.SEO_ARTICLE, maxTokens: 3000, json: true })).text);
+    } else {
+      const response = await openai.chat.completions.create({
+        model: "gpt-5.6-luna",
+        max_completion_tokens: 2000,
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+      });
+      void trackAiUsage({ userId: undefined, feature: AI_FEATURES.SEO_ARTICLE, model: "gpt-5.6-luna", usage: response.usage });
+      raw = response.choices[0]?.message?.content ?? "{}";
+    }
+    const parsed = JSON.parse(raw) as Partial<GeneratedArticle>;
     if (!parsed.title || !parsed.content || !parsed.metaDescription) return null;
     return parsed as GeneratedArticle;
   } catch (err) {

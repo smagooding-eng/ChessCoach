@@ -10,6 +10,7 @@
 //      email on that site (same rules as club outreach: only what the site
 //      itself prints)?
 // Pages can also be pasted in from an Ahrefs / Semrush export.
+import { askFreeAi, freeAiAvailable } from "./freeAi";
 import OpenAI from "openai";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
@@ -22,6 +23,11 @@ import { ensureEmailTracking } from "./emailTracking";
 // Claude when ANTHROPIC_API_KEY is set, otherwise OpenAI (same as club outreach).
 const SEARCH_MODELS = [process.env.OUTREACH_SEARCH_MODEL, "gpt-5.6-luna", "gpt-4.1-mini"].filter(Boolean) as string[];
 async function aiText(prompt: string, opts: { webSearch: boolean; maxTokens: number; feature: AiFeature }): Promise<string> {
+  // Free AI first (Gemini searches the web with Google; Groq for plain text).
+  if (await freeAiAvailable({ webSearch: opts.webSearch })) {
+    return (await askFreeAi(opts.webSearch ? `${prompt}\n\nSearch the web to find them. Your final message must be only the JSON object, with no other text.` : prompt,
+      { feature: opts.feature, maxTokens: opts.maxTokens, webSearch: opts.webSearch })).text;
+  }
   if (claudeAvailable()) {
     const r = await askClaude(opts.webSearch ? `${prompt}\n\nUse web search to find them. Your final message must be only the JSON object, with no other text.` : prompt,
       { webSearch: opts.webSearch, maxSearches: 6, maxTokens: opts.maxTokens });

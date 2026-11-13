@@ -20,13 +20,13 @@ import {
   loadToons, toonThumb, warmToon, drawToon, toonFromPerson, type ToonPick, type ToonCustom,
 } from '@/lib/streamer/toonAvatars';
 import { Avatar3D, loadThree, saveAvatarFile, loadAvatarFile, clearAvatarFile } from '@/lib/streamer/avatar3d';
-import { drawComposite, type BoardFeed } from '@/lib/streamer/compositor';
+import { drawComposite, headSizes, type BoardFeed, type TextRun } from '@/lib/streamer/compositor';
 import { CloudRecorder, type RecStatus } from '@/lib/streamer/recorder';
 import { LiveHost } from '@/lib/streamer/live';
 import { apiFetch } from '@/lib/api';
 import { useSettings, PIECE_SHAPES } from '@/context/SettingsContext';
 
-type PanelId = 'board' | 'cam' | 'tag';
+type PanelId = 'board' | 'cam' | 'tag' | 'head';
 interface Rect { x: number; y: number; w: number; h: number; z: number; hidden?: boolean; round?: boolean }
 type Layout = Record<PanelId, Rect>;
 type Aspect = '9:16' | '16:9';
@@ -43,19 +43,21 @@ interface Settings {
   hat: Hat; eyewear: Eyewear; person: PersonLook; customVoice: CustomVoice; personStyle: 'cartoon' | 'real';
   voice: VoicePreset; pitch: number; micId: string; output: string;
   name: string; subtitle: string;
+  // Headline panel: "The road to 1500 ELO" with the real rating under it.
+  headline: string; goal: number; ratingFrom: string; manualRating: number;
   broadcast: boolean; recordLive: boolean; title: string;
 }
 
 const PRESETS: Record<Aspect, { id: string; label: string; layout: Layout }[]> = {
   '9:16': [
-    { id: 'board-top', label: 'Board top · camera bottom', layout: { board: { x: 0, y: 0, w: 100, h: 56.25, z: 1 }, cam: { x: 0, y: 56.25, w: 100, h: 36.75, z: 2 }, tag: { x: 0, y: 93, w: 100, h: 7, z: 3 } } },
-    { id: 'board-bottom', label: 'Camera top · board bottom', layout: { tag: { x: 0, y: 0, w: 100, h: 7, z: 3 }, cam: { x: 0, y: 7, w: 100, h: 36.75, z: 2 }, board: { x: 0, y: 43.75, w: 100, h: 56.25, z: 1 } } },
-    { id: 'pip', label: 'Big board · round camera', layout: { cam: { x: 4, y: 2.5, w: 40, h: 22.5, z: 2, round: true }, tag: { x: 47, y: 9.5, w: 50, h: 8.5, z: 3 }, board: { x: 0, y: 28, w: 100, h: 56.25, z: 1 } } },
+    { id: 'board-top', label: 'Board top · camera bottom', layout: { head: { x: 0, y: 0, w: 100, h: 8, z: 4 }, board: { x: 0, y: 8, w: 100, h: 56.25, z: 1 }, cam: { x: 0, y: 64.25, w: 100, h: 28.75, z: 2 }, tag: { x: 0, y: 93, w: 100, h: 7, z: 3 } } },
+    { id: 'board-bottom', label: 'Camera top · board bottom', layout: { tag: { x: 0, y: 0, w: 100, h: 7, z: 3 }, head: { x: 0, y: 7, w: 100, h: 8, z: 4 }, cam: { x: 0, y: 15, w: 100, h: 28.75, z: 2 }, board: { x: 0, y: 43.75, w: 100, h: 56.25, z: 1 } } },
+    { id: 'pip', label: 'Big board · round camera', layout: { cam: { x: 4, y: 2.5, w: 40, h: 22.5, z: 2, round: true }, head: { x: 47, y: 2, w: 50, h: 8, z: 4 }, tag: { x: 47, y: 11, w: 50, h: 8.5, z: 3 }, board: { x: 0, y: 28, w: 100, h: 56.25, z: 1 } } },
   ],
   '16:9': [
-    { id: 'board-left', label: 'Board left · camera right', layout: { board: { x: 0, y: 0, w: 56.25, h: 100, z: 1 }, cam: { x: 56.25, y: 0, w: 43.75, h: 86, z: 2 }, tag: { x: 56.25, y: 86, w: 43.75, h: 14, z: 3 } } },
-    { id: 'board-right', label: 'Camera left · board right', layout: { cam: { x: 0, y: 0, w: 43.75, h: 86, z: 2 }, tag: { x: 0, y: 86, w: 43.75, h: 14, z: 3 }, board: { x: 43.75, y: 0, w: 56.25, h: 100, z: 1 } } },
-    { id: 'pip', label: 'Board centre · camera corner', layout: { board: { x: 21.875, y: 0, w: 56.25, h: 100, z: 1 }, cam: { x: 79, y: 3, w: 19.5, h: 34.67, z: 2 }, tag: { x: 1.5, y: 84, w: 19, h: 13, z: 3 } } },
+    { id: 'board-left', label: 'Board left · camera right', layout: { board: { x: 0, y: 0, w: 56.25, h: 100, z: 1 }, head: { x: 56.25, y: 0, w: 43.75, h: 16, z: 4 }, cam: { x: 56.25, y: 16, w: 43.75, h: 70, z: 2 }, tag: { x: 56.25, y: 86, w: 43.75, h: 14, z: 3 } } },
+    { id: 'board-right', label: 'Camera left · board right', layout: { head: { x: 0, y: 0, w: 43.75, h: 16, z: 4 }, cam: { x: 0, y: 16, w: 43.75, h: 70, z: 2 }, tag: { x: 0, y: 86, w: 43.75, h: 14, z: 3 }, board: { x: 43.75, y: 0, w: 56.25, h: 100, z: 1 } } },
+    { id: 'pip', label: 'Board centre · camera corner', layout: { board: { x: 21.875, y: 0, w: 56.25, h: 100, z: 1 }, head: { x: 1.5, y: 3, w: 19, h: 18, z: 4 }, cam: { x: 79, y: 3, w: 19.5, h: 34.67, z: 2 }, tag: { x: 1.5, y: 84, w: 19, h: 13, z: 3 } } },
   ],
 };
 
@@ -76,6 +78,7 @@ const DEFAULTS: Settings = {
   disguise: 'avatar', avatar: 'toon', toon: { style: 'avataaars', seed: 'avataaars-0-3', custom: null }, toonShuffle: 0, hat: 'none', eyewear: 'none', person: DEFAULT_PERSON, customVoice: DEFAULT_CUSTOM, personStyle: 'cartoon', bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3,
   voice: 'off', pitch: 0, micId: '', output: 'none',
   name: 'Anonymous Knight', subtitle: 'Playing on chessscout.net',
+  headline: 'The road to 1500 ELO', goal: 1500, ratingFrom: 'auto', manualRating: 0,
   broadcast: true, recordLive: true, title: '',
 };
 const KEY = 'cs_streamer_v2';
@@ -91,6 +94,11 @@ function loadSettings(): Settings {
       const saved = JSON.parse(raw) as Partial<Settings>;
       const merged = { ...DEFAULTS, ...saved };
       if (!saved.toon) merged.avatar = 'toon'; // first time with the new cartoon characters
+      if (!merged.layout.head) {
+        // first time with the headline: a ready-made layout makes room for it; your own arrangement gets it on top
+        const pre = PRESETS[merged.aspect]?.find((p) => p.id === merged.preset);
+        merged.layout = pre ? pre.layout : { ...merged.layout, head: { x: 0, y: 0, w: 100, h: 8, z: 9 } };
+      }
       return merged;
     }
   } catch { /* ignore */ }
@@ -143,6 +151,9 @@ export default function StreamerStudio() {
   const camStream = useRef<MediaStream | null>(null);
   const boardFrame = useRef<HTMLIFrameElement>(null);
   const [boardBox, setBoardBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  // Your ChessScout ratings, refreshed every 30s so the headline moves as games finish.
+  const [ratings, setRatings] = useState<Record<string, { rating: number; gamesPlayed: number }> | null>(null);
+  const ratingStart = useRef<Record<string, number>>({});
   const [peek, setPeek] = useState(false); // show the whole page for a moment (pick a game, change opponent)
   const peekRef = useRef(peek); peekRef.current = peek;
   const screenStream = useRef<MediaStream | null>(null);
@@ -384,6 +395,38 @@ export default function StreamerStudio() {
     return () => window.clearInterval(id);
   }, [s.boardSource, s.frame, s.appPath]);
 
+  useEffect(() => {
+    let gone = false;
+    const load = () => apiFetch('/api/live/ratings', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { ratings?: Record<string, { rating: number; gamesPlayed: number }> } | null) => { if (!gone && d?.ratings) setRatings(d.ratings); })
+      .catch(() => { /* keep the last one */ });
+    void load();
+    const id = window.setInterval(load, 30_000);
+    return () => { gone = true; window.clearInterval(id); };
+  }, []);
+  const headRef = useRef<{ title: string; runs: TextRun[] } | null>(null);
+  const headLine = (() => {
+    let key = s.ratingFrom, value: number | null = null;
+    if (s.ratingFrom === 'manual') value = s.manualRating > 0 ? s.manualRating : null;
+    else if (ratings) {
+      if (s.ratingFrom === 'auto') {
+        let best: [string, { rating: number; gamesPlayed: number }] | null = null;
+        for (const e of Object.entries(ratings)) if (e[1].gamesPlayed > 0 && (!best || e[1].gamesPlayed > best[1].gamesPlayed)) best = e;
+        if (best) { key = best[0]; value = best[1].rating; }
+      } else if (ratings[s.ratingFrom]) value = ratings[s.ratingFrom].rating;
+    }
+    if (value == null) return [] as TextRun[];
+    if (ratingStart.current[key] == null) ratingStart.current[key] = value;
+    const diff = value - ratingStart.current[key];
+    const runs: TextRun[] = [{ text: `${value} ELO`, color: RD.green }];
+    if (s.goal > value) runs.push({ text: `  ·  ${s.goal - value} to go`, color: '#C9D1CE' });
+    else if (s.goal > 0) runs.push({ text: '  ·  goal reached!', color: '#F5C542' });
+    if (diff !== 0) runs.push({ text: `  ·  ${diff > 0 ? '▲' : '▼'}${Math.abs(diff)} this stream`, color: diff > 0 ? RD.green : '#FF6B6B' });
+    return runs;
+  })();
+  headRef.current = s.headline.trim() || headLine.length ? { title: s.headline.trim(), runs: headLine } : null;
+
   // ---- the composite stage canvas (what's recorded and broadcast) ----
   useEffect(() => {
     let raf = 0, lastDraw = 0;
@@ -402,7 +445,7 @@ export default function StreamerStudio() {
       drawComposite(c, W, H, {
         layout: st.layout, board, cam: camCanvas.current, name: st.name, subtitle: st.subtitle,
         light: looks.current.light, dark: looks.current.dark, pieceSrc: looks.current.pieceSrc,
-        live: host.current.live,
+        live: host.current.live, head: headRef.current,
       });
     };
     raf = requestAnimationFrame(loop);
@@ -748,6 +791,15 @@ export default function StreamerStudio() {
           <canvas ref={camCanvas} className="absolute inset-0 w-full h-full" />
         </div>
       ))}
+      {headRef.current && panel('head', 'Headline', (() => {
+        const hr = px(s.layout.head), fz = headSizes(hr.width, hr.height);
+        return (
+          <div className="absolute inset-0 flex flex-col items-center justify-center px-[4%] text-center leading-tight" style={{ background: CARD, borderBottom: `${Math.max(2, hr.height * 0.035)}px solid ${RD.green}` }}>
+            {s.headline.trim() && <p className="w-full truncate font-black uppercase" style={{ color: RD.text, fontSize: fz.title }}>{s.headline.trim()}</p>}
+            {headLine.length > 0 && <p className="w-full truncate font-extrabold" style={{ fontSize: fz.line }}>{headLine.map((r, i) => <span key={i} style={{ color: r.color, whiteSpace: 'pre' }}>{r.text}</span>)}</p>}
+          </div>
+        );
+      })())}
       {panel('tag', 'Name tag', (
         <div className="absolute inset-0 flex items-center gap-[3%] px-[4%]" style={{ background: CARD, borderTop: `2px solid ${RD.green}` }}>
           <img src="/icons/icon-192.png" alt="" className="rounded-[22%] shrink-0" style={{ height: '62%', aspectRatio: '1' }} />
@@ -834,6 +886,23 @@ export default function StreamerStudio() {
             <input value={s.name} onChange={(e) => set({ name: e.target.value.slice(0, 40) })} placeholder="Stream name" className="w-full px-3 py-2 rounded-lg text-sm mb-2" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }} />
             <input value={s.subtitle} onChange={(e) => set({ subtitle: e.target.value.slice(0, 60) })} placeholder="Subtitle" className="w-full px-3 py-2 rounded-lg text-sm" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }} />
             <Note>Use a stream name, not your real one, to stay anonymous.</Note>
+            <Label>Headline</Label>
+            <input value={s.headline} onChange={(e) => set({ headline: e.target.value.slice(0, 50) })} placeholder="The road to 1500 ELO" className="w-full px-3 py-2 rounded-lg text-sm mb-2" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }} />
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-[12.5px] font-semibold" style={{ color: RD.muted }}>Goal</span>
+              <input type="number" inputMode="numeric" value={s.goal || ''} onChange={(e) => set({ goal: Math.max(0, Math.min(3500, Number(e.target.value) || 0)) })} className="w-24 px-3 py-2 rounded-lg text-sm" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }} />
+              <button onClick={() => toggleHidden('head')} className="ml-auto px-3 py-2 rounded-xl text-[13px] font-semibold" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }}>{s.layout.head.hidden ? 'Show headline' : 'Hide headline'}</button>
+            </div>
+            <p className="text-[12px] font-semibold mb-1.5" style={{ color: RD.muted }}>Rating shown under it</p>
+            <div className="flex flex-wrap gap-2">
+              {[['auto', 'Most played'], ['blitz_5_0', '5 min'], ['blitz_5_3', '5 | 3'], ['rapid_10_0', '10 min'], ['rapid_15_0', '15 min'], ['daily', 'Daily'], ['manual', 'Type it in']].map(([id, label]) => (
+                <Chip key={id} on={s.ratingFrom === id} onClick={() => set({ ratingFrom: id })}>{label}{ratings?.[id] ? ` · ${ratings[id].rating}` : ''}</Chip>
+              ))}
+            </div>
+            {s.ratingFrom === 'manual' && (
+              <input type="number" inputMode="numeric" value={s.manualRating || ''} onChange={(e) => set({ manualRating: Math.max(0, Math.min(3500, Number(e.target.value) || 0)) })} placeholder="e.g. your Chess.com rating" className="mt-2 w-full px-3 py-2 rounded-lg text-sm" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }} />
+            )}
+            <Note>Your real ChessScout rating, updated every 30 seconds, so it moves on stream as you win or lose. Pick “Type it in” if you play somewhere else.</Note>
           </>)}
 
           {tab === 'board' && (<>

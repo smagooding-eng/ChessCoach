@@ -9,8 +9,13 @@ export type BoardFeed =
   | { kind: 'video'; video: HTMLVideoElement; zoom: number; panX: number; panY: number }
   | { kind: 'none' };
 
+// A text run: the headline's rating line is drawn as coloured pieces side by side.
+export interface TextRun { text: string; color: string }
+
 export interface CompositeInput {
-  layout: Record<'board' | 'cam' | 'tag', PanelRect>;
+  layout: Record<'board' | 'cam' | 'tag', PanelRect> & { head?: PanelRect };
+  /** The headline panel ("The road to 1500 ELO") and the rating line under it. */
+  head?: { title: string; runs: TextRun[] } | null;
   board: BoardFeed;
   cam: HTMLCanvasElement | null;
   name: string; subtitle: string;
@@ -80,10 +85,10 @@ export function drawComposite(c: CanvasRenderingContext2D, W: number, H: number,
   let tx = sx + ih + gap;
   label.forEach((t, i) => { c.fillStyle = i === 1 ? '#81B64C' : '#F5F7F6'; c.fillText(t, tx, cy); tx += widths[i]; });
 
-  const order = (Object.keys(inp.layout) as ('board' | 'cam' | 'tag')[]).sort((a, b) => inp.layout[a].z - inp.layout[b].z);
+  const order = (Object.keys(inp.layout) as ('board' | 'cam' | 'tag' | 'head')[]).filter((k) => !!inp.layout[k]).sort((a, b) => inp.layout[a]!.z - inp.layout[b]!.z);
   for (const id of order) {
-    const r = inp.layout[id];
-    if (r.hidden) continue;
+    const r = inp.layout[id]!;
+    if (r.hidden || (id === 'head' && !inp.head)) continue;
     const x = (r.x / 100) * W, y = (r.y / 100) * H, w = (r.w / 100) * W, h = (r.h / 100) * H;
     c.save();
     if (r.round) { c.beginPath(); c.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); c.clip(); }
@@ -110,6 +115,8 @@ export function drawComposite(c: CanvasRenderingContext2D, W: number, H: number,
         const cw = inp.cam.width, ch = inp.cam.height, s = Math.max(w / cw, h / ch);
         c.drawImage(inp.cam, x + (w - cw * s) / 2, y + (h - ch * s) / 2, cw * s, ch * s);
       } else { c.fillStyle = '#0D1516'; c.fillRect(x, y, w, h); }
+    } else if (id === 'head') {
+      drawHead(c, inp.head!, x, y, w, h);
     } else {
       c.fillStyle = '#0D1516'; c.fillRect(x, y, w, h);
       c.fillStyle = '#81B64C'; c.fillRect(x, y, w, Math.max(2, h * 0.03));
@@ -134,4 +141,25 @@ export function drawComposite(c: CanvasRenderingContext2D, W: number, H: number,
     c.fillStyle = '#fff'; c.font = `900 ${ph * 0.55}px "DM Sans", sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
     c.fillText('● LIVE', px + pw / 2, py + ph / 2);
   }
+}
+
+/** Font sizes for the headline panel, shared with the on-screen stage so both match. */
+export function headSizes(w: number, h: number) {
+  return { title: Math.max(12, Math.min(h * 0.4, w * 0.075)), line: Math.max(10, Math.min(h * 0.26, w * 0.05)) };
+}
+
+function drawHead(c: CanvasRenderingContext2D, head: { title: string; runs: TextRun[] }, x: number, y: number, w: number, h: number) {
+  c.fillStyle = '#0D1516'; c.fillRect(x, y, w, h);
+  c.fillStyle = '#81B64C'; c.fillRect(x, y + h - Math.max(2, h * 0.035), w, Math.max(2, h * 0.035));
+  const fz = headSizes(w, h), pad = w * 0.04, maxW = w - pad * 2, cx = x + w / 2;
+  c.textAlign = 'center'; c.textBaseline = 'alphabetic';
+  c.fillStyle = '#F5F7F6'; c.font = `900 ${fz.title}px "DM Sans", sans-serif`;
+  c.fillText(head.title.toUpperCase(), cx, y + h * 0.5, maxW);
+  if (!head.runs.length) return;
+  c.font = `800 ${fz.line}px "DM Sans", sans-serif`;
+  const widths = head.runs.map((r) => c.measureText(r.text).width);
+  const total = widths.reduce((a, b) => a + b, 0), k = total > maxW ? maxW / total : 1;
+  let tx = cx - (total * k) / 2;
+  c.textAlign = 'left';
+  head.runs.forEach((r, i) => { c.fillStyle = r.color; c.fillText(r.text, tx, y + h * 0.84, widths[i] * k); tx += widths[i] * k; });
 }

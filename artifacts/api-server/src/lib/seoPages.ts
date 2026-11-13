@@ -13,6 +13,7 @@
 //
 // Keep every claim true: features, prices and limits must match the app.
 
+import { askFreeAi, freeAiAvailable, stripFence } from "./freeAi";
 import OpenAI from "openai";
 import { createHash } from "crypto";
 import { db } from "@workspace/db";
@@ -408,14 +409,20 @@ Return only the translated JSON.
 
 ${JSON.stringify(src)}`;
   try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-5.6-luna",
-      max_completion_tokens: 4000,
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-    });
-    void trackAiUsage({ userId: undefined, feature: AI_FEATURES.SEO_ARTICLE, model: "gpt-5.6-luna", usage: response.usage });
-    const out = JSON.parse(response.choices[0]?.message?.content ?? "{}") as Translatable;
+    let raw: string;
+    if (await freeAiAvailable()) {
+      raw = stripFence((await askFreeAi(prompt, { feature: AI_FEATURES.SEO_ARTICLE, maxTokens: 6000, json: true })).text);
+    } else {
+      const response = await openai.chat.completions.create({
+        model: "gpt-5.6-luna",
+        max_completion_tokens: 4000,
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+      });
+      void trackAiUsage({ userId: undefined, feature: AI_FEATURES.SEO_ARTICLE, model: "gpt-5.6-luna", usage: response.usage });
+      raw = response.choices[0]?.message?.content ?? "{}";
+    }
+    const out = JSON.parse(raw) as Translatable;
     if (!sameShape(src, out)) return null;
     // Links: keep our hrefs whatever came back.
     out.sections = out.sections.map((s, i) => ({ h: s.h, p: s.p, ...(src.sections[i].links ? { links: src.sections[i].links!.map((l, j) => ({ label: s.links?.[j]?.label || l.label, href: l.href })) } : {}) }));

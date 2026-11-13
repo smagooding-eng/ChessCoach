@@ -1,4 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
+import { askFreeAi, freeAiAvailable, stripFence, freeAiStatus, saveFreeAiKey, removeFreeAiKey, type FreeProvider } from "../lib/freeAi";
 import { exclusionSummary } from "../lib/analyticsExclusions";
 import { db, usersTable, pageViewsTable, gamesTable, weaknessesTable, coursesTable, lessonsTable, backgroundJobsTable, referralConversionsTable, affiliateAdjustmentsTable, seoArticlesTable, puzzlesTable } from "@workspace/db";
 import { preGenerateExplanations } from "../lib/puzzleSeed";
@@ -1301,6 +1302,27 @@ router.get("/admin/ai-health", requireAdmin, async (_req: Request, res: Response
   }
 });
 
+// Free AI for admin work (lib/freeAi): which keys are set, add or remove one.
+router.get("/admin/free-ai", requireAdmin, async (_req: Request, res: Response): Promise<void> => {
+  res.json(await freeAiStatus());
+});
+router.post("/admin/free-ai", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  const provider = String(req.body?.provider ?? "") as FreeProvider;
+  if (provider !== "gemini" && provider !== "groq") { res.status(400).json({ error: "Pick Gemini or Groq" }); return; }
+  try {
+    const r = await saveFreeAiKey(provider, String(req.body?.key ?? ""));
+    res.json({ ok: true, model: r.model, status: await freeAiStatus() });
+  } catch (err: any) {
+    res.status(400).json({ error: String(err?.message ?? err).slice(0, 300) });
+  }
+});
+router.delete("/admin/free-ai/:provider", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  const provider = String(req.params.provider) as FreeProvider;
+  if (provider !== "gemini" && provider !== "groq") { res.status(400).json({ error: "Unknown provider" }); return; }
+  await removeFreeAiKey(provider);
+  res.json({ ok: true, status: await freeAiStatus() });
+});
+
 router.post("/admin/marketing/generate", requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { theme, customNote } = req.body as { theme: string; customNote?: string };
@@ -1352,15 +1374,20 @@ Return VALID JSON only:
   ]
 }`;
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-5.6-luna",
-      max_tokens: 2500,
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
-    });
-    void trackAiUsage({ userId: req.user?.id, feature: AI_FEATURES.ADMIN_MARKETING, model: "gpt-5.6-luna", usage: response.usage });
-
-    const content = response.choices[0]?.message?.content ?? "{}";
+    let content: string;
+    if (await freeAiAvailable()) {
+      // Free AI (Gemini / Groq) when a key is set: no paid credits for admin copy.
+      content = stripFence((await askFreeAi(prompt, { feature: AI_FEATURES.ADMIN_MARKETING, maxTokens: 2500, json: true, userId: req.user?.id })).text);
+    } else {
+      const response = await openai.chat.completions.create({
+        model: "gpt-5.6-luna",
+        max_tokens: 2500,
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+      });
+      void trackAiUsage({ userId: req.user?.id, feature: AI_FEATURES.ADMIN_MARKETING, model: "gpt-5.6-luna", usage: response.usage });
+      content = response.choices[0]?.message?.content ?? "{}";
+    }
     const parsed = JSON.parse(content);
     if (!parsed.posts || !Array.isArray(parsed.posts)) {
       res.status(500).json({ error: "Engine returned unexpected format" });

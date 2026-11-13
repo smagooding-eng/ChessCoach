@@ -50,6 +50,7 @@ const MODEL_RATES_PER_1M_TOKENS: Record<string, { prompt: number; completion: nu
 };
 
 export function estimateCostUsd(model: string, promptTokens: number, completionTokens: number): number | null {
+  if (model.startsWith("free:")) return 0; // Gemini / Groq free tier (lib/freeAi)
   const rate = MODEL_RATES_PER_1M_TOKENS[model];
   if (!rate) return null;
   return (promptTokens / 1_000_000) * rate.prompt + (completionTokens / 1_000_000) * rate.completion;

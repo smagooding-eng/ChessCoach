@@ -1,4 +1,5 @@
 import { db, puzzlesTable } from "@workspace/db";
+import { askFreeAi, freeAiAvailable } from "./freeAi";
 import { count, eq, sql } from "drizzle-orm";
 import { Chess } from "chess.js";
 import { trackAiUsage, AI_FEATURES } from "./aiUsageTracker";
@@ -299,7 +300,7 @@ export async function seedPuzzlesIfNeeded(minCount = 15) {
   console.log(`[puzzles] Seed complete: ${inserted} new puzzles inserted`);
 }
 
-export async function generatePuzzleExplanation(puzzle: { fen: string; moves: string; themes: string | null; rating: number }): Promise<string | null> {
+export async function generatePuzzleExplanation(puzzle: { fen: string; moves: string; themes: string | null; rating: number }, opts: { free?: boolean } = {}): Promise<string | null> {
   try {
     const OpenAI = (await import("openai")).default;
     const openai = new OpenAI({
@@ -321,6 +322,12 @@ export async function generatePuzzleExplanation(puzzle: { fen: string; moves: st
       } catch { break; }
     }
 
+    const system = "You are a chess coach. Give a brief, clear explanation (2-3 sentences max) of why the puzzle solution moves are the best. Focus on the tactical or strategic idea. Use plain language suitable for intermediate players. Do not repeat the moves, just explain the idea.";
+    const ask = `Position (FEN): ${puzzle.fen}\nSolution moves: ${sanMoves.join(", ")}\nThemes: ${themes.join(", ")}\nRating: ${puzzle.rating}\n\nExplain briefly why these moves are best.`;
+    // Admin bulk pre-generation: free AI when a key is set.
+    if (opts.free && (await freeAiAvailable())) {
+      return (await askFreeAi(ask, { feature: AI_FEATURES.PUZZLE_EXPLANATION, maxTokens: 300, system })).text.trim() || null;
+    }
     const completion = await openai.chat.completions.create({
       model: "gpt-5.6-luna",
       max_completion_tokens: 200,
@@ -360,7 +367,7 @@ export async function preGenerateExplanations(limit?: number) {
   let generated = 0;
 
   for (const puzzle of puzzles) {
-    const explanation = await generatePuzzleExplanation(puzzle);
+    const explanation = await generatePuzzleExplanation(puzzle, { free: true });
     if (explanation) {
       await db.update(puzzlesTable).set({ explanation }).where(eq(puzzlesTable.id, puzzle.id));
       generated++;

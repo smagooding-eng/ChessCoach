@@ -1,4 +1,5 @@
 import { BacklinkGapPanel } from '@/components/admin/BacklinkGapPanel';
+import { FreeAiPanel } from '@/components/admin/FreeAiPanel';
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { PageHero } from '@/components/DesignSystem';
 import { useLocation } from 'wouter';
@@ -845,7 +846,7 @@ export function Admin() {
         </>
       )}
 
-      {activeTab === 'ai' && <AiUsagePanel />}
+      {activeTab === 'ai' && <><FreeAiPanel /><AiUsagePanel /></>}
 
       {activeTab === 'users' && (
         <>

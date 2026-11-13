@@ -17,6 +17,7 @@
 // coaches, bloggers and podcasters to invite to the affiliate program. Same
 // rule: only a business/contact email the creator publishes on their own
 // website or link-in-bio page. Social platforms themselves are never scraped.
+import { askFreeAi, freeAiAvailable } from "./freeAi";
 import dns from "dns";
 import OpenAI from "openai";
 import { db } from "@workspace/db";
@@ -255,6 +256,12 @@ async function searchOrganizations(type: string, place: string, audience: Audien
     : clubPrompt(type, place);
   // Claude with web search when ANTHROPIC_API_KEY is set; OpenAI only as the
   // fallback for when it isn't.
+  if (await freeAiAvailable({ webSearch: true })) {
+    const r = await askFreeAi(`${prompt}
+
+Search the web to find them. Your final message must be only the JSON object, with no other text.`, { feature: AI_FEATURES.OUTREACH_DISCOVERY, maxTokens: 4000, webSearch: true });
+    return validCandidates(r.text);
+  }
   if (claudeAvailable()) {
     const r = await askClaude(`${prompt}
 
