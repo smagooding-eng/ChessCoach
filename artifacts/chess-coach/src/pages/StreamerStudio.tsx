@@ -67,6 +67,7 @@ const APP_PAGES: { path: string; label: string }[] = [
   { path: '/live', label: 'Live game' },
   { path: '/play-now', label: 'Quick bot game' },
   { path: '/games', label: 'Game reviews' },
+  { path: '/lookup', label: 'Game lookup' },
   { path: '/lichess', label: 'Lichess' },
   { path: '/play', label: 'Play the computer' },
   { path: '/tournaments', label: 'Tournaments' },
@@ -1072,6 +1073,13 @@ export default function StreamerStudio() {
               <Chip on={s.boardSource === 'screen'} onClick={() => set({ boardSource: 'screen' })}>🪟 Another window</Chip>
               <Chip on={s.boardSource === 'follow'} onClick={() => set({ boardSource: 'follow' })}>♟ Live Lichess game</Chip>
             </div>
+            <Label>Reviews &amp; lookup</Label>
+            <div className="flex flex-wrap gap-2">
+              <Chip on={false} onClick={() => void reviewLatest()}>{reviewBusy ? 'Opening…' : '🔎 Review my last game'}</Chip>
+              <Chip on={s.boardSource === 'app' && s.appPath === '/games'} onClick={() => set({ boardSource: 'app', appPath: '/games' })}>📚 All game reviews</Chip>
+              <Chip on={s.boardSource === 'app' && s.appPath === '/lookup'} onClick={() => set({ boardSource: 'app', appPath: '/lookup' })}>🔍 Game lookup</Chip>
+            </div>
+            <Note>Opens in the board panel, so viewers see it. Game lookup finds games between any two Chess.com players to break down on stream. Tap ⤢ Whole page on the panel to show the coach’s notes and move list too.</Note>
             <input ref={clipInput} type="file" accept="video/*" className="hidden" onChange={(e) => { void pickClip(e.target.files?.[0]); e.target.value = ''; }} />
             {s.boardSource === 'follow' ? (<>
               <Label>Lichess username</Label>
@@ -1088,8 +1096,7 @@ export default function StreamerStudio() {
                 {APP_PAGES.map((p) => <Chip key={p.path} on={s.appPath === p.path} onClick={() => set({ appPath: p.path })}>{p.label}</Chip>)}
               </div>
               <Note>You play right inside the panel. It’s your normal ChessScout account.</Note>
-              <button onClick={() => void reviewLatest()} disabled={reviewBusy} className="mt-2 w-full py-2.5 rounded-xl font-bold text-sm disabled:opacity-60" style={{ background: RD.green, color: '#06110A' }}>{reviewBusy ? 'Opening…' : '🔎 Review my last game'}</button>
-              <Note>Opens the review of your latest game in the board panel. Game reviews (above) lists all your games to pick from. After a live game, Review game on the result screen works too.</Note>
+
               <Label>Framing</Label>
               <div className="flex flex-wrap gap-2">
                 <Chip on={s.frame === 'auto' && s.framePad === 'players'} onClick={() => set({ frame: 'auto', framePad: 'players' })}>Board + names</Chip>
