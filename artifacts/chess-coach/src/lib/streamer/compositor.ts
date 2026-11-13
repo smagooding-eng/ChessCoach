@@ -5,7 +5,7 @@
 export interface PanelRect { x: number; y: number; w: number; h: number; z: number; hidden?: boolean; round?: boolean }
 
 export type BoardFeed =
-  | { kind: 'fen'; fen: string; flipped: boolean; last: string }
+  | { kind: 'fen'; fen: string; flipped: boolean; last: string; top?: string; bottom?: string }
   | { kind: 'video'; video: HTMLVideoElement; zoom: number; panX: number; panY: number }
   | { kind: 'none' };
 
@@ -36,7 +36,23 @@ function rr(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: num
   c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
 }
 
-function drawBoard(c: CanvasRenderingContext2D, b: Extract<BoardFeed, { kind: 'fen' }>, x: number, y: number, size: number, inp: CompositeInput) {
+type Look = Pick<CompositeInput, 'light' | 'dark' | 'pieceSrc'>;
+
+/** The board panel for a position: the board, with the players' names above and below when given. */
+export function drawBoardPanel(c: CanvasRenderingContext2D, b: Extract<BoardFeed, { kind: 'fen' }>, x: number, y: number, w: number, h: number, look: Look) {
+  c.fillStyle = '#050A0B'; c.fillRect(x, y, w, h);
+  const names = !!(b.top || b.bottom);
+  const strip = names ? Math.max(16, Math.min(w, h) * 0.07) : 0;
+  const size = Math.min(w, h - strip * 2) * 0.98;
+  const bx = x + (w - size) / 2, by = y + (h - size) / 2;
+  drawBoard(c, b, bx, by, size, look);
+  if (!names) return;
+  c.font = `800 ${Math.round(strip * 0.62)}px "DM Sans", sans-serif`; c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillStyle = '#F5F7F6';
+  if (b.top) c.fillText(b.top, bx + 2, by - strip / 2, size - 4);
+  if (b.bottom) c.fillText(b.bottom, bx + 2, by + size + strip / 2, size - 4);
+}
+
+function drawBoard(c: CanvasRenderingContext2D, b: Extract<BoardFeed, { kind: 'fen' }>, x: number, y: number, size: number, inp: Look) {
   const sq = size / 8;
   const rows = b.fen.split(' ')[0].split('/');
   const last = b.last.length >= 4 ? [b.last.slice(0, 2), b.last.slice(2, 4)] : [];
@@ -97,8 +113,7 @@ export function drawComposite(c: CanvasRenderingContext2D, W: number, H: number,
       c.fillStyle = '#050A0B'; c.fillRect(x, y, w, h);
       const b = inp.board;
       if (b.kind === 'fen') {
-        const size = Math.min(w, h) * 0.98;
-        drawBoard(c, b, x + (w - size) / 2, y + (h - size) / 2, size, inp);
+        drawBoardPanel(c, b, x, y, w, h, inp);
       } else if (b.kind === 'video' && b.video.videoWidth) {
         const vw = b.video.videoWidth, vh = b.video.videoHeight;
         const s = Math.min(w / vw, h / vh) * b.zoom, dw = vw * s, dh = vh * s;

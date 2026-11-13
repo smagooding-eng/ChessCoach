@@ -20,10 +20,11 @@ import {
   loadToons, toonThumb, warmToon, drawToon, toonFromPerson, type ToonPick, type ToonCustom,
 } from '@/lib/streamer/toonAvatars';
 import { Avatar3D, loadThree, saveAvatarFile, loadAvatarFile, clearAvatarFile } from '@/lib/streamer/avatar3d';
-import { drawComposite, headSizes, type BoardFeed, type TextRun } from '@/lib/streamer/compositor';
+import { drawComposite, drawBoardPanel, headSizes, type BoardFeed, type TextRun } from '@/lib/streamer/compositor';
 import { CloudRecorder, type RecStatus } from '@/lib/streamer/recorder';
 import { LiveHost } from '@/lib/streamer/live';
 import { apiFetch } from '@/lib/api';
+import { useLichessGame } from '@/components/watch/LiveVideo';
 import { useSettings, PIECE_SHAPES } from '@/context/SettingsContext';
 
 type PanelId = 'board' | 'cam' | 'tag' | 'head';
@@ -36,7 +37,7 @@ type Tab = 'layout' | 'board' | 'camera' | 'voice' | 'videos' | 'live';
 
 interface Settings {
   aspect: Aspect; preset: string; layout: Layout;
-  boardSource: 'app' | 'screen'; appPath: string; zoom: number; panX: number; panY: number;
+  boardSource: 'app' | 'screen' | 'follow'; followUser: string; appPath: string; zoom: number; panX: number; panY: number;
   frame: 'auto' | 'manual'; framePad: 'board' | 'players';
   camOn: boolean; camId: string; facing: 'user' | 'environment'; mirror: boolean;
   disguise: Disguise; avatar: AvatarId | 'toon' | '3d'; toon: ToonPick; toonShuffle: number; bg: Bg; bgColor: string; avatarScale: number;
@@ -72,7 +73,7 @@ const APP_PAGES: { path: string; label: string }[] = [
 
 const DEFAULTS: Settings = {
   aspect: '9:16', preset: 'board-top', layout: PRESETS['9:16'][0].layout,
-  boardSource: 'app', appPath: '/live', zoom: 1, panX: 0, panY: 0,
+  boardSource: 'app', followUser: '', appPath: '/live', zoom: 1, panX: 0, panY: 0,
   frame: 'auto', framePad: 'players',
   camOn: false, camId: '', facing: 'user', mirror: true,
   disguise: 'avatar', avatar: 'toon', toon: { style: 'avataaars', seed: 'avataaars-0-3', custom: null }, toonShuffle: 0, hat: 'none', eyewear: 'none', person: DEFAULT_PERSON, customVoice: DEFAULT_CUSTOM, personStyle: 'cartoon', bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3,
@@ -164,7 +165,7 @@ export default function StreamerStudio() {
   const [cloud, setCloud] = useState<(RecStatus & { start: number }) | null>(null);
   const host = useRef(new LiveHost());
   const [watching, setWatching] = useState<number | null>(null);
-  const feed = useRef<{ fen: string; flipped: boolean; last: string } | null>(null);
+  const feed = useRef<{ fen: string; flipped: boolean; last: string; top?: string; bottom?: string } | null>(null);
   const outCanvas = useRef<HTMLCanvasElement>(null);
   const { boardColors, pieceShape } = useSettings();
   const looks = useRef({ light: '#eeeed2', dark: '#769656', pieceSrc: (k: string) => `/pieces/ink-cream/${k}.webp?v=1` });
@@ -340,20 +341,107 @@ export default function StreamerStudio() {
       if (!md.getDisplayMedia) { flash('This browser can’t capture other windows. Use a computer with Chrome or Edge, or pick a ChessScout page.'); return; }
       const st = await md.getDisplayMedia({ video: { frameRate: 30 }, audio: false });
       screenStream.current?.getTracks().forEach((t) => t.stop());
+      setClip((old) => { if (old) URL.revokeObjectURL(old.url); return null; });
+      if (screenVideo.current) { screenVideo.current.removeAttribute('src'); screenVideo.current.loop = false; }
       screenStream.current = st; setScreenOn(true);
       st.getVideoTracks()[0]?.addEventListener('ended', () => { setScreenOn(false); screenStream.current = null; });
       if (screenVideo.current) { screenVideo.current.srcObject = st; await screenVideo.current.play().catch(() => undefined); }
     } catch { /* cancelled */ }
   }, [flash]);
   useEffect(() => {
-    if (s.boardSource === 'screen' && screenVideo.current && screenStream.current && screenVideo.current.srcObject !== screenStream.current) {
+    if (s.boardSource === 'screen' && !clip && screenVideo.current && screenStream.current && screenVideo.current.srcObject !== screenStream.current) {
       screenVideo.current.srcObject = screenStream.current; void screenVideo.current.play().catch(() => undefined);
     }
   });
 
+  // ---- a screen recording as the board (phones can't capture other apps live) ----
+  const clipInput = useRef<HTMLInputElement>(null);
+  const [clip, setClip] = useState<{ url: string; name: string } | null>(null);
+  const [clipPlaying, setClipPlaying] = useState(false);
+  const [clipLoop, setClipLoop] = useState(true);
+  const pickClip = useCallback(async (f: File | undefined) => {
+    if (!f) return;
+    screenStream.current?.getTracks().forEach((t) => t.stop()); screenStream.current = null;
+    setClip((old) => { if (old) URL.revokeObjectURL(old.url); return { url: URL.createObjectURL(f), name: f.name }; });
+    setScreenOn(true);
+  }, []);
+  useEffect(() => {
+    const v = screenVideo.current;
+    if (!v || !clip || s.boardSource !== 'screen') return;
+    if (v.srcObject) v.srcObject = null;
+    if (v.src !== clip.url) { v.src = clip.url; v.currentTime = 0; }
+    v.loop = clipLoop;
+    const on = () => setClipPlaying(!v.paused);
+    v.addEventListener('play', on); v.addEventListener('pause', on); v.addEventListener('ended', on);
+    void v.play().catch(() => undefined);
+    return () => { v.removeEventListener('play', on); v.removeEventListener('pause', on); v.removeEventListener('ended', on); };
+  }, [clip, s.boardSource]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (screenVideo.current) screenVideo.current.loop = clipLoop; }, [clipLoop]);
+  const clipCmd = (c: 'toggle' | 'restart') => {
+    const v = screenVideo.current; if (!v) return;
+    if (c === 'restart') { v.currentTime = 0; void v.play().catch(() => undefined); }
+    else if (v.paused) void v.play().catch(() => undefined); else v.pause();
+  };
+
+  // ---- follow a live Lichess game (played in the Lichess app or anywhere) ----
+  const [followGame, setFollowGame] = useState<string | null>(null);
+  const [followNote, setFollowNote] = useState('');
+  const lichess = useLichessGame(s.boardSource === 'follow' ? followGame : null);
+  useEffect(() => {
+    const u = s.followUser.trim().toLowerCase();
+    if (s.boardSource !== 'follow' || !u || (followGame && !lichess?.ended)) return;
+    let gone = false;
+    const check = async () => {
+      try {
+        const r = await fetch(`https://lichess.org/api/users/status?ids=${encodeURIComponent(u)}&withGameIds=true`);
+        const d = (await r.json()) as { id: string; playingId?: string; online?: boolean }[];
+        if (gone) return;
+        const me = d.find((x) => x.id === u);
+        if (!me) { setFollowNote(`No Lichess player called ${s.followUser.trim()}.`); return; }
+        if (me.playingId && me.playingId !== followGame) { setFollowGame(me.playingId); setFollowNote(''); }
+        else if (!me.playingId) setFollowNote(`Waiting for ${s.followUser.trim()} to start a game on Lichess…`);
+      } catch { if (!gone) setFollowNote('Can’t reach Lichess right now. Trying again…'); }
+    };
+    // After a game ends, keep the final position up for a moment, then look for the next game.
+    const first = window.setTimeout(check, lichess?.ended ? 8000 : 0);
+    const id = window.setInterval(check, 6000);
+    return () => { gone = true; window.clearTimeout(first); window.clearInterval(id); };
+  }, [s.boardSource, s.followUser, followGame, lichess?.ended]);
+  useEffect(() => {
+    if (s.boardSource !== 'follow') return;
+    if (!lichess) { feed.current = null; return; }
+    const u = s.followUser.trim().toLowerCase();
+    const blackIsMe = (lichess.black?.name ?? '').toLowerCase() === u;
+    const tag = (p: typeof lichess.white) => (p ? `${p.title ? p.title + ' ' : ''}${p.name}${p.rating ? ` (${p.rating})` : ''}` : '');
+    feed.current = {
+      fen: lichess.fen, flipped: blackIsMe, last: lichess.last ? lichess.last.from + lichess.last.to : '',
+      top: blackIsMe ? tag(lichess.white) : tag(lichess.black), bottom: blackIsMe ? tag(lichess.black) : tag(lichess.white),
+    };
+  }, [lichess, s.boardSource, s.followUser]);
+  // The stage's own view of the followed board (the recording draws the same thing).
+  const followCanvas = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    if (s.boardSource !== 'follow') return undefined;
+    let raf = 0;
+    const loop = () => {
+      raf = requestAnimationFrame(loop);
+      const cv = followCanvas.current; if (!cv) return;
+      const w = cv.clientWidth, h = cv.clientHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+      if (!w || !h) return;
+      if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+      const c = cv.getContext('2d'); if (!c) return;
+      c.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const f = feed.current;
+      if (f) drawBoardPanel(c, { kind: 'fen', ...f }, 0, 0, w, h, looks.current);
+      else { c.fillStyle = '#050A0B'; c.fillRect(0, 0, w, h); }
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [s.boardSource]);
+
   // ---- auto-frame: find the chessboard inside the ChessScout page and fit it to the panel ----
   useEffect(() => {
-    if (s.boardSource !== 'app') { setBoardBox(null); feed.current = null; return undefined; }
+    if (s.boardSource !== 'app') { setBoardBox(null); if (s.boardSource !== 'follow') feed.current = null; return undefined; }
     const id = window.setInterval(() => {
       try {
         const doc = boardFrame.current?.contentDocument;
@@ -441,7 +529,7 @@ export default function StreamerStudio() {
       const c = cv.getContext('2d'); if (!c) return;
       let board: BoardFeed = { kind: 'none' };
       if (st.boardSource === 'screen' && screenVideo.current && screenVideo.current.videoWidth) board = { kind: 'video', video: screenVideo.current, zoom: st.zoom, panX: st.panX, panY: st.panY };
-      else if (st.boardSource === 'app' && feed.current) board = { kind: 'fen', ...feed.current };
+      else if ((st.boardSource === 'app' || st.boardSource === 'follow') && feed.current) board = { kind: 'fen', ...feed.current };
       drawComposite(c, W, H, {
         layout: st.layout, board, cam: camCanvas.current, name: st.name, subtitle: st.subtitle,
         light: looks.current.light, dark: looks.current.dark, pieceSrc: looks.current.pieceSrc,
@@ -768,7 +856,16 @@ export default function StreamerStudio() {
         <img src="/icons/icon-192.png" alt="" style={{ height: '62%', borderRadius: '22%' }} />
         <span>chess<span style={{ color: RD.green }}>scout</span>.net</span>
       </div>
-      {panel('board', 'Board', s.boardSource === 'app' ? (
+      {panel('board', 'Board', s.boardSource === 'follow' ? (
+        <div className="absolute inset-0" style={{ background: '#050A0B' }}>
+          <canvas ref={followCanvas} className="absolute inset-0 w-full h-full" />
+          {!lichess && (
+            <p className="absolute inset-x-0 top-1/2 -translate-y-1/2 px-4 text-center text-[13px] font-semibold" style={{ color: RD.muted }}>
+              {s.followUser.trim() ? (followNote || 'Looking for the game on Lichess…') : 'Type a Lichess username in Board settings.'}
+            </p>
+          )}
+        </div>
+      ) : s.boardSource === 'app' ? (
         <div className="absolute inset-0 overflow-hidden" style={{ background: '#050A0B' }}>
           {s.frame === 'auto' && boardBox && !clean && !recording && !edit && (
             <button onClick={() => setPeek((v) => !v)} className="absolute top-1.5 right-1.5 z-10 px-2.5 py-1 rounded-lg text-[11px] font-bold"
@@ -783,7 +880,15 @@ export default function StreamerStudio() {
         <div className="absolute inset-0 overflow-hidden flex items-center justify-center" style={{ background: '#050A0B' }}>
           <video ref={screenVideo} muted playsInline
             style={{ position: 'absolute', left: offX, top: offY, width: boardRect.width * z, height: boardRect.height * z, objectFit: 'contain', display: screenOn ? 'block' : 'none' }} />
-          {!screenOn && <button onClick={pickScreen} className="px-4 py-3 rounded-xl font-bold text-sm" style={{ background: RD.green, color: '#06110A' }}>Pick a window or tab to show</button>}
+          {!screenOn && (IS_PHONE
+            ? <button onClick={() => clipInput.current?.click()} className="px-4 py-3 rounded-xl font-bold text-sm" style={{ background: RD.green, color: '#06110A' }}>Pick a screen recording</button>
+            : <button onClick={pickScreen} className="px-4 py-3 rounded-xl font-bold text-sm" style={{ background: RD.green, color: '#06110A' }}>Pick a window or tab to show</button>)}
+          {clip && !edit && !recording && !clean && (
+            <div className="absolute bottom-1.5 right-1.5 z-10 flex gap-1">
+              <button onClick={() => clipCmd('toggle')} className="px-2.5 py-1 rounded-lg text-[11px] font-bold" style={{ background: CARD, color: RD.text, border: `1px solid ${RD.border}` }}>{clipPlaying ? '⏸' : '▶'}</button>
+              <button onClick={() => clipCmd('restart')} className="px-2.5 py-1 rounded-lg text-[11px] font-bold" style={{ background: CARD, color: RD.text, border: `1px solid ${RD.border}` }}>⟲</button>
+            </div>
+          )}
         </div>
       ))}
       {panel('cam', 'Camera', (
@@ -910,8 +1015,15 @@ export default function StreamerStudio() {
             <div className="flex flex-wrap gap-2">
               <Chip on={s.boardSource === 'app'} onClick={() => set({ boardSource: 'app' })}>♞ ChessScout</Chip>
               <Chip on={s.boardSource === 'screen'} onClick={() => set({ boardSource: 'screen' })}>🪟 Another window</Chip>
+              <Chip on={s.boardSource === 'follow'} onClick={() => set({ boardSource: 'follow' })}>♟ Live Lichess game</Chip>
             </div>
-            {s.boardSource === 'app' ? (<>
+            <input ref={clipInput} type="file" accept="video/*" className="hidden" onChange={(e) => { void pickClip(e.target.files?.[0]); e.target.value = ''; }} />
+            {s.boardSource === 'follow' ? (<>
+              <Label>Lichess username</Label>
+              <input value={s.followUser} onChange={(e) => { set({ followUser: e.target.value.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 30) }); setFollowGame(null); }} placeholder="Your Lichess username" className="w-full px-3 py-2 rounded-lg text-sm" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }} />
+              <Note>Play in the Lichess app (or anywhere on Lichess) and your game shows here live, move by move, with your pieces and board colours. The next game appears by itself. Works on phones, in recordings and when you go live.</Note>
+              {lichess && <Note>Showing: {lichess.white?.name ?? '?'} vs {lichess.black?.name ?? '?'}{lichess.ended ? ' (finished; the next game shows when it starts)' : ''}</Note>}
+            </>) : s.boardSource === 'app' ? (<>
               <Label>Page</Label>
               <div className="flex flex-wrap gap-2">
                 {APP_PAGES.map((p) => <Chip key={p.path} on={s.appPath === p.path} onClick={() => set({ appPath: p.path })}>{p.label}</Chip>)}
@@ -925,8 +1037,18 @@ export default function StreamerStudio() {
               </div>
               <Note>{s.frame === 'auto' ? (boardBox ? 'The board is found and fitted automatically, even when it moves.' : 'No game on screen yet: pick or start a game right in the panel, and the board fills the panel as soon as it starts. Use ⤢ Whole page on the panel any time to get back to the page.') : 'Zoom and move below to show the part of the page you want.'}</Note>
             </>) : (<>
-              <button onClick={pickScreen} className="mt-3 w-full py-2.5 rounded-xl font-bold text-sm" style={{ background: RD.green, color: '#06110A' }}>{screenOn ? 'Pick a different window' : 'Pick a window or tab'}</button>
-              <Note>Show any chess site or app window (computer only). Zoom and move below to frame just the board.</Note>
+              {!IS_PHONE && <button onClick={pickScreen} className="mt-3 w-full py-2.5 rounded-xl font-bold text-sm" style={{ background: RD.green, color: '#06110A' }}>{screenOn && !clip ? 'Pick a different window' : 'Pick a window or tab'}</button>}
+              <button onClick={() => clipInput.current?.click()} className="mt-2 w-full py-2.5 rounded-xl font-bold text-sm" style={IS_PHONE ? { background: RD.green, color: '#06110A' } : { background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }}>{clip ? 'Pick a different screen recording' : '📼 Use a screen recording'}</button>
+              {clip && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Chip on={clipPlaying} onClick={() => clipCmd('toggle')}>{clipPlaying ? '⏸ Pause' : '▶ Play'}</Chip>
+                  <Chip on={false} onClick={() => clipCmd('restart')}>⟲ From the start</Chip>
+                  <Chip on={clipLoop} onClick={() => setClipLoop((v) => !v)}>🔁 Loop</Chip>
+                </div>
+              )}
+              <Note>{IS_PHONE
+                ? 'Phones don’t let websites show other apps live. Record your game with the phone’s screen recorder (Chess.com app, anything), then pick that video here: it plays in the board panel while you react on camera and record. For a live game, use ♟ Live Lichess game.'
+                : 'Show any chess site or app window, or a screen recording you made. Zoom and move below to frame just the board.'}{clip ? ` Playing: ${clip.name}` : ''}</Note>
             </>)}
             {(s.boardSource === 'screen' || s.frame === 'manual') && (<>
               <Label>Zoom &amp; frame</Label>
