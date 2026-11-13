@@ -24,6 +24,7 @@ import { drawComposite, drawBoardPanel, headSizes, type BoardFeed, type TextRun 
 import { CloudRecorder, type RecStatus } from '@/lib/streamer/recorder';
 import { LiveHost } from '@/lib/streamer/live';
 import { apiFetch } from '@/lib/api';
+import { useUser } from '@/hooks/use-user';
 import { useLichessGame } from '@/components/watch/LiveVideo';
 import { useSettings, PIECE_SHAPES } from '@/context/SettingsContext';
 
@@ -156,6 +157,21 @@ export default function StreamerStudio() {
   // Your ChessScout ratings, refreshed every 30s so the headline moves as games finish.
   const [ratings, setRatings] = useState<Record<string, { rating: number; gamesPlayed: number }> | null>(null);
   const ratingStart = useRef<Record<string, number>>({});
+  // Lichess ratings too (most of your rated games may be on Lichess): your linked Lichess name, or the one you follow.
+  const { authUser } = useUser();
+  const lichessName = (s.followUser.trim() || authUser?.lichessUsername || '').toLowerCase();
+  const [lichessRatings, setLichessRatings] = useState<Record<string, { rating: number; games: number; prov?: boolean }> | null>(null);
+  useEffect(() => {
+    if (!lichessName || !s.ratingFrom.startsWith('lichess:')) return;
+    let gone = false;
+    const load = () => fetch(`https://lichess.org/api/user/${encodeURIComponent(lichessName)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { perfs?: Record<string, { rating: number; games: number; prov?: boolean }> } | null) => { if (!gone && d?.perfs) setLichessRatings(d.perfs); })
+      .catch(() => { /* keep the last one */ });
+    void load();
+    const id = window.setInterval(load, 30_000);
+    return () => { gone = true; window.clearInterval(id); };
+  }, [lichessName, s.ratingFrom]);
   const [peek, setPeek] = useState(false); // show the whole page for a moment (pick a game, change opponent)
   const peekRef = useRef(peek); peekRef.current = peek;
   const screenStream = useRef<MediaStream | null>(null);
@@ -528,6 +544,7 @@ export default function StreamerStudio() {
   const headLine = (() => {
     let key = s.ratingFrom, value: number | null = null;
     if (s.ratingFrom === 'manual') value = s.manualRating > 0 ? s.manualRating : null;
+    else if (s.ratingFrom.startsWith('lichess:')) { const pf = lichessRatings?.[s.ratingFrom.slice(8)]; value = pf ? pf.rating : null; }
     else if (ratings) {
       if (s.ratingFrom === 'auto') {
         let best: [string, { rating: number; gamesPlayed: number }] | null = null;
@@ -1038,11 +1055,14 @@ export default function StreamerStudio() {
               {[['auto', 'Most played'], ['blitz_5_0', '5 min'], ['blitz_5_3', '5 | 3'], ['rapid_10_0', '10 min'], ['rapid_15_0', '15 min'], ['daily', 'Daily'], ['manual', 'Type it in']].map(([id, label]) => (
                 <Chip key={id} on={s.ratingFrom === id} onClick={() => set({ ratingFrom: id })}>{label}{ratings?.[id] ? ` · ${ratings[id].rating}` : ''}</Chip>
               ))}
+              {[['lichess:rapid', 'Lichess rapid'], ['lichess:classical', 'Lichess classical'], ['lichess:blitz', 'Lichess blitz']].map(([id, label]) => (
+                <Chip key={id} on={s.ratingFrom === id} onClick={() => set({ ratingFrom: id })}>{label}{lichessRatings?.[id.slice(8)] ? ` · ${lichessRatings[id.slice(8)].rating}` : ''}</Chip>
+              ))}
             </div>
             {s.ratingFrom === 'manual' && (
               <input type="number" inputMode="numeric" value={s.manualRating || ''} onChange={(e) => set({ manualRating: Math.max(0, Math.min(3500, Number(e.target.value) || 0)) })} placeholder="e.g. your Chess.com rating" className="mt-2 w-full px-3 py-2 rounded-lg text-sm" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }} />
             )}
-            <Note>Your real ChessScout rating, updated every 30 seconds, so it moves on stream as you win or lose. Pick “Type it in” if you play somewhere else.</Note>
+            <Note>Your real rating, updated every 30 seconds, so it moves on stream as you win or lose. Lichess options use {lichessName ? <b>{lichessName}</b> : 'your linked Lichess account'} (10+0 and 15+0 games on Lichess count as rapid). Pick “Type it in” for anywhere else.</Note>
           </>)}
 
           {tab === 'board' && (<>

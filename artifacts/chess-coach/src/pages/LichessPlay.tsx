@@ -325,6 +325,34 @@ export function LichessPlay() {
   }, [gameId, auth, authUser?.lichessUsername, refreshAuth]);
   useEffect(() => { if (phase === 'over' && saving === 'idle' && plies >= 4 && st?.status !== 'aborted') void saveGame(); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Rated game over: ask Lichess how each rating moved (the game itself only carries the
+  // ratings from the start). Lichess can take a moment to settle it, so try a few times.
+  const [diffs, setDiffs] = useState<{ w?: number; b?: number } | null>(null);
+  useEffect(() => {
+    setDiffs(null);
+    if (phase !== 'over' || !gameId || !full?.rated) return;
+    let gone = false;
+    void (async () => {
+      for (let k = 0; k < 5 && !gone; k++) {
+        await new Promise((r) => setTimeout(r, k ? 2000 : 800));
+        try {
+          const r = await fetch(`https://lichess.org/game/export/${encodeURIComponent(gameId)}?moves=false&clocks=false&evals=false&opening=false`, { headers: { Accept: 'application/json' } });
+          if (!r.ok) continue;
+          const d = (await r.json()) as { players?: { white?: { ratingDiff?: number }; black?: { ratingDiff?: number } } };
+          const w = d.players?.white?.ratingDiff, b = d.players?.black?.ratingDiff;
+          if (typeof w === 'number' || typeof b === 'number') { if (!gone) setDiffs({ w, b }); return; }
+        } catch { /* try again */ }
+      }
+    })();
+    return () => { gone = true; };
+  }, [phase, gameId, full?.rated]);
+  const myDiff = diffs ? (myColor === 'w' ? diffs.w : diffs.b) : undefined;
+  const myStart = (myColor === 'w' ? full?.white : full?.black)?.rating;
+  const ratingLine = phase !== 'over' || !full ? null
+    : !full.rated ? 'Casual game: ratings don’t change. Pick Rated before you search to play for rating.'
+    : typeof myDiff === 'number' && myStart ? `Lichess rating ${myStart} → ${myStart + myDiff} (${myDiff >= 0 ? '+' : ''}${myDiff})`
+    : null;
+
   const top = myColor === 'w' ? 'b' : 'w';
   const player = (c: 'w' | 'b') => (c === 'w' ? full?.white : full?.black);
   const clockChip = (c: 'w' | 'b') => { const on = running && turn === c, low = timeOf(c) < 10_000; return (
@@ -332,7 +360,7 @@ export function LichessPlay() {
   ); };
   const row = (c: 'w' | 'b') => { const p = player(c); return (
     <div className="flex items-center justify-between gap-2 px-1">
-      <p className="truncate text-[14px] font-bold" style={{ color: PT.text }}>{p?.title && <span className="mr-1 rounded bg-[#CA3431] px-1 text-[11px] text-white">{p.title}</span>}{nameOf(p)}{p?.rating ? <span className="ml-1.5 font-semibold" style={{ color: PT.muted }}>{p.rating}{p.provisional ? '?' : ''}</span> : null}{c === myColor && <span className="ml-1.5 text-[9px] font-black uppercase tracking-[0.14em]" style={{ color: PT.green }}>You</span>}</p>
+      <p className="truncate text-[14px] font-bold" style={{ color: PT.text }}>{p?.title && <span className="mr-1 rounded bg-[#CA3431] px-1 text-[11px] text-white">{p.title}</span>}{nameOf(p)}{p?.rating ? <span className="ml-1.5 font-semibold" style={{ color: PT.muted }}>{p.rating}{p.provisional ? '?' : ''}</span> : null}{(() => { const d = diffs ? (c === 'w' ? diffs.w : diffs.b) : undefined; return typeof d === 'number' && p?.rating ? <span className="ml-1 font-bold" style={{ color: d >= 0 ? PT.green : '#E5484D' }}>→ {p.rating + d} ({d >= 0 ? '+' : ''}{d})</span> : null; })()}{c === myColor && <span className="ml-1.5 text-[9px] font-black uppercase tracking-[0.14em]" style={{ color: PT.green }}>You</span>}</p>
       {full?.clock && clockChip(c)}
     </div>
   ); };
@@ -382,7 +410,7 @@ export function LichessPlay() {
             status: phase !== 'playing' ? 'Game over' : myTurn ? 'Your move' : 'Opponent to move',
           } : undefined}
           boardOverlay={phase === 'over' ? (
-            <GameOverOverlay gameKey={full.id} outcome={outcome} yourColor={myColor === 'w' ? 'white' : 'black'} subtitle={LICHESS_STATUS_TEXT[st.status]}
+            <GameOverOverlay gameKey={full.id} outcome={outcome} yourColor={myColor === 'w' ? 'white' : 'black'} ratingDelta={myDiff ?? null} subtitle={ratingLine ? `${LICHESS_STATUS_TEXT[st.status] ?? ''}${LICHESS_STATUS_TEXT[st.status] ? ' · ' : ''}${ratingLine}` : LICHESS_STATUS_TEXT[st.status]}
               actions={<>
                 {saving === 'saved' && <OverlayButton primary onClick={() => navigate(savedId ? `/games/${savedId}` : '/games')}><Sparkles size={15} /> Review this game</OverlayButton>}
                 {full.speed === 'correspondence'
