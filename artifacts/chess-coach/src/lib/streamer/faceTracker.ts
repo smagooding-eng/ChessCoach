@@ -26,6 +26,8 @@ export class FaceTracker {
   private lastTs = 0;
   /** Latest face points (0..1 of the video) and when they were seen. */
   lastLandmarks: { x: number; y: number }[] | null = null;
+  /** Latest face expression scores (ARKit names: jawOpen, eyeBlinkLeft, mouthSmileRight…). */
+  lastBlendshapes: Record<string, number> = {};
   lastAt = 0;
 
   load(): Promise<boolean> {
@@ -72,6 +74,7 @@ export class FaceTracker {
     const half = Math.max(1, Math.hypot(r.x - l.x, r.y - l.y) / 2);
     const bs: Record<string, number> = {};
     for (const c of res.faceBlendshapes?.[0]?.categories ?? []) bs[c.categoryName] = c.score;
+    this.lastBlendshapes = bs;
     return {
       x: cx, y: cy, size,
       roll: Math.atan2(eyeR.y - eyeL.y, eyeR.x - eyeL.x),

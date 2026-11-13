@@ -19,6 +19,7 @@ import {
   TOON_STYLES, TOON_CREDITS, TOON_TOPS, TOON_FACIAL, TOON_CLOTHES, TOON_GLASSES, TOON_SKINS, DEFAULT_TOON_CUSTOM,
   loadToons, toonThumb, warmToon, drawToon, toonFromPerson, type ToonPick, type ToonCustom,
 } from '@/lib/streamer/toonAvatars';
+import { Avatar3D, loadThree, saveAvatarFile, loadAvatarFile, clearAvatarFile } from '@/lib/streamer/avatar3d';
 import { drawComposite, type BoardFeed } from '@/lib/streamer/compositor';
 import { CloudRecorder, type RecStatus } from '@/lib/streamer/recorder';
 import { LiveHost } from '@/lib/streamer/live';
@@ -38,7 +39,7 @@ interface Settings {
   boardSource: 'app' | 'screen'; appPath: string; zoom: number; panX: number; panY: number;
   frame: 'auto' | 'manual'; framePad: 'board' | 'players';
   camOn: boolean; camId: string; facing: 'user' | 'environment'; mirror: boolean;
-  disguise: Disguise; avatar: AvatarId | 'toon'; toon: ToonPick; toonShuffle: number; bg: Bg; bgColor: string; avatarScale: number;
+  disguise: Disguise; avatar: AvatarId | 'toon' | '3d'; toon: ToonPick; toonShuffle: number; bg: Bg; bgColor: string; avatarScale: number;
   hat: Hat; eyewear: Eyewear; person: PersonLook; customVoice: CustomVoice; personStyle: 'cartoon' | 'real';
   voice: VoicePreset; pitch: number; micId: string; output: string;
   name: string; subtitle: string;
@@ -172,7 +173,34 @@ export default function StreamerStudio() {
   useEffect(() => { void loadToons().then((l) => setToonsReady(!!l)); }, []);
   useEffect(() => { if (toonsReady) warmToon(s.toon); }, [toonsReady, s.toon]);
 
+
+
   const flash = useCallback((m: string) => { setMsg(m); window.setTimeout(() => setMsg((x) => (x === m ? null : x)), 6000); }, []);
+
+  // ---- realistic 3D avatar (file kept on this device) ----
+  const a3d = useRef<Avatar3D | null>(null);
+  const [a3dState, setA3dState] = useState<{ status: 'none' | 'loading' | 'ready' | 'failed'; name?: string; shapes?: number }>({ status: 'none' });
+  const openAvatar3D = useCallback(async (name: string, data: ArrayBuffer) => {
+    setA3dState({ status: 'loading', name });
+    const T = await loadThree();
+    if (!T) { setA3dState({ status: 'failed', name }); return false; }
+    a3d.current ??= new Avatar3D(T);
+    const ok = await a3d.current.load(data.slice(0));
+    setA3dState({ status: ok ? 'ready' : 'failed', name, shapes: a3d.current.faceShapes });
+    return ok;
+  }, []);
+  useEffect(() => {
+    if (s.avatar !== '3d' || a3dState.status !== 'none') return;
+    void loadAvatarFile().then((f) => { if (f) void openAvatar3D(f.name, f.data); });
+  }, [s.avatar, a3dState.status, openAvatar3D]);
+  const pick3D = useCallback(async (file: File) => {
+    if (file.size > 60 * 1024 * 1024) { flash('That file is over 60 MB. Export a lighter version (fewer textures or a smaller texture size).'); return; }
+    const data = await file.arrayBuffer();
+    const ok = await openAvatar3D(file.name, data);
+    if (ok) { await saveAvatarFile(file.name, data).catch(() => undefined); set({ avatar: '3d', disguise: 'avatar' }); }
+    else flash('Couldn’t open that file. Use a .glb (or .vrm) 3D avatar.');
+  }, [openAvatar3D, flash, set]);
+  useEffect(() => () => a3d.current?.dispose(), []);
 
   // ---- stage size: keep the aspect, fit the space ----
   useEffect(() => {
@@ -482,7 +510,14 @@ export default function StreamerStudio() {
           pose.mouth = Math.min(1, vlevel * 1.8);
         } else if (pose.mouth < 0.1 && vlevel > 0.15) pose.mouth = Math.min(1, vlevel * 1.5);
         pose.t = t / 1000;
-        if (st.avatar === 'toon') drawToon(c, st.toon, pose);
+        if (st.avatar === '3d' && a3d.current?.status === 'ready') {
+          const rw = Math.round(W * 0.8), rh = Math.round(H * 0.8);
+          const img = a3d.current.render(rw, rh, st.avatarScale / 1.3, {
+            yaw: pose.yaw, pitch: pose.pitch, roll: pose.roll, t: pose.t, mirror, tracked,
+            voice: vlevel, blinkL: pose.blinkL, blinkR: pose.blinkR,
+          }, tracked ? tracker.current.lastBlendshapes : {});
+          c.drawImage(img, 0, 0, W, H);
+        } else if (st.avatar === 'toon' || st.avatar === '3d') drawToon(c, st.toon, pose);
         else drawAvatar(c, st.avatar, pose, { person: st.person, hat: st.hat, eyewear: st.eyewear, style: st.personStyle });
       }
 
@@ -864,6 +899,27 @@ export default function StreamerStudio() {
             )}
 
             {s.disguise === 'avatar' && (<>
+              <Label>Realistic 3D</Label>
+              <Chip on={s.avatar === '3d'} onClick={() => set({ avatar: '3d' })}>🧑‍🚀 3D realistic (your own)</Chip>
+              {s.avatar === '3d' && (
+                <div className="mt-2 p-3 rounded-xl" style={{ background: CARD_LIGHT, border: `1px solid ${RD.border}` }}>
+                  <label className="block w-full py-2.5 rounded-xl font-bold text-sm text-center cursor-pointer" style={{ background: RD.green, color: '#06110A' }}>
+                    {a3dState.status === 'ready' ? 'Change 3D avatar file' : 'Upload a 3D avatar (.glb or .vrm)'}
+                    <input type="file" accept=".glb,.vrm,model/gltf-binary" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void pick3D(f); e.target.value = ''; }} />
+                  </label>
+                  <Note>
+                    {a3dState.status === 'loading' && `Opening ${a3dState.name ?? 'your avatar'}…`}
+                    {a3dState.status === 'ready' && `${a3dState.name}: ${a3dState.shapes ? `${a3dState.shapes} face expressions found, so it blinks, talks and smiles with you.` : 'no face expressions in this file, so only the head moves.'}`}
+                    {a3dState.status === 'failed' && 'That file didn’t open. Try exporting it again as .glb.'}
+                    {a3dState.status === 'none' && 'No 3D avatar yet.'}
+                  </Note>
+                  <Note>
+                    Make a realistic 3D you from a selfie in a free avatar maker such as <a className="underline" href="https://avaturn.me" target="_blank" rel="noreferrer">Avaturn</a> or <a className="underline" href="https://metaperson.avatarsdk.com" target="_blank" rel="noreferrer">MetaPerson Creator</a> (or an anime-style one in <a className="underline" href="https://vroid.com/en/studio" target="_blank" rel="noreferrer">VRoid Studio</a>), export it as a .glb or .vrm file, and upload it here. Pick one with ARKit face blendshapes for the best movement.
+                    The file stays on this device.
+                  </Note>
+                  {a3dState.status === 'ready' && <button onClick={() => { void clearAvatarFile(); setA3dState({ status: 'none' }); set({ avatar: 'toon' }); }} className="mt-2 text-[12px] underline" style={{ color: RD.muted }}>Remove 3D avatar</button>}
+                </div>
+              )}
               <Label>Cartoon characters</Label>
               <div className="flex flex-wrap gap-1.5">
                 {TOON_STYLES.map((t) => <Chip key={t.id} on={s.avatar === 'toon' && s.toon.style === t.id} onClick={() => set({ avatar: 'toon', toon: { style: t.id, seed: `${t.id}-${s.toonShuffle}-0`, custom: t.id === 'avataaars' ? s.toon.custom ?? null : null } })}>{t.label}</Chip>)}
