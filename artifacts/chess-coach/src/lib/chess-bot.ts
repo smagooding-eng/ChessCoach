@@ -93,9 +93,46 @@ function mirrorIndex(idx: number): number {
   return (7 - rank) * 8 + file;
 }
 
+// Extra judgement used only when a bot is choosing its own move (the move-quality
+// labels elsewhere in the app keep the plain evaluation): develop pieces, castle,
+// don't wander with rooks and the queen in the opening.
+let botMode = false;
+function playingSense(chess: Chess, board: ReturnType<Chess['board']>): number {
+  const n = chess.moveNumber();
+  const at = (sq: string) => { const f = sq.charCodeAt(0) - 97, r = 8 - Number(sq[1]); return board[r][f]; };
+  const is = (sq: string, color: 'w' | 'b', type: string) => { const p = at(sq); return !!p && p.color === color && p.type === type; };
+  let queens = 0, minors = 0;
+  for (const row of board) for (const p of row) { if (!p) continue; if (p.type === 'q') queens++; if (p.type === 'n' || p.type === 'b') minors++; }
+  const middlegame = queens > 0 && minors >= 4;
+  let sc = 0;
+  for (const color of ['w', 'b'] as const) {
+    const sign = color === 'w' ? 1 : -1, back = color === 'w' ? '1' : '8';
+    let s2 = 0;
+    // pieces still at home in the opening
+    const undeveloped = ['b', 'c', 'f', 'g'].filter((f) => is(f + back, color, f === 'b' || f === 'g' ? 'n' : 'b')).length;
+    if (n <= 16) s2 -= undeveloped * 14;
+    // castled king is safe; a king stuck in the middle is not
+    const kingSq = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((f) => f + back).find((sq) => is(sq, color, 'k'));
+    if (middlegame) {
+      if (kingSq === 'g' + back || kingSq === 'h' + back || kingSq === 'c' + back || kingSq === 'b' + back) s2 += 35;
+      else if (!kingSq) s2 -= 30;                       // king walked off the back rank
+      else if (n > 8 && (kingSq === 'e' + back || kingSq === 'd' + back || kingSq === 'f' + back)) s2 -= 25;
+      // rooks and queen should wait until the minor pieces are out
+      if (n <= 14 && kingSq === 'e' + back) {
+        if (!is('a' + back, color, 'r')) s2 -= 18;
+        if (!is('h' + back, color, 'r')) s2 -= 18;
+      }
+      if (n <= 10 && !is('d' + back, color, 'q') && undeveloped >= 2) s2 -= 22;
+    }
+    sc += sign * s2;
+  }
+  return sc;
+}
+
 function evaluate(chess: Chess): number {
   let score = 0;
   const board = chess.board();
+  if (botMode) score += playingSense(chess, board);
   for (let r = 0; r < 8; r++) {
     for (let f = 0; f < 8; f++) {
       const piece = board[r][f];
@@ -134,13 +171,34 @@ let searchDeadline = Infinity;
 let searchNodes = 0;
 const SEARCH_TIMEOUT = new Error('search timeout');
 
+// At the end of the search, keep looking at captures until things are quiet, so the
+// bot doesn't stop counting in the middle of a trade and hang a piece.
+function quiesce(chess: Chess, alpha: number, beta: number, maximizing: boolean, qd: number): number {
+  if ((++searchNodes & 511) === 0 && Date.now() > searchDeadline) throw SEARCH_TIMEOUT;
+  const stand = evaluate(chess);
+  if (qd <= 0) return stand;
+  if (maximizing) { if (stand >= beta) return stand; if (stand > alpha) alpha = stand; }
+  else { if (stand <= alpha) return stand; if (stand < beta) beta = stand; }
+  const caps = chess.moves().filter((m) => m.includes('x') || m.includes('='));
+  let best = stand;
+  for (const m of caps) {
+    chess.move(m);
+    const v = quiesce(chess, alpha, beta, !maximizing, qd - 1);
+    chess.undo();
+    if (maximizing) { if (v > best) best = v; if (v > alpha) alpha = v; }
+    else { if (v < best) best = v; if (v < beta) beta = v; }
+    if (beta <= alpha) break;
+  }
+  return best;
+}
+
 function minimax(chess: Chess, depth: number, alpha: number, beta: number, maximizing: boolean): number {
   if ((++searchNodes & 511) === 0 && Date.now() > searchDeadline) throw SEARCH_TIMEOUT;
   if (depth === 0) {
     // Leaf: only checkmate matters here, and that needs the side to move to be
     // in check -- so skip the (expensive) full game-over test otherwise.
     if (chess.inCheck() && chess.moves().length === 0) return maximizing ? -MATE_SCORE : MATE_SCORE;
-    return evaluate(chess);
+    return botMode ? quiesce(chess, alpha, beta, maximizing, 4) : evaluate(chess);
   }
 
   const legal = chess.moves();
@@ -327,7 +385,35 @@ async function serverBotMove(fen: string, elo: number): Promise<string | null> {
   }
 }
 
+// Positions the bots have recently played into, so they don't shuffle a piece back
+// and forth (it isn't in the FEN, so it's remembered here for the session).
+const recentPositions: { key: string; at: number }[] = [];
+const posKey = (fen: string) => fen.split(' ').slice(0, 2).join(' ');
+function rememberPosition(fen: string) {
+  const now = Date.now();
+  recentPositions.push({ key: posKey(fen), at: now });
+  while (recentPositions.length > 40 || (recentPositions.length && now - recentPositions[0].at > 45 * 60_000)) recentPositions.shift();
+}
+const seenRecently = (fen: string) => { const k = posKey(fen); return recentPositions.some((p) => p.key === k); };
+// The bot's own last move, to stop "Rg1, Rh1, Rg1…" (undoing its previous move).
+let lastBot: { color: string; from: string; to: string; piece: string } | null = null;
+function undoesLastMove(chess: Chess, from: string, to: string): boolean {
+  if (!lastBot || lastBot.color !== chess.turn()) return false;
+  const p = chess.get(lastBot.to as Parameters<Chess['get']>[0]);
+  if (!p || p.color !== lastBot.color || p.type !== lastBot.piece) return false; // a different game
+  return from === lastBot.to && to === lastBot.from;
+}
+
 export async function getBotMove(fen: string, bot: BotConfig): Promise<string | null> {
+  rememberPosition(fen);
+  const mv = await chooseBotMove(fen, bot);
+  if (mv) {
+    try { const c = new Chess(fen); const m = c.move(mv); lastBot = { color: m.color, from: m.from, to: m.to, piece: m.piece }; rememberPosition(c.fen()); } catch { /* ignore */ }
+  }
+  return mv;
+}
+
+async function chooseBotMove(fen: string, bot: BotConfig): Promise<string | null> {
   const chess = new Chess(fen);
   const moves = chess.moves();
   if (moves.length === 0) return null;
@@ -338,7 +424,10 @@ export async function getBotMove(fen: string, bot: BotConfig): Promise<string | 
   }
 
   if (Math.random() < bot.blunderRate) {
-    return moves[Math.floor(Math.random() * moves.length)];
+    // a "human" slip: a random move, but not one that just walks back into a recent position
+    const fresh = moves.filter((m) => { const v = chess.move(m); const f = chess.fen(); chess.undo(); return !seenRecently(f) && !undoesLastMove(chess, v.from, v.to); });
+    const pool = fresh.length ? fresh : moves;
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 
   // Beginner bots don't see everything: drop the captures / mates they
@@ -388,6 +477,13 @@ export async function getBotMove(fen: string, bot: BotConfig): Promise<string | 
   const started = Date.now();
   searchDeadline = started + BUDGET_MS;
   searchNodes = 0;
+  botMode = true;
+  // going back to a position from a few moves ago is almost never the plan
+  const repeatPenalty = (move: string) => {
+    const v = chess.move(move); const f = chess.fen(); chess.undo();
+    const bad = seenRecently(f) || undoesLastMove(chess, v.from, v.to);
+    return bad ? (maximizing ? -45 : 45) : 0;
+  };
   let order = shuffled;
   try {
     for (let d = 1; d <= effectiveDepth; d++) {
@@ -402,6 +498,7 @@ export async function getBotMove(fen: string, bot: BotConfig): Promise<string | 
         } finally {
           chess.undo();
         }
+        ev += repeatPenalty(move);
         scored.push({ move, ev });
         if (maximizing ? ev > iterEval : ev < iterEval) { iterEval = ev; iterBest = move; }
         await new Promise(resolve => setTimeout(resolve, 0));
@@ -417,6 +514,7 @@ export async function getBotMove(fen: string, bot: BotConfig): Promise<string | 
     // Out of time: keep the best move from the last depth that completed.
   } finally {
     searchDeadline = Infinity;
+    botMode = false;
   }
 
   return bestMove;

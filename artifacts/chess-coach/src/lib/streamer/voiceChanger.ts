@@ -152,6 +152,50 @@ class PitchShifter {
   stop() { this.sources.forEach((s) => { try { s.stop(); } catch { /* already stopped */ } }); }
 }
 
+// Smooth pitch shifter that runs on the audio thread: two read heads glide through a
+// short delay line at the new speed and cross-fade with Hann windows, so there are no
+// clicks between grains (the old one, built from plain nodes, crackled).
+const SHIFTER_SRC = `
+class CsShifter extends AudioWorkletProcessor {
+  static get parameterDescriptors() { return [{ name: 'ratio', defaultValue: 1, minValue: 0.25, maxValue: 4, automationRate: 'k-rate' }]; }
+  constructor() { super(); this.N = 16384; this.buf = new Float32Array(this.N); this.w = 0; this.G = Math.round(sampleRate * 0.06); this.d = 0; }
+  read(pos) { const N = this.N; let p = pos % N; if (p < 0) p += N; const i = Math.floor(p), f = p - i; return this.buf[i] * (1 - f) + this.buf[(i + 1) % N] * f; }
+  process(inputs, outputs, params) {
+    const out = outputs[0] && outputs[0][0]; if (!out) return true;
+    const inp = inputs[0] && inputs[0][0];
+    const r = params.ratio[0], G = this.G, half = G / 2, step = 1 - r;
+    for (let i = 0; i < out.length; i++) {
+      this.buf[this.w] = inp ? inp[i] : 0;
+      this.d += step; if (this.d >= G) this.d -= G; else if (this.d < 0) this.d += G;
+      const d1 = this.d, d2 = (this.d + half) % G;
+      const w1 = Math.sin(Math.PI * d1 / G), w2 = Math.sin(Math.PI * d2 / G);
+      out[i] = this.read(this.w - d1 - 1) * w1 * w1 + this.read(this.w - d2 - 1) * w2 * w2;
+      this.w = (this.w + 1) % this.N;
+    }
+    for (let c = 1; c < outputs[0].length; c++) outputs[0][c].set(out);
+    return true;
+  }
+}
+registerProcessor('cs-shifter', CsShifter);
+`;
+const workletReady = new WeakMap<BaseAudioContext, Promise<boolean>>();
+function loadShifter(ctx: AudioContext): Promise<boolean> {
+  let p = workletReady.get(ctx);
+  if (!p) {
+    p = (async () => {
+      try {
+        if (!ctx.audioWorklet) return false;
+        const url = URL.createObjectURL(new Blob([SHIFTER_SRC], { type: 'application/javascript' }));
+        await ctx.audioWorklet.addModule(url);
+        URL.revokeObjectURL(url);
+        return true;
+      } catch { return false; }
+    })();
+    workletReady.set(ctx, p);
+  }
+  return p;
+}
+
 function distortion(ctx: AudioContext, amount: number): WaveShaperNode {
   const ws = ctx.createWaveShaper(), n = 1024, curve = new Float32Array(n);
   for (let i = 0; i < n; i++) { const x = (i * 2) / n - 1; curve[i] = ((3 + amount) * x * 20 * (Math.PI / 180)) / (Math.PI + amount * Math.abs(x)); }
@@ -171,6 +215,7 @@ export class VoiceChanger {
   private stoppers: (() => void)[] = [];
   private player: HTMLAudioElement | null = null;
   private levelBuf: Uint8Array<ArrayBuffer> | null = null;
+  private workletOk = false;
   preset: VoicePreset = 'off';
   pitch = 0;
   custom: CustomVoice = { ...DEFAULT_CUSTOM };
@@ -181,12 +226,15 @@ export class VoiceChanger {
 
   async start(micId?: string) {
     this.stop();
-    const ctx = this.ctx ?? new AudioContext();
+    // 'playback' asks for bigger audio buffers: a little more delay, but no crackle when
+    // the phone is also busy with the camera, face tracking and the board.
+    const ctx = this.ctx ?? new AudioContext({ latencyHint: 'playback' });
     this.ctx = ctx;
     if (ctx.state === 'suspended') await ctx.resume();
     this.mic = await navigator.mediaDevices.getUserMedia({
-      audio: { deviceId: micId ? { exact: micId } : undefined, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      audio: { deviceId: micId ? { exact: micId } : undefined, echoCancellation: true, noiseSuppression: true, autoGainControl: false, channelCount: 1 },
     });
+    this.workletOk = await loadShifter(ctx);
     this.src = ctx.createMediaStreamSource(this.mic);
     this.inGain = ctx.createGain(); this.outGain = ctx.createGain();
     this.analyser = ctx.createAnalyser(); this.analyser.fftSize = 512;
@@ -269,8 +317,15 @@ export class VoiceChanger {
     };
     if (r.high) nodes.push(filter('highpass', r.high));
     if (Math.abs(r.pitch) > 0.01) {
-      const s = new PitchShifter(ctx); s.set(Math.max(-1, Math.min(1, r.pitch))); this.stoppers.push(() => s.stop());
-      keep(s.input); keep(s.output); nodes.push(new SeriesPair(s.input, s.output) as unknown as AudioNode);
+      const pitch = Math.max(-1, Math.min(1, r.pitch));
+      if (this.workletOk) {
+        const w = keep(new AudioWorkletNode(ctx, 'cs-shifter', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] }));
+        const ratio = w.parameters.get('ratio'); if (ratio) ratio.value = Math.pow(2, pitch);
+        nodes.push(w);
+      } else {
+        const s = new PitchShifter(ctx); s.set(pitch); this.stoppers.push(() => s.stop());
+        keep(s.input); keep(s.output); nodes.push(new SeriesPair(s.input, s.output) as unknown as AudioNode);
+      }
     }
     if (r.vibrato) {
       const d = keep(ctx.createDelay(0.1)); d.delayTime.value = 0.01;
@@ -304,7 +359,10 @@ export class VoiceChanger {
     // a gentle compressor keeps every voice at an even, streamable level
     const comp = keep(ctx.createDynamicsCompressor());
     comp.threshold.value = -24; comp.knee.value = 18; comp.ratio.value = 3.5; comp.attack.value = 0.005; comp.release.value = 0.2;
-    const makeup = keep(ctx.createGain()); makeup.gain.value = (r.gain ?? 1) * 1.15;
+    const makeup = keep(ctx.createGain()); makeup.gain.value = (r.gain ?? 1);
+    // last stop: a brick-wall limiter so loud words never clip into static
+    const limit = keep(ctx.createDynamicsCompressor());
+    limit.threshold.value = -2; limit.knee.value = 0; limit.ratio.value = 20; limit.attack.value = 0.002; limit.release.value = 0.1;
 
     // wire the series chain
     let prev: AudioNode = inG;
@@ -321,11 +379,11 @@ export class VoiceChanger {
       dry.connect(dl); dl.connect(fb); fb.connect(dl); dl.connect(wet); wet.connect(comp);
     }
     if (r.reverb) {
-      const cv = keep(ctx.createConvolver()); cv.buffer = impulse(ctx, r.reverb[0]);
+      const cv = keep(ctx.createConvolver()); cv.buffer = impulse(ctx, Math.min(1.6, r.reverb[0]));
       const wet = keep(ctx.createGain()); wet.gain.value = r.reverb[1] * 1.6;
       dry.connect(cv); cv.connect(wet); wet.connect(comp);
     }
-    comp.connect(makeup); makeup.connect(out);
+    comp.connect(makeup); makeup.connect(limit); limit.connect(out);
   }
 }
 
