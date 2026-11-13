@@ -199,10 +199,9 @@ function candidates(provider: FreeProvider, models: string[]): string[] {
 }
 
 /**
- * Saves a key once it's shown to be real (it can list its models). Then tries the
- * likely models with a tiny request and keeps the first that answers. If none
- * answers right now (a busy or limited moment), the key is still saved and the
- * reason is returned, so it isn't lost.
+ * Saves a key as soon as it's shown to be real (it can list its models), so the
+ * save is quick. The likely models are then tried in the background with a tiny
+ * request, and the first that answers is kept (Gemini's can take a while).
  */
 export async function saveFreeAiKey(provider: FreeProvider, key: string): Promise<{ model: string | null; warning?: string }> {
   const k = key.trim().replace(/^["']|["']$/g, "").replace(/\s+/g, "");
@@ -212,21 +211,23 @@ export async function saveFreeAiKey(provider: FreeProvider, key: string): Promis
   catch (err) { throw new Error(`${provider === "gemini" ? "Google" : "Groq"} didn't accept that key: ${err instanceof Error ? err.message : String(err)}`); }
   const tries = candidates(provider, models);
   if (!tries.length) throw new Error(`The key works, but it has no text models available (${models.length} models listed)`);
-  let model: string | null = null;
-  const errors: string[] = [];
-  for (const m of tries) {
-    try {
-      const conf = { key: k, model: m, fromEnv: false };
-      const msgs = toMsgs("Reply with OK.");
-      const r = provider === "gemini" ? await callGemini(conf, msgs, { feature: "admin_marketing", maxTokens: 200 }) : await callGroq(conf, msgs, { feature: "admin_marketing", maxTokens: 200 });
-      void r; model = m; break;
-    } catch (err) { errors.push(`${m}: ${err instanceof Error ? err.message.slice(0, 160) : String(err)}`); }
-  }
   await ensureTable();
-  await db.execute(sql`INSERT INTO free_ai_settings (provider, api_key, model, updated_at) VALUES (${provider}, ${k}, ${model}, now())
+  await db.execute(sql`INSERT INTO free_ai_settings (provider, api_key, model, updated_at) VALUES (${provider}, ${k}, ${tries[0]}, now())
     ON CONFLICT (provider) DO UPDATE SET api_key = EXCLUDED.api_key, model = EXCLUDED.model, updated_at = now()`);
   cache = null;
-  return model ? { model } : { model: null, warning: `Saved, but no model answered a test just now. ${errors.slice(0, 3).join(" | ")}` };
+  void (async () => {
+    for (const m of tries) {
+      try {
+        const conf = { key: k, model: m, fromEnv: false };
+        const msgs = toMsgs("Reply with OK.");
+        await (provider === "gemini" ? callGemini(conf, msgs, { feature: "admin_marketing", maxTokens: 200 }) : callGroq(conf, msgs, { feature: "admin_marketing", maxTokens: 200 }));
+        await db.execute(sql`UPDATE free_ai_settings SET model = ${m} WHERE provider = ${provider} AND api_key = ${k}`);
+        cache = null;
+        return;
+      } catch { /* try the next model */ }
+    }
+  })();
+  return { model: tries[0] };
 }
 
 export async function removeFreeAiKey(provider: FreeProvider): Promise<void> {
