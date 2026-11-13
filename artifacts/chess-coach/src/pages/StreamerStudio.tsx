@@ -65,6 +65,7 @@ const PRESETS: Record<Aspect, { id: string; label: string; layout: Layout }[]> =
 const APP_PAGES: { path: string; label: string }[] = [
   { path: '/live', label: 'Live game' },
   { path: '/play-now', label: 'Quick bot game' },
+  { path: '/games', label: 'Game reviews' },
   { path: '/lichess', label: 'Lichess' },
   { path: '/play', label: 'Play the computer' },
   { path: '/tournaments', label: 'Tournaments' },
@@ -418,6 +419,36 @@ export default function StreamerStudio() {
       top: blackIsMe ? tag(lichess.white) : tag(lichess.black), bottom: blackIsMe ? tag(lichess.black) : tag(lichess.white),
     };
   }, [lichess, s.boardSource, s.followUser]);
+  // ---- reviews: open a game's review right in the board panel ----
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const openReview = (id: number | string) => set({ boardSource: 'app', appPath: `/games/${id}` });
+  const reviewLatest = async () => {
+    setReviewBusy(true);
+    try {
+      const r = await apiFetch('/api/games?limit=1', { credentials: 'include' });
+      const d = r.ok ? await r.json() : null;
+      const id = d?.games?.[0]?.id;
+      if (id) openReview(id); else flash('No games in your account yet. Play one, then review it here.');
+    } catch { flash('Couldn’t load your games. Try again.'); }
+    finally { setReviewBusy(false); }
+  };
+  // A Lichess game you just played: bring it into your games, then open its review.
+  const reviewFollowed = async () => {
+    if (!followGame) return;
+    setReviewBusy(true);
+    try {
+      const pgn = await fetch(`https://lichess.org/game/export/${encodeURIComponent(followGame)}?clocks=false&evals=false`).then((r) => (r.ok ? r.text() : ''));
+      if (!pgn.trim()) throw new Error('Lichess didn’t send the game. Try again in a moment.');
+      const r = await apiFetch('/api/games/import-pgn', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pgn }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'Couldn’t add the game to your account.');
+      const id = d.ids?.[0];
+      if (!id) throw new Error(d.notYours ? 'That game isn’t yours (link this Lichess username to your account first).' : 'Couldn’t add the game to your account.');
+      openReview(id);
+    } catch (e) { flash(e instanceof Error ? e.message : 'Couldn’t open the review.'); }
+    finally { setReviewBusy(false); }
+  };
+
   // The stage's own view of the followed board (the recording draws the same thing).
   const followCanvas = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -859,6 +890,10 @@ export default function StreamerStudio() {
       {panel('board', 'Board', s.boardSource === 'follow' ? (
         <div className="absolute inset-0" style={{ background: '#050A0B' }}>
           <canvas ref={followCanvas} className="absolute inset-0 w-full h-full" />
+          {lichess?.ended && !edit && !recording && !clean && (
+            <button onClick={() => void reviewFollowed()} disabled={reviewBusy} className="absolute top-1.5 right-1.5 z-10 px-2.5 py-1 rounded-lg text-[11px] font-bold disabled:opacity-60"
+              style={{ background: RD.green, color: '#06110A' }}>{reviewBusy ? 'Opening…' : '🔎 Review this game'}</button>
+          )}
           {!lichess && (
             <p className="absolute inset-x-0 top-1/2 -translate-y-1/2 px-4 text-center text-[13px] font-semibold" style={{ color: RD.muted }}>
               {s.followUser.trim() ? (followNote || 'Looking for the game on Lichess…') : 'Type a Lichess username in Board settings.'}
@@ -1023,12 +1058,18 @@ export default function StreamerStudio() {
               <input value={s.followUser} onChange={(e) => { set({ followUser: e.target.value.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 30) }); setFollowGame(null); }} placeholder="Your Lichess username" className="w-full px-3 py-2 rounded-lg text-sm" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }} />
               <Note>Play in the Lichess app (or anywhere on Lichess) and your game shows here live, move by move, with your pieces and board colours. The next game appears by itself. Works on phones, in recordings and when you go live.</Note>
               {lichess && <Note>Showing: {lichess.white?.name ?? '?'} vs {lichess.black?.name ?? '?'}{lichess.ended ? ' (finished; the next game shows when it starts)' : ''}</Note>}
+              {followGame && lichess?.ended && (
+                <button onClick={() => void reviewFollowed()} disabled={reviewBusy} className="mt-2 w-full py-2.5 rounded-xl font-bold text-sm disabled:opacity-60" style={{ background: RD.green, color: '#06110A' }}>{reviewBusy ? 'Opening…' : '🔎 Review this game'}</button>
+              )}
+              <Note>Review opens the game in ChessScout’s game review, in the board panel. Switch back to ♟ Live Lichess game for your next one.</Note>
             </>) : s.boardSource === 'app' ? (<>
               <Label>Page</Label>
               <div className="flex flex-wrap gap-2">
                 {APP_PAGES.map((p) => <Chip key={p.path} on={s.appPath === p.path} onClick={() => set({ appPath: p.path })}>{p.label}</Chip>)}
               </div>
               <Note>You play right inside the panel. It’s your normal ChessScout account.</Note>
+              <button onClick={() => void reviewLatest()} disabled={reviewBusy} className="mt-2 w-full py-2.5 rounded-xl font-bold text-sm disabled:opacity-60" style={{ background: RD.green, color: '#06110A' }}>{reviewBusy ? 'Opening…' : '🔎 Review my last game'}</button>
+              <Note>Opens the review of your latest game in the board panel. Game reviews (above) lists all your games to pick from. After a live game, Review game on the result screen works too.</Note>
               <Label>Framing</Label>
               <div className="flex flex-wrap gap-2">
                 <Chip on={s.frame === 'auto' && s.framePad === 'players'} onClick={() => set({ frame: 'auto', framePad: 'players' })}>Board + names</Chip>
