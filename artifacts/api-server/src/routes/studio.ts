@@ -5,6 +5,7 @@ import { listMoments, tagCounts, contentScanProgress, scanContentBatch, studioGa
 
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
+import { Chess } from "chess.js";
 
 const router: IRouter = Router();
 
@@ -207,6 +208,81 @@ router.put("/admin/studio/crowd", requireAdmin, async (req: Request, res: Respon
       ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, updated_at = now()`);
     res.json({ ok: true });
   } catch (err) { req.log.error({ err }, "[studio] crowd save failed"); res.status(500).json({ error: "Couldn't save the crowd game." }); }
+});
+
+// ── Puzzle reels I've made, with their answers, so comments can be answered days later ──
+let prReady: Promise<unknown> | null = null;
+const prTable = () => (prReady ??= db.execute(sql`CREATE TABLE IF NOT EXISTS studio_puzzle_reels (
+  puzzle_id INTEGER NOT NULL, mode VARCHAR(8) NOT NULL, theme VARCHAR(40), fen TEXT NOT NULL, moves TEXT NOT NULL,
+  rating INTEGER, answer TEXT NOT NULL DEFAULT '', letter VARCHAR(2), headline TEXT, choices JSONB,
+  rendered BOOLEAN NOT NULL DEFAULT false, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (puzzle_id, mode))`).catch((e) => { prReady = null; throw e; }));
+const prRows = (r: unknown) => (Array.isArray(r) ? r : ((r as { rows?: unknown[] }).rows ?? [])) as Record<string, unknown>[];
+// Puzzle reels rendered before this list existed: recover them (and their answers) from past MP4 renders.
+let prBackfilled = false;
+async function backfillPuzzleReels() {
+  if (prBackfilled) return;
+  prBackfilled = true;
+  try {
+    const rows = prRows(await db.execute(sql`SELECT payload, created_at FROM studio_renders WHERE payload->'source'->>'kind' = 'puzzleReel' ORDER BY created_at ASC LIMIT 2000`));
+    for (const row of rows) {
+      const o = ((row.payload as { source?: { opts?: Record<string, unknown> } })?.source?.opts ?? {}) as {
+        mode?: string; theme?: string; headline?: string; puzzle?: { id: number; fen: string; moves: string; rating?: number } | null;
+        choices?: { uci: string; san: string; correct: boolean }[];
+      };
+      const pz = o.puzzle;
+      if (!pz || !Number.isInteger(pz.id) || !pz.fen || !pz.moves) continue;
+      const mode = o.mode === "abc" ? "abc" : "mate2";
+      let answer = "", letter = "";
+      if (mode === "abc" && o.choices?.length) {
+        const i = o.choices.findIndex((c) => c.correct);
+        letter = i >= 0 ? "ABC"[i] : ""; answer = o.choices[i]?.san ?? "";
+      } else {
+        try {
+          const c = new Chess(pz.fen);
+          answer = pz.moves.split(" ").filter(Boolean).map((u) => { try { return c.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] || undefined }).san; } catch { return null; } }).filter(Boolean).join(" ");
+        } catch { /* leave blank */ }
+      }
+      await db.execute(sql`INSERT INTO studio_puzzle_reels (puzzle_id, mode, theme, fen, moves, rating, answer, letter, headline, choices, rendered, created_at, updated_at)
+        VALUES (${pz.id}, ${mode}, ${String(o.theme ?? "").slice(0, 40)}, ${pz.fen}, ${pz.moves}, ${Number(pz.rating) || null}, ${answer}, ${letter},
+          ${String(o.headline ?? "").slice(0, 200)}, ${o.choices ? JSON.stringify(o.choices) : null}::jsonb, true, ${row.created_at as string}::timestamptz, ${row.created_at as string}::timestamptz)
+        ON CONFLICT (puzzle_id, mode) DO NOTHING`);
+    }
+  } catch (err) { prBackfilled = false; void err; }
+}
+router.get("/admin/studio/puzzle-reels", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    await prTable();
+    await backfillPuzzleReels();
+    const q = String(req.query.q ?? "").trim().replace(/^#/, "");
+    const r = /^\d+$/.test(q)
+      ? await db.execute(sql`SELECT * FROM studio_puzzle_reels WHERE puzzle_id::text LIKE ${q + "%"} ORDER BY updated_at DESC LIMIT 300`)
+      : q ? await db.execute(sql`SELECT * FROM studio_puzzle_reels WHERE answer ILIKE ${"%" + q + "%"} OR headline ILIKE ${"%" + q + "%"} ORDER BY updated_at DESC LIMIT 300`)
+        : await db.execute(sql`SELECT * FROM studio_puzzle_reels ORDER BY updated_at DESC LIMIT 300`);
+    res.json({ reels: prRows(r) });
+  } catch (err) { req.log.error({ err }, "[studio] puzzle reels load failed"); res.status(500).json({ error: "Couldn't load your puzzle reels." }); }
+});
+router.post("/admin/studio/puzzle-reels", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const b = req.body ?? {};
+    const id = Number(b.puzzleId), mode = String(b.mode || "mate2").slice(0, 8);
+    if (!Number.isInteger(id) || !b.fen || !b.moves) { res.status(400).json({ error: "Bad puzzle" }); return; }
+    await prTable();
+    await db.execute(sql`INSERT INTO studio_puzzle_reels (puzzle_id, mode, theme, fen, moves, rating, answer, letter, headline, choices, rendered)
+      VALUES (${id}, ${mode}, ${String(b.theme ?? "").slice(0, 40)}, ${String(b.fen).slice(0, 120)}, ${String(b.moves).slice(0, 400)}, ${Number(b.rating) || null},
+        ${String(b.answer ?? "").slice(0, 200)}, ${String(b.letter ?? "").slice(0, 2)}, ${String(b.headline ?? "").slice(0, 200)},
+        ${b.choices ? JSON.stringify(b.choices).slice(0, 4000) : null}::jsonb, ${!!b.rendered})
+      ON CONFLICT (puzzle_id, mode) DO UPDATE SET answer = EXCLUDED.answer, letter = EXCLUDED.letter, headline = EXCLUDED.headline,
+        choices = EXCLUDED.choices, rendered = studio_puzzle_reels.rendered OR EXCLUDED.rendered, updated_at = now()`);
+    res.json({ ok: true });
+  } catch (err) { req.log.error({ err }, "[studio] puzzle reel save failed"); res.status(500).json({ error: "Couldn't save the puzzle reel." }); }
+});
+router.delete("/admin/studio/puzzle-reels/:id/:mode", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    await prTable();
+    await db.execute(sql`DELETE FROM studio_puzzle_reels WHERE puzzle_id = ${Number(req.params.id)} AND mode = ${String(req.params.mode)}`);
+    res.json({ ok: true });
+  } catch (err) { req.log.error({ err }, "[studio] puzzle reel delete failed"); res.status(500).json({ error: "Couldn't delete it." }); }
 });
 
 export default router;

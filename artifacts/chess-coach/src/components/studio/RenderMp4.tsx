@@ -73,7 +73,7 @@ export function RecentRenders() {
   );
 }
 
-export function RenderMp4({ payload, name, shareText }: { payload: () => RenderPayload; name: string; shareText?: string }) {
+export function RenderMp4({ payload, name, shareText, onStart }: { payload: () => RenderPayload; name: string; shareText?: string; onStart?: () => void }) {
   const [job, setJob] = useState<{ id: string; status: string; error?: string | null } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [startedAt, setStartedAt] = useState(0);
@@ -88,6 +88,7 @@ export function RenderMp4({ payload, name, shareText }: { payload: () => RenderP
     return () => clearInterval(t);
   }, [job]);
   const start = async () => {
+    onStart?.();
     if (starting) return;
     setErr(null); setStarting(true);
     try {

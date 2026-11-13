@@ -78,8 +78,8 @@ const DEFAULTS: Record<PuzzleReelOpts['mode'], Pick<PuzzleReelOpts, 'headline' |
 export function puzzleOptsFor(o: Partial<PuzzleReelOpts>): PuzzleReelOpts {
   const mode = o.mode ?? 'mate2';
   const t = themeOf(o.theme);
-  return { mode, theme: t.id, puzzle: null, seconds: o.seconds ?? 7, reveal: o.reveal ?? false, music: o.music ?? 'hype',
-    ...(mode === 'abc' ? DEFAULTS.abc : { headline: t.headline, sub: t.sub }) };
+  return { mode, theme: t.id, puzzle: o.puzzle ?? null, choices: o.choices, seconds: o.seconds ?? 7, reveal: o.reveal ?? false, music: o.music ?? 'hype',
+    ...(mode === 'abc' ? DEFAULTS.abc : { headline: t.headline, sub: t.sub }), ...(o.headline ? { headline: o.headline } : {}), ...(o.sub ? { sub: o.sub } : {}) };
 }
 
 const uciMove = (c: Chess, uci: string) => {
@@ -110,6 +110,7 @@ export function PuzzleReel({ opts: initial, render = false, onClose }: { opts?: 
   const [left, setLeft] = useState(0);
   const [ply, setPly] = useState(0);
   const [clean, setClean] = useState(false);
+  const [saved, setSaved] = useState<number | null>(null);
   const seen = useRef<number[]>([]);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const music = useRef<StudioMusic | null>(null);
@@ -231,6 +232,8 @@ export function PuzzleReel({ opts: initial, render = false, onClose }: { opts?: 
             <p className="mt-[0.8cqh] font-bold" style={{ fontSize: '2.2cqh', color: MUTED }}>{toPlay} to play</p>
           </div>
           <div className="relative w-full rounded-[1.6cqh] p-[1.2cqh]" style={{ background: '#141D1F', border: '1px solid #243033' }}>
+            {/* small puzzle number, so a comment can be matched to its answer later */}
+            <span className="absolute -top-[2.4cqh] right-[0.4cqh] font-bold tabular-nums" style={{ fontSize: '1.5cqh', color: MUTED }}>#{p.id}</span>
             <LookOverride look={look}><ChessBoard fen={fen} lastMove={lastMove} moveQuality={quality} arrows={arrows} squareMarks={marks} flipped={flipped} maxWidthOverride="100%" suppressConfirmMoves animationMs={260} /></LookOverride>
           </div>
           <div className="flex h-[9cqh] items-center justify-center">
@@ -269,6 +272,16 @@ export function PuzzleReel({ opts: initial, render = false, onClose }: { opts?: 
   const theme = themeOf(opts.theme);
   // The answer in plain moves, for the pinned comment.
   const answerSan = (() => { if (!p) return ''; try { const c = new Chess(p.fen); const mv = opts.mode === 'abc' ? [opts.choices?.find((x) => x.correct)?.uci ?? solution[0]] : solution.slice(0, answerPlies); return mv.map((u) => uciMove(c, u)?.san).filter(Boolean).join(' '); } catch { return ''; } })();
+  const saveAnswer = async (rendered: boolean) => {
+    if (!p) return;
+    try {
+      const r = await apiFetch('/api/admin/studio/puzzle-reels', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ puzzleId: p.id, mode: opts.mode, theme: opts.theme, fen: p.fen, moves: p.moves, rating: p.rating, answer: answerSan, letter: correctLetter, headline: opts.headline, choices: opts.choices ?? null, rendered }),
+      });
+      if (r.ok) setSaved(p.id);
+    } catch { /* not critical */ }
+  };
   const caption = opts.mode === 'mate2'
     ? `${opts.headline.charAt(0) + opts.headline.slice(1).toLowerCase()}. ${opts.sub} ${toPlay} to play — drop your move below 👇${opts.reveal ? '' : '\nAnswer in tomorrow\'s reel 👀'}\n\nUnlimited free puzzles at chessscout.net\n\n#chess #chesspuzzle #${theme.group === 'Endgames' ? 'chessendgame' : 'chesstactics'} #${theme.id.toLowerCase()}`
     : `Which move is correct? A, B or C 👇\n${toPlay} to play.${opts.reveal ? '' : ' Answer tomorrow 👀'}\n\nUnlimited free puzzles at chessscout.net\n\n#chess #chesspuzzle #chesstactics #chessgame`;
@@ -337,11 +350,13 @@ export function PuzzleReel({ opts: initial, render = false, onClose }: { opts?: 
           <EngagePicker kind="puzzle" value={opts.engage} onChange={(v) => setOpts({ ...opts, engage: v })} label="Comment prompt beside the countdown (and first line of the caption)" />
           <CaptionBox key={caption + (opts.engage ?? '')} text={withEngage(opts.engage, caption)} />
           {p && <PinnedBox text={hiddenAnswer(answerSan || 'see tomorrow’s reel')} />}
+          <p className="text-[11.5px] text-white/45">Every puzzle you make an MP4 or Clean view of is saved with its answer in the Content Studio’s <b>Answers 📌</b> tab. The small #{p?.id ?? 'number'} on the reel tells you which one a comment is about.</p>
           {!opts.reveal && <p className="text-[11.5px] text-white/45">Tip: post the answer as its own reel the next day ("Yesterday's puzzle: here's the answer"), with the same puzzle and "Show the answer" ticked.</p>}
           <div className="flex flex-wrap gap-2">
             <button onClick={() => play()} disabled={!p} className="inline-flex items-center gap-1.5 rounded-lg bg-[#81B64C] px-3 py-1.5 text-[12.5px] font-black text-white"><Play size={14} />Replay</button>
-            <button onClick={() => { clear(); music.current?.stop(); setClean(true); setPhase('idle'); at(4000, () => play()); }} disabled={!p} className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-black"><Maximize2 size={14} />Clean view</button>
-            {p && <RenderMp4 name={`chessscout-${opts.mode === 'mate2' ? theme.id : 'abc'}-${p.id}`} shareText={caption} payload={() => ({ source: { kind: 'puzzleReel', opts }, prefs: {} })} />}
+            <button onClick={() => { void saveAnswer(false); clear(); music.current?.stop(); setClean(true); setPhase('idle'); at(4000, () => play()); }} disabled={!p} className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-black"><Maximize2 size={14} />Clean view</button>
+            {p && <RenderMp4 name={`chessscout-${opts.mode === 'mate2' ? theme.id : 'abc'}-${p.id}`} shareText={caption} onStart={() => void saveAnswer(true)} payload={() => ({ source: { kind: 'puzzleReel', opts }, prefs: {} })} />}
+            {p && <button onClick={() => void saveAnswer(false)} className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-black">{saved === p.id ? '✓ Answer saved' : '📌 Save the answer'}</button>}
           </div>
         </div>
       </div>

@@ -18,6 +18,7 @@ import { TRAPS } from '@/components/studio/traps';
 import { CrowdReel } from '@/components/studio/CrowdReel';
 import { SectionReel, SECTIONS } from '@/components/studio/SectionReels';
 import { PuzzleReel, puzzleOptsFor, type PuzzleReelOpts } from '@/components/studio/PuzzleReel';
+import { PuzzleAnswers } from '@/components/studio/PuzzleAnswers';
 import { ReelsPlan, type PlanAction } from '@/components/studio/ReelsPlan';
 import { FeatureBlitz } from '@/components/studio/FeatureBlitz';
 import { RenderReady, RecentRenders } from '@/components/studio/RenderMp4';
@@ -136,7 +137,7 @@ export function ContentStudio() {
   const togglePick = (x: StudioSource) => setPicked((cur) => (cur.some((c) => keyOf(c) === keyOf(x)) ? cur.filter((c) => keyOf(c) !== keyOf(x)) : [...cur, x]));
   const isPicked = (x: StudioSource) => picked.some((c) => keyOf(c) === keyOf(x));
   const choose = (x: StudioSource) => (picking ? togglePick(x) : setOpen(x));
-  const [view, setView] = useState<'plan' | 'moments' | 'traps' | 'puzzles' | 'reviews' | 'kids' | 'scout' | 'scan' | 'analyzer' | 'promo' | 'openings' | 'comebacks'>('plan');
+  const [view, setView] = useState<'plan' | 'moments' | 'traps' | 'puzzles' | 'answers' | 'reviews' | 'kids' | 'scout' | 'scan' | 'analyzer' | 'promo' | 'openings' | 'comebacks'>('plan');
   // Openings: main line, ideas, replies and variations, with real-game numbers and Stockfish.
   const [openings, setOpenings] = useState<{ id: string; name: string; side: 'white' | 'black'; line: string[]; lines: string[] }[] | null>(null);
   useEffect(() => {
@@ -419,7 +420,7 @@ export function ContentStudio() {
         {picking ? 'Cancel compilation' : '🎬 Make a compilation'}
       </button>
       <div className="order-1 inline-flex flex-wrap rounded-xl bg-white/5 p-1">
-        {([['plan', 'Reels plan 📅'], ['moments', 'Game moments'], ['comebacks', 'Comebacks 🔥'], ['reviews', 'Game reviews'], ['puzzles', 'Puzzles'], ['traps', 'Trap lessons'], ['kids', 'Kids & beginners'], ['scout', 'Opponent scout'], ['scan', 'Scan position'], ['analyzer', 'Analyzer games'], ['openings', 'Openings'], ['promo', 'Promos']] as const).map(([k, t]) => (
+        {([['plan', 'Reels plan 📅'], ['moments', 'Game moments'], ['comebacks', 'Comebacks 🔥'], ['reviews', 'Game reviews'], ['puzzles', 'Puzzles'], ['answers', 'Answers 📌'], ['traps', 'Trap lessons'], ['kids', 'Kids & beginners'], ['scout', 'Opponent scout'], ['scan', 'Scan position'], ['analyzer', 'Analyzer games'], ['openings', 'Openings'], ['promo', 'Promos']] as const).map(([k, t]) => (
           <button key={k} onClick={() => setView(k)} className="rounded-lg px-3.5 py-1.5 text-[13px] font-black" style={{ background: view === k ? '#81B64C' : 'transparent', color: view === k ? '#fff' : '#C9CFCD' }}>{t}</button>
         ))}
       </div>
@@ -819,6 +820,8 @@ export function ContentStudio() {
             <button onClick={() => setOpen({ kind: 'promo', promo: challenge })} className="rounded-lg bg-[#81B64C] px-4 py-2 text-[13px] font-black text-white">🎬 Make the clip</button>
           </div>
         )}
+      </>) : view === 'answers' ? (<>
+        <PuzzleAnswers onMakeAnswerReel={(o) => setPuzzleOpen(o)} />
       </>) : view === 'puzzles' ? (<>
         <div className="mb-2 flex flex-wrap gap-1.5">
           <button onClick={() => setPTheme('')} className="rounded-full px-3 py-1.5 text-[12.5px] font-bold" style={{ background: !pTheme ? '#81B64C' : 'rgba(255,255,255,.06)', color: !pTheme ? '#fff' : '#C9CFCD' }}>All themes</button>
