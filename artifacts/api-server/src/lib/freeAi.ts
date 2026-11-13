@@ -13,6 +13,7 @@
 //
 // Note: on Gemini's free tier Google may use what's sent to improve its products.
 // Only admin content (no player data) is sent.
+import { AsyncLocalStorage } from "node:async_hooks";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "./logger";
@@ -97,10 +98,14 @@ async function modelFor(provider: FreeProvider, c: Conf): Promise<string> {
 
 export interface FreeAiResult { text: string; provider: FreeProvider; model: string }
 
-async function callGemini(c: Conf, prompt: string, o: FreeAskOpts): Promise<FreeAiResult & { usage: { prompt_tokens: number; completion_tokens: number } }> {
+type Msg = { role: "system" | "user" | "assistant"; content: string };
+const toMsgs = (prompt: string, system?: string): Msg[] => [...(system ? [{ role: "system" as const, content: system }] : []), { role: "user", content: prompt }];
+
+async function callGemini(c: Conf, msgs: Msg[], o: FreeAskOpts): Promise<FreeAiResult & { usage: { prompt_tokens: number; completion_tokens: number } }> {
   const model = await modelFor("gemini", c);
+  const system = msgs.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
   const body: Record<string, unknown> = {
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    contents: msgs.filter((m) => m.role !== "system").map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
     generationConfig: {
       // Newer Flash models think before answering and that counts here, so leave room for it.
       maxOutputTokens: Math.max(2048, (o.maxTokens ?? 4000) * 3),
@@ -108,7 +113,7 @@ async function callGemini(c: Conf, prompt: string, o: FreeAskOpts): Promise<Free
       ...(o.json && !o.webSearch ? { responseMimeType: "application/json" } : {}),
     },
   };
-  if (o.system) body.systemInstruction = { parts: [{ text: o.system }] };
+  if (system) body.systemInstruction = { parts: [{ text: system }] };
   if (o.webSearch) body.tools = [{ google_search: {} }];
   const r = await fetch(`${GEMINI}/models/${encodeURIComponent(model)}:generateContent`, {
     method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": c.key }, body: JSON.stringify(body),
@@ -122,9 +127,9 @@ async function callGemini(c: Conf, prompt: string, o: FreeAskOpts): Promise<Free
   return { text, provider: "gemini", model, usage: { prompt_tokens: d.usageMetadata?.promptTokenCount ?? 0, completion_tokens: d.usageMetadata?.candidatesTokenCount ?? 0 } };
 }
 
-async function callGroq(c: Conf, prompt: string, o: FreeAskOpts): Promise<FreeAiResult & { usage: { prompt_tokens: number; completion_tokens: number } }> {
+async function callGroq(c: Conf, msgs: Msg[], o: FreeAskOpts): Promise<FreeAiResult & { usage: { prompt_tokens: number; completion_tokens: number } }> {
   const model = await modelFor("groq", c);
-  const messages = [...(o.system ? [{ role: "system", content: o.system }] : []), { role: "user", content: prompt }];
+  const messages = msgs;
   const r = await fetch(`${GROQ}/chat/completions`, {
     method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${c.key}` },
     body: JSON.stringify({ model, messages, max_completion_tokens: o.maxTokens ?? 4000, ...(o.json ? { response_format: { type: "json_object" } } : {}) }),
@@ -155,7 +160,8 @@ export async function askFreeAi(prompt: string, o: FreeAskOpts): Promise<FreeAiR
     const conf = c[p];
     if (!conf) continue;
     try {
-      const r = p === "gemini" ? await callGemini(conf, prompt, o) : await callGroq(conf, prompt, o);
+      const msgs = toMsgs(prompt, o.system);
+      const r = p === "gemini" ? await callGemini(conf, msgs, o) : await callGroq(conf, msgs, o);
       if (!r.text.trim()) throw new Error(`${p} returned nothing`);
       void trackAiUsage({ userId: o.userId ?? null, feature: o.feature, model: `free:${r.model}`, usage: { ...r.usage, total_tokens: r.usage.prompt_tokens + r.usage.completion_tokens } });
       return { text: r.text, provider: r.provider, model: r.model };
@@ -191,8 +197,8 @@ export async function saveFreeAiKey(provider: FreeProvider, key: string): Promis
   if (!model) throw new Error(`The key works but has no usable ${provider} model`);
   // A tiny test call so a key without free access shows up now, not later.
   const test = provider === "gemini"
-    ? await callGemini({ key: k, model, fromEnv: false }, "Reply with OK.", { feature: "admin_marketing", maxTokens: 200 })
-    : await callGroq({ key: k, model, fromEnv: false }, "Reply with OK.", { feature: "admin_marketing", maxTokens: 200 });
+    ? await callGemini({ key: k, model, fromEnv: false }, toMsgs("Reply with OK."), { feature: "admin_marketing", maxTokens: 200 })
+    : await callGroq({ key: k, model, fromEnv: false }, toMsgs("Reply with OK."), { feature: "admin_marketing", maxTokens: 200 });
   void test;
   await ensureTable();
   await db.execute(sql`INSERT INTO free_ai_settings (provider, api_key, model, updated_at) VALUES (${provider}, ${k}, ${model}, now())
@@ -205,4 +211,160 @@ export async function removeFreeAiKey(provider: FreeProvider): Promise<void> {
   await ensureTable();
   await db.execute(sql`DELETE FROM free_ai_settings WHERE provider = ${provider}`);
   cache = null;
+}
+
+// ── Anything you (an admin) start runs on free AI ─────────────────────────────
+// Requests from an admin account carry this scope (set in app.ts), and so do the
+// background jobs they start (scout reports, game reviews and courses made while
+// building content). The game-analysis code's OpenAI client is wrapped so text
+// calls in that scope go to the free provider instead. Players are never in it.
+
+export const aiScope = new AsyncLocalStorage<{ admin: boolean; freeModel?: string }>();
+
+/** The model actually used for the last free call in this scope (for the cost log). */
+export function freeModelInScope(): string | undefined { return aiScope.getStore()?.freeModel; }
+
+type ChatParams = { model?: string; messages?: { role: string; content: unknown }[]; max_completion_tokens?: number; max_tokens?: number; response_format?: { type?: string } };
+
+function textOnly(p: ChatParams): Msg[] | null {
+  const out: Msg[] = [];
+  for (const m of p.messages ?? []) {
+    if (typeof m.content !== "string") return null; // images, audio: leave to OpenAI
+    const role = m.role === "developer" ? "system" : m.role;
+    if (role !== "system" && role !== "user" && role !== "assistant") return null;
+    out.push({ role, content: m.content });
+  }
+  return out.length ? out : null;
+}
+
+/** Wraps an OpenAI client: admin-scope text chat calls go to the free AI (OpenAI-shaped reply). */
+export function adminFreeRouted<T extends { chat: { completions: { create: (...a: any[]) => any } } }>(client: T): T {
+  const real = client.chat.completions.create.bind(client.chat.completions);
+  const create = async (params: ChatParams & Record<string, unknown>, ...rest: unknown[]) => {
+    const scope = aiScope.getStore();
+    const msgs = scope?.admin && !(params as { stream?: boolean }).stream ? textOnly(params) : null;
+    if (!scope || !msgs || !(await freeAiAvailable())) return real(params, ...rest);
+    const c = await config();
+    const json = params.response_format?.type === "json_object" || params.response_format?.type === "json_schema";
+    const o: FreeAskOpts = { feature: "game_analysis" as AiFeature, maxTokens: params.max_completion_tokens ?? params.max_tokens ?? 4000, json };
+    let lastErr: unknown = null;
+    for (const p of ["gemini", "groq"] as FreeProvider[]) {
+      const conf = c[p];
+      if (!conf) continue;
+      try {
+        const r = p === "gemini" ? await callGemini(conf, msgs, o) : await callGroq(conf, msgs, o);
+        if (!r.text.trim()) throw new Error(`${p} returned nothing`);
+        scope.freeModel = `free:${r.model}`;
+        return {
+          id: `free-${Date.now()}`, object: "chat.completion", created: Math.floor(Date.now() / 1000), model: scope.freeModel,
+          choices: [{ index: 0, finish_reason: "stop", message: { role: "assistant", content: json ? stripFence(r.text) : r.text } }],
+          usage: { prompt_tokens: r.usage.prompt_tokens, completion_tokens: r.usage.completion_tokens, total_tokens: r.usage.prompt_tokens + r.usage.completion_tokens },
+        };
+      } catch (err) {
+        lastErr = err;
+        logger.warn({ provider: p, err: err instanceof Error ? err.message : err }, "[free-ai] admin call failed");
+      }
+    }
+    throw new Error(`Free AI failed (it may be at its daily limit, try again later): ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`);
+  };
+  // Proxies, so everything else on the client keeps working as before.
+  const completions = new Proxy(client.chat.completions, { get: (t, k) => (k === "create" ? create : Reflect.get(t, k)) });
+  const chat = new Proxy(client.chat, { get: (t, k) => (k === "completions" ? completions : Reflect.get(t, k)) });
+  return new Proxy(client, { get: (t, k) => (k === "chat" ? chat : Reflect.get(t, k)) });
+}
+
+// ── Free voices for the Content Studio (admin only) ──────────────────────────
+// Gemini's TTS models and Groq's Orpheus have small free daily limits, so lines
+// are also kept for good in the voiceover cache (routes/tts.ts).
+
+export const FREE_VOICES: { id: string; provider: FreeProvider; voice: string; label: string }[] = [
+  { id: "free:gemini:Puck", provider: "gemini", voice: "Puck", label: "Free · Puck (upbeat)" },
+  { id: "free:gemini:Fenrir", provider: "gemini", voice: "Fenrir", label: "Free · Fenrir (excitable)" },
+  { id: "free:gemini:Charon", provider: "gemini", voice: "Charon", label: "Free · Charon (clear)" },
+  { id: "free:gemini:Kore", provider: "gemini", voice: "Kore", label: "Free · Kore (firm)" },
+  { id: "free:gemini:Leda", provider: "gemini", voice: "Leda", label: "Free · Leda (youthful)" },
+  { id: "free:groq:troy", provider: "groq", voice: "troy", label: "Free · Troy (Groq)" },
+  { id: "free:groq:austin", provider: "groq", voice: "austin", label: "Free · Austin (Groq)" },
+  { id: "free:groq:daniel", provider: "groq", voice: "daniel", label: "Free · Daniel (Groq)" },
+  { id: "free:groq:hannah", provider: "groq", voice: "hannah", label: "Free · Hannah (Groq)" },
+];
+
+export async function freeVoicesAvailable(): Promise<{ id: string; label: string }[]> {
+  const c = await config();
+  return FREE_VOICES.filter((v) => !!c[v.provider]).map(({ id, label }) => ({ id, label }));
+}
+
+function wavFromPcm(pcm: Buffer, rate = 24000, channels = 1, bits = 16): Buffer {
+  const h = Buffer.alloc(44);
+  h.write("RIFF", 0); h.writeUInt32LE(36 + pcm.length, 4); h.write("WAVE", 8);
+  h.write("fmt ", 12); h.writeUInt32LE(16, 16); h.writeUInt16LE(1, 20); h.writeUInt16LE(channels, 22);
+  h.writeUInt32LE(rate, 24); h.writeUInt32LE(rate * channels * bits / 8, 28); h.writeUInt16LE(channels * bits / 8, 32); h.writeUInt16LE(bits, 34);
+  h.write("data", 36); h.writeUInt32LE(pcm.length, 40);
+  return Buffer.concat([h, pcm]);
+}
+
+/** The PCM samples and format of a WAV file (walks the chunks, so any header size works). */
+function readWav(b: Buffer): { pcm: Buffer; rate: number; channels: number; bits: number } {
+  let i = 12, rate = 24000, channels = 1, bits = 16;
+  while (i + 8 <= b.length) {
+    const id = b.toString("ascii", i, i + 4); let size = b.readUInt32LE(i + 4);
+    if (id === "fmt ") { channels = b.readUInt16LE(i + 10); rate = b.readUInt32LE(i + 12); bits = b.readUInt16LE(i + 22); }
+    if (id === "data") { if (size === 0 || size > b.length - i - 8) size = b.length - i - 8; return { pcm: b.subarray(i + 8, i + 8 + size), rate, channels, bits }; }
+    i += 8 + size + (size % 2);
+  }
+  throw new Error("Unreadable audio from the free voice");
+}
+
+/** Pieces of at most `max` characters, split at sentence ends, then commas, then spaces. */
+function chunkText(t: string, max: number): string[] {
+  const out: string[] = [];
+  let rest = t.trim();
+  while (rest.length > max) {
+    const part = rest.slice(0, max);
+    const cut = Math.max(part.lastIndexOf(". "), part.lastIndexOf("! "), part.lastIndexOf("? "), part.lastIndexOf("… "));
+    const at = cut > max * 0.4 ? cut + 1 : Math.max(part.lastIndexOf(", ") + 1, part.lastIndexOf(" "));
+    const n = at > 0 ? at : max;
+    out.push(rest.slice(0, n).trim()); rest = rest.slice(n).trim();
+  }
+  if (rest) out.push(rest);
+  return out;
+}
+
+/** Speaks a line with a free voice; returns a WAV file. Throws when the free limit is used up. */
+export async function speakFree(voiceId: string, text: string, style: string): Promise<Buffer> {
+  const v = FREE_VOICES.find((x) => x.id === voiceId);
+  if (!v) throw new Error("Unknown free voice");
+  const c = (await config())[v.provider];
+  if (!c) throw new Error(`Add a free ${v.provider === "gemini" ? "Gemini" : "Groq"} key in Admin › AI usage to use this voice`);
+  if (v.provider === "gemini") {
+    const models = await listModels("gemini", c.key);
+    const tts = models.filter((m) => /tts/.test(m) && /flash/.test(m)).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))[0] ?? models.find((m) => /tts/.test(m));
+    if (!tts) throw new Error("No Gemini voice model for this key");
+    const r = await fetch(`${GEMINI}/models/${encodeURIComponent(tts)}:generateContent`, {
+      method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": c.key },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: `${style}\n\nSay exactly this, nothing else:\n${text}` }] }],
+        generationConfig: { responseModalities: ["AUDIO"], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: v.voice } } } },
+      }),
+    });
+    if (!r.ok) throw new Error(r.status === 429 ? "the free Gemini voice is at its daily limit (try a Groq voice, or tomorrow)" : `Gemini voice ${r.status}: ${(await r.text().catch(() => "")).slice(0, 200)}`);
+    const d = (await r.json()) as { candidates?: { content?: { parts?: { inlineData?: { data?: string; mimeType?: string } }[] } }[] };
+    const part = d.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data)?.inlineData;
+    if (!part?.data) throw new Error("The free Gemini voice returned no audio");
+    const rate = Number(/rate=(\d+)/.exec(part.mimeType ?? "")?.[1] ?? 24000);
+    return wavFromPcm(Buffer.from(part.data, "base64"), rate);
+  }
+  // Groq Orpheus: up to 200 characters a request, so long lines are spoken in pieces and joined.
+  const pieces: Buffer[] = [];
+  let fmt = { rate: 24000, channels: 1, bits: 16 };
+  for (const t of chunkText(text, 195)) {
+    const r = await fetch(`${GROQ}/audio/speech`, {
+      method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${c.key}` },
+      body: JSON.stringify({ model: "canopylabs/orpheus-v1-english", voice: v.voice, input: t, response_format: "wav" }),
+    });
+    if (!r.ok) throw new Error(r.status === 429 ? "the free Groq voice is at its daily limit (try a Gemini voice, or tomorrow)" : `Groq voice ${r.status}: ${(await r.text().catch(() => "")).slice(0, 200)}`);
+    const w = readWav(Buffer.from(await r.arrayBuffer()));
+    fmt = w; pieces.push(w.pcm);
+  }
+  return wavFromPcm(Buffer.concat(pieces), fmt.rate, fmt.channels, fmt.bits);
 }

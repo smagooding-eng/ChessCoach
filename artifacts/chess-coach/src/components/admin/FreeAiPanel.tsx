@@ -50,8 +50,8 @@ export function FreeAiPanel() {
     <div className="rounded-2xl p-5 mb-4" style={CARD}>
       <h2 className="text-sm font-bold">Free AI for admin work</h2>
       <p className="mt-1 text-xs text-muted-foreground">
-        SEO articles and translations, marketing copy, outreach drafts and searches, and bulk puzzle explanations use these free keys instead of OpenAI.
-        Players' features (game reviews, courses, the coach) are unchanged. If the free limit runs out, those admin jobs pause until the next day instead of spending credits.
+        SEO articles and translations, marketing copy, outreach drafts and searches, bulk puzzle explanations, and anything you run yourself (scout reports, game reviews and courses made in the Content Studio or while signed in as you) use these free keys instead of OpenAI.
+        The Content Studio also gets free voiceover voices (marked “Free” in the voice list). Players' features are unchanged. If a free limit runs out, the job stops with a message instead of spending credits.
       </p>
       <p className="mt-2 text-xs font-bold" style={{ color: anySet ? '#81B64C' : '#F5C542' }}>
         {status ? (anySet ? 'On: admin AI is free.' : 'Off: admin AI still uses OpenAI. Add a key below.') : 'Checking…'}

@@ -2,6 +2,9 @@ import { Router } from "express";
 import OpenAI from "openai";
 import { createHash } from "crypto";
 import { logger } from "../lib/logger";
+import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
+import { aiScope, freeVoicesAvailable, speakFree } from "../lib/freeAi";
 
 const router = Router();
 
@@ -44,9 +47,42 @@ async function speakEleven(text: string, lively = false): Promise<Buffer> {
   return Buffer.from(await r.arrayBuffer());
 }
 
-router.get("/tts/voices", (_req, res) => {
-  res.json({ premium: !!ELEVEN_KEY, best: ELEVEN_KEY ? "premium" : "ash" });
+router.get("/tts/voices", async (_req, res) => {
+  // Free voices (Gemini / Groq keys from Admin › AI usage) are offered to admins only.
+  const free = aiScope.getStore()?.admin ? await freeVoicesAvailable().catch(() => []) : [];
+  res.json({ premium: !!ELEVEN_KEY, best: ELEVEN_KEY ? "premium" : "ash", free });
 });
+
+// Every voiceover line is also kept in the database, so the same line in the same
+// voice is only ever paid for once, even after the server restarts.
+let storeReady: Promise<void> | null = null;
+function ensureStore(): Promise<void> {
+  if (!storeReady) {
+    storeReady = db.execute(sql`CREATE TABLE IF NOT EXISTS tts_audio_cache (k VARCHAR(64) PRIMARY KEY, mime VARCHAR(32) NOT NULL, audio BYTEA NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now(), used_at TIMESTAMPTZ NOT NULL DEFAULT now())`)
+      .then(() => undefined).catch((err) => { storeReady = null; throw err; });
+  }
+  return storeReady;
+}
+async function storeGet(key: string): Promise<Buffer | undefined> {
+  try {
+    await ensureStore();
+    const r = await db.execute(sql`UPDATE tts_audio_cache SET used_at = now() WHERE k = ${key} RETURNING audio`);
+    const row = ((r as unknown as { rows?: { audio: Buffer }[] }).rows ?? [])[0];
+    return row?.audio ? Buffer.from(row.audio) : undefined;
+  } catch { return undefined; }
+}
+let puts = 0;
+async function storePut(key: string, mime: string, buf: Buffer): Promise<void> {
+  try {
+    await ensureStore();
+    await db.execute(sql`INSERT INTO tts_audio_cache (k, mime, audio) VALUES (${key}, ${mime}, ${buf}) ON CONFLICT (k) DO NOTHING`);
+    // Keep it to a sensible size: lines not played for 120 days, and anything past the newest 5,000.
+    if (++puts % 50 === 1) {
+      await db.execute(sql`DELETE FROM tts_audio_cache WHERE used_at < now() - interval '120 days'
+        OR k IN (SELECT k FROM tts_audio_cache ORDER BY used_at DESC OFFSET 5000)`);
+    }
+  } catch (err) { logger.warn({ err: err instanceof Error ? err.message : err }, "[tts] cache save failed"); }
+}
 
 const CACHE_MAX_ENTRIES = 400;
 const CACHE_MAX_BYTES = 24 * 1024 * 1024; // the server has 512MB in all
@@ -116,11 +152,22 @@ router.post("/tts/speak", async (req, res): Promise<void> => {
     const validVoices = ["alloy", "ash", "ballad", "coral", "echo", "fable", "nova", "onyx", "sage", "shimmer", "verse"] as const;
     type Voice = typeof validVoices[number];
     const premium = voice === "premium" && !!ELEVEN_KEY;
+    const freeVoice = typeof voice === "string" && voice.startsWith("free:") ? voice : null;
+    if (freeVoice && !aiScope.getStore()?.admin) { res.status(403).json({ error: "TTS generation failed", reason: "Free voices are for the admin Content Studio" }); return; }
+    const mime = freeVoice ? "audio/wav" : "audio/mpeg";
     // "premium" without a premium key: OpenAI's best narrator.
     const selectedVoice: Voice = validVoices.includes(voice as Voice) ? (voice as Voice) : (studio || voice === "premium") ? "ash" : "nova";
 
-    const key = createHash("sha1").update(`${premium ? "eleven:" + ELEVEN_VOICE : selectedVoice}\u0000${kids ? "kids" : creator ? "creator" : studio ? "studio" : ""}\u0000${trimmed}`).digest("hex");
-    let buffer = cacheGet(key);
+    const key = createHash("sha1").update(`${freeVoice ?? (premium ? "eleven:" + ELEVEN_VOICE : selectedVoice)}\u0000${kids ? "kids" : creator ? "creator" : studio ? "studio" : ""}\u0000${trimmed}`).digest("hex");
+    let buffer = cacheGet(key) ?? await storeGet(key);
+    if (buffer) cachePut(key, buffer);
+    if (!buffer && freeVoice) {
+      // Free voice: no paid fallback, the reason goes back to the Studio.
+      try { buffer = await speakFree(freeVoice, trimmed, kids ? KIDS_STYLE : creator ? CREATOR_STYLE : studio ? STUDIO_STYLE : NARRATION_STYLE); }
+      catch (err) { res.status(502).json({ error: "TTS generation failed", reason: (err as Error)?.message ?? "free voice failed" }); return; }
+      cachePut(key, buffer);
+      void storePut(key, mime, buffer);
+    }
     if (!buffer) {
       try {
         if (premium) {
@@ -136,10 +183,11 @@ router.post("/tts/speak", async (req, res): Promise<void> => {
         return;
       }
       cachePut(key, buffer);
+      void storePut(key, mime, buffer);
     }
 
     res.set({
-      "Content-Type": "audio/mpeg",
+      "Content-Type": mime,
       "Content-Length": buffer.length.toString(),
       "Cache-Control": "public, max-age=86400",
     });

@@ -1,3 +1,4 @@
+import { freeModelInScope } from "./freeAi";
 import { db, aiUsageEventsTable } from "@workspace/db";
 
 // Fixed slugs, not free-text, so the admin breakdown groups cleanly
@@ -73,7 +74,8 @@ export async function trackAiUsage(params: {
     await db.insert(aiUsageEventsTable).values({
       userId: params.userId ?? null,
       feature: params.feature,
-      model: params.model,
+      // A call the admin scope sent to the free AI: log the free model, not the OpenAI one asked for.
+      model: /^gpt-5\.6-(luna|terra)$/.test(params.model) && freeModelInScope() ? freeModelInScope()! : params.model,
       promptTokens,
       completionTokens,
       totalTokens,

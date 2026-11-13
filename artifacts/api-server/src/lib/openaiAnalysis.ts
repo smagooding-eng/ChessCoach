@@ -14,10 +14,13 @@ import {
   type EngineFacts,
 } from "./engineFacts";
 import { trackAiUsage, AI_FEATURES } from "./aiUsageTracker";
+import { adminFreeRouted } from "./freeAi";
 
-const openai = new OpenAI({
+// Calls made for an admin (and the jobs an admin starts) go to the free AI when a
+// free key is set (lib/freeAi); everyone else's go to OpenAI as before.
+const openai = adminFreeRouted(new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-});
+}));
 
 interface GameSummary {
   pgn: string;

@@ -13,6 +13,7 @@ import { RenderMp4 } from './RenderMp4';
 import { StudioMusic, MUSIC_STYLES, bpmOf, type MusicStyle } from './studioMusic';
 import { mapTree, findEpisode, nextEpisode, partLabel, type MapEpisode } from './openingMap';
 import { reelFrameSize, EngagePicker, useBackToClose } from './reelKit';
+import { useFreeVoices } from './freeVoices';
 
 // Content Studio player: a game moment or a trap lesson as a 9:16 clip for
 // TikTok, Reels and Shorts. The clip is a script of frames: an intro with the
@@ -1836,6 +1837,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   useEffect(() => { if (blank && playing && blankDone.current) setBlank(false); }, [blank, playing]);
   // The premium narrator (ElevenLabs) when the server has it; it becomes the default once.
   const [premiumVoice, setPremiumVoice] = useState(false);
+  const freeVoices = useFreeVoices();
   useEffect(() => {
     apiFetch('/api/tts/voices').then((r) => (r.ok ? r.json() : null)).then((d) => {
       if (!d?.premium) return;
@@ -3390,6 +3392,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
               <select value={prefs.voiceName} onChange={(e) => set('voiceName', e.target.value)} className="rounded-lg bg-white/5 px-2 py-1 text-[12px] text-white ring-1 ring-white/10">
                 {premiumVoice && <option value="premium">Premium narrator</option>}
                 {['ash', 'ballad', 'verse', 'coral', 'sage', 'onyx', 'nova', 'echo', 'fable', 'alloy', 'shimmer'].map((v) => <option key={v} value={v}>{v[0].toUpperCase() + v.slice(1)}{v === 'ash' ? ' (recommended)' : ''}</option>)}
+                {freeVoices.map((v) => <option key={v.id} value={v.id}>{v.label}</option>)}
               </select>
             )}
             {prefs.voice && <Mic size={14} className="text-[#B8E08C]" />}

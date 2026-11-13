@@ -6,6 +6,8 @@ import router from "./routes";
 import sitemapRouter from "./routes/sitemap";
 import { logger } from "./lib/logger";
 import { authMiddleware } from "./middlewares/authMiddleware";
+import { aiScope } from "./lib/freeAi";
+import { ADMIN_EMAILS } from "./lib/auth";
 import { WebhookHandlers } from "./lib/webhookHandlers";
 import { analytics } from "@heycatch/sdk";
 import { getStripeSecretKey } from "./lib/stripeClient";
@@ -132,6 +134,13 @@ app.use(cookieParser());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(authMiddleware);
+// Admin requests (and the jobs they start) use the free AI for text when a free key is set (lib/freeAi).
+app.use((req, _res, next) => {
+  const u = req.user as { isAdmin?: boolean; email?: string | null } | undefined;
+  const admin = !!u && (!!u.isAdmin || ADMIN_EMAILS.includes(u.email?.toLowerCase?.() ?? ""));
+  if (!admin) { next(); return; }
+  aiScope.run({ admin: true }, next);
+});
 
 // Mounted at root, not under /api -- needs to be reachable at exactly
 // /sitemap.xml so a Vercel rewrite can proxy chessscout.net/sitemap.xml

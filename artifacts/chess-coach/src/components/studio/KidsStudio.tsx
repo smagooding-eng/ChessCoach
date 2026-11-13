@@ -12,6 +12,7 @@ import { KID_FONT, INK, useKidFont } from '@/components/kids/KidsChrome';
 import { StudioMusic } from './studioMusic';
 import { kidsScript, type KidsVideo, type KidsScene } from './kidsVideos';
 import { reelFrameSize, useBackToClose } from './reelKit';
+import { useFreeVoices } from './freeVoices';
 
 const VOICES = [{ id: 'nova', label: 'Nova (warm)' }, { id: 'coral', label: 'Coral (bright)' }, { id: 'shimmer', label: 'Shimmer (soft)' }, { id: 'fable', label: 'Fable (storyteller)' }];
 const PREF = 'cs_kids_studio';
@@ -58,6 +59,7 @@ export function KidsStudio({ video, onClose }: { video: KidsVideo; onClose: () =
   const urls = useRef(new Map<string, { url: string; len: number }>());
   const [prep, setPrep] = useState<{ done: number; total: number; failed: number } | null>(null);
   const vkey = (t: string) => `${prefs.voiceName}|${t}`;
+  const freeVoices = useFreeVoices();
   useEffect(() => {
     if (!prefs.voice) { setPrep(null); return; }
     let live = true;
@@ -287,6 +289,7 @@ export function KidsStudio({ video, onClose }: { video: KidsVideo; onClose: () =
             <label className="flex items-center gap-2"><input type="checkbox" checked={prefs.music} onChange={(e) => { set('music', e.target.checked); if (!e.target.checked) mus().stop(); else if (playing) mus().start('playful'); }} />Playful music</label>
             <select value={prefs.voiceName} onChange={(e) => set('voiceName', e.target.value)} className="col-span-2 rounded-lg bg-white/10 px-2 py-1.5">
               {VOICES.map((v) => <option key={v.id} value={v.id} className="text-black">{v.label}</option>)}
+              {freeVoices.map((v) => <option key={v.id} value={v.id} className="text-black">{v.label}</option>)}
             </select>
           </div>
           <div className="rounded-xl bg-white/5 p-3">
