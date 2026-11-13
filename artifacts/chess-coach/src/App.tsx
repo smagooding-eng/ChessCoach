@@ -1,4 +1,5 @@
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { gameState } from '@/lib/gameBusy';
 import { isRunningStandalone } from '@/hooks/use-pwa-install';
 import { isInPlayApp } from '@/lib/playApp';
 import { pathLang } from "@/lib/i18n";
@@ -444,7 +445,8 @@ function ReleaseWatcher() {
   const stale = useRef(false);
   const where = useRef(location);
   where.current = location;
-  const safe = () => !GAME_PAGE.test(where.current);
+  // Safe to reload: not on a game page, or on one that says no game is being played.
+  const safe = () => !GAME_PAGE.test(where.current) || gameState() === 'idle';
   useEffect(() => {
     const el = document.querySelector('script[type="module"][src*="/assets/index-"]') as HTMLScriptElement | null;
     const mine = el ? new URL(el.src).pathname : null;
@@ -465,11 +467,18 @@ function ReleaseWatcher() {
     const t = setInterval(() => void check(false), 10 * 60_000);
     return () => { document.removeEventListener('visibilitychange', onVis); clearInterval(t); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  // Moving to another page: a good moment to pick up the new release.
+  // Moving to another page: a good moment to pick up the new release. Leaving a finished
+  // game for the Live or Lichess lobby (New game) counts too: the search starts again
+  // from the same link after the reload.
   const first = useRef(true);
+  const prev = useRef(location);
   useEffect(() => {
+    const from = prev.current; prev.current = location;
     if (first.current) { first.current = false; return; }
-    if (stale.current && safe()) window.location.reload();
+    if (!stale.current) return;
+    const lobby = /^\/(live|lichess)\/?$/.test(location.split('?')[0]);
+    const leftIdleGame = GAME_PAGE.test(from) && gameState() === 'idle';
+    if (!GAME_PAGE.test(location) || (lobby && leftIdleGame)) window.location.reload();
   }, [location]); // eslint-disable-line react-hooks/exhaustive-deps
   return null;
 }

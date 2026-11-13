@@ -2,6 +2,7 @@
 // people here when nobody's on ChessScout (/lichess?seek=10+0&rated=0), or they
 // can open it themselves. Finished games are saved into their ChessScout games
 // for review. See lib/lichessBoard.ts for how it talks to Lichess.
+import { useGameBusy } from '@/lib/gameBusy';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Chess } from 'chess.js';
@@ -257,6 +258,7 @@ export function LichessPlay() {
   const myColor: 'w' | 'b' = full && full.black.id === me ? 'b' : 'w';
   const pos = useMemo(() => (full && st ? fromUci(full.initialFen, st.moves) : null), [full, st]);
   const plies = st ? st.moves.split(' ').filter(Boolean).length : 0;
+  useGameBusy(phase === 'playing');
   const myTurn = !!pos && phase === 'playing' && pos.chess.turn() === myColor && st?.status === 'started';
   const [pending, setPending] = useState<{ fen: string; last: { from: string; to: string } } | null>(null);
   useEffect(() => { setPending(null); }, [st?.moves]);

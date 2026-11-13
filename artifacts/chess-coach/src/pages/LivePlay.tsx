@@ -1,3 +1,4 @@
+import { useGameBusy } from '@/lib/gameBusy';
 import React, { useEffect, useRef, useState } from 'react';
 import { announceChallengeSent } from '@/lib/challengeSent';
 import { useLivePlay, type LiveMode } from '@/hooks/use-live-play';
@@ -46,6 +47,8 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
   const dailyRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if ((readTab() ?? initialTab) === 'daily') setTimeout(() => dailyRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 600); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const live = useLivePlay();
+  // A new release may load in the lobby or after a game, never during one.
+  useGameBusy(!!live.game && (live.game.status === 'active' || live.status === 'in_game'));
   const [, navigate] = useLocation();
   const [lichess, setLichess] = useState(lichessAuth);
   useEffect(() => {
