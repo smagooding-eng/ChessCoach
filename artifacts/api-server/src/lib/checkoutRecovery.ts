@@ -3,7 +3,7 @@
 // The in-page checkout creates an "incomplete" Stripe subscription as soon as
 // someone picks a plan; it only becomes real when they pay. For people who
 // opened checkout and never paid:
-//   checkout_recovery     ~2h after the abandoned checkout (within 7 days):
+//   checkout_recovery     ~1h after the abandoned checkout (within 7 days):
 //                         "finish going Pro", linking straight back to the
 //                         same plan's payment form.
 //   checkout_trial_offer  48h after that email, if they still haven't paid:
@@ -97,7 +97,7 @@ async function sendFinishCheckoutEmails() {
     FROM users u
     JOIN stripe.subscriptions s ON s.customer = u.stripe_customer_id
     WHERE s.status IN ('incomplete','incomplete_expired')
-      AND to_timestamp(s.created) <= now() - interval '2 hours'
+      AND to_timestamp(s.created) <= now() - interval '1 hour'
       AND to_timestamp(s.created) >= now() - interval '7 days'
       AND s.livemode IS NOT FALSE
       AND u.email IS NOT NULL AND u.email_opt_out = false AND u.is_premium_override = false

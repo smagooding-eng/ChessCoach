@@ -23,6 +23,13 @@ export function startGrowthScheduler() {
     await runEmailDrips();
   });
 
+  // Unfinished Pro checkouts: checked every 15 minutes so the "your checkout is
+  // still open" email lands about an hour after someone leaves, while they still care.
+  cron.schedule('*/15 * * * *', async () => {
+    await import('./checkoutRecovery').then(({ runCheckoutRecovery }) => runCheckoutRecovery())
+      .catch((err: unknown) => logger.error({ error: err instanceof Error ? err.message : 'Unknown' }, '[growth] Checkout recovery error'));
+  });
+
   // Push reminders once a day at 18:00 UTC (2pm New York, 11am California,
   // 7pm London) so nobody's phone buzzes in the middle of the night.
   cron.schedule('0 18 * * *', async () => {
@@ -120,16 +127,19 @@ async function runAutoReviewTick() {
 }
 
 async function runEmailDrips() {
-  try {
-    await sendTrialExpiryReminders();
-    await sendWinBackEmails();
-    await sendUnreviewedGamesReminder();
-    await sendEngagedUpgradeEmails();
-    await sendRaffleCountdownEmails();
-    await import('./checkoutRecovery').then(({ runCheckoutRecovery }) => runCheckoutRecovery());
-    await import('./firstReviewEmail').then(({ runFirstReviewEmails }) => runFirstReviewEmails());
-  } catch (err: unknown) {
-    logger.error({ error: err instanceof Error ? err.message : 'Unknown' }, '[growth] Drip error');
+  // Each drip on its own: one failing must not stop the others.
+  const drips: [string, () => Promise<unknown>][] = [
+    ['trial-expiry', sendTrialExpiryReminders],
+    ['win-back', sendWinBackEmails],
+    ['unreviewed-games', sendUnreviewedGamesReminder],
+    ['engaged-upgrade', sendEngagedUpgradeEmails],
+    ['raffle-countdown', sendRaffleCountdownEmails],
+    ['first-review', () => import('./firstReviewEmail').then(({ runFirstReviewEmails }) => runFirstReviewEmails())],
+  ];
+  for (const [name, run] of drips) {
+    try { await run(); } catch (err: unknown) {
+      logger.error({ drip: name, error: err instanceof Error ? err.message : 'Unknown' }, '[growth] Drip error');
+    }
   }
 }
 

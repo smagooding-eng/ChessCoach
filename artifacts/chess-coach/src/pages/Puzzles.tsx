@@ -129,6 +129,8 @@ export function Puzzles() {
   const [game, setGame] = useState<Chess | null>(null);
   const [solutionMoves, setSolutionMoves] = useState<string[]>([]);
   const [currentMoveIndex, setCurrentMoveIndex] = useState(0);
+  // Puzzles solved since opening the page: after three it is a good moment to ask "where did you find us?".
+  const [solvedHere, setSolvedHere] = useState(0);
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
   const [feedback, setFeedback] = useState<'correct' | 'wrong' | null>(null);
   const [showHint, setShowHint] = useState(false);
@@ -168,6 +170,8 @@ export function Puzzles() {
   // Lichess's puzzle of the day (added to ChessScout's puzzles), shown as a card at the top.
   const [lichessDaily, setLichessDaily] = useState<{ id: number; rating: number } | null>(null);
   const wantPuzzle = useRef<number | null>(null);
+  useEffect(() => { if (state === 'correct') setSolvedHere((n) => n + 1); }, [state]);
+
   useEffect(() => {
     let live = true;
     apiFetch('/api/lichess/daily-puzzle').then((r) => (r.ok ? r.json() : null)).then((d) => { if (live && d?.available && d.id) setLichessDaily({ id: d.id, rating: d.rating }); }).catch(() => {});
@@ -974,6 +978,9 @@ export function Puzzles() {
                   )}
                 </div>
 
+                {state === 'correct' && solvedHere >= 3 && !(stats && stats.streak >= 3) && (
+                  <div className="mt-4"><RatePlayCard moment={`${solvedHere} solved!`} /></div>
+                )}
                 {state === 'correct' && (
                   <div className="mt-4 rounded-xl p-4" style={{ background: BG_CARD, border: '1px solid rgba(129,182,76,0.2)' }}>
                     <div className="flex items-center gap-2 mb-2">

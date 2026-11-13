@@ -36,6 +36,21 @@ export function PlayNow() {
   const { isAuthenticated, isAuthLoading } = useUser();
   const [, navigate] = useLocation();
   const saved0 = useMemo(load, []);
+  // Came from someone's challenge link: play here first, then sign up and go
+  // straight to their challenge (Welcome/Layout pick up the pending code).
+  const fromChallenge = useMemo(() => {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      const code = (q.get('challenge') || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 24);
+      const vs = (q.get('vs') || '').slice(0, 40);
+      return code ? { code, vs: vs || 'your friend' } : null;
+    } catch { return null; }
+  }, []);
+  // After signing up: back here so the game is saved, or (from a challenge) to that challenge.
+  const comeBack = () => {
+    if (!fromChallenge) { rememberReturnTo('/play-now'); return; }
+    try { localStorage.setItem('cs_pending_challenge', fromChallenge.code); } catch { /* ignore */ }
+  };
   const [bot, setBot] = useState<BotConfig>(() => GUEST_BOTS.find((b) => b.name === saved0?.bot) ?? GUEST_BOTS[1] ?? GUEST_BOTS[0]);
   const [color, setColor] = useState<'w' | 'b'>(saved0?.color ?? 'w');
   const chessRef = useRef(new Chess());
@@ -104,12 +119,11 @@ export function PlayNow() {
   }, [isAuthenticated, isAuthLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const signUp = () => {
-    // Come back here after signing up, so the game gets saved.
-    rememberReturnTo('/play-now');
+    comeBack();
     trackFunnelEvent('signup_clicked');
     startGoogleSignup();
   };
-  const emailHref = () => { rememberReturnTo('/play-now'); return `${import.meta.env.BASE_URL}setup?signup=email`; };
+  const emailHref = () => { if (!fromChallenge) rememberReturnTo('/play-now'); return `${import.meta.env.BASE_URL}setup?signup=email`; };
 
   const subtitle = chess.isCheckmate() ? 'by checkmate' : chess.isStalemate() ? 'by stalemate' : chess.isThreefoldRepetition() ? 'by repetition' : chess.isInsufficientMaterial() ? 'not enough pieces to mate' : result === 'loss' ? 'You resigned' : undefined;
 
@@ -121,8 +135,8 @@ export function PlayNow() {
           <span className="text-[19px] font-extrabold" style={{ color: PT.text }}>Chess<span style={{ color: PT.green }}>Scout</span>.net</span>
         </Link>
         <div className="text-center">
-          <p className="text-[22px] font-black leading-tight" style={{ color: PT.text }}>Play a game right now</p>
-          <p className="mt-1 text-[13.5px]" style={{ color: PT.muted }}>No account needed. Pick a bot and make your move.</p>
+          <p className="text-[22px] font-black leading-tight" style={{ color: PT.text }}>{fromChallenge ? `Warm up, then play ${fromChallenge.vs}` : 'Play a game right now'}</p>
+          <p className="mt-1 text-[13.5px]" style={{ color: PT.muted }}>{fromChallenge ? `No account needed. Play a bot now, then sign up free to take on ${fromChallenge.vs}.` : 'No account needed. Pick a bot and make your move.'}</p>
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-2">
@@ -146,7 +160,7 @@ export function PlayNow() {
             boardOverlay={result !== 'playing' ? (
               <GameOverOverlay gameKey={key} outcome={result === 'win' ? 'win' : result === 'loss' ? 'loss' : 'draw'} yourColor={color === 'w' ? 'white' : 'black'} subtitle={subtitle}
                 actions={!isAuthenticated ? (
-                  <OverlayButton primary onClick={signUp}><Sparkles size={15} /> Get this game reviewed free</OverlayButton>
+                  <OverlayButton primary onClick={signUp}><Sparkles size={15} /> {fromChallenge ? `Now play ${fromChallenge.vs}: sign up free` : 'Get this game reviewed free'}</OverlayButton>
                 ) : (
                   <OverlayButton primary onClick={() => newGame(color === 'w' ? 'b' : 'w')}><RotateCcw size={15} /> Play again</OverlayButton>
                 )} />
@@ -165,17 +179,17 @@ export function PlayNow() {
         {/* The free account: always here under the board, never in the way. */}
         {!isAuthenticated && !isAuthLoading && (
           <div className="space-y-2.5 p-5" style={cardStyle}>
-            <p className="text-[16px] font-black" style={{ color: PT.text }}>{result === 'playing' ? 'Like it? Keep every game.' : 'See where this game was won or lost'}</p>
-            <p className="text-[13px]" style={{ color: PT.muted }}>A free account reviews your games move by move, finds the mistakes you keep making, and lets you play friends live or one move a day. {moves >= 2 ? 'This game is saved to it.' : ''}</p>
+            <p className="text-[16px] font-black" style={{ color: PT.text }}>{fromChallenge ? `Ready to play ${fromChallenge.vs}?` : result === 'playing' ? 'Like it? Keep every game.' : 'See where this game was won or lost'}</p>
+            <p className="text-[13px]" style={{ color: PT.muted }}>A free account reviews your games move by move, finds the mistakes you keep making, and lets you play friends live or one move a day. {fromChallenge ? `Sign up and you go straight to ${fromChallenge.vs}'s challenge.` : moves >= 2 ? 'This game is saved to it.' : ''}</p>
             <button type="button" onClick={signUp} className="flex w-full items-center justify-center gap-3 rounded-[14px] py-3.5 text-[15px] font-extrabold" style={{ background: '#FFFFFF', color: '#1F1F1F' }}>
               <GoogleMark /> Continue with Google
             </button>
-            <button type="button" onClick={() => { rememberReturnTo('/play-now'); trackFunnelEvent('signup_clicked'); trackFunnelEvent('lichess_oauth_clicked'); startLichessSignIn(); }}
+            <button type="button" onClick={() => { comeBack(); trackFunnelEvent('signup_clicked'); trackFunnelEvent('lichess_oauth_clicked'); startLichessSignIn(); }}
               className="flex w-full items-center justify-center gap-3 rounded-[14px] py-3.5 text-[15px] font-extrabold"
               style={{ background: '#262421', color: '#FFFFFF', border: '1px solid rgba(255,255,255,.14)' }}>
               <span aria-hidden="true" className="text-[1.25em] leading-none">♞</span> Continue with Lichess
             </button>
-            <a href={emailHref()} onClick={() => rememberReturnTo('/play-now')} className="flex w-full items-center justify-center gap-2 rounded-[14px] py-3 text-[13.5px] font-bold" style={ghostBtn}>
+            <a href={emailHref()} onClick={() => { comeBack(); }} className="flex w-full items-center justify-center gap-2 rounded-[14px] py-3 text-[13.5px] font-bold" style={ghostBtn}>
               <Mail size={15} /> Use email instead
             </a>
             <p className="text-center text-[11.5px]" style={{ color: PT.muted }}>Free, no credit card.</p>

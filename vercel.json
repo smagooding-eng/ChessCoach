@@ -5,6 +5,26 @@
   "framework": null,
   "redirects": [
     {
+      "source": "/ig",
+      "destination": "/?utm_source=instagram&utm_medium=bio&utm_campaign=bio_link",
+      "permanent": false
+    },
+    {
+      "source": "/tt",
+      "destination": "/?utm_source=tiktok&utm_medium=bio&utm_campaign=bio_link",
+      "permanent": false
+    },
+    {
+      "source": "/yt",
+      "destination": "/?utm_source=youtube&utm_medium=bio&utm_campaign=bio_link",
+      "permanent": false
+    },
+    {
+      "source": "/fb",
+      "destination": "/?utm_source=facebook&utm_medium=bio&utm_campaign=bio_link",
+      "permanent": false
+    },
+    {
       "source": "/blog/:slug",
       "destination": "/learn/:slug",
       "permanent": true

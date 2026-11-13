@@ -257,9 +257,12 @@ export function Challenge() {
           </div>
         )}
         {!isAuthenticated && !isAuthLoading && ch && !isCreator && (
-          <Link href="/play-now" className="block rounded-xl py-3 text-center text-[14px] font-extrabold" style={ghostBtn}>
-            Or play a bot right now, no account needed
-          </Link>
+          <div className="space-y-1.5">
+            <Link href={`/play-now?challenge=${ch.code}&vs=${encodeURIComponent(ch.creatorUsername)}`} className="block rounded-xl py-3.5 text-center text-[15px] font-extrabold" style={greenBtn}>
+              Play now as a guest
+            </Link>
+            <p className="text-center text-[12px]" style={{ color: PT.muted }}>No account needed. Warm up against a bot, then sign up free to play {ch.creatorUsername}.</p>
+          </div>
         )}
         {!isAuthenticated && !isAuthLoading && ch && !isCreator && (
           <div className="px-2 text-center text-[12.5px] leading-relaxed" style={{ color: PT.muted }}>

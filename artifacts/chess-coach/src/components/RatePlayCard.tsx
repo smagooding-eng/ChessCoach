@@ -32,11 +32,18 @@ function snoozed(key: string, ms: number, done: string): boolean {
 const save = (key: string, v: string) => { try { localStorage.setItem(key, v); } catch { /* ignore */ } };
 
 export function RatePlayCard({ moment = 'Nice one!' }: { moment?: string }) {
-  const { isAuthenticated } = useUser();
+  const { isAuthenticated, isAuthLoading } = useUser();
   const [rate, setRate] = useState(() => isInPlayApp() && !snoozed(RATE_KEY, RATE_SNOOZE_MS, 'rated'));
-  // null = still checking whether this account has answered.
-  const [ask, setAsk] = useState<boolean | null>(() => (isAuthenticated && !snoozed(ASK_KEY, ASK_SNOOZE_MS, 'done') ? null : false));
+  // undefined = waiting for sign-in to load; null = checking whether this account has answered.
+  const [ask, setAsk] = useState<boolean | null | undefined>(undefined);
   const [thanks, setThanks] = useState(false);
+
+  // Decide once sign-in has loaded (deciding on first render missed everyone
+  // whose session was still loading, so the question never showed).
+  useEffect(() => {
+    if (ask !== undefined || isAuthLoading) return;
+    setAsk(isAuthenticated && !snoozed(ASK_KEY, ASK_SNOOZE_MS, 'done') ? null : false);
+  }, [ask, isAuthLoading, isAuthenticated]);
 
   useEffect(() => {
     if (ask !== null) return;
