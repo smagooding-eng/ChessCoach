@@ -19,7 +19,7 @@ import { ChatBubble, ChatTray, useChatMuted } from '@/components/play/LiveChat';
 import { NotifyPrompt } from '@/components/play/NotifyPrompt';
 import type { LiveChat } from '@/hooks/use-live-play';
 import {
-  lichessAuth, connectLichess, disconnectLichess, syncLichessAuth, seek as lichessSeek, streamEvents, streamGame, playMove, resign, abort, draw, claimVictory,
+  lichessAuth, connectLichess, disconnectLichess, myLichessRating, syncLichessAuth, seek as lichessSeek, streamEvents, streamGame, playMove, resign, abort, draw, claimVictory,
   nowPlaying, isDaily, exportPgn, lichessChallengeLink, sendChat, chatHistory, isOver, LICHESS_STATUS_TEXT, type LichessGameFull, type LichessState, type LichessPlayer,
 } from '@/lib/lichessBoard';
 
@@ -325,27 +325,37 @@ export function LichessPlay() {
   }, [gameId, auth, authUser?.lichessUsername, refreshAuth]);
   useEffect(() => { if (phase === 'over' && saving === 'idle' && plies >= 4 && st?.status !== 'aborted') void saveGame(); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Rated game over: ask Lichess how each rating moved (the game itself only carries the
-  // ratings from the start). Lichess can take a moment to settle it, so try a few times.
+  // Rated game over: how did the ratings move? The game itself only carries the ratings
+  // from the start. Your account rating updates the moment the game ends, so read that;
+  // Lichess's game export (which also has the opponent's change) can lag up to a minute.
   const [diffs, setDiffs] = useState<{ w?: number; b?: number } | null>(null);
   useEffect(() => {
     setDiffs(null);
     if (phase !== 'over' || !gameId || !full?.rated) return;
+    const mine = myColor === 'w' ? 'w' : 'b';
+    const start = (mine === 'w' ? full.white : full.black)?.rating;
+    const speed = full.speed ?? 'rapid';
     let gone = false;
     void (async () => {
-      for (let k = 0; k < 5 && !gone; k++) {
-        await new Promise((r) => setTimeout(r, k ? 2000 : 800));
+      let got: { w?: number; b?: number } = {};
+      for (let k = 0; k < 40 && !gone; k++) {
+        await new Promise((r) => setTimeout(r, k ? 2500 : 600));
+        if (got[mine] === undefined && start) {
+          const now = await myLichessRating(speed).catch(() => null);
+          if (now && now.rating !== start) { got = { ...got, [mine]: now.rating - start }; if (!gone) setDiffs({ ...got }); }
+        }
         try {
           const r = await fetch(`https://lichess.org/game/export/${encodeURIComponent(gameId)}?moves=false&clocks=false&evals=false&opening=false`, { headers: { Accept: 'application/json' } });
-          if (!r.ok) continue;
-          const d = (await r.json()) as { players?: { white?: { ratingDiff?: number }; black?: { ratingDiff?: number } } };
-          const w = d.players?.white?.ratingDiff, b = d.players?.black?.ratingDiff;
-          if (typeof w === 'number' || typeof b === 'number') { if (!gone) setDiffs({ w, b }); return; }
+          if (r.ok) {
+            const d = (await r.json()) as { players?: { white?: { ratingDiff?: number }; black?: { ratingDiff?: number } } };
+            const w = d.players?.white?.ratingDiff, b = d.players?.black?.ratingDiff;
+            if (typeof w === 'number' || typeof b === 'number') { if (!gone) setDiffs({ w, b }); return; }
+          }
         } catch { /* try again */ }
       }
     })();
     return () => { gone = true; };
-  }, [phase, gameId, full?.rated]);
+  }, [phase, gameId, full?.rated]); // eslint-disable-line react-hooks/exhaustive-deps
   const myDiff = diffs ? (myColor === 'w' ? diffs.w : diffs.b) : undefined;
   const myStart = (myColor === 'w' ? full?.white : full?.black)?.rating;
   const ratingLine = phase !== 'over' || !full ? null

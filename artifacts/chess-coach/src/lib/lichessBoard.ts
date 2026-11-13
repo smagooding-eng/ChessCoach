@@ -254,6 +254,15 @@ export async function alsoSeekDailyOnLichess(tc: string, mode: 'casual' | 'ranke
 }
 
 /** The finished game's PGN, from Lichess. */
+/** Your current Lichess rating in one speed (rapid, classical…), straight from your account. */
+export async function myLichessRating(speed: string): Promise<{ rating: number; games: number } | null> {
+  const r = await call('/api/account').catch(() => null);
+  if (!r?.ok) return null;
+  const d = (await r.json().catch(() => null)) as { perfs?: Record<string, { rating?: number; games?: number }> } | null;
+  const p = d?.perfs?.[speed];
+  return p && typeof p.rating === 'number' ? { rating: p.rating, games: p.games ?? 0 } : null;
+}
+
 export async function exportPgn(id: string): Promise<string | null> {
   const r = await fetch(`${LICHESS}/game/export/${id}?clocks=true&evals=false&opening=true`, { headers: { Accept: 'application/x-chess-pgn' } }).catch(() => null);
   if (!r?.ok) return null;
