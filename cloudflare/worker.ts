@@ -176,7 +176,20 @@ export default {
 
     // The functions Vercel ran under /api
     if (path === '/api/geo') return runVercel(geo, request, {}, url.pathname + url.search);
-    if (path === '/api/stripe/products') return request.method === 'GET' ? stripeProducts(env) : new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
+    if (path === '/api/stripe/products') {
+      if (request.method !== 'GET') return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
+      // Straight from Stripe when the Worker has a key that can read products/prices;
+      // otherwise (no key, wrong permissions, Stripe hiccup) the API server's own copy,
+      // which also falls back to its saved list. Plans must never fail to show.
+      const direct = await stripeProducts(env).catch(() => null);
+      if (direct?.ok) {
+        const body = await direct.clone().json().catch(() => null) as { data?: unknown[] } | null;
+        if (body?.data?.length) return direct;
+      }
+      const viaApi = await fetch(new URL('/api/stripe/products', env.API_URL || RENDER).toString(), { headers: { Accept: 'application/json' } }).catch(() => null);
+      if (viaApi) return new Response(viaApi.body, { status: viaApi.status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+      return direct ?? new Response(JSON.stringify({ error: 'Failed to list products' }), { status: 502, headers: { 'Content-Type': 'application/json' } });
+    }
     if (path === '/api/og' || path === '/api/page' || path === '/api/sitemap') {
       const q = Object.fromEntries(url.searchParams);
       return cached(request, ctx, () => runVercel(FNS[path.slice(5) as 'og' | 'page' | 'sitemap'], request, q, url.pathname + url.search));
