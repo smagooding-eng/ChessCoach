@@ -14,6 +14,9 @@ import geo from '../api/geo';
 import og from '../api/og';
 import page from '../api/page';
 import sitemap from '../api/sitemap';
+// The Android app's link to this site (served by the Worker itself, so it can't go
+// missing even if the folder starting with a dot isn't uploaded with the files).
+import assetlinks from '../artifacts/chess-coach/public/.well-known/assetlinks.json';
 
 interface Env {
   ASSETS: { fetch: (req: Request) => Promise<Response> };
@@ -166,6 +169,10 @@ export default {
     assets = env.ASSETS;
     const url = new URL(request.url);
     const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, '') : url.pathname;
+
+    if (path === '/.well-known/assetlinks.json') {
+      return new Response(JSON.stringify(assetlinks), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600' } });
+    }
 
     // The functions Vercel ran under /api
     if (path === '/api/geo') return runVercel(geo, request, {}, url.pathname + url.search);
