@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { setLichessOwner, forgetLichessOnDevice } from '@/lib/lichessBoard';
 import { appFlagFromSignin } from '@/lib/playApp';
 import { analytics } from '@heycatch/sdk';
 import { apiFetch, setAuthToken, getAuthToken } from '@/lib/api';
@@ -213,12 +214,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       await apiFetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
     } catch {}
     analytics.resetIdentity();
+    forgetLichessOnDevice();
     setAuthToken(null);
     localStorage.removeItem('chessCoachUsername');
     setUsername(null);
     setAuthUser(null);
     setSubscription({ status: 'none', subscription: null });
   }, []);
+
+  // The device's Lichess connection is shown only to the account that made it
+  // (set here, before any page reads it). Signed out or still loading: nobody's.
+  setLichessOwner(authUser ? { id: authUser.id, lichessUsername: authUser.lichessUsername } : null);
 
   const isPremium = !!authUser?.isAdmin || subscription.status === 'active' || subscription.status === 'trialing' || subscription.status === 'free_trial';
 

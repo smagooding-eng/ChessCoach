@@ -16,9 +16,19 @@ const CLIENT_ID = 'chessscout.net';
 const TOKEN_KEY = 'cs_lichess_token';
 const PKCE_KEY = 'cs_lichess_pkce';
 
-export interface LichessAuth { token: string; username: string; expiresAt: number | null }
+/** `owner`: the ChessScout account that connected it. A Lichess connection on a
+ *  device belongs to one account, so someone else signed in on the same phone never
+ *  sees (or uses) it. */
+export interface LichessAuth { token: string; username: string; expiresAt: number | null; owner?: string }
 
-export function lichessAuth(): LichessAuth | null {
+// Who's signed in to ChessScout right now (set by UserContext before pages render).
+// undefined = not known yet; null = signed out.
+let signedIn: { id: string; lichessUsername: string | null } | null | undefined;
+export function setLichessOwner(user: { id: string; lichessUsername?: string | null } | null): void {
+  signedIn = user ? { id: user.id, lichessUsername: user.lichessUsername ?? null } : null;
+}
+
+function readStored(): LichessAuth | null {
   try {
     const a = JSON.parse(localStorage.getItem(TOKEN_KEY) || 'null') as LichessAuth | null;
     if (!a?.token) return null;
@@ -26,7 +36,27 @@ export function lichessAuth(): LichessAuth | null {
     return a;
   } catch { return null; }
 }
+
+export function lichessAuth(): LichessAuth | null {
+  const a = readStored();
+  if (!a || !signedIn) return null;
+  if (a.owner) return a.owner === signedIn.id ? a : null;
+  // Saved before connections had an owner: it belongs to this account only if this
+  // account is linked to the same Lichess username. Then it's claimed for good.
+  if (signedIn.lichessUsername && signedIn.lichessUsername.toLowerCase() === a.username.toLowerCase()) {
+    const claimed = { ...a, owner: signedIn.id };
+    saveAuth(claimed);
+    return claimed;
+  }
+  return null;
+}
 const saveAuth = (a: LichessAuth | null) => { try { if (a) localStorage.setItem(TOKEN_KEY, JSON.stringify(a)); else localStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ } };
+
+/** Signing out: forget this device's Lichess connection (it stays on the account and
+ *  on Lichess, and comes back when that account signs in here again). */
+export function forgetLichessOnDevice(): void {
+  try { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(PAIR_KEY); } catch { /* ignore */ }
+}
 
 const redirectUri = () => `${window.location.origin}/lichess-callback`;
 const b64url = (buf: ArrayBuffer | Uint8Array) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -68,7 +98,11 @@ export async function syncLichessAuth(): Promise<LichessAuth | null> {
   try {
     const r = await apiFetch('/api/lichess/board/token', { credentials: 'include' });
     const d = r.ok ? await r.json().catch(() => null) as { connected?: boolean; token?: string; username?: string } | null : null;
-    if (d?.connected && d.token && d.username) { const a = { token: d.token, username: d.username, expiresAt: null }; saveAuth(a); return a; }
+    if (d?.connected && d.token && d.username) {
+      const a: LichessAuth = { token: d.token, username: d.username, expiresAt: null, owner: signedIn?.id };
+      // Another account's connection on this device makes way for this account's own.
+      saveAuth(a); return a;
+    }
   } catch { /* not connected */ }
   return null;
 }
@@ -92,7 +126,7 @@ export async function finishLichessConnect(search: string): Promise<{ ok: true; 
     const acc = await fetch(`${LICHESS}/api/account`, { headers: { Authorization: `Bearer ${d.access_token}` } }).then((x) => (x.ok ? x.json() : null)).catch(() => null) as { username?: string; title?: string } | null;
     if (!acc?.username) return { ok: false, error: "Couldn't read your Lichess account. Please try again." };
     if (acc.title === 'BOT') return { ok: false, error: 'That is a Lichess BOT account. Connect your own account instead.' };
-    saveAuth({ token: d.access_token, username: acc.username, expiresAt: d.expires_in ? Date.now() + d.expires_in * 1000 : null });
+    saveAuth({ token: d.access_token, username: acc.username, expiresAt: d.expires_in ? Date.now() + d.expires_in * 1000 : null, owner: signedIn?.id });
     return { ok: true, returnTo: saved.returnTo || '/lichess', username: acc.username };
   } catch {
     return { ok: false, error: "Couldn't reach Lichess. Check your connection and try again." };
