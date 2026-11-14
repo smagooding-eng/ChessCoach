@@ -1,0 +1,36 @@
+// ChessScout.net on Cloudflare Workers. Build first (Cloudflare's build settings):
+//   pnpm install && pnpm run typecheck && pnpm --filter @workspace/chess-coach run build
+// then deploy from the repo root:
+//   npx wrangler deploy --config cloudflare/wrangler.jsonc
+// Build variables (same values as on Vercel): VITE_API_URL, VITE_STRIPE_PUBLISHABLE_KEY.
+// Worker secret: STRIPE_SECRET_KEY (npx wrangler secret put STRIPE_SECRET_KEY --config cloudflare/wrangler.jsonc).
+{
+  "name": "chessscout",
+  "main": "worker.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "../artifacts/chess-coach/dist/public",
+    "binding": "ASSETS",
+    // App routes that aren't files get index.html (Vercel's "/(.*) -> /index.html").
+    "not_found_handling": "single-page-application",
+    // Only these paths run the Worker; every other request is a free static file.
+    "run_worker_first": [
+      "/api/*",
+      "/ig", "/tt", "/yt", "/fb", "/blog", "/blog/*",
+      "/a", "/b", "/c", "/d", "/e", "/f", "/g", "/h", "/i", "/j", "/k", "/l", "/m", "/n", "/o", "/p", "/q", "/r", "/s", "/t", "/u", "/v", "/w", "/x", "/y", "/z",
+      "/0", "/1", "/2", "/3", "/4", "/5", "/6", "/7", "/8", "/9",
+      "/push-rotate", "/t/*",
+      "/challenge/*", "/share/*", "/tournaments", "/tournaments/*", "/beginner", "/beginner/*", "/kids", "/kids/*",
+      "/players", "/players/*", "/learn", "/learn/*", "/sitemap.xml", "/pricing",
+      "/play-chess-online", "/chess-for-kids", "/learn-chess", "/chess-puzzles", "/chess-tournaments", "/chess-game-analysis", "/scout-chess-opponent",
+      "/es", "/es/*", "/pt", "/pt/*", "/fr", "/fr/*", "/de", "/de/*", "/it", "/it/*", "/nl", "/nl/*", "/pl", "/pl/*", "/ru", "/ru/*",
+      "/uk", "/uk/*", "/tr", "/tr/*", "/ro", "/ro/*", "/cs", "/cs/*", "/hu", "/hu/*", "/el", "/el/*", "/sv", "/sv/*", "/ar", "/ar/*",
+      "/fa", "/fa/*", "/hi", "/hi/*", "/bn", "/bn/*", "/id", "/id/*", "/vi", "/vi/*", "/th", "/th/*", "/tl", "/tl/*",
+      "/zh-cn", "/zh-cn/*", "/zh-tw", "/zh-tw/*", "/ja", "/ja/*", "/ko", "/ko/*",
+      "/vs/*", "/chess-openings", "/chess-openings/*", "/chess-traps", "/chess-traps/*", "/chess-tactics", "/chess-tactics/*"
+    ]
+  },
+  "vars": { "API_URL": "https://chesscoach-api-kbf8.onrender.com" },
+  "observability": { "enabled": true }
+}
