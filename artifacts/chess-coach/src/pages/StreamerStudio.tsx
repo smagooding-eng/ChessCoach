@@ -1148,6 +1148,8 @@ function Slider({ label, min, max, step, value, onChange }: { label: string; min
   );
 }
 
+interface SavedVideo { id: string; title: string; mime: string; size_bytes: number | string; duration_ms: number; status: string; created_at: string; username?: string | null }
+
 function VideosPanel({ refreshKey, onError }: { refreshKey: number; onError: (m: string) => void }) {
   const [list, setList] = useState<SavedVideo[] | null>(null);
   const [playing, setPlaying] = useState<{ id: string; url: string } | null>(null);
