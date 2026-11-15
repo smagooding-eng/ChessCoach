@@ -90,5 +90,17 @@ export class FaceTracker {
     };
   }
 
+  /** Face points (0..1 of the picture, with depth) in a still photo, or null if no face. */
+  detectImage(img: HTMLCanvasElement): { x: number; y: number; z: number }[] | null {
+    if (!this.lm) return null;
+    let ts = performance.now();
+    if (ts <= this.lastTs) ts = this.lastTs + 1;
+    this.lastTs = ts;
+    try {
+      const f = this.lm.detectForVideo(img as unknown as HTMLVideoElement, ts).faceLandmarks?.[0];
+      return f && f.length >= 468 ? f.map((q) => ({ x: q.x, y: q.y, z: q.z })) : null;
+    } catch { return null; }
+  }
+
   close() { try { this.lm?.close(); } catch { /* ignore */ } this.lm = null; this.loading = null; this.status = 'idle'; }
 }

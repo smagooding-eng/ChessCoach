@@ -20,6 +20,7 @@ import {
   loadToons, toonThumb, warmToon, drawToon, toonFromPerson, type ToonPick, type ToonCustom,
 } from '@/lib/streamer/toonAvatars';
 import { Avatar3D, loadThree, saveAvatarFile, loadAvatarFile, clearAvatarFile } from '@/lib/streamer/avatar3d';
+import { PhotoAvatar, portraitCanvas, savePortrait, loadPortrait, clearPortrait, type Pt3 } from '@/lib/streamer/photoAvatar';
 import { drawComposite, drawBoardPanel, headSizes, type BoardFeed, type TextRun } from '@/lib/streamer/compositor';
 import { CloudRecorder, type RecStatus } from '@/lib/streamer/recorder';
 import { LiveHost } from '@/lib/streamer/live';
@@ -41,7 +42,7 @@ interface Settings {
   boardSource: 'app' | 'screen' | 'follow'; followUser: string; appPath: string; zoom: number; panX: number; panY: number;
   frame: 'auto' | 'manual'; framePad: 'board' | 'players';
   camOn: boolean; camId: string; facing: 'user' | 'environment'; mirror: boolean;
-  disguise: Disguise; avatar: AvatarId | 'toon' | '3d'; toon: ToonPick; toonShuffle: number; bg: Bg; bgColor: string; avatarScale: number;
+  disguise: Disguise; avatar: AvatarId | 'toon' | '3d' | 'photo'; toon: ToonPick; toonShuffle: number; bg: Bg; bgColor: string; avatarScale: number;
   hat: Hat; eyewear: Eyewear; person: PersonLook; customVoice: CustomVoice; personStyle: 'cartoon' | 'real';
   voice: VoicePreset; pitch: number; micId: string; output: string;
   name: string; subtitle: string;
@@ -231,6 +232,57 @@ export default function StreamerStudio() {
     else flash('Couldn’t open that file. Use a .glb (or .vrm) 3D avatar.');
   }, [openAvatar3D, flash, set]);
   useEffect(() => () => a3d.current?.dispose(), []);
+
+  // ---- realistic photo avatar: one portrait photo that moves with you (kept on this device) ----
+  const photoAv = useRef<PhotoAvatar | null>(null);
+  const [photoState, setPhotoState] = useState<{ status: 'none' | 'working' | 'ready' | 'failed'; name?: string; preview?: string; why?: string }>({ status: 'none' });
+  const openPortrait = useCallback(async (name: string, image: Blob, landmarks: Pt3[]) => {
+    photoAv.current ??= new PhotoAvatar();
+    if (!photoAv.current.supported) { setPhotoState({ status: 'failed', why: 'This device’s browser can’t draw the photo avatar (WebGL is off).' }); return false; }
+    const cv = await portraitCanvas(image);
+    const ok = photoAv.current.setPortrait(cv, landmarks);
+    setPhotoState(ok ? { status: 'ready', name, preview: cv.toDataURL('image/jpeg', 0.7) } : { status: 'failed', why: 'Couldn’t build a face from that photo.' });
+    return ok;
+  }, []);
+  useEffect(() => {
+    if (s.avatar !== 'photo' || photoState.status !== 'none') return;
+    void loadPortrait().then((p) => { if (p) void openPortrait(p.name, p.image, p.landmarks); });
+  }, [s.avatar, photoState.status, openPortrait]);
+  const applyPortrait = useCallback(async (name: string, image: Blob) => {
+    setPhotoState({ status: 'working', name });
+    try {
+      const cv = await portraitCanvas(image);
+      const tr = tracker.current;
+      if (!(await tr.load())) { setPhotoState({ status: 'failed', why: 'Face finding couldn’t load on this device.' }); return; }
+      const lm = tr.detectImage(cv);
+      if (!lm) { setPhotoState({ status: 'failed', why: 'No face found. Use a clear, front-facing photo with the whole face showing.' }); return; }
+      const blob = await new Promise<Blob | null>((r) => cv.toBlob(r, 'image/jpeg', 0.92));
+      if (!blob) { setPhotoState({ status: 'failed', why: 'Couldn’t read that photo.' }); return; }
+      if (await openPortrait(name, blob, lm)) {
+        await savePortrait({ name, image: blob, landmarks: lm }).catch(() => undefined);
+        set({ avatar: 'photo', disguise: 'avatar' });
+      }
+    } catch { setPhotoState({ status: 'failed', why: 'Couldn’t open that photo. Try a .jpg or .png.' }); }
+  }, [openPortrait, set]);
+  const portraitFromCamera = useCallback(async () => {
+    if (!sRef.current.camOn) set({ camOn: true });
+    setPhotoState({ status: 'working', name: 'camera' });
+    const t0 = performance.now();
+    while (performance.now() - t0 < 15000) {
+      await new Promise((r) => window.setTimeout(r, 300));
+      const v = camVideo.current;
+      if (tracker.current.status === 'failed') break;
+      if (v && v.videoWidth && tracker.current.lastLandmarks && performance.now() - tracker.current.lastAt < 400) {
+        await new Promise((r) => window.setTimeout(r, 800)); // let the camera settle its exposure
+        const cv = document.createElement('canvas'); cv.width = v.videoWidth; cv.height = v.videoHeight;
+        cv.getContext('2d')!.drawImage(v, 0, 0);
+        const blob = await new Promise<Blob | null>((r) => cv.toBlob(r, 'image/jpeg', 0.92));
+        if (blob) { await applyPortrait('From my camera', blob); return; }
+      }
+    }
+    setPhotoState({ status: 'failed', why: 'Couldn’t see your face. Turn the camera on, face it in good light, and try again.' });
+  }, [set, applyPortrait]);
+  useEffect(() => () => photoAv.current?.dispose(), []);
 
   // ---- stage size: keep the aspect, fit the space ----
   useEffect(() => {
@@ -690,14 +742,20 @@ export default function StreamerStudio() {
           pose.mouth = Math.min(1, vlevel * 1.8);
         } else if (pose.mouth < 0.1 && vlevel > 0.15) pose.mouth = Math.min(1, vlevel * 1.5);
         pose.t = t / 1000;
-        if (st.avatar === '3d' && a3d.current?.status === 'ready') {
+        if (st.avatar === 'photo' && photoAv.current?.ready) {
+          const img = photoAv.current.render(W, H, st.avatarScale / 1.3, {
+            yaw: pose.yaw, pitch: pose.pitch, roll: pose.roll, mouth: pose.mouth, blinkL: pose.blinkL, blinkR: pose.blinkR,
+            smile: tracked ? pose.smile : 0.15, brow: pose.brow ?? 0, t: pose.t, mirror,
+          });
+          c.drawImage(img, 0, 0, W, H);
+        } else if (st.avatar === '3d' && a3d.current?.status === 'ready') {
           const rw = Math.round(W * 0.8), rh = Math.round(H * 0.8);
           const img = a3d.current.render(rw, rh, st.avatarScale / 1.3, {
             yaw: pose.yaw, pitch: pose.pitch, roll: pose.roll, t: pose.t, mirror, tracked,
             voice: vlevel, blinkL: pose.blinkL, blinkR: pose.blinkR,
           }, tracked ? tracker.current.lastBlendshapes : {});
           c.drawImage(img, 0, 0, W, H);
-        } else if (st.avatar === 'toon' || st.avatar === '3d') drawToon(c, st.toon, pose);
+        } else if (st.avatar === 'toon' || st.avatar === '3d' || st.avatar === 'photo') drawToon(c, st.toon, pose);
         else drawAvatar(c, st.avatar, pose, { person: st.person, hat: st.hat, eyewear: st.eyewear, style: st.personStyle });
       }
 
@@ -1158,7 +1216,33 @@ export default function StreamerStudio() {
             )}
 
             {s.disguise === 'avatar' && (<>
-              <Label>Realistic 3D</Label>
+              <Label>Realistic</Label>
+              <Chip on={s.avatar === 'photo'} onClick={() => set({ avatar: 'photo' })}>📸 Photo avatar (moves with you)</Chip>
+              {s.avatar === 'photo' && (
+                <div className="mt-2 mb-2 p-3 rounded-xl" style={{ background: CARD_LIGHT, border: `1px solid ${RD.border}` }}>
+                  {photoState.status === 'ready' && photoState.preview && (
+                    <img src={photoState.preview} alt="" className="w-20 h-20 rounded-xl object-cover mb-2" style={{ border: `1px solid ${RD.border}` }} />
+                  )}
+                  <label className="block w-full py-2.5 rounded-xl font-bold text-sm text-center cursor-pointer" style={{ background: RD.green, color: '#06110A' }}>
+                    {photoState.status === 'ready' ? 'Use a different photo' : 'Upload a portrait photo'}
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void applyPortrait(f.name, f); e.target.value = ''; }} />
+                  </label>
+                  <button onClick={() => void portraitFromCamera()} disabled={photoState.status === 'working'} className="mt-2 w-full py-2.5 rounded-xl font-bold text-sm"
+                    style={{ background: CARD, color: RD.text, border: `1px solid ${RD.border}` }}>
+                    {photoState.status === 'working' ? 'Finding the face…' : '📷 Take the portrait with my camera'}
+                  </button>
+                  <Note>
+                    {photoState.status === 'ready' && `${photoState.name}: ready. It turns its head, blinks, talks, smiles and raises its eyebrows with you. With no camera it talks with your voice.`}
+                    {photoState.status === 'failed' && (photoState.why ?? 'That didn’t work. Try another photo.')}
+                    {photoState.status === 'none' && 'No photo yet.'}
+                  </Note>
+                  <Note>
+                    Best results: face the camera straight on, mouth closed, good even light, head and shoulders in the shot. Any realistic face works,
+                    such as your own photo or a made-up person you created, as long as you have the right to use it. The photo stays on this device.
+                  </Note>
+                  {photoState.status === 'ready' && <button onClick={() => { void clearPortrait(); setPhotoState({ status: 'none' }); set({ avatar: 'toon' }); }} className="mt-2 text-[12px] underline" style={{ color: RD.muted }}>Remove photo avatar</button>}
+                </div>
+              )}
               <Chip on={s.avatar === '3d'} onClick={() => set({ avatar: '3d' })}>🧑‍🚀 3D realistic (your own)</Chip>
               {s.avatar === '3d' && (
                 <div className="mt-2 p-3 rounded-xl" style={{ background: CARD_LIGHT, border: `1px solid ${RD.border}` }}>
