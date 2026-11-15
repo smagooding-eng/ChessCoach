@@ -391,3 +391,57 @@ export async function speakFree(voiceId: string, text: string, style: string): P
   }
   return wavFromPcm(Buffer.concat(pieces), fmt.rate, fmt.channels, fmt.bits);
 }
+
+
+// ── Streamer Studio: redraw a portrait as a character with the free Gemini image model ──
+
+export const CHARACTER_STYLES: Record<string, string> = {
+  "3d": "a 3D animated feature-film character: soft stylised proportions, slightly larger expressive eyes, smooth skin with subtle subsurface glow, rich cinematic lighting, high-quality 3D render",
+  anime: "an anime character: clean line art, cel shading, detailed expressive eyes, vibrant hair colours true to the photo",
+  game: "a stylised video game hero: semi-realistic hand-painted 3D look, crisp details, slightly heroic proportions",
+  comic: "a comic book illustration: bold confident ink lines, flat colours with graphic shadows, halftone-free",
+  clay: "a claymation figure: sculpted plasticine look, visible soft fingerprints, handmade charm",
+  painting: "a digital painting: painterly brush strokes, warm stylised colours, illustrated rather than photographic",
+};
+
+/** Draws the person in the photo as a character in the chosen style. Returns PNG/JPEG images. */
+export async function drawCharacterFree(image: { data: string; mimeType: string }, style: string, count: number, note = ""): Promise<{ data: string; mimeType: string }[]> {
+  const c = (await config()).gemini;
+  if (!c) throw new Error("Add a free Gemini key in Admin › AI usage first");
+  const models = await listModels("gemini", c.key);
+  const prefer = ["gemini-2.5-flash-image", "gemini-2.5-flash-image-preview", "gemini-2.0-flash-preview-image-generation", "gemini-2.0-flash-exp-image-generation"];
+  const model = prefer.find((m) => models.includes(m))
+    ?? models.filter((m) => /flash/.test(m) && /image/.test(m)).sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))[0]
+    ?? models.find((m) => /image/.test(m) && !/imagen/.test(m));
+  if (!model) throw new Error("This Gemini key has no image model available");
+  const look = CHARACTER_STYLES[style] ?? CHARACTER_STYLES["3d"];
+  const prompt = [
+    `Redraw the person in this photo as ${look}.`,
+    "They must stay clearly recognisable as the same person: same face shape, skin tone, eye colour, hairstyle and hair colour, facial hair, glasses and clothing colours.",
+    "Framing for an animated stream avatar: head and shoulders, centred, facing the camera straight on and looking into the lens, both eyes fully open, mouth closed with a relaxed slight smile, even front lighting, no hands near the face.",
+    "Plain soft gradient background in a dark colour. Portrait orientation. No text, no logos, no borders.",
+    note ? `Also: ${note.slice(0, 200)}` : "",
+  ].filter(Boolean).join(" ");
+  const one = async (i: number) => {
+    const r = await fetch(`${GEMINI}/models/${encodeURIComponent(model)}:generateContent`, {
+      method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": c.key },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ inlineData: image }, { text: i ? `${prompt} (Variation ${i + 1}: vary the expression and lighting a little.)` : prompt }] }],
+        generationConfig: { responseModalities: ["TEXT", "IMAGE"], temperature: 0.9 },
+      }),
+    });
+    if (!r.ok) {
+      const body = (await r.text().catch(() => "")).slice(0, 300);
+      if (r.status === 429) throw new Error(/limit: 0|free_tier/i.test(body) ? "Your Gemini key's free tier doesn't include image drawing. Turn on billing for the key in Google AI Studio (a few cents per picture) and try again." : "The Gemini image limit is used up for now. Try again later.");
+      throw new Error(`Gemini ${r.status}: ${body}`);
+    }
+    const d = (await r.json()) as { candidates?: { content?: { parts?: { inlineData?: { data?: string; mimeType?: string } }[] }; finishReason?: string }[] };
+    const part = d.candidates?.[0]?.content?.parts?.find((p) => p.inlineData?.data)?.inlineData;
+    if (!part?.data) throw new Error(d.candidates?.[0]?.finishReason === "SAFETY" || d.candidates?.[0]?.finishReason === "IMAGE_SAFETY" ? "Gemini wouldn't draw that photo. Try a different one." : "Gemini returned no picture. Try again.");
+    return { data: part.data, mimeType: part.mimeType ?? "image/png" };
+  };
+  const results = await Promise.allSettled(Array.from({ length: Math.max(1, Math.min(4, count)) }, (_, i) => one(i)));
+  const ok = results.filter((r): r is PromiseFulfilledResult<{ data: string; mimeType: string }> => r.status === "fulfilled").map((r) => r.value);
+  if (!ok.length) throw (results[0] as PromiseRejectedResult).reason;
+  return ok;
+}

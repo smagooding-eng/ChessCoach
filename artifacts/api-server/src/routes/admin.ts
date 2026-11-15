@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { askFreeAi, freeAiAvailable, stripFence, freeAiStatus, saveFreeAiKey, removeFreeAiKey, type FreeProvider } from "../lib/freeAi";
+import { askFreeAi, freeAiAvailable, stripFence, freeAiStatus, saveFreeAiKey, removeFreeAiKey, drawCharacterFree, type FreeProvider } from "../lib/freeAi";
 import { exclusionSummary } from "../lib/analyticsExclusions";
 import { db, usersTable, pageViewsTable, gamesTable, weaknessesTable, coursesTable, lessonsTable, backgroundJobsTable, referralConversionsTable, affiliateAdjustmentsTable, seoArticlesTable, puzzlesTable } from "@workspace/db";
 import { preGenerateExplanations } from "../lib/puzzleSeed";
@@ -1314,6 +1314,17 @@ router.post("/admin/free-ai", requireAdmin, async (req: Request, res: Response):
     res.json({ ok: true, model: r.model, warning: r.warning ?? null, status: await freeAiStatus() });
   } catch (err: any) {
     res.status(400).json({ error: String(err?.message ?? err).slice(0, 300) });
+  }
+});
+// Streamer Studio: the admin's portrait redrawn as a character (free Gemini image model).
+router.post("/admin/studio/character", requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  const m = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/.exec(String(req.body?.image ?? ""));
+  if (!m) { res.status(400).json({ error: "Send a .jpg, .png or .webp photo" }); return; }
+  try {
+    const images = await drawCharacterFree({ mimeType: m[1], data: m[2] }, String(req.body?.style ?? "3d"), Number(req.body?.count ?? 3), String(req.body?.note ?? ""));
+    res.json({ images: images.map((i) => `data:${i.mimeType};base64,${i.data}`) });
+  } catch (err: any) {
+    res.status(400).json({ error: String(err?.message ?? err).slice(0, 400) });
   }
 });
 router.delete("/admin/free-ai/:provider", requireAdmin, async (req: Request, res: Response): Promise<void> => {

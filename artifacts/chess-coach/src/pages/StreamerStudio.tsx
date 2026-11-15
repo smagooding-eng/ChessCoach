@@ -265,9 +265,9 @@ export default function StreamerStudio() {
       }
     } catch { setPhotoState({ status: 'failed', why: 'Couldn’t open that photo. Try a .jpg or .png.' }); }
   }, [openPortrait, set]);
-  const portraitFromCamera = useCallback(async () => {
+  // one still of the camera once a face is in view (null if none within 15s)
+  const snapCamera = useCallback(async (): Promise<Blob | null> => {
     if (!sRef.current.camOn) set({ camOn: true });
-    setPhotoState({ status: 'working', name: 'camera' });
     const t0 = performance.now();
     while (performance.now() - t0 < 15000) {
       await new Promise((r) => window.setTimeout(r, 300));
@@ -277,11 +277,40 @@ export default function StreamerStudio() {
         await new Promise((r) => window.setTimeout(r, 800)); // let the camera settle its exposure
         const cv = document.createElement('canvas'); cv.width = v.videoWidth; cv.height = v.videoHeight;
         cv.getContext('2d')!.drawImage(v, 0, 0);
-        const blob = await new Promise<Blob | null>((r) => cv.toBlob(r, 'image/jpeg', 0.92));
-        if (blob) { await applyPortrait('From my camera', blob); return; }
+        return await new Promise<Blob | null>((r) => cv.toBlob(r, 'image/jpeg', 0.92));
       }
     }
+    return null;
+  }, [set]);
+  const portraitFromCamera = useCallback(async () => {
+    setPhotoState({ status: 'working', name: 'camera' });
+    const blob = await snapCamera();
+    if (blob) { await applyPortrait('From my camera', blob); return; }
     setPhotoState({ status: 'failed', why: 'Couldn’t see your face. Turn the camera on, face it in good light, and try again.' });
+  }, [snapCamera, applyPortrait]);
+
+  // ---- AI character of me: Gemini redraws the portrait in a style, then it animates like any photo ----
+  const [charStyle, setCharStyle] = useState('3d');
+  const [charNote, setCharNote] = useState('');
+  const [charState, setCharState] = useState<{ status: 'idle' | 'snapping' | 'drawing' | 'done' | 'failed'; images?: string[]; why?: string }>({ status: 'idle' });
+  const drawCharacter = useCallback(async (src: Blob | null) => {
+    if (!src) { setCharState({ status: 'failed', why: 'Couldn’t see your face. Turn the camera on, face it in good light, and try again.' }); return; }
+    setCharState({ status: 'drawing' });
+    try {
+      const cv = await portraitCanvas(src);
+      const r = await apiFetch('/api/admin/studio/character', {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: cv.toDataURL('image/jpeg', 0.9), style: charStyle, note: charNote, count: 3 }),
+      });
+      const d = await r.json().catch(() => ({})) as { images?: string[]; error?: string };
+      if (!r.ok || !d.images?.length) { setCharState({ status: 'failed', why: d.error ?? 'Drawing failed. Try again.' }); return; }
+      setCharState({ status: 'done', images: d.images });
+    } catch { setCharState({ status: 'failed', why: 'Couldn’t reach the server. Try again.' }); }
+  }, [charStyle, charNote]);
+  const pickCharacter = useCallback(async (dataUrl: string, i: number) => {
+    const blob = await (await fetch(dataUrl)).blob();
+    set({ photoStyle: 'real' }); // it's already drawn; no filter on top
+    await applyPortrait(`AI character ${i + 1}`, blob);
   }, [set, applyPortrait]);
   useEffect(() => () => photoAv.current?.dispose(), []);
   // a new look redraws the photo once
@@ -1230,6 +1259,39 @@ export default function StreamerStudio() {
                   {photoState.status === 'ready' && photoState.preview && (
                     <img src={photoState.preview} alt="" className="w-20 h-20 rounded-xl object-cover mb-2" style={{ border: `1px solid ${RD.border}` }} />
                   )}
+                  <div className="mb-3 p-3 rounded-xl" style={{ background: CARD, border: `1px solid ${RD.border}` }}>
+                    <div className="text-[13px] font-extrabold mb-1" style={{ color: RD.text }}>✨ AI character of me</div>
+                    <div className="text-[12px] mb-2" style={{ color: RD.muted }}>AI redraws you as a character, then it talks, blinks and turns its head with you.</div>
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {([['3d', '3D cartoon'], ['anime', 'Anime'], ['game', 'Game hero'], ['comic', 'Comic'], ['clay', 'Clay'], ['painting', 'Painting']] as const).map(([id, label]) =>
+                        <Chip key={id} on={charStyle === id} onClick={() => setCharStyle(id)}>{label}</Chip>)}
+                    </div>
+                    <input value={charNote} onChange={(e) => setCharNote(e.target.value)} maxLength={200} placeholder="Extra (optional): e.g. wearing a hoodie, knight helmet"
+                      className="w-full mb-2 px-3 py-2 rounded-lg text-[13px]" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }} />
+                    <div className="grid grid-cols-2 gap-2">
+                      <button disabled={charState.status === 'snapping' || charState.status === 'drawing'}
+                        onClick={async () => { setCharState({ status: 'snapping' }); await drawCharacter(await snapCamera()); }}
+                        className="py-2.5 rounded-xl font-bold text-[13px]" style={{ background: RD.gold, color: '#050A0B' }}>
+                        {charState.status === 'snapping' ? 'Looking at you…' : charState.status === 'drawing' ? 'Drawing… (up to a minute)' : '📷 From my camera'}
+                      </button>
+                      <label className="py-2.5 rounded-xl font-bold text-[13px] text-center cursor-pointer" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }}>
+                        🖼️ From a photo
+                        <input type="file" accept="image/*" className="hidden" disabled={charState.status === 'drawing'} onChange={(e) => { const f = e.target.files?.[0]; if (f) void drawCharacter(f); e.target.value = ''; }} />
+                      </label>
+                    </div>
+                    {charState.status === 'failed' && <Note>{charState.why}</Note>}
+                    {charState.status === 'done' && charState.images && (<>
+                      <div className="text-[12px] mt-2 mb-1.5" style={{ color: RD.muted }}>Tap the one you want:</div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {charState.images.map((src, i) => (
+                          <button key={i} onClick={() => void pickCharacter(src, i)} className="rounded-xl overflow-hidden" style={{ border: `1px solid ${RD.border}` }}>
+                            <img src={src} alt={`Character ${i + 1}`} className="w-full aspect-square object-cover" />
+                          </button>
+                        ))}
+                      </div>
+                      <button onClick={() => setCharState({ status: 'idle' })} className="mt-2 text-[12px] underline" style={{ color: RD.muted }}>Clear these</button>
+                    </>)}
+                  </div>
                   <div className="text-[12px] font-bold mb-1.5" style={{ color: RD.muted }}>Look</div>
                   <div className="flex flex-wrap gap-1.5 mb-3">
                     {PHOTO_STYLES.map((p) => <Chip key={p.id} on={s.photoStyle === p.id} onClick={() => set({ photoStyle: p.id })}>{p.label}</Chip>)}
