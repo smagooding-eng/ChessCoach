@@ -10,7 +10,7 @@ import { aiScope } from "./lib/freeAi";
 import { ADMIN_EMAILS } from "./lib/auth";
 import { WebhookHandlers } from "./lib/webhookHandlers";
 import { analytics } from "@heycatch/sdk";
-import { getStripeSecretKey } from "./lib/stripeClient";
+import { getStripeSecretKey, stripeAgent } from "./lib/stripeClient";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
@@ -42,7 +42,7 @@ async function trackSubscriptionEventBestEffort(payload: Buffer, signature: stri
     if (!webhookSecret) return;
     const { default: Stripe } = await import("stripe");
     const secretKey = await getStripeSecretKey();
-    const stripe = new Stripe(secretKey, { apiVersion: "2025-08-27.basil" as any });
+    const stripe = new Stripe(secretKey, { apiVersion: "2025-08-27.basil" as any, httpAgent: stripeAgent, maxNetworkRetries: 2, timeout: 10000 });
     const event = stripe.webhooks.constructEvent(payload, signature, webhookSecret);
 
     // Pro tournament entry fees (the return page also confirms; this covers

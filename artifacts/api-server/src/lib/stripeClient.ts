@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import https from 'https';
 
 async function getCredentials() {
   if (!process.env.STRIPE_SECRET_KEY) {
@@ -14,12 +15,20 @@ async function getCredentials() {
   };
 }
 
+// Checkout was taking 30-60s+: from Render, Node can try an IPv6 route to
+// api.stripe.com that never answers, and each call then waited out a 20s timeout
+// (x3 retries). The old Vercel products function fixed the same thing with an
+// IPv4-only agent. Here: IPv4 only, and connections kept open between calls, so
+// creating a checkout is a few quick requests instead of fresh, slow ones.
+export const stripeAgent = new https.Agent({ keepAlive: true, family: 4, maxSockets: 50 });
+
 export async function getUncachableStripeClient() {
   const { secretKey } = await getCredentials();
   return new Stripe(secretKey, {
     apiVersion: '2025-08-27.basil' as any,
-    maxNetworkRetries: 3,
-    timeout: 20000,
+    httpAgent: stripeAgent,
+    maxNetworkRetries: 2,
+    timeout: 10000,
   });
 }
 

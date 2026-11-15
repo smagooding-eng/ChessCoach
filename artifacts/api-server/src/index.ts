@@ -1,3 +1,7 @@
+// Prefer IPv4 for every outgoing connection (Stripe, Lichess, email…). From Render,
+// some IPv6 routes hang instead of failing, which made checkout take a minute.
+import dns from "node:dns";
+dns.setDefaultResultOrder("ipv4first");
 import { runMigrations } from 'stripe-replit-sync';
 import { ensureAnalyticsViews } from "./lib/analyticsExclusions";
 import { getStripeSync } from "./lib/stripeClient";
