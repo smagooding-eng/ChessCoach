@@ -19,6 +19,24 @@ function getOrigin(req: Request): string {
   return `${proto}://${host}`;
 }
 
+// The customer saved on the account, or a new one when it's missing or no longer exists
+// in this Stripe account (deleted, or saved under a different Stripe account or test mode).
+async function checkoutCustomer(userId: string, user: { email?: string | null; stripeCustomerId?: string | null } | undefined): Promise<string> {
+  const saved = user?.stripeCustomerId;
+  if (saved) {
+    try {
+      const stripe = await getUncachableStripeClient();
+      const c = await stripe.customers.retrieve(saved);
+      if (!(c as any).deleted) return saved;
+    } catch (err: any) {
+      if (err?.code !== 'resource_missing' && err?.statusCode !== 404) throw err;
+    }
+  }
+  const customer = await stripeService.createCustomer(user?.email || `${userId}@chess-coach.app`, userId);
+  await storage.updateUserStripeInfo(userId, { stripeCustomerId: customer.id });
+  return customer.id;
+}
+
 router.get('/stripe/config', async (_req: Request, res: Response) => {
   try {
     const publishableKey = await stripeService.getPublishableKey();
@@ -154,16 +172,7 @@ router.post('/stripe/checkout', async (req: Request, res: Response) => {
     }
 
     const user = await storage.getUser(req.user.id);
-    let customerId = user?.stripeCustomerId;
-
-    if (!customerId) {
-      const customer = await stripeService.createCustomer(
-        user?.email || `${req.user.id}@chess-coach.app`,
-        req.user.id,
-      );
-      await storage.updateUserStripeInfo(req.user.id, { stripeCustomerId: customer.id });
-      customerId = customer.id;
-    }
+    const customerId = await checkoutCustomer(req.user.id, user);
 
     const frontendUrl = process.env.CORS_ORIGIN;
     const origin = frontendUrl || getOrigin(req);
@@ -202,16 +211,7 @@ router.post('/stripe/checkout-embedded', async (req: Request, res: Response) => 
 
   try {
     const user = await storage.getUser(req.user.id);
-    let customerId = user?.stripeCustomerId;
-
-    if (!customerId) {
-      const customer = await stripeService.createCustomer(
-        user?.email || `${req.user.id}@chess-coach.app`,
-        req.user.id,
-      );
-      await storage.updateUserStripeInfo(req.user.id, { stripeCustomerId: customer.id });
-      customerId = customer.id;
-    }
+    const customerId = await checkoutCustomer(req.user.id, user);
 
     const stripe = await getUncachableStripeClient();
 
@@ -406,12 +406,7 @@ router.post('/stripe/checkout-trial', async (req: Request, res: Response) => {
       return;
     }
     const user = await storage.getUser(req.user.id);
-    let customerId = user?.stripeCustomerId;
-    if (!customerId) {
-      const customer = await stripeService.createCustomer(user?.email || `${req.user.id}@chess-coach.app`, req.user.id);
-      await storage.updateUserStripeInfo(req.user.id, { stripeCustomerId: customer.id });
-      customerId = customer.id;
-    }
+    const customerId = await checkoutCustomer(req.user.id, user);
     const frontendUrl = process.env.CORS_ORIGIN;
     const origin = frontendUrl || getOrigin(req);
     const basePath = frontendUrl ? '' : '/chess-coach';
