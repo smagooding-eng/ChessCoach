@@ -1,6 +1,6 @@
 // Streamer Studio (admin-only, Features in Development).
 // A stage the streamer arranges: board (a ChessScout page or any captured window),
-// camera (raw, face-hidden or a live avatar), and a name tag. Voice changer on the mic.
+// camera (raw or face-hidden), and a name tag. Voice changer on the mic.
 // Record to a file here; stream through OBS / Discord using Go live (full screen).
 // Everything runs in the browser: no server changes.
 
@@ -10,17 +10,6 @@ import { Link } from 'wouter';
 import { RD } from '@/lib/redesignTheme';
 import { VoiceChanger, VOICE_PRESETS, VOICE_GROUPS, DEFAULT_CUSTOM, type VoicePreset, type CustomVoice } from '@/lib/streamer/voiceChanger';
 import { FaceTracker, type FacePose } from '@/lib/streamer/faceTracker';
-import {
-  AVATARS, drawAvatar, preloadPieceAvatars, HATS, EYEWEAR, HAIR_STYLES, FACIAL_HAIR, SKIN_TONES, HAIR_COLORS, EYE_COLORS, SHIRT_COLORS, DEFAULT_PERSON, OUTFITS, CHARACTER_EXTRAS,
-  type AvatarId, type AvatarPose, type Hat, type Eyewear, type PersonLook,
-} from '@/lib/streamer/avatars';
-import { cartoonFromCamera } from '@/lib/streamer/cartoonMe';
-import {
-  TOON_STYLES, TOON_CREDITS, TOON_TOPS, TOON_FACIAL, TOON_CLOTHES, TOON_GLASSES, TOON_SKINS, DEFAULT_TOON_CUSTOM,
-  loadToons, toonThumb, warmToon, drawToon, toonFromPerson, type ToonPick, type ToonCustom,
-} from '@/lib/streamer/toonAvatars';
-import { Avatar3D, loadThree, saveAvatarFile, loadAvatarFile, clearAvatarFile } from '@/lib/streamer/avatar3d';
-import { PhotoAvatar, portraitCanvas, savePortrait, loadPortrait, clearPortrait, PHOTO_STYLES, type Pt3, type PhotoStyle } from '@/lib/streamer/photoAvatar';
 import { drawComposite, drawBoardPanel, headSizes, type BoardFeed, type TextRun } from '@/lib/streamer/compositor';
 import { CloudRecorder, type RecStatus } from '@/lib/streamer/recorder';
 import { LiveHost } from '@/lib/streamer/live';
@@ -33,7 +22,7 @@ type PanelId = 'board' | 'cam' | 'tag' | 'head';
 interface Rect { x: number; y: number; w: number; h: number; z: number; hidden?: boolean; round?: boolean }
 type Layout = Record<PanelId, Rect>;
 type Aspect = '9:16' | '16:9';
-type Disguise = 'none' | 'avatar' | 'pixelate' | 'blur';
+type Disguise = 'none' | 'pixelate' | 'blur';
 type Bg = 'brand' | 'blur' | 'room' | 'color';
 type Tab = 'layout' | 'board' | 'camera' | 'voice' | 'videos' | 'live';
 
@@ -42,8 +31,8 @@ interface Settings {
   boardSource: 'app' | 'screen' | 'follow'; followUser: string; appPath: string; zoom: number; panX: number; panY: number;
   frame: 'auto' | 'manual'; framePad: 'board' | 'players';
   camOn: boolean; camId: string; facing: 'user' | 'environment'; mirror: boolean;
-  disguise: Disguise; avatar: AvatarId | 'toon' | '3d' | 'photo'; photoStyle: PhotoStyle; toon: ToonPick; toonShuffle: number; bg: Bg; bgColor: string; avatarScale: number;
-  hat: Hat; eyewear: Eyewear; person: PersonLook; customVoice: CustomVoice; personStyle: 'cartoon' | 'real';
+  disguise: Disguise; bg: Bg; bgColor: string; avatarScale: number;
+  customVoice: CustomVoice;
   voice: VoicePreset; pitch: number; micId: string; output: string;
   name: string; subtitle: string;
   // Headline panel: "The road to 1500 ELO" with the real rating under it.
@@ -80,7 +69,7 @@ const DEFAULTS: Settings = {
   boardSource: 'app', followUser: '', appPath: '/live', zoom: 1, panX: 0, panY: 0,
   frame: 'auto', framePad: 'players',
   camOn: false, camId: '', facing: 'user', mirror: true,
-  disguise: 'avatar', avatar: 'toon', photoStyle: 'real', toon: { style: 'avataaars', seed: 'avataaars-0-3', custom: null }, toonShuffle: 0, hat: 'none', eyewear: 'none', person: DEFAULT_PERSON, customVoice: DEFAULT_CUSTOM, personStyle: 'cartoon', bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3,
+  disguise: 'blur', customVoice: DEFAULT_CUSTOM, bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3,
   voice: 'off', pitch: 0, micId: '', output: 'none',
   name: 'Anonymous Knight', subtitle: 'Playing on chessscout.net',
   headline: 'The road to 1500 ELO', goal: 1500, ratingFrom: 'auto', manualRating: 0,
@@ -98,7 +87,7 @@ function loadSettings(): Settings {
     if (raw) {
       const saved = JSON.parse(raw) as Partial<Settings>;
       const merged = { ...DEFAULTS, ...saved };
-      if (!saved.toon) merged.avatar = 'toon'; // first time with the new cartoon characters
+      if ((merged.disguise as string) === 'avatar') merged.disguise = 'blur'; // avatars were removed
       if (!merged.layout.head) {
         // first time with the headline: a ready-made layout makes room for it; your own arrangement gets it on top
         const pre = PRESETS[merged.aspect]?.find((p) => p.id === merged.preset);
@@ -199,126 +188,7 @@ export default function StreamerStudio() {
         : info.raster ? (k: string) => `/pieces/${pieceShape}/${k}.webp?v=${info.version ?? 1}` : (k: string) => `/pieces/${pieceShape}/${k}.svg`,
     };
   }
-  useEffect(() => { preloadPieceAvatars(); }, []);
-  const [toonsReady, setToonsReady] = useState(false);
-  useEffect(() => { void loadToons().then((l) => setToonsReady(!!l)); }, []);
-  useEffect(() => { if (toonsReady) warmToon(s.toon); }, [toonsReady, s.toon]);
-
-
-
   const flash = useCallback((m: string) => { setMsg(m); window.setTimeout(() => setMsg((x) => (x === m ? null : x)), 6000); }, []);
-
-  // ---- realistic 3D avatar (file kept on this device) ----
-  const a3d = useRef<Avatar3D | null>(null);
-  const [a3dState, setA3dState] = useState<{ status: 'none' | 'loading' | 'ready' | 'failed'; name?: string; shapes?: number }>({ status: 'none' });
-  const openAvatar3D = useCallback(async (name: string, data: ArrayBuffer) => {
-    setA3dState({ status: 'loading', name });
-    const T = await loadThree();
-    if (!T) { setA3dState({ status: 'failed', name }); return false; }
-    a3d.current ??= new Avatar3D(T);
-    const ok = await a3d.current.load(data.slice(0));
-    setA3dState({ status: ok ? 'ready' : 'failed', name, shapes: a3d.current.faceShapes });
-    return ok;
-  }, []);
-  useEffect(() => {
-    if (s.avatar !== '3d' || a3dState.status !== 'none') return;
-    void loadAvatarFile().then((f) => { if (f) void openAvatar3D(f.name, f.data); });
-  }, [s.avatar, a3dState.status, openAvatar3D]);
-  const pick3D = useCallback(async (file: File) => {
-    if (file.size > 60 * 1024 * 1024) { flash('That file is over 60 MB. Export a lighter version (fewer textures or a smaller texture size).'); return; }
-    const data = await file.arrayBuffer();
-    const ok = await openAvatar3D(file.name, data);
-    if (ok) { await saveAvatarFile(file.name, data).catch(() => undefined); set({ avatar: '3d', disguise: 'avatar' }); }
-    else flash('Couldn’t open that file. Use a .glb (or .vrm) 3D avatar.');
-  }, [openAvatar3D, flash, set]);
-  useEffect(() => () => a3d.current?.dispose(), []);
-
-  // ---- realistic photo avatar: one portrait photo that moves with you (kept on this device) ----
-  const photoAv = useRef<PhotoAvatar | null>(null);
-  const [photoState, setPhotoState] = useState<{ status: 'none' | 'working' | 'ready' | 'failed'; name?: string; preview?: string; why?: string }>({ status: 'none' });
-  const openPortrait = useCallback(async (name: string, image: Blob, landmarks: Pt3[]) => {
-    photoAv.current ??= new PhotoAvatar();
-    if (!photoAv.current.supported) { setPhotoState({ status: 'failed', why: 'This device’s browser can’t draw the photo avatar (WebGL is off).' }); return false; }
-    const cv = await portraitCanvas(image);
-    const ok = photoAv.current.setPortrait(cv, landmarks);
-    const pic = ok ? photoAv.current.setStyle(sRef.current.photoStyle) : null;
-    setPhotoState(ok ? { status: 'ready', name, preview: (pic ?? cv).toDataURL('image/jpeg', 0.7) } : { status: 'failed', why: 'Couldn’t build a face from that photo.' });
-    return ok;
-  }, []);
-  useEffect(() => {
-    if (s.avatar !== 'photo' || photoState.status !== 'none') return;
-    void loadPortrait().then((p) => { if (p) void openPortrait(p.name, p.image, p.landmarks); });
-  }, [s.avatar, photoState.status, openPortrait]);
-  const applyPortrait = useCallback(async (name: string, image: Blob) => {
-    setPhotoState({ status: 'working', name });
-    try {
-      const cv = await portraitCanvas(image);
-      const tr = tracker.current;
-      if (!(await tr.load())) { setPhotoState({ status: 'failed', why: 'Face finding couldn’t load on this device.' }); return; }
-      const lm = tr.detectImage(cv);
-      if (!lm) { setPhotoState({ status: 'failed', why: 'No face found. Use a clear, front-facing photo with the whole face showing.' }); return; }
-      const blob = await new Promise<Blob | null>((r) => cv.toBlob(r, 'image/jpeg', 0.92));
-      if (!blob) { setPhotoState({ status: 'failed', why: 'Couldn’t read that photo.' }); return; }
-      if (await openPortrait(name, blob, lm)) {
-        await savePortrait({ name, image: blob, landmarks: lm }).catch(() => undefined);
-        set({ avatar: 'photo', disguise: 'avatar' });
-      }
-    } catch { setPhotoState({ status: 'failed', why: 'Couldn’t open that photo. Try a .jpg or .png.' }); }
-  }, [openPortrait, set]);
-  // one still of the camera once a face is in view (null if none within 15s)
-  const snapCamera = useCallback(async (): Promise<Blob | null> => {
-    if (!sRef.current.camOn) set({ camOn: true });
-    const t0 = performance.now();
-    while (performance.now() - t0 < 15000) {
-      await new Promise((r) => window.setTimeout(r, 300));
-      const v = camVideo.current;
-      if (tracker.current.status === 'failed') break;
-      if (v && v.videoWidth && tracker.current.lastLandmarks && performance.now() - tracker.current.lastAt < 400) {
-        await new Promise((r) => window.setTimeout(r, 800)); // let the camera settle its exposure
-        const cv = document.createElement('canvas'); cv.width = v.videoWidth; cv.height = v.videoHeight;
-        cv.getContext('2d')!.drawImage(v, 0, 0);
-        return await new Promise<Blob | null>((r) => cv.toBlob(r, 'image/jpeg', 0.92));
-      }
-    }
-    return null;
-  }, [set]);
-  const portraitFromCamera = useCallback(async () => {
-    setPhotoState({ status: 'working', name: 'camera' });
-    const blob = await snapCamera();
-    if (blob) { await applyPortrait('From my camera', blob); return; }
-    setPhotoState({ status: 'failed', why: 'Couldn’t see your face. Turn the camera on, face it in good light, and try again.' });
-  }, [snapCamera, applyPortrait]);
-
-  // ---- AI character of me: Gemini redraws the portrait in a style, then it animates like any photo ----
-  const [charStyle, setCharStyle] = useState('3d');
-  const [charNote, setCharNote] = useState('');
-  const [charState, setCharState] = useState<{ status: 'idle' | 'snapping' | 'drawing' | 'done' | 'failed'; images?: string[]; why?: string }>({ status: 'idle' });
-  const drawCharacter = useCallback(async (src: Blob | null) => {
-    if (!src) { setCharState({ status: 'failed', why: 'Couldn’t see your face. Turn the camera on, face it in good light, and try again.' }); return; }
-    setCharState({ status: 'drawing' });
-    try {
-      const cv = await portraitCanvas(src);
-      const r = await apiFetch('/api/admin/studio/character', {
-        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: cv.toDataURL('image/jpeg', 0.9), style: charStyle, note: charNote, count: 3 }),
-      });
-      const d = await r.json().catch(() => ({})) as { images?: string[]; error?: string };
-      if (!r.ok || !d.images?.length) { setCharState({ status: 'failed', why: d.error ?? 'Drawing failed. Try again.' }); return; }
-      setCharState({ status: 'done', images: d.images });
-    } catch { setCharState({ status: 'failed', why: 'Couldn’t reach the server. Try again.' }); }
-  }, [charStyle, charNote]);
-  const pickCharacter = useCallback(async (dataUrl: string, i: number) => {
-    const blob = await (await fetch(dataUrl)).blob();
-    set({ photoStyle: 'real' }); // it's already drawn; no filter on top
-    await applyPortrait(`AI character ${i + 1}`, blob);
-  }, [set, applyPortrait]);
-  useEffect(() => () => photoAv.current?.dispose(), []);
-  // a new look redraws the photo once
-  useEffect(() => {
-    const pa = photoAv.current; if (!pa?.ready) return;
-    const pic = pa.setStyle(s.photoStyle);
-    if (pic) setPhotoState((st) => ({ ...st, preview: pic.toDataURL('image/jpeg', 0.7) }));
-  }, [s.photoStyle]);
 
   // ---- stage size: keep the aspect, fit the space ----
   useEffect(() => {
@@ -396,31 +266,6 @@ export default function StreamerStudio() {
   }, [flash, refreshDevices]);
   const stopVoice = useCallback(() => { voice.current.stop(); setVoiceOn(false); }, []);
   const [testing, setTesting] = useState<'rec' | 'play' | null>(null);
-  const [making, setMaking] = useState(false);
-  const cartoonMe = useCallback(async () => {
-    setMaking(true);
-    try {
-      if (!sRef.current.camOn || sRef.current.disguise !== 'avatar') set({ camOn: true, disguise: 'avatar' });
-      const t0 = performance.now();
-      // wait for the camera and face tracking, then a fresh look at the face
-      while (performance.now() - t0 < 15000) {
-        await new Promise((r) => window.setTimeout(r, 300));
-        const tr = tracker.current;
-        if (tr.status === 'failed') break;
-        if (tr.lastLandmarks && performance.now() - tr.lastAt < 400 && camVideo.current && camVideo.current.videoWidth) {
-          await new Promise((r) => window.setTimeout(r, 600)); // let the camera settle its exposure
-          const look = cartoonFromCamera(camVideo.current, tr.lastLandmarks, sRef.current.person);
-          if (look) {
-            const custom = toonFromPerson(look, sRef.current.toon.custom ?? DEFAULT_TOON_CUSTOM);
-            set({ person: look, avatar: 'toon', toon: { style: 'avataaars', seed: sRef.current.toon.style === 'avataaars' ? sRef.current.toon.seed : 'avataaars-me', custom } });
-            flash('Made a cartoon of you. Fine-tune it under “Customise”.');
-            return;
-          }
-        }
-      }
-      flash('Couldn’t see your face clearly. Face the camera in good light and try again.');
-    } finally { setMaking(false); }
-  }, [set, flash]);
   const testVoice = useCallback(async () => {
     if (!voice.current.running) await startVoice();
     const track = voice.current.stream?.getAudioTracks()[0];
@@ -691,8 +536,8 @@ export default function StreamerStudio() {
   // ---- camera canvas render loop ----
   useEffect(() => {
     let raf = 0;
-    const pose: AvatarPose = { x: 0, y: 0, size: 0, roll: 0, yaw: 0, pitch: 0, mouth: 0, blinkL: 0, blinkR: 0, smile: 0, t: 0 };
-    let lastSeen = 0, nextBlink = performance.now() + 2500, blinkUntil = 0;
+    const pose = { x: 0, y: 0, size: 0, roll: 0 }; // where the face is, to hide it
+    let lastSeen = 0;
     const tiny = document.createElement('canvas');
     const tctx = tiny.getContext('2d');
     const loop = () => {
@@ -737,25 +582,18 @@ export default function StreamerStudio() {
       if (face) {
         lastSeen = t;
         const fx = ox + face.x * sc, fy = oy + face.y * sc;
-        const tx = mirror ? W - fx : fx, roll = mirror ? -face.roll : face.roll, yaw = mirror ? -face.yaw : face.yaw;
+        const tx = mirror ? W - fx : fx, roll = mirror ? -face.roll : face.roll;
         const k = pose.size ? 0.55 : 1;
         pose.x += (tx - pose.x) * k; pose.y += (fy - pose.y) * k; pose.size += (face.size * sc * st.avatarScale - pose.size) * k;
-        pose.roll += (roll - pose.roll) * k; pose.yaw += (yaw - pose.yaw) * k; pose.pitch += (face.pitch - pose.pitch) * k;
-        pose.mouth = face.mouth; pose.blinkL = face.blinkL; pose.blinkR = face.blinkR; pose.smile = face.smile;
-        pose.brow = (pose.brow ?? 0) + (face.brow - (pose.brow ?? 0)) * 0.5;
-        pose.lookX = mirror ? -face.lookX : face.lookX; pose.lookY = face.lookY;
+        pose.roll += (roll - pose.roll) * k;
       }
       const tracked = t - lastSeen < 450;
-      const vlevel = voice.current.running ? voice.current.level() : 0;
 
       if (st.disguise === 'none') {
         if (hasVideo) drawVideo(); else brand();
       } else if (!tracked) {
         // Privacy shield: no face found -> never show the raw camera.
-        if (st.disguise === 'avatar' && st.bg !== 'room' && st.bg !== 'blur') brand();
-        else if (hasVideo) drawVideo(40); else brand();
-      } else if (st.disguise === 'avatar') {
-        if (st.bg === 'room') drawVideo(); else if (st.bg === 'blur') drawVideo(28); else brand();
+        if (hasVideo) drawVideo(40); else brand();
       } else {
         drawVideo();
         // hide the face region: ellipse in the (mirrored) video space
@@ -765,37 +603,7 @@ export default function StreamerStudio() {
         c.restore();
       }
 
-      if (st.disguise === 'avatar') {
-        if (!tracked) {
-          // idle avatar driven by the voice
-          const tx = W / 2 + Math.sin(t / 1400) * W * 0.015, ty = H * 0.47 + Math.sin(t / 900) * H * 0.008;
-          const size = Math.min(W, H) * 0.42;
-          const k = pose.size ? 0.08 : 1;
-          pose.x += (tx - pose.x) * k; pose.y += (ty - pose.y) * k; pose.size += (size - pose.size) * k;
-          pose.roll *= 0.9; pose.yaw = Math.sin(t / 2100) * 0.25; pose.pitch *= 0.9; pose.smile = 0.3;
-          if (t > nextBlink) { blinkUntil = t + 140; nextBlink = t + 2500 + Math.random() * 3000; }
-          pose.blinkL = pose.blinkR = t < blinkUntil ? 1 : 0;
-          pose.mouth = Math.min(1, vlevel * 1.8);
-        } else if (pose.mouth < 0.1 && vlevel > 0.15) pose.mouth = Math.min(1, vlevel * 1.5);
-        pose.t = t / 1000;
-        if (st.avatar === 'photo' && photoAv.current?.ready) {
-          const img = photoAv.current.render(W, H, st.avatarScale / 1.3, {
-            yaw: pose.yaw, pitch: pose.pitch, roll: pose.roll, mouth: pose.mouth, blinkL: pose.blinkL, blinkR: pose.blinkR,
-            smile: tracked ? pose.smile : 0.15, brow: pose.brow ?? 0, t: pose.t, mirror,
-          });
-          c.drawImage(img, 0, 0, W, H);
-        } else if (st.avatar === '3d' && a3d.current?.status === 'ready') {
-          const rw = Math.round(W * 0.8), rh = Math.round(H * 0.8);
-          const img = a3d.current.render(rw, rh, st.avatarScale / 1.3, {
-            yaw: pose.yaw, pitch: pose.pitch, roll: pose.roll, t: pose.t, mirror, tracked,
-            voice: vlevel, blinkL: pose.blinkL, blinkR: pose.blinkR,
-          }, tracked ? tracker.current.lastBlendshapes : {});
-          c.drawImage(img, 0, 0, W, H);
-        } else if (st.avatar === 'toon' || st.avatar === '3d' || st.avatar === 'photo') drawToon(c, st.toon, pose);
-        else drawAvatar(c, st.avatar, pose, { person: st.person, hat: st.hat, eyewear: st.eyewear, style: st.personStyle });
-      }
-
-      if (!hasVideo && st.disguise !== 'avatar') {
+      if (!hasVideo) {
         c.fillStyle = RD.muted; c.font = `${Math.round(H * 0.06)}px "DM Sans", sans-serif`; c.textAlign = 'center';
         c.fillText(st.camOn ? 'Starting camera…' : 'Camera off', W / 2, H / 2);
       }
@@ -1234,11 +1042,9 @@ export default function StreamerStudio() {
                 {cams.map((d, i) => <option key={d.deviceId} value={d.deviceId}>{d.label || `Camera ${i + 1}`}</option>)}
               </select>
             )}
-            <Note>No camera? Pick an avatar anyway: it talks along with your voice.</Note>
 
             <Label>Hide my face</Label>
             <div className="flex flex-wrap gap-2">
-              <Chip on={s.disguise === 'avatar'} onClick={() => set({ disguise: 'avatar' })}>🎭 Avatar</Chip>
               <Chip on={s.disguise === 'pixelate'} onClick={() => set({ disguise: 'pixelate' })}>▦ Pixelate face</Chip>
               <Chip on={s.disguise === 'blur'} onClick={() => set({ disguise: 'blur' })}>◌ Blur face</Chip>
               <Chip on={s.disguise === 'none'} onClick={() => set({ disguise: 'none' })}>🙂 Show my face</Chip>
@@ -1247,172 +1053,10 @@ export default function StreamerStudio() {
               <Note>
                 {trackStatus === 'loading' && 'Loading face tracking…'}
                 {trackStatus === 'ready' && 'Face tracking on. If your face is ever lost, the camera is hidden until it’s found again.'}
-                {trackStatus === 'failed' && 'Face tracking couldn’t load on this device, so your camera stays hidden and the avatar follows your voice.'}
+                {trackStatus === 'failed' && 'Face tracking couldn’t load on this device, so your camera stays hidden.'}
               </Note>
             )}
 
-            {s.disguise === 'avatar' && (<>
-              <Label>Realistic</Label>
-              <Chip on={s.avatar === 'photo'} onClick={() => set({ avatar: 'photo' })}>📸 Photo avatar (moves with you)</Chip>
-              {s.avatar === 'photo' && (
-                <div className="mt-2 mb-2 p-3 rounded-xl" style={{ background: CARD_LIGHT, border: `1px solid ${RD.border}` }}>
-                  {photoState.status === 'ready' && photoState.preview && (
-                    <img src={photoState.preview} alt="" className="w-20 h-20 rounded-xl object-cover mb-2" style={{ border: `1px solid ${RD.border}` }} />
-                  )}
-                  <div className="mb-3 p-3 rounded-xl" style={{ background: CARD, border: `1px solid ${RD.border}` }}>
-                    <div className="text-[13px] font-extrabold mb-1" style={{ color: RD.text }}>✨ AI character of me</div>
-                    <div className="text-[12px] mb-2" style={{ color: RD.muted }}>AI redraws you as a character, then it talks, blinks and turns its head with you.</div>
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {([['3d', '3D cartoon'], ['anime', 'Anime'], ['game', 'Game hero'], ['comic', 'Comic'], ['clay', 'Clay'], ['painting', 'Painting']] as const).map(([id, label]) =>
-                        <Chip key={id} on={charStyle === id} onClick={() => setCharStyle(id)}>{label}</Chip>)}
-                    </div>
-                    <input value={charNote} onChange={(e) => setCharNote(e.target.value)} maxLength={200} placeholder="Extra (optional): e.g. wearing a hoodie, knight helmet"
-                      className="w-full mb-2 px-3 py-2 rounded-lg text-[13px]" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }} />
-                    <div className="grid grid-cols-2 gap-2">
-                      <button disabled={charState.status === 'snapping' || charState.status === 'drawing'}
-                        onClick={async () => { setCharState({ status: 'snapping' }); await drawCharacter(await snapCamera()); }}
-                        className="py-2.5 rounded-xl font-bold text-[13px]" style={{ background: RD.gold, color: '#050A0B' }}>
-                        {charState.status === 'snapping' ? 'Looking at you…' : charState.status === 'drawing' ? 'Drawing… (up to a minute)' : '📷 From my camera'}
-                      </button>
-                      <label className="py-2.5 rounded-xl font-bold text-[13px] text-center cursor-pointer" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }}>
-                        🖼️ From a photo
-                        <input type="file" accept="image/*" className="hidden" disabled={charState.status === 'drawing'} onChange={(e) => { const f = e.target.files?.[0]; if (f) void drawCharacter(f); e.target.value = ''; }} />
-                      </label>
-                    </div>
-                    {charState.status === 'failed' && <Note>{charState.why}</Note>}
-                    {charState.status === 'done' && charState.images && (<>
-                      <div className="text-[12px] mt-2 mb-1.5" style={{ color: RD.muted }}>Tap the one you want:</div>
-                      <div className="grid grid-cols-3 gap-2">
-                        {charState.images.map((src, i) => (
-                          <button key={i} onClick={() => void pickCharacter(src, i)} className="rounded-xl overflow-hidden" style={{ border: `1px solid ${RD.border}` }}>
-                            <img src={src} alt={`Character ${i + 1}`} className="w-full aspect-square object-cover" />
-                          </button>
-                        ))}
-                      </div>
-                      <button onClick={() => setCharState({ status: 'idle' })} className="mt-2 text-[12px] underline" style={{ color: RD.muted }}>Clear these</button>
-                    </>)}
-                  </div>
-                  <div className="text-[12px] font-bold mb-1.5" style={{ color: RD.muted }}>Look</div>
-                  <div className="flex flex-wrap gap-1.5 mb-3">
-                    {PHOTO_STYLES.map((p) => <Chip key={p.id} on={s.photoStyle === p.id} onClick={() => set({ photoStyle: p.id })}>{p.label}</Chip>)}
-                  </div>
-                  <label className="block w-full py-2.5 rounded-xl font-bold text-sm text-center cursor-pointer" style={{ background: RD.green, color: '#06110A' }}>
-                    {photoState.status === 'ready' ? 'Use a different photo' : 'Upload a portrait photo'}
-                    <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void applyPortrait(f.name, f); e.target.value = ''; }} />
-                  </label>
-                  <button onClick={() => void portraitFromCamera()} disabled={photoState.status === 'working'} className="mt-2 w-full py-2.5 rounded-xl font-bold text-sm"
-                    style={{ background: CARD, color: RD.text, border: `1px solid ${RD.border}` }}>
-                    {photoState.status === 'working' ? 'Finding the face…' : '📷 Take the portrait with my camera'}
-                  </button>
-                  <Note>
-                    {photoState.status === 'ready' && `${photoState.name}: ready. It turns its head, blinks, talks, smiles and raises its eyebrows with you. With no camera it talks with your voice.`}
-                    {photoState.status === 'failed' && (photoState.why ?? 'That didn’t work. Try another photo.')}
-                    {photoState.status === 'none' && 'No photo yet.'}
-                  </Note>
-                  <Note>
-                    Best results: face the camera straight on, mouth closed, good even light, head and shoulders in the shot. Any realistic face works,
-                    such as your own photo or a made-up person you created, as long as you have the right to use it. The photo stays on this device.
-                  </Note>
-                  {photoState.status === 'ready' && <button onClick={() => { void clearPortrait(); setPhotoState({ status: 'none' }); set({ avatar: 'toon' }); }} className="mt-2 text-[12px] underline" style={{ color: RD.muted }}>Remove photo avatar</button>}
-                </div>
-              )}
-              <Chip on={s.avatar === '3d'} onClick={() => set({ avatar: '3d' })}>🧑‍🚀 3D realistic (your own)</Chip>
-              {s.avatar === '3d' && (
-                <div className="mt-2 p-3 rounded-xl" style={{ background: CARD_LIGHT, border: `1px solid ${RD.border}` }}>
-                  <label className="block w-full py-2.5 rounded-xl font-bold text-sm text-center cursor-pointer" style={{ background: RD.green, color: '#06110A' }}>
-                    {a3dState.status === 'ready' ? 'Change 3D avatar file' : 'Upload a 3D avatar (.glb or .vrm)'}
-                    <input type="file" accept=".glb,.vrm,model/gltf-binary" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void pick3D(f); e.target.value = ''; }} />
-                  </label>
-                  <Note>
-                    {a3dState.status === 'loading' && `Opening ${a3dState.name ?? 'your avatar'}…`}
-                    {a3dState.status === 'ready' && `${a3dState.name}: ${a3dState.shapes ? `${a3dState.shapes} face expressions found, so it blinks, talks and smiles with you.` : 'no face expressions in this file, so only the head moves.'}`}
-                    {a3dState.status === 'failed' && 'That file didn’t open. Try exporting it again as .glb.'}
-                    {a3dState.status === 'none' && 'No 3D avatar yet.'}
-                  </Note>
-                  <Note>
-                    Make a realistic 3D you from a selfie in a free avatar maker such as <a className="underline" href="https://avaturn.me" target="_blank" rel="noreferrer">Avaturn</a> or <a className="underline" href="https://metaperson.avatarsdk.com" target="_blank" rel="noreferrer">MetaPerson Creator</a> (or an anime-style one in <a className="underline" href="https://vroid.com/en/studio" target="_blank" rel="noreferrer">VRoid Studio</a>), export it as a .glb or .vrm file, and upload it here. Pick one with ARKit face blendshapes for the best movement.
-                    The file stays on this device.
-                  </Note>
-                  {a3dState.status === 'ready' && <button onClick={() => { void clearAvatarFile(); setA3dState({ status: 'none' }); set({ avatar: 'toon' }); }} className="mt-2 text-[12px] underline" style={{ color: RD.muted }}>Remove 3D avatar</button>}
-                </div>
-              )}
-              <Label>Cartoon characters</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {TOON_STYLES.map((t) => <Chip key={t.id} on={s.avatar === 'toon' && s.toon.style === t.id} onClick={() => set({ avatar: 'toon', toon: { style: t.id, seed: `${t.id}-${s.toonShuffle}-0`, custom: t.id === 'avataaars' ? s.toon.custom ?? null : null } })}>{t.label}</Chip>)}
-              </div>
-              <ToonGrid ready={toonsReady} style={s.toon.style} shuffle={s.toonShuffle} current={s.avatar === 'toon' ? s.toon : null}
-                onPick={(seed) => set({ avatar: 'toon', toon: { style: s.toon.style, seed, custom: s.toon.style === 'avataaars' ? s.toon.custom ?? null : null } })}
-                onShuffle={() => set({ toonShuffle: s.toonShuffle + 1 })} />
-              <button onClick={() => void cartoonMe()} disabled={making} className="mt-3 w-full py-3 rounded-xl font-extrabold text-sm"
-                style={{ background: making ? CARD_LIGHT : RD.gold, color: making ? RD.text : '#050A0B' }}>
-                {making ? 'Looking at you… hold still' : '✨ Make a cartoon of me from my camera'}
-              </button>
-              <Note>Looks at your camera once and draws you as a cartoon: skin, hair, beard and clothes. The picture never leaves your device.</Note>
-              {s.avatar === 'toon' && s.toon.style === 'avataaars' && (
-                <ToonCustomiser value={s.toon.custom ?? DEFAULT_TOON_CUSTOM} on={!!s.toon.custom}
-                  onToggle={(on) => set({ toon: { ...s.toon, custom: on ? (s.toon.custom ?? DEFAULT_TOON_CUSTOM) : null } })}
-                  onChange={(c) => set({ toon: { ...s.toon, custom: c } })} />
-              )}
-              <details className="mt-4">
-              <summary className="cursor-pointer text-[13px] font-bold py-2" style={{ color: RD.text }}>More avatars: chess pieces, classic cartoons, people</summary>
-              <Label>Chess pieces</Label>
-              <div className="grid grid-cols-6 gap-2">
-                {AVATARS.filter((a) => a.group === 'piece').map((a) => <AvatarBtn key={a.id} id={a.id} label={a.label.split(' ')[1]} on={s.avatar === a.id} onClick={() => set({ avatar: a.id })} />)}
-              </div>
-              <Label>Cartoon</Label>
-              <div className="grid grid-cols-5 gap-2">
-                {AVATARS.filter((a) => a.group === 'cartoon').map((a) => <AvatarBtn key={a.id} id={a.id} label={a.label} on={s.avatar === a.id} onClick={() => set({ avatar: a.id })} />)}
-              </div>
-              <Label>Person</Label>
-              <div className="grid grid-cols-5 gap-2">
-                {AVATARS.filter((a) => a.group === 'person').map((a) => <AvatarBtn key={a.id} id={a.id} label={a.label} style={s.personStyle} person={a.id === 'me' ? s.person : undefined} on={s.avatar === a.id} onClick={() => set({ avatar: a.id })} />)}
-              </div>
-              <Label>Chess characters</Label>
-              <div className="grid grid-cols-6 gap-2">
-                {AVATARS.filter((a) => a.group === 'character').map((a) => <AvatarBtn key={a.id} id={a.id} label={a.label} style={s.personStyle} on={s.avatar === a.id}
-                  onClick={() => set({ avatar: a.id, ...(CHARACTER_EXTRAS[a.id] ?? {}) })} />)}
-              </div>
-              <div className="mt-3 flex flex-wrap gap-2 items-center">
-                <span className="text-[12px] font-semibold" style={{ color: RD.muted }}>People style:</span>
-                <Chip on={s.personStyle === 'cartoon'} onClick={() => set({ personStyle: 'cartoon' })}>✏️ Cartoon</Chip>
-                <Chip on={s.personStyle === 'real'} onClick={() => set({ personStyle: 'real' })}>🖌️ Realistic</Chip>
-              </div>
-              <button onClick={() => void cartoonMe()} disabled={making} className="mt-3 w-full py-2.5 rounded-xl font-bold text-sm"
-                style={{ background: making ? CARD_LIGHT : RD.gold, color: making ? RD.text : '#050A0B' }}>
-                {making ? 'Looking at you… hold still' : '✨ Make an avatar from my camera'}
-              </button>
-              <Note>Looks at your camera once and builds a matching person (skin, hair, beard, eyes, shirt), cartoon or realistic. You can tweak it after. The picture never leaves your device.</Note>
-              {s.avatar === 'me' && (<div className="mt-3 p-3 rounded-xl" style={{ background: CARD_LIGHT, border: `1px solid ${RD.border}` }}>
-                <p className="text-[12px] font-bold mb-1">Make your own</p>
-                <Swatches label="Skin" colors={SKIN_TONES} value={s.person.skin} onPick={(v) => set({ person: { ...s.person, skin: v } })} />
-                <Label>Hair</Label>
-                <div className="flex flex-wrap gap-1.5">{HAIR_STYLES.map((h) => <Chip key={h.id} on={s.person.hair === h.id} onClick={() => set({ person: { ...s.person, hair: h.id } })}>{h.label}</Chip>)}</div>
-                <Swatches label="Hair colour" colors={HAIR_COLORS} value={s.person.hairColor} onPick={(v) => set({ person: { ...s.person, hairColor: v } })} />
-                <Label>Facial hair</Label>
-                <div className="flex flex-wrap gap-1.5">{FACIAL_HAIR.map((h) => <Chip key={h.id} on={s.person.facial === h.id} onClick={() => set({ person: { ...s.person, facial: h.id } })}>{h.label}</Chip>)}</div>
-                <Swatches label="Eyes" colors={EYE_COLORS} value={s.person.eyes} onPick={(v) => set({ person: { ...s.person, eyes: v } })} />
-                <Label>Outfit</Label>
-                <div className="flex flex-wrap gap-1.5">{OUTFITS.map((h) => <Chip key={h.id} on={(s.person.outfit ?? 'tee') === h.id} onClick={() => set({ person: { ...s.person, outfit: h.id } })}>{h.label}</Chip>)}</div>
-                <Swatches label="Outfit colour" colors={SHIRT_COLORS} value={s.person.shirt} onPick={(v) => set({ person: { ...s.person, shirt: v } })} />
-              </div>)}
-              <Label>Hat</Label>
-              <div className="flex flex-wrap gap-1.5">{HATS.map((h) => <Chip key={h.id} on={s.hat === h.id} onClick={() => set({ hat: h.id })}>{h.emoji} {h.label}</Chip>)}</div>
-              <Label>Glasses</Label>
-              <div className="flex flex-wrap gap-1.5">{EYEWEAR.map((h) => <Chip key={h.id} on={s.eyewear === h.id} onClick={() => set({ eyewear: h.id })}>{h.emoji} {h.label}</Chip>)}</div>
-              <Note>Hats and glasses work on these avatars, the chess pieces too.</Note>
-              </details>
-              <Slider label="Avatar size" min={0.8} max={2.2} step={0.05} value={s.avatarScale} onChange={(v) => set({ avatarScale: v })} />
-              <p className="text-[10px] mt-2 leading-snug" style={{ color: RD.muted }}>{TOON_CREDITS}</p>
-              <Label>Behind the avatar</Label>
-              <div className="flex flex-wrap gap-2">
-                <Chip on={s.bg === 'brand'} onClick={() => set({ bg: 'brand' })}>ChessScout</Chip>
-                <Chip on={s.bg === 'color'} onClick={() => set({ bg: 'color' })}>Colour</Chip>
-                <Chip on={s.bg === 'blur'} onClick={() => set({ bg: 'blur' })}>Blurred room</Chip>
-                <Chip on={s.bg === 'room'} onClick={() => set({ bg: 'room' })}>My room</Chip>
-              </div>
-              {s.bg === 'color' && <input type="color" value={s.bgColor} onChange={(e) => set({ bgColor: e.target.value })} className="mt-2 w-16 h-9 rounded" />}
-              <Note>For full anonymity keep ChessScout or a colour behind the avatar: nothing from your room is shown.</Note>
-            </>)}
           </>)}
 
           {tab === 'voice' && (<>
@@ -1504,27 +1148,6 @@ function Slider({ label, min, max, step, value, onChange }: { label: string; min
   );
 }
 
-function AvatarBtn({ id, label, on, onClick, person, style }: { id: AvatarId; label: string; on: boolean; onClick: () => void; person?: PersonLook; style?: 'cartoon' | 'real' }) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  useEffect(() => {
-    const cv = ref.current; const c = cv?.getContext('2d'); if (!cv || !c) return;
-    c.clearRect(0, 0, cv.width, cv.height);
-    const draw = () => { c.clearRect(0, 0, cv.width, cv.height); drawAvatar(c, id, { x: 48, y: 50, size: 44, roll: 0, yaw: 0, pitch: 0, mouth: 0, blinkL: 0, blinkR: 0, smile: 0.4, t: 0 }, { person, style }); };
-    draw();
-    const tm = window.setTimeout(draw, 700); // piece images may still be loading
-    return () => window.clearTimeout(tm);
-  }, [id, person, style]);
-  return (
-    <button onClick={onClick} title={label} className="rounded-xl overflow-hidden flex flex-col items-center pb-1"
-      style={{ background: CARD_LIGHT, border: `2px solid ${on ? RD.green : 'transparent'}` }}>
-      <canvas ref={ref} width={96} height={96} className="w-full aspect-square" />
-      <span className="text-[10px] font-semibold truncate w-full text-center" style={{ color: on ? RD.green : RD.muted }}>{label}</span>
-    </button>
-  );
-}
-
-interface SavedVideo { id: string; title: string; mime: string; size_bytes: number | string; duration_ms: number; status: string; created_at: string; username?: string | null }
-
 function VideosPanel({ refreshKey, onError }: { refreshKey: number; onError: (m: string) => void }) {
   const [list, setList] = useState<SavedVideo[] | null>(null);
   const [playing, setPlaying] = useState<{ id: string; url: string } | null>(null);
@@ -1583,62 +1206,3 @@ function VideosPanel({ refreshKey, onError }: { refreshKey: number; onError: (m:
   );
 }
 
-function Swatches({ label, colors, value, onPick }: { label: string; colors: string[]; value: string; onPick: (v: string) => void }) {
-  return (
-    <div>
-      <p className="text-[11px] font-bold uppercase tracking-wider mt-3 mb-1.5" style={{ color: RD.muted }}>{label}</p>
-      <div className="flex flex-wrap gap-1.5">
-        {colors.map((c) => (
-          <button key={c} onClick={() => onPick(c)} aria-label={c} className="w-8 h-8 rounded-full"
-            style={{ background: c, border: `3px solid ${value === c ? RD.green : 'rgba(255,255,255,.12)'}` }} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ToonGrid({ ready, style, shuffle, current, onPick, onShuffle }: { ready: boolean; style: ToonPick['style']; shuffle: number; current: ToonPick | null; onPick: (seed: string) => void; onShuffle: () => void }) {
-  if (!ready) return <Note>Loading characters…</Note>;
-  const seeds = Array.from({ length: 12 }, (_, i) => `${style}-${shuffle}-${i}`);
-  return (
-    <div className="mt-2">
-      <div className="grid grid-cols-4 gap-2">
-        {seeds.map((seed) => {
-          const on = !!current && current.style === style && current.seed === seed;
-          const src = toonThumb({ style, seed, custom: on ? current?.custom : null });
-          return (
-            <button key={seed} onClick={() => onPick(seed)} className="rounded-xl overflow-hidden aspect-square"
-              style={{ background: '#e9edf2', border: `3px solid ${on ? RD.green : 'transparent'}` }}>
-              {src && <img src={src} alt="" className="w-full h-full" />}
-            </button>
-          );
-        })}
-      </div>
-      <button onClick={onShuffle} className="mt-2 w-full py-2 rounded-xl text-[13px] font-bold" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }}>🔀 Show me more</button>
-    </div>
-  );
-}
-
-function ToonCustomiser({ value, on, onToggle, onChange }: { value: ToonCustom; on: boolean; onToggle: (on: boolean) => void; onChange: (c: ToonCustom) => void }) {
-  return (
-    <div className="mt-3 p-3 rounded-xl" style={{ background: CARD_LIGHT, border: `1px solid ${RD.border}` }}>
-      <div className="flex items-center gap-2">
-        <p className="text-[13px] font-bold flex-1">Customise</p>
-        <Chip on={on} onClick={() => onToggle(!on)}>{on ? 'On' : 'Off'}</Chip>
-      </div>
-      {on && (<>
-        <Swatches label="Skin" colors={TOON_SKINS} value={value.skinColor} onPick={(v) => onChange({ ...value, skinColor: v })} />
-        <Label>Hair</Label>
-        <div className="flex flex-wrap gap-1.5">{TOON_TOPS.map((h) => <Chip key={h.id} on={value.top === h.id} onClick={() => onChange({ ...value, top: h.id })}>{h.label}</Chip>)}</div>
-        <Swatches label="Hair colour" colors={HAIR_COLORS} value={value.hairColor} onPick={(v) => onChange({ ...value, hairColor: v })} />
-        <Label>Facial hair</Label>
-        <div className="flex flex-wrap gap-1.5">{TOON_FACIAL.map((h) => <Chip key={h.id} on={value.facialHair === h.id} onClick={() => onChange({ ...value, facialHair: h.id })}>{h.label}</Chip>)}</div>
-        <Label>Glasses</Label>
-        <div className="flex flex-wrap gap-1.5">{TOON_GLASSES.map((h) => <Chip key={h.id} on={value.accessories === h.id} onClick={() => onChange({ ...value, accessories: h.id })}>{h.label}</Chip>)}</div>
-        <Label>Clothes</Label>
-        <div className="flex flex-wrap gap-1.5">{TOON_CLOTHES.map((h) => <Chip key={h.id} on={value.clothing === h.id} onClick={() => onChange({ ...value, clothing: h.id })}>{h.label}</Chip>)}</div>
-        <Swatches label="Clothes colour" colors={SHIRT_COLORS} value={value.clothesColor} onPick={(v) => onChange({ ...value, clothesColor: v })} />
-      </>)}
-    </div>
-  );
-}
