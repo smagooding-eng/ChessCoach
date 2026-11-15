@@ -96,6 +96,13 @@ router.post("/lichess/board/token", requireAuth, async (req: Request, res: Respo
     await ensureTable();
     const acc = await fetch("https://lichess.org/api/account", { headers: { Authorization: `Bearer ${token}` } }).then((x) => (x.ok ? x.json() : null)).catch(() => null) as { username?: string; title?: string } | null;
     if (!acc?.username || acc.title === "BOT") { res.status(400).json({ error: "Lichess didn't accept that connection" }); return; }
+    // A connection left on a shared device by another ChessScout account stays with that
+    // account: it's only copied here when no other account holds this Lichess account,
+    // or this account is the one signed up with it.
+    const taken = rowsOf<{ user_id: string }>(await db.execute(sql`SELECT t.user_id FROM lichess_board_tokens t
+      WHERE lower(t.username) = lower(${acc.username}) AND t.user_id <> ${req.user!.id}
+      AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id = ${req.user!.id} AND lower(u.lichess_username) = lower(${acc.username})) LIMIT 1`));
+    if (taken.length) { res.status(409).json({ error: "That Lichess account is connected to another ChessScout account" }); return; }
     await db.execute(sql`INSERT INTO lichess_board_tokens (user_id, token, username, updated_at) VALUES (${req.user!.id}, ${seal(token)}, ${acc.username}, now())
       ON CONFLICT (user_id) DO UPDATE SET token = EXCLUDED.token, username = EXCLUDED.username, updated_at = now()`);
     res.json({ ok: true });
@@ -160,9 +167,23 @@ async function checkDailyTurns(): Promise<void> {
   // Old records go after a month.
   await db.execute(sql`DELETE FROM lichess_daily_notified WHERE at < now() - interval '30 days'`).catch(() => {});
 }
+// One Lichess account copied onto several ChessScout accounts from a shared device:
+// it stays only with the account that owns it (signed up with that Lichess account,
+// otherwise the one that connected it first). The others just lose the copy; the
+// Lichess connection itself isn't revoked.
+async function removeCopiedConnections(): Promise<void> {
+  await ensureTable();
+  await db.execute(sql`DELETE FROM lichess_board_tokens t USING (
+      SELECT t2.user_id, row_number() OVER (PARTITION BY lower(t2.username)
+        ORDER BY (lower(u.lichess_username) = lower(t2.username)) IS TRUE DESC, t2.updated_at ASC) AS rank
+      FROM lichess_board_tokens t2 LEFT JOIN users u ON u.id = t2.user_id
+    ) r WHERE r.user_id = t.user_id AND r.rank > 1`);
+}
+
 export function startLichessDailyWatch(): void {
   if (watching) return;
   watching = true;
+  void removeCopiedConnections().catch((err) => logger.warn({ err }, "[lichess] removing copied connections failed"));
   let busy = false;
   const tick = async () => { if (busy) return; busy = true; try { await checkDailyTurns(); } catch (err) { logger.warn({ err }, "[lichess-daily] check failed"); } finally { busy = false; } };
   setTimeout(() => void tick(), 90_000);

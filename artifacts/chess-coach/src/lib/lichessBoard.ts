@@ -90,7 +90,9 @@ export async function syncLichessAuth(): Promise<LichessAuth | null> {
     if (!uploaded) {
       uploaded = true;
       void apiFetch('/api/lichess/board/token', { credentials: 'include' }).then((r) => (r.ok ? r.json() : null)).then((d: { connected?: boolean } | null) => {
-        if (d && !d.connected) void apiFetch('/api/lichess/board/token', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: local.token }) }).catch(() => {});
+        // 409: that Lichess account belongs to another ChessScout account, so this device forgets it here.
+        if (d && !d.connected) void apiFetch('/api/lichess/board/token', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: local.token }) })
+          .then((r) => { if (r.status === 409 && lichessAuth()?.token === local.token) saveAuth(null); }).catch(() => {});
       }).catch(() => {});
     }
     return local;
