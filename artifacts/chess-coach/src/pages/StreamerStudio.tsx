@@ -10,6 +10,10 @@ import { Link } from 'wouter';
 import { RD } from '@/lib/redesignTheme';
 import { VoiceChanger, VOICE_PRESETS, VOICE_GROUPS, DEFAULT_CUSTOM, type VoicePreset, type CustomVoice } from '@/lib/streamer/voiceChanger';
 import { FaceTracker, type FacePose } from '@/lib/streamer/faceTracker';
+import {
+  MojiHead, loadThree, lookFromCamera, DEFAULT_MOJI, MOJI_SKINS, MOJI_HAIR_COLORS, MOJI_EYE_COLORS, MOJI_FRAMES, MOJI_HAIRS, MOJI_BEARDS, MOJI_MUSTACHES, MOJI_GLASSES,
+  type MojiLook,
+} from '@/lib/streamer/mojiHead';
 import { drawComposite, drawBoardPanel, headSizes, type BoardFeed, type TextRun } from '@/lib/streamer/compositor';
 import { CloudRecorder, type RecStatus } from '@/lib/streamer/recorder';
 import { LiveHost } from '@/lib/streamer/live';
@@ -22,7 +26,7 @@ type PanelId = 'board' | 'cam' | 'tag' | 'head';
 interface Rect { x: number; y: number; w: number; h: number; z: number; hidden?: boolean; round?: boolean }
 type Layout = Record<PanelId, Rect>;
 type Aspect = '9:16' | '16:9';
-type Disguise = 'none' | 'pixelate' | 'blur';
+type Disguise = 'none' | 'moji' | 'pixelate' | 'blur';
 type Bg = 'brand' | 'blur' | 'room' | 'color';
 type Tab = 'layout' | 'board' | 'camera' | 'voice' | 'videos' | 'live';
 
@@ -31,7 +35,7 @@ interface Settings {
   boardSource: 'app' | 'screen' | 'follow'; followUser: string; appPath: string; zoom: number; panX: number; panY: number;
   frame: 'auto' | 'manual'; framePad: 'board' | 'players';
   camOn: boolean; camId: string; facing: 'user' | 'environment'; mirror: boolean;
-  disguise: Disguise; bg: Bg; bgColor: string; avatarScale: number;
+  disguise: Disguise; moji: MojiLook; bg: Bg; bgColor: string; avatarScale: number;
   customVoice: CustomVoice;
   voice: VoicePreset; pitch: number; micId: string; output: string;
   name: string; subtitle: string;
@@ -69,7 +73,7 @@ const DEFAULTS: Settings = {
   boardSource: 'app', followUser: '', appPath: '/live', zoom: 1, panX: 0, panY: 0,
   frame: 'auto', framePad: 'players',
   camOn: false, camId: '', facing: 'user', mirror: true,
-  disguise: 'blur', customVoice: DEFAULT_CUSTOM, bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3,
+  disguise: 'moji', moji: DEFAULT_MOJI, customVoice: DEFAULT_CUSTOM, bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3,
   voice: 'off', pitch: 0, micId: '', output: 'none',
   name: 'Anonymous Knight', subtitle: 'Playing on chessscout.net',
   headline: 'The road to 1500 ELO', goal: 1500, ratingFrom: 'auto', manualRating: 0,
@@ -87,7 +91,8 @@ function loadSettings(): Settings {
     if (raw) {
       const saved = JSON.parse(raw) as Partial<Settings>;
       const merged = { ...DEFAULTS, ...saved };
-      if ((merged.disguise as string) === 'avatar') merged.disguise = 'blur'; // avatars were removed
+      if ((merged.disguise as string) === 'avatar') merged.disguise = 'moji'; // the old avatars became the 3D head
+      merged.moji = { ...DEFAULT_MOJI, ...(saved.moji ?? {}) };
       if (!merged.layout.head) {
         // first time with the headline: a ready-made layout makes room for it; your own arrangement gets it on top
         const pre = PRESETS[merged.aspect]?.find((p) => p.id === merged.preset);
@@ -246,6 +251,39 @@ export default function StreamerStudio() {
     stopCam(); host.current.stop(); void cloudRec.current?.stop();
     voice.current.stop(); tracker.current.close(); screenStream.current?.getTracks().forEach((t) => t.stop());
   }, [stopCam]);
+
+  // ---- 3D cartoon head (three.js loads only when it's picked) ----
+  const moji = useRef<MojiHead | null>(null);
+  const [mojiStatus, setMojiStatus] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle');
+  useEffect(() => {
+    if (s.disguise !== 'moji' || moji.current) return;
+    setMojiStatus('loading');
+    void loadThree().then((T) => {
+      if (!T) { setMojiStatus('failed'); return; }
+      const h = new MojiHead(T);
+      if (h.ok) { moji.current = h; setMojiStatus('ready'); } else setMojiStatus('failed');
+    });
+  }, [s.disguise]);
+  useEffect(() => () => moji.current?.dispose(), []);
+  const [matching, setMatching] = useState(false);
+  const matchMyLook = useCallback(async () => {
+    setMatching(true);
+    try {
+      if (!sRef.current.camOn) set({ camOn: true });
+      const t0 = performance.now();
+      while (performance.now() - t0 < 15000) {
+        await new Promise((r) => window.setTimeout(r, 300));
+        const tr = tracker.current, v = camVideo.current;
+        if (tr.status === 'failed') break;
+        if (v && v.videoWidth && tr.lastLandmarks && performance.now() - tr.lastAt < 400) {
+          await new Promise((r) => window.setTimeout(r, 700)); // let the camera settle its exposure
+          const look = tr.lastLandmarks ? lookFromCamera(v, tr.lastLandmarks, sRef.current.moji) : null;
+          if (look) { set({ moji: look, disguise: 'moji' }); flash('Matched your skin, hair and facial hair. Fine-tune anything below.'); return; }
+        }
+      }
+      flash('Couldn’t see your face clearly. Face the camera in good light and try again.');
+    } finally { setMatching(false); }
+  }, [set, flash]);
 
   // ---- face tracker: only loaded when a disguise needs it ----
   useEffect(() => {
@@ -537,7 +575,8 @@ export default function StreamerStudio() {
   useEffect(() => {
     let raf = 0;
     const pose = { x: 0, y: 0, size: 0, roll: 0 }; // where the face is, to hide it
-    let lastSeen = 0;
+    const ex = { yaw: 0, pitch: 0, mouth: 0, smile: 0, pucker: 0, blinkL: 0, blinkR: 0, brow: 0, lookX: 0, lookY: 0 }; // for the 3D head, screen terms
+    let lastSeen = 0, nextBlink = performance.now() + 2500, blinkUntil = 0;
     const tiny = document.createElement('canvas');
     const tctx = tiny.getContext('2d');
     const loop = () => {
@@ -586,6 +625,13 @@ export default function StreamerStudio() {
         const k = pose.size ? 0.55 : 1;
         pose.x += (tx - pose.x) * k; pose.y += (fy - pose.y) * k; pose.size += (face.size * sc * st.avatarScale - pose.size) * k;
         pose.roll += (roll - pose.roll) * k;
+        const bs = tracker.current.lastBlendshapes ?? {};
+        ex.yaw += ((mirror ? -face.yaw : face.yaw) - ex.yaw) * 0.6; ex.pitch += (face.pitch - ex.pitch) * 0.6;
+        ex.mouth = face.mouth; ex.smile = face.smile; ex.brow += (face.brow - ex.brow) * 0.5;
+        ex.pucker = Math.min(1, ((bs.mouthPucker ?? 0) + (bs.mouthFunnel ?? 0)) * 0.8);
+        // MediaPipe's left/right are the picture's; a mirrored view swaps them on screen
+        ex.blinkL = mirror ? face.blinkR : face.blinkL; ex.blinkR = mirror ? face.blinkL : face.blinkR;
+        ex.lookX = mirror ? -face.lookX : face.lookX; ex.lookY = face.lookY;
       }
       const tracked = t - lastSeen < 450;
 
@@ -594,6 +640,13 @@ export default function StreamerStudio() {
       } else if (!tracked) {
         // Privacy shield: no face found -> never show the raw camera.
         if (hasVideo) drawVideo(40); else brand();
+      } else if (st.disguise === 'moji') {
+        drawVideo();
+        // blur the face underneath too, in case the head ever slips
+        const r = pose.size * 0.62;
+        c.save(); c.beginPath(); c.ellipse(pose.x, pose.y, r * 1.1, r * 1.4, pose.roll, 0, Math.PI * 2); c.clip();
+        drawVideo(Math.max(10, r / 3));
+        c.restore();
       } else {
         drawVideo();
         // hide the face region: ellipse in the (mirrored) video space
@@ -603,7 +656,25 @@ export default function StreamerStudio() {
         c.restore();
       }
 
-      if (!hasVideo) {
+      if (st.disguise === 'moji' && moji.current) {
+        const head = moji.current;
+        let S: number, cx: number, cy: number;
+        if (tracked) {
+          S = pose.size * 1.66; cx = pose.x; cy = pose.y;
+        } else {
+          // no face in view (or no camera): the head talks with your voice and blinks on its own
+          const vlevel = voice.current.running ? voice.current.level() : 0;
+          if (t > nextBlink) { blinkUntil = t + 140; nextBlink = t + 2500 + Math.random() * 3000; }
+          const b = t < blinkUntil ? 1 : 0;
+          Object.assign(ex, { yaw: Math.sin(t / 2100) * 0.22, pitch: Math.sin(t / 1700) * 0.08, mouth: Math.min(1, vlevel * 1.8), smile: 0.25, pucker: 0, blinkL: b, blinkR: b, brow: vlevel > 0.3 ? 0.3 : 0, lookX: 0, lookY: 0 });
+          pose.roll *= 0.9;
+          S = Math.min(W, H) * 0.95 * (st.avatarScale / 1.3); cx = W / 2; cy = H * 0.52;
+        }
+        const img = head.render(st.moji, { ...ex, roll: pose.roll });
+        c.drawImage(img, cx - S / 2, cy - S / 2, S, S);
+      }
+
+      if (!hasVideo && st.disguise !== 'moji') {
         c.fillStyle = RD.muted; c.font = `${Math.round(H * 0.06)}px "DM Sans", sans-serif`; c.textAlign = 'center';
         c.fillText(st.camOn ? 'Starting camera…' : 'Camera off', W / 2, H / 2);
       }
@@ -1045,6 +1116,7 @@ export default function StreamerStudio() {
 
             <Label>Hide my face</Label>
             <div className="flex flex-wrap gap-2">
+              <Chip on={s.disguise === 'moji'} onClick={() => set({ disguise: 'moji' })}>🙂 3D cartoon head</Chip>
               <Chip on={s.disguise === 'pixelate'} onClick={() => set({ disguise: 'pixelate' })}>▦ Pixelate face</Chip>
               <Chip on={s.disguise === 'blur'} onClick={() => set({ disguise: 'blur' })}>◌ Blur face</Chip>
               <Chip on={s.disguise === 'none'} onClick={() => set({ disguise: 'none' })}>🙂 Show my face</Chip>
@@ -1056,6 +1128,36 @@ export default function StreamerStudio() {
                 {trackStatus === 'failed' && 'Face tracking couldn’t load on this device, so your camera stays hidden.'}
               </Note>
             )}
+            {s.disguise === 'moji' && (<>
+              <Note>
+                {mojiStatus === 'loading' && 'Loading the 3D head…'}
+                {mojiStatus === 'failed' && 'This browser can’t draw 3D (WebGL is off), so the 3D head isn’t available here.'}
+                {mojiStatus === 'ready' && 'Your head is swapped for a 3D cartoon that copies your face: turns, blinks, eyes, eyebrows, talking and smiling. With the camera off it talks with your voice.'}
+              </Note>
+              <button onClick={() => void matchMyLook()} disabled={matching} className="mt-2 w-full py-3 rounded-xl font-extrabold text-sm"
+                style={{ background: matching ? CARD_LIGHT : RD.gold, color: matching ? RD.text : '#050A0B' }}>
+                {matching ? 'Looking at you… hold still' : '✨ Match my look from the camera'}
+              </button>
+              <Label>Skin</Label>
+              <Swatches colors={MOJI_SKINS} value={s.moji.skin} onPick={(v) => set({ moji: { ...s.moji, skin: v } })} />
+              <Label>Hair</Label>
+              <div className="flex flex-wrap gap-1.5">{MOJI_HAIRS.map((h) => <Chip key={h.id} on={s.moji.hair === h.id} onClick={() => set({ moji: { ...s.moji, hair: h.id } })}>{h.label}</Chip>)}</div>
+              <Swatches colors={MOJI_HAIR_COLORS} value={s.moji.hairColor} onPick={(v) => set({ moji: { ...s.moji, hairColor: v } })} />
+              <Label>Eyes</Label>
+              <Swatches colors={MOJI_EYE_COLORS} value={s.moji.eyes} onPick={(v) => set({ moji: { ...s.moji, eyes: v } })} />
+              <Label>Beard</Label>
+              <div className="flex flex-wrap gap-1.5">{MOJI_BEARDS.map((h) => <Chip key={h.id} on={s.moji.beard === h.id} onClick={() => set({ moji: { ...s.moji, beard: h.id } })}>{h.label}</Chip>)}</div>
+              <Label>Moustache</Label>
+              <div className="flex flex-wrap gap-1.5">{MOJI_MUSTACHES.map((h) => <Chip key={h.id} on={s.moji.mustache === h.id} onClick={() => set({ moji: { ...s.moji, mustache: h.id } })}>{h.label}</Chip>)}</div>
+              {(s.moji.beard !== 'none' || s.moji.mustache !== 'none') && (<>
+                <Label>Facial hair colour</Label>
+                <Swatches colors={MOJI_HAIR_COLORS} value={s.moji.beardColor} onPick={(v) => set({ moji: { ...s.moji, beardColor: v } })} />
+              </>)}
+              <Label>Glasses</Label>
+              <div className="flex flex-wrap gap-1.5">{MOJI_GLASSES.map((h) => <Chip key={h.id} on={s.moji.glasses === h.id} onClick={() => set({ moji: { ...s.moji, glasses: h.id } })}>{h.label}</Chip>)}</div>
+              {s.moji.glasses !== 'none' && <Swatches colors={MOJI_FRAMES} value={s.moji.frame} onPick={(v) => set({ moji: { ...s.moji, frame: v } })} />}
+              <Slider label="Head size" min={0.9} max={1.9} step={0.05} value={s.avatarScale} onChange={(v) => set({ avatarScale: v })} />
+            </>)}
 
           </>)}
 
@@ -1135,6 +1237,17 @@ export default function StreamerStudio() {
           </>)}
         </div>
       </aside>}
+    </div>
+  );
+}
+
+function Swatches({ colors, value, onPick }: { colors: string[]; value: string; onPick: (v: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-1.5">
+      {colors.map((c) => (
+        <button key={c} onClick={() => onPick(c)} aria-label={c} className="w-8 h-8 rounded-full"
+          style={{ background: c, border: value.toLowerCase() === c.toLowerCase() ? `3px solid ${RD.green}` : `2px solid ${RD.border}` }} />
+      ))}
     </div>
   );
 }
