@@ -20,7 +20,7 @@ import {
   loadToons, toonThumb, warmToon, drawToon, toonFromPerson, type ToonPick, type ToonCustom,
 } from '@/lib/streamer/toonAvatars';
 import { Avatar3D, loadThree, saveAvatarFile, loadAvatarFile, clearAvatarFile } from '@/lib/streamer/avatar3d';
-import { PhotoAvatar, portraitCanvas, savePortrait, loadPortrait, clearPortrait, type Pt3 } from '@/lib/streamer/photoAvatar';
+import { PhotoAvatar, portraitCanvas, savePortrait, loadPortrait, clearPortrait, PHOTO_STYLES, type Pt3, type PhotoStyle } from '@/lib/streamer/photoAvatar';
 import { drawComposite, drawBoardPanel, headSizes, type BoardFeed, type TextRun } from '@/lib/streamer/compositor';
 import { CloudRecorder, type RecStatus } from '@/lib/streamer/recorder';
 import { LiveHost } from '@/lib/streamer/live';
@@ -42,7 +42,7 @@ interface Settings {
   boardSource: 'app' | 'screen' | 'follow'; followUser: string; appPath: string; zoom: number; panX: number; panY: number;
   frame: 'auto' | 'manual'; framePad: 'board' | 'players';
   camOn: boolean; camId: string; facing: 'user' | 'environment'; mirror: boolean;
-  disguise: Disguise; avatar: AvatarId | 'toon' | '3d' | 'photo'; toon: ToonPick; toonShuffle: number; bg: Bg; bgColor: string; avatarScale: number;
+  disguise: Disguise; avatar: AvatarId | 'toon' | '3d' | 'photo'; photoStyle: PhotoStyle; toon: ToonPick; toonShuffle: number; bg: Bg; bgColor: string; avatarScale: number;
   hat: Hat; eyewear: Eyewear; person: PersonLook; customVoice: CustomVoice; personStyle: 'cartoon' | 'real';
   voice: VoicePreset; pitch: number; micId: string; output: string;
   name: string; subtitle: string;
@@ -80,7 +80,7 @@ const DEFAULTS: Settings = {
   boardSource: 'app', followUser: '', appPath: '/live', zoom: 1, panX: 0, panY: 0,
   frame: 'auto', framePad: 'players',
   camOn: false, camId: '', facing: 'user', mirror: true,
-  disguise: 'avatar', avatar: 'toon', toon: { style: 'avataaars', seed: 'avataaars-0-3', custom: null }, toonShuffle: 0, hat: 'none', eyewear: 'none', person: DEFAULT_PERSON, customVoice: DEFAULT_CUSTOM, personStyle: 'cartoon', bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3,
+  disguise: 'avatar', avatar: 'toon', photoStyle: 'real', toon: { style: 'avataaars', seed: 'avataaars-0-3', custom: null }, toonShuffle: 0, hat: 'none', eyewear: 'none', person: DEFAULT_PERSON, customVoice: DEFAULT_CUSTOM, personStyle: 'cartoon', bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3,
   voice: 'off', pitch: 0, micId: '', output: 'none',
   name: 'Anonymous Knight', subtitle: 'Playing on chessscout.net',
   headline: 'The road to 1500 ELO', goal: 1500, ratingFrom: 'auto', manualRating: 0,
@@ -241,7 +241,8 @@ export default function StreamerStudio() {
     if (!photoAv.current.supported) { setPhotoState({ status: 'failed', why: 'This device’s browser can’t draw the photo avatar (WebGL is off).' }); return false; }
     const cv = await portraitCanvas(image);
     const ok = photoAv.current.setPortrait(cv, landmarks);
-    setPhotoState(ok ? { status: 'ready', name, preview: cv.toDataURL('image/jpeg', 0.7) } : { status: 'failed', why: 'Couldn’t build a face from that photo.' });
+    const pic = ok ? photoAv.current.setStyle(sRef.current.photoStyle) : null;
+    setPhotoState(ok ? { status: 'ready', name, preview: (pic ?? cv).toDataURL('image/jpeg', 0.7) } : { status: 'failed', why: 'Couldn’t build a face from that photo.' });
     return ok;
   }, []);
   useEffect(() => {
@@ -283,6 +284,12 @@ export default function StreamerStudio() {
     setPhotoState({ status: 'failed', why: 'Couldn’t see your face. Turn the camera on, face it in good light, and try again.' });
   }, [set, applyPortrait]);
   useEffect(() => () => photoAv.current?.dispose(), []);
+  // a new look redraws the photo once
+  useEffect(() => {
+    const pa = photoAv.current; if (!pa?.ready) return;
+    const pic = pa.setStyle(s.photoStyle);
+    if (pic) setPhotoState((st) => ({ ...st, preview: pic.toDataURL('image/jpeg', 0.7) }));
+  }, [s.photoStyle]);
 
   // ---- stage size: keep the aspect, fit the space ----
   useEffect(() => {
@@ -1223,6 +1230,10 @@ export default function StreamerStudio() {
                   {photoState.status === 'ready' && photoState.preview && (
                     <img src={photoState.preview} alt="" className="w-20 h-20 rounded-xl object-cover mb-2" style={{ border: `1px solid ${RD.border}` }} />
                   )}
+                  <div className="text-[12px] font-bold mb-1.5" style={{ color: RD.muted }}>Look</div>
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {PHOTO_STYLES.map((p) => <Chip key={p.id} on={s.photoStyle === p.id} onClick={() => set({ photoStyle: p.id })}>{p.label}</Chip>)}
+                  </div>
                   <label className="block w-full py-2.5 rounded-xl font-bold text-sm text-center cursor-pointer" style={{ background: RD.green, color: '#06110A' }}>
                     {photoState.status === 'ready' ? 'Use a different photo' : 'Upload a portrait photo'}
                     <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void applyPortrait(f.name, f); e.target.value = ''; }} />

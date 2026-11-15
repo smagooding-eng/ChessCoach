@@ -7,6 +7,129 @@
 // Drawn with WebGL. The photo and its face points stay on this device (IndexedDB).
 
 export type Pt3 = { x: number; y: number; z: number };
+export type PhotoStyle = 'real' | 'cartoon' | 'comic' | 'painted' | 'sketch';
+export const PHOTO_STYLES: { id: PhotoStyle; label: string }[] = [
+  { id: 'real', label: 'Real' }, { id: 'cartoon', label: 'Cartoon' }, { id: 'comic', label: 'Comic' },
+  { id: 'painted', label: 'Painted' }, { id: 'sketch', label: 'Sketch' },
+];
+
+// ── less realistic looks: the same photo, redrawn once (the face still moves the same way) ──
+function boxBlur(src: Uint8ClampedArray, w: number, h: number, r: number): Uint8ClampedArray {
+  const tmp = new Uint8ClampedArray(src.length), out = new Uint8ClampedArray(src.length);
+  const pass = (a: Uint8ClampedArray, b: Uint8ClampedArray, horiz: boolean) => {
+    const len = horiz ? w : h, lines = horiz ? h : w;
+    for (let l = 0; l < lines; l++) {
+      for (let ch = 0; ch < 4; ch++) {
+        let sum = 0, n = 0;
+        const at = (k: number) => ((horiz ? l * w + k : k * w + l) * 4 + ch);
+        for (let k = 0; k <= r && k < len; k++) { sum += a[at(k)]; n++; }
+        for (let k = 0; k < len; k++) {
+          b[at(k)] = sum / n;
+          const add = k + r + 1, rem = k - r;
+          if (add < len) { sum += a[at(add)]; n++; }
+          if (rem >= 0) { sum -= a[at(rem)]; n--; }
+        }
+      }
+    }
+  };
+  pass(src, tmp, true); pass(tmp, out, false);
+  return out;
+}
+
+// Kuwahara filter: smooths skin and walls into flat brush-like patches but keeps edges sharp.
+function kuwahara(src: Uint8ClampedArray, w: number, h: number, r: number): Uint8ClampedArray {
+  const W1 = w + 1, N = W1 * (h + 1);
+  const I = [new Float64Array(N), new Float64Array(N), new Float64Array(N), new Float64Array(N), new Float64Array(N)];
+  for (let y = 0; y < h; y++) {
+    const row = [0, 0, 0, 0, 0];
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const L = 0.299 * src[i] + 0.587 * src[i + 1] + 0.114 * src[i + 2];
+      const v = [src[i], src[i + 1], src[i + 2], L, L * L];
+      const o = (y + 1) * W1 + x + 1;
+      for (let c = 0; c < 5; c++) { row[c] += v[c]; I[c][o] = I[c][o - W1] + row[c]; }
+    }
+  }
+  const box = (c: number, x0: number, y0: number, x1: number, y1: number) => I[c][y1 * W1 + x1] - I[c][y0 * W1 + x1] - I[c][y1 * W1 + x0] + I[c][y0 * W1 + x0];
+  const out = new Uint8ClampedArray(src.length);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let best = Infinity, br = 0, bg = 0, bb = 0;
+    for (const [qx, qy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      const x0 = Math.max(0, qx < 0 ? x - r : x), x1 = Math.min(w, qx < 0 ? x + 1 : x + r + 1);
+      const y0 = Math.max(0, qy < 0 ? y - r : y), y1 = Math.min(h, qy < 0 ? y + 1 : y + r + 1);
+      const n = (x1 - x0) * (y1 - y0); if (!n) continue;
+      const m = box(3, x0, y0, x1, y1) / n, varc = box(4, x0, y0, x1, y1) / n - m * m;
+      if (varc < best) { best = varc; br = box(0, x0, y0, x1, y1) / n; bg = box(1, x0, y0, x1, y1) / n; bb = box(2, x0, y0, x1, y1) / n; }
+    }
+    const i = (y * w + x) * 4;
+    out[i] = br; out[i + 1] = bg; out[i + 2] = bb; out[i + 3] = src[i + 3];
+  }
+  return out;
+}
+
+export function stylizePortrait(cv: HTMLCanvasElement, style: PhotoStyle): HTMLCanvasElement {
+  if (style === 'real') return cv;
+  const w = cv.width, h = cv.height;
+  const out = document.createElement('canvas'); out.width = w; out.height = h;
+  const ctx = out.getContext('2d')!;
+  ctx.drawImage(cv, 0, 0);
+  const im = ctx.getImageData(0, 0, w, h), d = im.data;
+  const scale = Math.max(w, h) / 800; // keep the look the same on any photo size
+  const lum = (a: Uint8ClampedArray, i: number) => 0.299 * a[i] + 0.587 * a[i + 1] + 0.114 * a[i + 2];
+  if (style === 'sketch') {
+    const g = new Uint8ClampedArray(d.length);
+    for (let i = 0; i < d.length; i += 4) { const v = 255 - lum(d, i); g[i] = g[i + 1] = g[i + 2] = v; g[i + 3] = 255; }
+    const R = Math.max(2, Math.round(5 * scale));
+    const b = boxBlur(boxBlur(boxBlur(g, w, h, R), w, h, R), w, h, R); // ≈ gaussian
+    for (let i = 0; i < d.length; i += 4) {
+      const base = lum(d, i), inv = b[i];
+      let v = inv >= 255 ? 255 : Math.min(255, (base * 255) / (255 - inv)); // pencil (colour dodge)
+      v = Math.pow(v / 255, 1.3) * 255;
+      d[i] = v * 0.98 + 4; d[i + 1] = v * 0.96 + 4; d[i + 2] = v * 0.9 + 6; // warm paper
+    }
+    ctx.putImageData(im, 0, 0);
+    return out;
+  }
+  const cfg = {
+    cartoon: { r: 3, levels: 6, sat: 1.35, edge: 85, line: 1 },
+    comic: { r: 3, levels: 4, sat: 1.55, edge: 60, line: 2 },
+    painted: { r: 6, levels: 0, sat: 1.2, edge: 0, line: 0 },
+  }[style];
+  const sm = kuwahara(d, w, h, Math.max(2, Math.round(cfg.r * scale)));
+  for (let i = 0; i < d.length; i += 4) {
+    const l = Math.max(1, lum(sm, i));
+    // brightness in a few flat bands (cel shading), colour kept; banded on a curve so shadows keep detail
+    const lq = cfg.levels ? Math.pow(Math.min(cfg.levels - 1, Math.round(Math.sqrt(l / 255) * (cfg.levels - 1) + 0.15)) / (cfg.levels - 1), 2) * 255 * 0.92 + 18 : l;
+    const k = lq / l;
+    for (let ch = 0; ch < 3; ch++) {
+      const v = (l + (sm[i + ch] - l) * cfg.sat) * k; // stronger colour
+      d[i + ch] = Math.max(0, Math.min(255, v));
+    }
+  }
+  if (cfg.edge) {
+    // ink lines where the picture changes sharply
+    const L = new Float32Array(w * h);
+    for (let p = 0; p < w * h; p++) L[p] = lum(sm, p * 4);
+    const ink = new Uint8Array(w * h);
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+      const p = y * w + x;
+      const gx = -L[p - w - 1] - 2 * L[p - 1] - L[p + w - 1] + L[p - w + 1] + 2 * L[p + 1] + L[p + w + 1];
+      const gy = -L[p - w - 1] - 2 * L[p - w] - L[p - w + 1] + L[p + w - 1] + 2 * L[p + w] + L[p + w + 1];
+      if (Math.hypot(gx, gy) > cfg.edge) ink[p] = 1;
+    }
+    const t = Math.max(0, Math.round((cfg.line - 1) * scale));
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let on = ink[y * w + x];
+      for (let dy = -t; !on && dy <= t; dy++) for (let dx = -t; !on && dx <= t; dx++) {
+        const yy = y + dy, xx = x + dx;
+        if (yy >= 0 && yy < h && xx >= 0 && xx < w && ink[yy * w + xx]) on = 1;
+      }
+      if (on) { const i = (y * w + x) * 4; d[i] = 26; d[i + 1] = 20; d[i + 2] = 18; }
+    }
+  }
+  ctx.putImageData(im, 0, 0);
+  return out;
+}
 export interface PhotoPose {
   yaw: number; pitch: number; roll: number; // screen terms (already mirrored when the preview is)
   mouth: number; blinkL: number; blinkR: number; smile: number; brow: number; // tracker values
@@ -154,19 +277,36 @@ export class PhotoAvatar {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buf.alpha); gl.bufferData(gl.ARRAY_BUFFER, alpha, gl.STATIC_DRAW);
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.buf.idx); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(tris), gl.STATIC_DRAW);
     this.triCount = tris.length;
-    if (this.tex) gl.deleteTexture(this.tex);
-    this.tex = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, this.tex);
-    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    this.original = img;
+    this.upload(stylizePortrait(img, this.style));
     this.ready = true;
     return true;
   }
   private triCount = 0;
+  private original: HTMLCanvasElement | null = null;
+  private style: PhotoStyle = 'real';
+
+  /** Real photo or a drawn look; the face points stay the same, only the picture changes. */
+  setStyle(style: PhotoStyle): HTMLCanvasElement | null {
+    this.style = style;
+    if (!this.original) return null;
+    const pic = stylizePortrait(this.original, style);
+    this.upload(pic);
+    return pic;
+  }
+
+  private upload(pic: HTMLCanvasElement) {
+    const gl = this.gl; if (!gl) return;
+    if (this.tex) gl.deleteTexture(this.tex);
+    this.tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, pic);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  }
 
   /** Bends the face for this moment: expressions first, then the head turn. */
   private pose(p: PhotoPose): Pt3[] {
