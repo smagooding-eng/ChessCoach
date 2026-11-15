@@ -97,7 +97,15 @@ function evaluate(chess: Chess): number {
 }
 
 const MATE_SCORE = 100000;
+// The search runs on the server's only thread: while it thinks, nothing else (other
+// games, sign-ins, Render's health check) gets an answer. Each move gets a time budget;
+// past it the search stops and the bot plays from a shallower search that always finishes.
+const THINK_BUDGET_MS = 350;
+const OUT_OF_TIME = Symbol("out of time");
+let deadline = Infinity;
+let nodes = 0;
 function minimax(chess: Chess, depth: number, alpha: number, beta: number, maximizing: boolean): number {
+  if ((++nodes & 127) === 0 && Date.now() > deadline) throw OUT_OF_TIME;
   if (chess.isGameOver()) {
     if (chess.isCheckmate()) return maximizing ? -MATE_SCORE - depth : MATE_SCORE + depth;
     return 0;
@@ -194,14 +202,29 @@ export function getBotMove(fen: string, elo: number): string | null {
   if (moves.length > 40) effectiveDepth = Math.min(effectiveDepth, 2);
   else if (moves.length > 30 && effectiveDepth > 3) effectiveDepth = 3;
 
-  const evals: { move: string; eval: number; hangLoss: number }[] = [];
   const shuffled = [...moves].sort(() => Math.random() - 0.5);
-  for (const move of shuffled) {
-    chess.move(move);
-    const e = minimax(chess, effectiveDepth - 1, -Infinity, Infinity, !maximizing);
-    const hangLoss = cfg.avoidHangCap > 0 ? worstReplyMaterialLoss(chess) : 0;
-    chess.undo();
-    evals.push({ move, eval: e, hangLoss });
+  const scoreAll = (depth: number) => {
+    const board = new Chess(fen);
+    const out: { move: string; eval: number; hangLoss: number }[] = [];
+    for (const move of shuffled) {
+      board.move(move);
+      const e = minimax(board, depth - 1, -Infinity, Infinity, !maximizing);
+      const hangLoss = cfg.avoidHangCap > 0 ? worstReplyMaterialLoss(board) : 0;
+      board.undo();
+      out.push({ move, eval: e, hangLoss });
+    }
+    return out;
+  };
+  let evals: { move: string; eval: number; hangLoss: number }[];
+  try {
+    deadline = Date.now() + THINK_BUDGET_MS;
+    evals = scoreAll(effectiveDepth);
+  } catch (err) {
+    if (err !== OUT_OF_TIME) throw err;
+    deadline = Infinity;
+    evals = scoreAll(Math.min(2, effectiveDepth));
+  } finally {
+    deadline = Infinity;
   }
   evals.sort((a, b) => maximizing ? b.eval - a.eval : a.eval - b.eval);
 
