@@ -3097,8 +3097,68 @@ function ShopManagementPanel() {
   );
 }
 
+type DeviceStats = Record<'mobile' | 'tablet' | 'desktop', { visitors: number; signups: number }>;
+type CheckoutClicks = Record<string, { total: number; mobile: number; tablet: number; desktop: number }>;
+
+// Phone vs computer: landing visitors and new accounts (website + app), counted since Nov 14, 2026.
+function DeviceSignupsSection({ data }: { data: DeviceStats }) {
+  const rows: { key: keyof DeviceStats; label: string }[] = [
+    { key: 'mobile', label: 'Phone' }, { key: 'desktop', label: 'Computer' }, { key: 'tablet', label: 'Tablet' },
+  ];
+  const totalSignups = rows.reduce((n, r) => n + data[r.key].signups, 0);
+  return (
+    <div className="rounded-xl border border-border/40 bg-secondary/40 p-4">
+      <h4 className="text-sm font-bold mb-1">Sign-ups by device</h4>
+      <p className="text-[11px] text-muted-foreground mb-3">Website and app together. Counted from Nov 14, 2026.</p>
+      <div className="grid grid-cols-4 gap-2 text-[11px] text-muted-foreground pb-1 border-b border-border/30">
+        <span>Device</span><span className="text-right">Visitors</span><span className="text-right">Sign-ups</span><span className="text-right">Rate</span>
+      </div>
+      {rows.map((r) => {
+        const d = data[r.key];
+        return (
+          <div key={r.key} className="grid grid-cols-4 gap-2 text-sm py-1.5 border-b border-border/20 last:border-0">
+            <span className="font-semibold">{r.label}</span>
+            <span className="text-right">{d.visitors.toLocaleString()}</span>
+            <span className="text-right font-bold">{d.signups.toLocaleString()}{totalSignups ? <span className="text-[10px] text-muted-foreground font-normal"> ({Math.round((d.signups / totalSignups) * 100)}%)</span> : null}</span>
+            <span className="text-right">{d.visitors ? `${((d.signups / d.visitors) * 100).toFixed(1)}%` : '—'}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Pro checkout: which way people pressed to pay. Counted from Nov 14, 2026.
+function CheckoutClicksSection({ data }: { data: CheckoutClicks }) {
+  const LABELS: Record<string, string> = {
+    stripe: 'Continue with Stripe', card: 'Card details (manual)', google_pay: 'Google Pay', apple_pay: 'Apple Pay',
+    link: 'Link', amazon_pay: 'Amazon Pay', paypal: 'PayPal', other: 'Other wallet',
+  };
+  const rows = Object.entries(data).filter(([, v]) => v.total > 0).sort((a, b) => b[1].total - a[1].total);
+  const max = Math.max(1, ...rows.map(([, v]) => v.total));
+  return (
+    <div className="rounded-xl border border-border/40 bg-secondary/40 p-4">
+      <h4 className="text-sm font-bold mb-1">Pro checkout: how people pay</h4>
+      <p className="text-[11px] text-muted-foreground mb-3">People who pressed each option (phone / computer). Counted from Nov 14, 2026.</p>
+      {rows.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No checkout clicks in this range yet.</p>
+      ) : rows.map(([k, v]) => (
+        <div key={k} className="mb-2 last:mb-0">
+          <div className="flex justify-between text-xs mb-1">
+            <span className="font-semibold">{LABELS[k] ?? k}</span>
+            <span><b>{v.total}</b> <span className="text-muted-foreground">({v.mobile + v.tablet} / {v.desktop})</span></span>
+          </div>
+          <div className="h-2 rounded-full bg-black/30 overflow-hidden">
+            <div className="h-full rounded-full" style={{ width: `${(v.total / max) * 100}%`, background: '#635BFF' }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function LandingFunnelPanel() {
-  const [data, setData] = useState<{ days: number; web: PlatformFunnelData; app: PlatformFunnelData } | null>(null);
+  const [data, setData] = useState<{ days: number; web: PlatformFunnelData; app: PlatformFunnelData; byDevice?: DeviceStats; checkoutClicks?: CheckoutClicks } | null>(null);
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<DateRange>({ startDate: '', endDate: '' });
   const [funnelError, setFunnelError] = useState('');
@@ -3139,6 +3199,8 @@ function LandingFunnelPanel() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <PlatformFunnelSection title="Website" data={data.web} />
             <PlatformFunnelSection title="App (installed PWA)" data={data.app} />
+            {data.byDevice && <DeviceSignupsSection data={data.byDevice} />}
+            {data.checkoutClicks && <CheckoutClicksSection data={data.checkoutClicks} />}
           </div>
         )}
       </div>

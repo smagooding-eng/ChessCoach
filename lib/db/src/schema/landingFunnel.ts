@@ -21,6 +21,8 @@ export const landingFunnelEventsTable = pgTable("landing_funnel_events", {
   // section, not just "where" -- e.g. the average time on page before
   // people abandon the Hero specifically.
   elapsedMs: integer("elapsed_ms"),
+  // 'mobile' | 'tablet' | 'desktop', from the browser's user agent. Null before Nov 2026.
+  device: varchar("device"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

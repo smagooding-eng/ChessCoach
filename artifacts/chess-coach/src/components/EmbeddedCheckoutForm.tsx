@@ -9,6 +9,13 @@ import {
 } from '@stripe/react-stripe-js';
 import { Loader2, Lock } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { trackFunnelEvent, type LandingFunnelEvent } from '@/lib/funnelTracking';
+import { isInPlayApp } from '@/lib/playApp';
+
+const WALLET_EVENTS: Record<string, LandingFunnelEvent> = {
+  google_pay: 'pro_checkout_google_pay', apple_pay: 'pro_checkout_apple_pay', link: 'pro_checkout_link',
+  amazon_pay: 'pro_checkout_amazon_pay', paypal: 'pro_checkout_paypal',
+};
 
 const CHESSCOM_GREEN = '#81b64c';
 
@@ -83,7 +90,13 @@ function ExpressCheckoutSection({ subscriptionId, onSuccess }: { subscriptionId:
       <ExpressCheckoutElement
         onReady={(event) => { if (!event.availablePaymentMethods) setAvailable(false); }}
         onConfirm={handleConfirm}
-        options={{ buttonHeight: 48 }}
+        onClick={(event) => {
+          trackFunnelEvent(WALLET_EVENTS[event.expressPaymentType] ?? 'pro_checkout_other');
+          event.resolve();
+        }}
+        // Amazon Pay opens its own window, which never loads inside the Android app (it
+        // stays on a blank page). There it's left out; "Continue with Stripe" still offers it.
+        options={{ buttonHeight: 48, paymentMethods: { amazonPay: isInPlayApp() ? 'never' : 'auto' } } as React.ComponentProps<typeof ExpressCheckoutElement>['options']}
       />
       {submitting && (
         <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">

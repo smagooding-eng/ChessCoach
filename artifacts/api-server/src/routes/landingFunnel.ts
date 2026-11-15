@@ -67,6 +67,18 @@ const BOT_UA = /bot\b|bot\/|crawl|spider|slurp|headless|lighthouse|pagespeed|fac
 
 const SECTION_IDS = ["hero", "pillars", "explore", "how_it_works", "differentiators", "features", "faq", "pricing", "final_cta"] as const;
 
+// Which way people pay on the Pro plan: Stripe's own page, the card form, or a wallet button.
+const CHECKOUT_EVENTS = ["pro_checkout_stripe", "pro_checkout_card", "pro_checkout_google_pay", "pro_checkout_apple_pay",
+  "pro_checkout_link", "pro_checkout_amazon_pay", "pro_checkout_paypal", "pro_checkout_other"] as const;
+const SIGNUP_EVENTS = ["signup_completed", "google_signup_completed", "lichess_signup_completed"];
+
+type Device = "mobile" | "tablet" | "desktop";
+function deviceOf(ua: string): Device {
+  if (/iPad|Tablet|PlayBook|Silk|Kindle/i.test(ua) || (/Android/i.test(ua) && !/Mobile/i.test(ua))) return "tablet";
+  if (/Mobi|iPhone|iPod|Android|Windows Phone|Opera Mini/i.test(ua)) return "mobile";
+  return "desktop";
+}
+
 const VALID_EVENTS = new Set([
   "landing_view", "mia_started", "mia_skipped", "signup_clicked", "signup_completed",
   "signup_form_submitted", "signup_error", "opponent_scout_clicked",
@@ -75,6 +87,7 @@ const VALID_EVENTS = new Set([
   "lichess_oauth_clicked", "lichess_signup_completed", "lichess_login_completed",
   "scroll_25", "scroll_50", "scroll_75", "scroll_100",
   "engaged_10s",
+  ...CHECKOUT_EVENTS,
   ...SECTION_IDS.map((s) => `viewed_${s}`),
   ...SECTION_IDS.map((s) => `exit_${s}`),
 ]);
@@ -112,6 +125,7 @@ router.post("/landing-funnel/track", async (req: Request, res: Response) => {
       eventType,
       platform: safePlatform,
       elapsedMs: safeElapsedMs,
+      device: deviceOf(ua),
     });
     res.json({ success: true });
   } catch (err: any) {
@@ -243,6 +257,43 @@ async function getFunnelStatsForPlatform(since: Date, until: Date, platform: Pla
   };
 }
 
+// Phone, tablet or computer: landing visitors and new accounts, website and app together.
+// Only counts events recorded since the device started being saved.
+async function getDeviceStats(since: Date, until: Date) {
+  const r = await db.execute(sql`
+    SELECT device,
+      COUNT(DISTINCT visitor_id) FILTER (WHERE event_type = 'landing_view') AS visitors,
+      COUNT(DISTINCT visitor_id) FILTER (WHERE event_type IN (${sql.join(SIGNUP_EVENTS.map((e) => sql`${e}`), sql`, `)})) AS signups
+    FROM landing_funnel_events
+    WHERE device IS NOT NULL AND created_at >= ${since} AND created_at <= ${until}
+      AND visitor_id NOT IN (SELECT visitor_id FROM analytics_excluded_visitors)
+    GROUP BY device`);
+  const out: Record<Device, { visitors: number; signups: number }> = { mobile: { visitors: 0, signups: 0 }, tablet: { visitors: 0, signups: 0 }, desktop: { visitors: 0, signups: 0 } };
+  for (const row of r.rows as { device: string; visitors: string | number; signups: string | number }[]) {
+    if (row.device in out) out[row.device as Device] = { visitors: Number(row.visitors), signups: Number(row.signups) };
+  }
+  return out;
+}
+
+// Pro checkout: how many people pressed each way to pay (one per person per way).
+async function getCheckoutClicks(since: Date, until: Date) {
+  const r = await db.execute(sql`
+    SELECT event_type, device, COUNT(DISTINCT visitor_id) AS people
+    FROM landing_funnel_events
+    WHERE event_type LIKE 'pro_checkout_%' AND created_at >= ${since} AND created_at <= ${until}
+      AND visitor_id NOT IN (SELECT visitor_id FROM analytics_excluded_visitors)
+    GROUP BY event_type, device`);
+  const out: Record<string, { total: number; mobile: number; tablet: number; desktop: number }> = {};
+  for (const e of CHECKOUT_EVENTS) out[e.replace("pro_checkout_", "")] = { total: 0, mobile: 0, tablet: 0, desktop: 0 };
+  for (const row of r.rows as { event_type: string; device: string | null; people: string | number }[]) {
+    const k = row.event_type.replace("pro_checkout_", ""); const n = Number(row.people);
+    if (!out[k]) continue;
+    out[k].total += n;
+    if (row.device === "mobile" || row.device === "tablet" || row.device === "desktop") out[k][row.device] += n;
+  }
+  return out;
+}
+
 // Admin-only aggregation. Separate route/section from the general admin
 // dashboard's page-view stats, per explicit instruction not to mix them in.
 // Returns both platform slices in one response under a single date range,
@@ -257,10 +308,14 @@ router.get("/admin/landing-funnel", requireAdmin, async (req: Request, res: Resp
       getFunnelStatsForPlatform(since, until, "app"),
     ]);
 
+    const [byDevice, checkoutClicks] = await Promise.all([getDeviceStats(since, until), getCheckoutClicks(since, until)]);
+
     res.json({
       days: Math.max(1, Math.round((until.getTime() - since.getTime()) / (24 * 60 * 60 * 1000))),
       web,
       app,
+      byDevice,
+      checkoutClicks,
     });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to fetch landing funnel stats", details: err?.cause?.message ?? err?.message });

@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import { apiFetch, apiFetchLocal } from '@/lib/api';
 import { axonTrack } from '@/lib/axon';
 import { EmbeddedCheckoutForm } from '@/components/EmbeddedCheckoutForm';
+import { trackFunnelEvent } from '@/lib/funnelTracking';
 
 const PREMIUM_FEATURES = [
   { icon: BrainCircuit, label: 'AI Coach on Every Game', desc: 'Plain-English explanations for every move, plus a summary of what decided the game' },
@@ -390,7 +391,7 @@ export function Subscription() {
                         <div className="flex-1 h-px bg-border/40" />
                       </div>
                       <button
-                        onClick={() => handleCheckout(selectedPriceId)}
+                        onClick={() => { trackFunnelEvent('pro_checkout_stripe'); handleCheckout(selectedPriceId); }}
                         disabled={!!checkoutLoading}
                         className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-sm transition-colors hover:brightness-110 disabled:opacity-60"
                         style={{ background: '#635BFF', color: '#fff' }}
@@ -414,7 +415,7 @@ export function Subscription() {
                         <div className="flex-1 h-px bg-border/40" />
                       </div>
                       <button
-                        onClick={() => setShowManualCard(true)}
+                        onClick={() => { trackFunnelEvent('pro_checkout_card'); setShowManualCard(true); }}
                         className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors font-bold text-sm"
                       >
                         <CreditCard className="w-4 h-4" />

@@ -35,6 +35,8 @@ export type LandingFunnelEvent =
   | 'lichess_oauth_clicked' | 'lichess_signup_completed' | 'lichess_login_completed'
   | 'scroll_25' | 'scroll_50' | 'scroll_75' | 'scroll_100'
   | 'engaged_10s'
+  | 'pro_checkout_stripe' | 'pro_checkout_card' | 'pro_checkout_google_pay' | 'pro_checkout_apple_pay'
+  | 'pro_checkout_link' | 'pro_checkout_amazon_pay' | 'pro_checkout_paypal' | 'pro_checkout_other'
   | `viewed_${LandingSectionId}`
   | `exit_${LandingSectionId}`;
 
