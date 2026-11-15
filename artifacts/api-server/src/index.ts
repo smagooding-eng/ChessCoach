@@ -496,6 +496,13 @@ async function runSchemaMigrations() {
   }
 }
 
+// A promise that fails with nobody waiting for it (a background job, a fire-and-
+// forget save) used to stop the whole server: Node's default is to exit, which
+// dropped every live game. Log it and keep serving instead.
+process.on("unhandledRejection", (reason) => {
+  logger.error({ err: reason instanceof Error ? { message: reason.message, stack: reason.stack } : reason }, "Unhandled promise rejection (server kept running)");
+});
+
 const httpServer = createServer(app);
 attachLiveServer(httpServer);
 startDailySweep();
