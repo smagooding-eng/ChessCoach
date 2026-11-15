@@ -253,6 +253,47 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
       FROM user_heard_from h JOIN users u ON u.id = h.user_id
       WHERE h.user_id NOT IN (SELECT id FROM analytics_excluded_users)
       GROUP BY 1 ORDER BY all_time DESC`).catch(() => []);
+    // Members: how often each one has used the app (distinct days with a signed-in page view,
+    // all time), when they were last on, and where they are (country from the visit's location).
+    const memberRows = rowsOf<Record<string, unknown>>(await db.execute(sql`
+      WITH d AS (
+        SELECT user_id, COUNT(DISTINCT ${DAY("created_at")}) AS days_active, MAX(created_at) AS last_active
+        FROM pv_people WHERE user_id IS NOT NULL GROUP BY user_id)
+      SELECT COALESCE(u.scout_username, u.chesscom_username, u.lichess_username, 'member') AS label,
+        u.country, u.auth_provider, u.created_at, COALESCE(d.days_active, 0) AS days_active, d.last_active,
+        (u.chesscom_username IS NOT NULL) AS chesscom, (u.lichess_username IS NOT NULL) AS lichess,
+        ${PAYING("u")} AS paying, COALESCE(u.is_premium_override, false) AS comped
+      FROM users u LEFT JOIN d ON d.user_id = u.id
+      WHERE u.id NOT IN (SELECT id FROM analytics_excluded_users)
+      ORDER BY days_active DESC, d.last_active DESC NULLS LAST`).catch(() => []));
+    const now = Date.now();
+    const ago = (r: Record<string, unknown>) => r.last_active ? (now - new Date(String(r.last_active)).getTime()) / 86_400_000 : Infinity;
+    const bucket = (n: number) => n === 0 ? "0 (no visit recorded)" : n === 1 ? "1 day" : n === 2 ? "2 days" : n <= 5 ? "3-5 days" : n <= 10 ? "6-10 days" : n <= 30 ? "11-30 days" : "31+ days";
+    const BUCKETS = ["0 (no visit recorded)", "1 day", "2 days", "3-5 days", "6-10 days", "11-30 days", "31+ days"];
+    const totalMembers = memberRows.length || 1;
+    const countries = new Map<string, number>();
+    for (const r of memberRows) { const c = (r.country as string | null) || "unknown"; countries.set(c, (countries.get(c) ?? 0) + 1); }
+    const members = {
+      note: "Days active = distinct days (your time zone) a member opened the app signed in, all time. Country comes from where they were when they visited. Usernames only, no emails.",
+      total: memberRows.length,
+      activeLast: {
+        day: memberRows.filter((r) => ago(r) <= 1).length,
+        week: memberRows.filter((r) => ago(r) <= 7).length,
+        month: memberRows.filter((r) => ago(r) <= 30).length,
+      },
+      daysActive: BUCKETS.map((b) => {
+        const n = memberRows.filter((r) => bucket(num(r.days_active)) === b).length;
+        return { daysActive: b, members: n, percent: Math.round((n / totalMembers) * 1000) / 10 };
+      }),
+      usedOnceOrTwicePercent: Math.round((memberRows.filter((r) => num(r.days_active) <= 2).length / totalMembers) * 1000) / 10,
+      countries: [...countries].sort((a, b) => b[1] - a[1]).map(([country, n]) => ({ country, members: n })),
+      list: memberRows.map((r) => ({
+        member: String(r.label), country: (r.country as string | null) ?? null, signedUpWith: r.auth_provider ?? null,
+        signedUp: r.created_at ? new Date(String(r.created_at)).toISOString().slice(0, 10) : null,
+        daysActive: num(r.days_active), lastActive: r.last_active ? new Date(String(r.last_active)).toISOString().slice(0, 10) : null,
+        chesscom: !!r.chesscom, lichess: !!r.lichess, pro: !!r.paying || !!r.comped,
+      })),
+    };
     const t = rowsOf<Record<string, unknown>>(totals)[0] ?? {};
     const catchup = await import("./games").then((m) => m.catchupReviewStatus()).catch(() => null);
     res.json({
@@ -261,8 +302,9 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
         note: "Answers to 'Where did you find us?', asked once after a win or a puzzle streak (not at signup). allTime = everyone who answered; signedUpInRange = answers from users who signed up in this range.",
         answers: rowsOf<Record<string, unknown>>(heard).map((r) => ({ source: String(r.source), allTime: num(r.all_time), answeredInRange: num(r.in_range), signedUpInRange: num(r.signed_up_in_range) })),
       },
+      members,
       devices,
-      about: "ChessScout.net traffic and funnel export. Aggregates only (no IPs, emails or user ids). Days are in the admin's local time zone. The owner's own accounts (and their browsers) and suspected bots are left out.",
+      about: "ChessScout.net traffic and funnel export. No IPs, emails or user ids (the member list uses chess usernames). Days are in the admin's local time zone. The owner's own accounts (and their browsers) and suspected bots are left out.",
       excluded: await exclusionSummary(),
       generatedAt: new Date().toISOString(),
       range: { since: since.toISOString(), until: until.toISOString(), tzOffsetMinutes: tz },
