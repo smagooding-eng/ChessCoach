@@ -329,7 +329,7 @@ export function LichessPlay() {
         await new Promise((r) => setTimeout(r, 1500));
       }
       if (!pgn) throw new Error('no pgn');
-      const r = await apiFetch('/api/games/import-pgn', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pgn, viaChessScout: true }) });
+      const r = await apiFetch('/api/games/import-pgn', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pgn, viaChessScout: true, side: myColor === 'b' ? 'black' : 'white' }) });
       const d = await r.json().catch(() => null) as { ids?: number[]; notYours?: number } | null;
       if (!r.ok) throw new Error('import');
       if (d?.notYours) { setSaving('notyours'); return; }
@@ -337,7 +337,7 @@ export function LichessPlay() {
       if (typeof saved !== 'number') throw new Error('not saved'); // never point "Review" at some other game
       setSavedId(saved); setSavedFor(id); setSaving('saved');
     } catch { setSaving('failed'); }
-  }, [gameId, auth, authUser?.lichessUsername, refreshAuth]);
+  }, [gameId, auth, authUser?.lichessUsername, refreshAuth, myColor]);
   useEffect(() => { if (phase === 'over' && saving === 'idle' && plies >= 4 && st?.status !== 'aborted') void saveGame(); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Rated game over: how did the ratings move? The game itself only carries the ratings

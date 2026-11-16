@@ -846,6 +846,20 @@ function splitPgnGames(text: string): string[] {
   if (!t) return [];
   return t.split(/\n\s*\n(?=\[Event\s)/).map((g) => g.trim()).filter(Boolean);
 }
+/** The game's outcome in plain words for the AI coach ("0-1 (Black won)"). The stored
+ *  result is from the owner's side ("win"/"loss"), which alone reads as "White won". */
+function outcomeLine(game: { pgn: string; result: string }, side?: "white" | "black"): string {
+  const tag = pgnHeader(game.pgn, "Result");
+  if (tag === "1-0") return "1-0 (White won)";
+  if (tag === "0-1") return "0-1 (Black won)";
+  if (tag === "1/2-1/2" || game.result === "draw") return "Draw";
+  if (side && (game.result === "win" || game.result === "loss")) {
+    const whiteWon = (game.result === "win") === (side === "white");
+    return whiteWon ? "1-0 (White won)" : "0-1 (Black won)";
+  }
+  return game.result;
+}
+
 function pgnHeader(pgn: string, name: string): string | null {
   const m = pgn.match(new RegExp(`\\[${name}\\s+"([^"]*)"\\]`));
   return m ? m[1] : null;
@@ -863,6 +877,9 @@ function pgnPlayedAt(pgn: string): Date {
 
 router.post("/games/import-pgn", requireAuth, async (req, res): Promise<void> => {
   const { pgn, viaChessScout } = req.body as { pgn?: string; viaChessScout?: boolean };
+  // Played on ChessScout's board: the board knows which colour they played, so that
+  // decides it (not a name match, which can miss or hit an older copy of the game).
+  const side = viaChessScout === true && (req.body?.side === "white" || req.body?.side === "black") ? req.body.side as "white" | "black" : null;
   if (!pgn || typeof pgn !== "string" || !pgn.trim()) {
     res.status(400).json({ error: "Choose a PGN file or paste PGN text first." });
     return;
@@ -904,8 +921,9 @@ router.post("/games/import-pgn", requireAuth, async (req, res): Promise<void> =>
         if (c.history().length === 0) { invalid++; continue; }
       } catch { invalid++; continue; }
 
-      const whiteIsMe = mine.includes(white.toLowerCase());
-      const blackIsMe = mine.includes(black.toLowerCase());
+      const sideKnown = side && games.length === 1;
+      const whiteIsMe = sideKnown ? side === "white" : mine.includes(white.toLowerCase());
+      const blackIsMe = sideKnown ? side === "black" : mine.includes(black.toLowerCase());
       if (!whiteIsMe && !blackIsMe) { notYours++; continue; }
 
       const tagResult = pgnHeader(g, "Result");
@@ -933,7 +951,17 @@ router.post("/games/import-pgn", requireAuth, async (req, res): Promise<void> =>
         : lichessGameId
           ? await db.select({ id: gamesTable.id }).from(gamesTable).where(and(eq(gamesTable.userId, userId), eq(gamesTable.lichessGameId, lichessGameId))).limit(1)
           : await db.select({ id: gamesTable.id }).from(gamesTable).where(and(eq(gamesTable.userId, userId), eq(gamesTable.pgn, g))).limit(1);
-      if (dupe.length > 0) { duplicates++; ids.push(dupe[0].id); continue; }
+      if (dupe.length > 0) {
+        // Already saved (e.g. by a sync): put it on their side if it was saved from the other
+        // player's, and drop the review written for the wrong side so it's redone.
+        if (sideKnown) {
+          const myName = (whiteIsMe ? white : black).toLowerCase();
+          await db.update(gamesTable).set({ result, username: myName, reviewData: null, analyzed: false })
+            .where(and(eq(gamesTable.id, dupe[0].id), sql`(${gamesTable.result} IS DISTINCT FROM ${result} OR lower(${gamesTable.username}) IS DISTINCT FROM ${myName})`))
+            .catch(() => {});
+        }
+        duplicates++; ids.push(dupe[0].id); continue;
+      }
 
       const { opening, eco } = extractOpeningFromPgn(g);
       const [row] = await db.insert(gamesTable).values({
@@ -1090,7 +1118,7 @@ router.get("/games/:id/replay", async (req, res): Promise<void> => {
       blackUsername: game.blackUsername,
       whiteRating: game.whiteRating,
       blackRating: game.blackRating,
-      result: game.result,
+      result: outcomeLine(game),
       opening: game.opening,
       eco: game.eco,
       analysisNotes: game.analysisNotes,
@@ -1121,7 +1149,7 @@ router.post("/games/:id/analyze-moves", async (req, res): Promise<void> => {
     moves,
     opening: game.opening,
     eco: game.eco,
-    result: game.result,
+    result: outcomeLine(game),
     whiteUsername: game.whiteUsername,
     blackUsername: game.blackUsername,
   });
@@ -1165,7 +1193,7 @@ router.post("/games/:id/analyze-move", requireAuth, requirePremium, async (req, 
       moveIndex,
       opening: game.opening,
       eco: game.eco,
-      result: game.result,
+      result: outcomeLine(game),
       whiteUsername: game.whiteUsername,
       blackUsername: game.blackUsername,
       userId: req.user?.id,
@@ -1278,18 +1306,19 @@ async function reviewOneGame(
 ): Promise<void> {
   const moves = parsePgnMoves(game.pgn);
   const startFen = extractStartFen(game.pgn);
+  const side = await coachSideFor(game);
   const reviewResult = await reviewFullGame({
     moves,
     opening: game.opening,
     eco: game.eco,
-    result: game.result,
+    result: outcomeLine(game, side),
     whiteUsername: game.whiteUsername,
     blackUsername: game.blackUsername,
     startFen: startFen !== "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" ? startFen : undefined,
     onProgress,
     userId,
     aiCoach: aiCoachOverride ?? await aiCoachForOwner(game.userId),
-    coachSide: await coachSideFor(game),
+    coachSide: side,
   });
 
   await saveReview(game.id, reviewResult);
@@ -1639,7 +1668,7 @@ async function runReviewJob(gameId: number, jobId: string, log: Logger): Promise
       moves,
       opening: game.opening,
       eco: game.eco,
-      result: game.result,
+      result: outcomeLine(game),
       whiteUsername: game.whiteUsername,
       blackUsername: game.blackUsername,
       startFen: startFen !== "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" ? startFen : undefined,

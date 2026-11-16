@@ -136,8 +136,31 @@ router.delete("/lichess/board/token", requireAuth, async (req: Request, res: Res
 // A daily (correspondence) game where it's their move, and that we haven't told
 // them about for this move yet, gets a notification (inbox + push).
 let watching = false;
+// Once per start: Lichess games saved from the wrong player's side (shown as a loss when
+// they won, board the wrong way round). Their connected Lichess name says which player is
+// them; the game's own Result tag says who won. Their old review goes, so it's redone.
+let sidesRepaired = false;
+async function repairLichessSides(): Promise<void> {
+  if (sidesRepaired) return;
+  sidesRepaired = true;
+  try {
+    await db.execute(sql`WITH g AS (
+        SELECT g.id, lower(t.username) AS me, lower(g.white_username) = lower(t.username) AS me_white,
+          lower(CASE WHEN lower(g.white_username) = lower(t.username) THEN g.black_username ELSE g.white_username END) AS opp,
+          substring(g.pgn from '\\[Result "([^"]+)"\\]') AS tag, g.result, lower(g.username) AS tagged
+        FROM games g JOIN lichess_board_tokens t ON t.user_id = g.user_id
+        WHERE g.lichess_game_id IS NOT NULL
+          AND (lower(g.white_username) = lower(t.username) OR lower(g.black_username) = lower(t.username))),
+      fix AS (
+        SELECT id, me, CASE WHEN tag = '1/2-1/2' THEN 'draw' WHEN (tag = '1-0') = me_white THEN 'win' ELSE 'loss' END AS want, result, tagged, opp
+        FROM g WHERE tag IN ('1-0', '0-1', '1/2-1/2'))
+      UPDATE games SET result = fix.want, username = fix.me, review_data = NULL, analyzed = false
+      FROM fix WHERE games.id = fix.id AND (fix.result IS DISTINCT FROM fix.want OR fix.tagged = fix.opp)`);
+  } catch { /* try again next start */ }
+}
 async function checkDailyTurns(): Promise<void> {
   await ensureTable();
+  await repairLichessSides();
   await db.execute(sql`CREATE TABLE IF NOT EXISTS lichess_daily_notified (
     user_id varchar NOT NULL, game_id varchar NOT NULL, last_move varchar NOT NULL DEFAULT '', at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (user_id, game_id))`);
