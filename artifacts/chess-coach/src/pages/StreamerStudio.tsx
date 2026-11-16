@@ -21,7 +21,7 @@ import {
   type MojiLook,
 } from '@/lib/streamer/mojiHead';
 import { SpriteAvatar } from '@/lib/streamer/spriteAvatar';
-import { drawComposite, drawBoardPanel, drawReviewNotes, headSizes, type BoardFeed, type TextRun, type ReviewNotes } from '@/lib/streamer/compositor';
+import { drawComposite, drawBoardPanel, drawReviewNotes, splitBoardPanel, headSizes, type BoardFeed, type TextRun, type ReviewNotes } from '@/lib/streamer/compositor';
 import { CloudRecorder, type RecStatus } from '@/lib/streamer/recorder';
 import { LiveHost } from '@/lib/streamer/live';
 import { apiFetch } from '@/lib/api';
@@ -562,7 +562,9 @@ export default function StreamerStudio() {
             const ps = co ? [...co.querySelectorAll('p')] : [];
             const cpRaw = ev?.getAttribute('data-cp') ?? '';
             n = {
-              title: (ps[0]?.textContent ?? '').trim(), text: (ps[1]?.textContent ?? '').replace(/\s*More$/, '').trim(),
+              title: (ps[0]?.textContent ?? '').trim(), text: co?.getAttribute('data-text') || (ps[1]?.textContent ?? '').replace(/\s*More$/, '').trim(),
+              pros: (() => { try { return JSON.parse(co?.getAttribute('data-pros') || '[]') as string[]; } catch { return []; } })(),
+              cons: (() => { try { return JSON.parse(co?.getAttribute('data-cons') || '[]') as string[]; } catch { return []; } })(),
               accent: co?.getAttribute('data-accent') || RD.green, glyph: co?.getAttribute('data-glyph') ?? '', glyphColor: co?.getAttribute('data-glyphcolor') ?? '',
               evalText: co?.getAttribute('data-eval') ?? '', cp: cpRaw === '' ? null : Number(cpRaw),
               white: ev?.getAttribute('data-white') ?? '', black: ev?.getAttribute('data-black') ?? '',
@@ -948,7 +950,8 @@ export default function StreamerStudio() {
   // Board only on a game review: the coach's note and the eval bar + names get their own panel
   const showNotes = !!notes && s.boardSource === 'app' && fitBoard && s.framePad === 'board';
   showNotesRef.current = showNotes;
-  const notesPx = s.layout.notes ? px(s.layout.notes) : null;
+  const split = showNotes ? splitBoardPanel(boardRect.width, boardRect.height) : null;
+  const notesPx = split ? { width: split.notes.w, height: split.notes.h } : null;
   useEffect(() => {
     const cv = notesCanvas.current; if (!cv || !notes || !notesPx) return;
     const dpr = Math.min(2, window.devicePixelRatio || 1), W = Math.max(2, Math.round(notesPx.width * dpr)), H = Math.max(2, Math.round(notesPx.height * dpr));
@@ -962,9 +965,11 @@ export default function StreamerStudio() {
   } else if (fitBoard && boardBox) {
     const pad = s.framePad === 'players' ? boardBox.w * 0.17 : 0;
     const r = { x: boardBox.x, y: boardBox.y - pad, w: boardBox.w, h: boardBox.h + pad * 2 };
-    ifScale = Math.min(boardRect.width / r.w, boardRect.height / r.h);
-    ifLeft = boardRect.width / 2 - (r.x + r.w / 2) * ifScale;
-    ifTop = boardRect.height / 2 - (r.y + r.h / 2) * ifScale;
+    // with review notes the board fits its part of the panel; the notes take the rest
+    const area = split ? split.board : { x: 0, y: 0, w: boardRect.width, h: boardRect.height };
+    ifScale = Math.min(area.w / r.w, area.h / r.h);
+    ifLeft = area.x + area.w / 2 - (r.x + r.w / 2) * ifScale;
+    ifTop = area.y + area.h / 2 - (r.y + r.h / 2) * ifScale;
   } else {
     ifLeft = Math.min(0, -(VIRTUAL_W * ifScale - boardRect.width) * s.panX);
     ifTop = Math.min(0, -(VIRTUAL_H * ifScale - boardRect.height) * s.panY);
@@ -1018,6 +1023,7 @@ export default function StreamerStudio() {
               {peek ? '⊡ Fit board' : '⤢ Whole page'}
             </button>
           )}
+          {split && <canvas ref={notesCanvas} className="absolute z-[5] pointer-events-none" style={{ left: split.notes.x, top: split.notes.y, width: split.notes.w, height: split.notes.h }} />}
           <iframe ref={boardFrame} title="Board" src={s.appPath} allow="autoplay; clipboard-write"
             style={{ position: 'absolute', left: ifLeft, top: ifTop, width: VIRTUAL_W, height: ifH, border: 0, transform: `scale(${ifScale})`, transformOrigin: '0 0', pointerEvents: edit ? 'none' : 'auto' }} />
         </div>
@@ -1035,9 +1041,6 @@ export default function StreamerStudio() {
             </div>
           )}
         </div>
-      ))}
-      {notes && showNotes && panel('notes', 'Review notes', (
-        <canvas ref={notesCanvas} className="absolute inset-0 w-full h-full pointer-events-none" />
       ))}
       {panel('cam', 'Camera', (
         <div className="absolute inset-0" style={{ background: '#050A0B' }}>

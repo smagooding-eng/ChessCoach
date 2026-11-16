@@ -13,6 +13,14 @@ export type BoardFeed =
 export interface ReviewNotes {
   title: string; text: string; accent: string; glyph: string; glyphColor: string; evalText: string;
   cp: number | null; white: string; black: string;
+  pros: string[]; cons: string[];
+}
+
+/** A board panel with review notes: the board gets a square, the notes the rest (beside it when
+ *  the panel is wide, under it otherwise), so neither covers the other. Offsets within the panel. */
+export function splitBoardPanel(w: number, h: number) {
+  if (w / h >= 1.15) { const bs = Math.min(h, w * 0.62); return { board: { x: 0, y: 0, w: bs, h }, notes: { x: bs, y: 0, w: w - bs, h } }; }
+  const nh = Math.max(h * 0.34, h - w); return { board: { x: 0, y: 0, w, h: h - nh }, notes: { x: 0, y: h - nh, w, h: nh } };
 }
 
 // A text run: the headline's rating line is drawn as coloured pieces side by side.
@@ -112,7 +120,7 @@ export function drawComposite(c: CanvasRenderingContext2D, W: number, H: number,
   const order = (Object.keys(inp.layout) as ('board' | 'cam' | 'tag' | 'head' | 'notes')[]).filter((k) => !!inp.layout[k]).sort((a, b) => inp.layout[a]!.z - inp.layout[b]!.z);
   for (const id of order) {
     const r = inp.layout[id]!;
-    if (r.hidden || (id === 'head' && !inp.head) || (id === 'notes' && !inp.notes)) continue;
+    if (r.hidden || (id === 'head' && !inp.head) || id === 'notes') continue; // notes are drawn inside the board panel
     const x = (r.x / 100) * W, y = (r.y / 100) * H, w = (r.w / 100) * W, h = (r.h / 100) * H;
     c.save();
     if (r.round) { c.beginPath(); c.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); c.clip(); }
@@ -120,7 +128,11 @@ export function drawComposite(c: CanvasRenderingContext2D, W: number, H: number,
     if (id === 'board') {
       c.fillStyle = '#050A0B'; c.fillRect(x, y, w, h);
       const b = inp.board;
-      if (b.kind === 'fen') {
+      if (b.kind === 'fen' && inp.notes) {
+        const sp = splitBoardPanel(w, h);
+        drawBoardPanel(c, b, x + sp.board.x, y + sp.board.y, sp.board.w, sp.board.h, inp);
+        drawReviewNotes(c, inp.notes, x + sp.notes.x, y + sp.notes.y, sp.notes.w, sp.notes.h);
+      } else if (b.kind === 'fen') {
         drawBoardPanel(c, b, x, y, w, h, inp);
       } else if (b.kind === 'video' && b.video.videoWidth) {
         const vw = b.video.videoWidth, vh = b.video.videoHeight;
@@ -140,8 +152,7 @@ export function drawComposite(c: CanvasRenderingContext2D, W: number, H: number,
       } else { c.fillStyle = '#0D1516'; c.fillRect(x, y, w, h); }
     } else if (id === 'head') {
       drawHead(c, inp.head!, x, y, w, h);
-    } else if (id === 'notes') {
-      drawReviewNotes(c, inp.notes!, x, y, w, h);
+
     } else {
       c.fillStyle = '#0D1516'; c.fillRect(x, y, w, h);
       c.fillStyle = '#81B64C'; c.fillRect(x, y, w, Math.max(2, h * 0.03));
@@ -201,48 +212,66 @@ function wrapLines(c: CanvasRenderingContext2D, text: string, maxW: number, maxL
   return out;
 }
 
-/** The coach's note (a card with the move's grade) over the eval bar and the players' names. */
+/** The coach's note (the move's grade, what it means, its pros and cons) over the eval bar and names. */
 export function drawReviewNotes(c: CanvasRenderingContext2D, n: ReviewNotes, x: number, y: number, w: number, h: number) {
+  c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip();
   c.fillStyle = '#050A0B'; c.fillRect(x, y, w, h);
-  const pad = Math.max(4, Math.min(w, h) * 0.05);
-  const barH = Math.max(6, h * 0.08), namesH = Math.max(12, h * 0.16);
-  const cardH = h - pad * 2 - barH - namesH - pad * 0.6;
-  const cx = x + pad, cw = w - pad * 2, cy = y + pad;
-  // card
-  rr(c, cx, cy, cw, cardH, Math.min(14, cardH * 0.14)); c.fillStyle = '#162022'; c.fill();
-  c.save(); rr(c, cx, cy, cw, cardH, Math.min(14, cardH * 0.14)); c.clip(); c.fillStyle = n.accent || '#81B64C'; c.fillRect(cx, cy, Math.max(3, cw * 0.008), cardH); c.restore();
-  const fs = Math.max(11, Math.min(cardH * 0.24, cw * 0.05)), small = fs * 0.78;
-  let tx = cx + cw * 0.035 + 4;
-  const ty = cy + cardH * 0.08 + fs * 0.6;
+  const pad = Math.max(5, Math.min(w, h) * 0.035);
+  const base = Math.max(10, Math.min(w * 0.05, h * 0.075, 24));
+  const barH = Math.max(5, base * 0.45), namesH = base * 1.25;
+  const cx = x + pad, cw = w - pad * 2, cy = y + pad, ch = h - pad * 2 - barH - namesH - pad * 0.5;
+  rr(c, cx, cy, cw, ch, Math.min(14, base * 0.7)); c.fillStyle = '#162022'; c.fill();
+  c.fillStyle = n.accent || '#81B64C'; c.fillRect(cx, cy + base * 0.4, Math.max(3, base * 0.18), ch - base * 0.8);
+  const ix = cx + base * 0.8, iw = cw - base * 1.4, bottom = cy + ch - base * 0.4;
+  let ty = cy + base * 0.55;
+  // title row: grade icon, "Rxc5 is a miss", eval chip
+  let tx = ix;
+  const rowMid = ty + base * 0.6;
   if (n.glyph) {
-    const r = fs * 0.62;
-    c.beginPath(); c.arc(tx + r, ty, r, 0, Math.PI * 2); c.fillStyle = n.glyphColor || '#81B64C'; c.fill();
-    c.fillStyle = '#fff'; c.font = `900 ${fs * (n.glyph.length > 1 ? 0.5 : 0.7)}px "DM Sans", sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(n.glyph, tx + r, ty + 1);
-    tx += r * 2 + fs * 0.35;
+    const r = base * 0.62;
+    c.beginPath(); c.arc(tx + r, rowMid, r, 0, Math.PI * 2); c.fillStyle = n.glyphColor || '#81B64C'; c.fill();
+    c.fillStyle = '#fff'; c.font = `900 ${base * (n.glyph.length > 1 ? 0.55 : 0.75)}px "DM Sans", sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(n.glyph, tx + r, rowMid + 1);
+    tx += r * 2 + base * 0.4;
   }
-  let right = cx + cw - cw * 0.03;
+  let right = ix + iw;
   if (n.evalText) {
-    c.font = `800 ${small}px "DM Sans", sans-serif`;
-    const ew = c.measureText(n.evalText).width + small * 0.9, eh = small * 1.5;
-    rr(c, right - ew, ty - eh / 2, ew, eh, eh * 0.25); c.fillStyle = 'rgba(255,255,255,.1)'; c.fill();
-    c.fillStyle = '#F5F7F6'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(n.evalText, right - ew / 2, ty + 1);
-    right -= ew + small * 0.6;
+    c.font = `800 ${base * 0.8}px "DM Sans", sans-serif`;
+    const ew = c.measureText(n.evalText).width + base * 0.8, eh = base * 1.25;
+    rr(c, right - ew, rowMid - eh / 2, ew, eh, eh * 0.25); c.fillStyle = 'rgba(255,255,255,.1)'; c.fill();
+    c.fillStyle = '#F5F7F6'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(n.evalText, right - ew / 2, rowMid + 1);
+    right -= ew + base * 0.5;
   }
-  c.fillStyle = '#F5F7F6'; c.font = `800 ${fs}px "DM Sans", sans-serif`; c.textAlign = 'left'; c.textBaseline = 'middle';
-  c.fillText(n.title, tx, ty, Math.max(10, right - tx));
-  if (n.text) {
-    c.font = `500 ${small}px "DM Sans", sans-serif`; c.fillStyle = 'rgba(245,247,246,.84)'; c.textBaseline = 'top';
-    const lines = wrapLines(c, n.text, cx + cw - (cx + cw * 0.035 + 4) - cw * 0.03, Math.max(1, Math.floor((cardH - (ty - cy) - fs * 0.7) / (small * 1.3))));
-    lines.forEach((l, i) => c.fillText(l, cx + cw * 0.035 + 4, ty + fs * 0.75 + i * small * 1.3));
+  c.fillStyle = '#F5F7F6'; c.font = `800 ${base * 1.05}px "DM Sans", sans-serif`; c.textAlign = 'left'; c.textBaseline = 'middle';
+  c.fillText(n.title, tx, rowMid, Math.max(10, right - tx));
+  ty += base * 1.55;
+  // explanation, then pros and cons, as much as fits
+  const line = base * 0.86, lh = line * 1.32;
+  const room = () => Math.floor((bottom - ty) / lh);
+  c.textBaseline = 'top';
+  if (n.text && room() > 0) {
+    c.font = `500 ${line}px "DM Sans", sans-serif`; c.fillStyle = 'rgba(245,247,246,.86)';
+    const want = n.pros.length || n.cons.length ? Math.max(1, Math.min(3, room() - Math.min(2, n.pros.length + n.cons.length))) : room();
+    for (const l of wrapLines(c, n.text, iw, want)) { c.fillText(l, ix, ty); ty += lh; }
+    ty += lh * 0.25;
   }
-  // eval bar: white's share from the left
-  const by = cy + cardH + pad * 0.6, cp = n.cp ?? 0;
+  const list = (items: string[], mark: string, color: string) => {
+    for (const it of items) {
+      const left = room(); if (left <= 0) return;
+      c.font = `800 ${line}px "DM Sans", sans-serif`; c.fillStyle = color; c.fillText(mark, ix, ty);
+      c.font = `500 ${line}px "DM Sans", sans-serif`; c.fillStyle = 'rgba(245,247,246,.86)';
+      for (const l of wrapLines(c, it, iw - line * 1.1, Math.min(2, left))) { c.fillText(l, ix + line * 1.1, ty); ty += lh; }
+    }
+  };
+  list(n.pros, '+', '#81B64C');
+  list(n.cons, '−', '#F0605D');
+  // eval bar (White's share from the left) and the names
+  const by = cy + ch + pad * 0.5, cp = n.cp ?? 0;
   const share = Math.abs(cp) >= 9000 ? (cp > 0 ? 1 : 0) : 0.5 + 0.5 * (2 / (1 + Math.exp(-0.00368208 * Math.max(-1500, Math.min(1500, cp)))) - 1);
   rr(c, cx, by, cw, barH, barH / 2); c.fillStyle = '#2B2F31'; c.fill();
   c.save(); rr(c, cx, by, cw, barH, barH / 2); c.clip(); c.fillStyle = '#EDEDED'; c.fillRect(cx, by, cw * share, barH); c.restore();
-  // names
   const ny = by + barH + namesH / 2 + 1;
-  c.font = `800 ${Math.max(10, namesH * 0.62)}px "DM Sans", sans-serif`; c.fillStyle = '#C9CFCD'; c.textBaseline = 'middle';
+  c.font = `800 ${base * 0.78}px "DM Sans", sans-serif`; c.fillStyle = '#C9CFCD'; c.textBaseline = 'middle';
   c.textAlign = 'left'; c.fillText(n.white, cx + 2, ny, cw * 0.48);
   c.textAlign = 'right'; c.fillText(n.black, cx + cw - 2, ny, cw * 0.48);
+  c.restore();
 }

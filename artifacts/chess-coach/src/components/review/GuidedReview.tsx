@@ -145,6 +145,15 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
   const openReport = canFullAnalysis ? (onReport ?? onExit) : (onUpgrade ?? onExit);
   const max = moves.length;
   const [mode, setMode] = useState<Mode>({ kind: 'main' });
+  // Stepping onto the last move (checkmate or the final position): the Pro report opens by itself
+  // a few seconds later. Going back to an earlier move first cancels it.
+  const lastPly = useRef(ply);
+  useEffect(() => {
+    const was = lastPly.current; lastPly.current = ply;
+    if (!canFullAnalysis || !onReport || mode.kind !== 'main' || moves.length === 0 || ply !== moves.length || was >= ply) return undefined;
+    const t = window.setTimeout(() => onReport(), 3500);
+    return () => window.clearTimeout(t);
+  }, [ply, mode.kind]); // eslint-disable-line react-hooks/exhaustive-deps
   const [expanded, setExpanded] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const byIndex = useMemo(() => new Map(reviewMoves.map((r) => [r.moveIndex, r])), [reviewMoves]);
@@ -197,7 +206,8 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
     const t = touch.current; touch.current = null;
     if (!t) return;
     const dx = e.changedTouches[0].clientX - t.x, dy = e.changedTouches[0].clientY - t.y;
-    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) go(ply + (dx < 0 ? 1 : -1));
+    // swipe right = next move, swipe left = back
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) go(ply + (dx > 0 ? 1 : -1));
   };
 
   // What the board shows.
@@ -416,6 +426,9 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
   // For Streamer Studio's board-only view: what the note says, as data (see data-studio below).
   const studioCls = mode.kind === 'best' || (mode.kind === 'retry' && mode.state === 'right') ? 'best' : rev && move && mode.kind === 'main' && ply > 0 ? rev.classification : null;
   const studioEval = rev && move && mode.kind === 'main' && ply > 0 ? evalLabel(rev.evalAfterCp) ?? '' : '';
+  const studioMain = !!(rev && move && mode.kind === 'main' && ply > 0);
+  const studioText = studioMain ? rev!.explanation ?? '' : '';
+  const studioPros = studioMain ? JSON.stringify(rev!.pros ?? []) : '[]', studioCons = studioMain ? JSON.stringify(rev!.cons ?? []) : '[]';
 
   const atEnd = ply >= max && mode.kind === 'main';
   let look: BoardLook | null = null;
@@ -479,7 +492,7 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
       {/* Phones: one column. Wide desktop (lg): board on the left, the coach, summary, moves and buttons on the right. */}
       <div className="mx-auto flex w-full max-w-[560px] min-h-0 flex-1 flex-col lg:grid lg:max-w-[1180px] lg:grid-cols-[minmax(0,1fr)_400px] lg:grid-rows-[auto_minmax(0,1fr)_auto_auto] lg:gap-x-6 lg:px-6 lg:pb-4">
         {/* Top card: fixed height so the board never shifts */}
-        <div data-studio="coach" data-accent={accent} data-glyph={studioCls ? CLS[studioCls].glyph : ''} data-glyphcolor={studioCls ? CLS[studioCls].color : ''} data-eval={studioEval} className="relative z-20 h-[92px] shrink-0 px-3 pb-2 pt-1 lg:col-start-2 lg:row-start-1 lg:px-0">
+        <div data-studio="coach" data-accent={accent} data-glyph={studioCls ? CLS[studioCls].glyph : ''} data-glyphcolor={studioCls ? CLS[studioCls].color : ''} data-eval={studioEval} data-text={studioText} data-pros={studioPros} data-cons={studioCons} className="relative z-20 h-[92px] shrink-0 px-3 pb-2 pt-1 lg:col-start-2 lg:row-start-1 lg:px-0">
           {/* Tap to read the whole explanation; it opens over the board, so nothing moves. */}
           <div onClick={canExpand ? () => setExpanded((v) => !v) : undefined}
             className={`absolute inset-x-3 top-1 overflow-hidden rounded-[14px] px-3.5 py-2.5 ${expanded ? 'min-h-[84px] shadow-2xl' : 'h-[84px]'} ${canExpand ? 'cursor-pointer' : ''}`}
