@@ -25,6 +25,7 @@ import { drawComposite, drawBoardPanel, drawReviewNotes, splitBoardPanel, headSi
 import { CloudRecorder, type RecStatus } from '@/lib/streamer/recorder';
 import { LiveHost } from '@/lib/streamer/live';
 import { apiFetch } from '@/lib/api';
+import { lastLichessGame, saveLichessGame } from '@/lib/lastLichessGame';
 import { useUser } from '@/hooks/use-user';
 import { useLichessGame } from '@/components/watch/LiveVideo';
 import { useSettings, PIECE_SHAPES } from '@/context/SettingsContext';
@@ -478,11 +479,17 @@ export default function StreamerStudio() {
   const reviewLatest = async () => {
     setReviewBusy(true);
     try {
+      // The game just finished in the board panel wins, unless a newer game is already saved.
+      const last = lastLichessGame();
       const r = await apiFetch('/api/games?limit=1', { credentials: 'include' });
       const d = r.ok ? await r.json() : null;
-      const id = d?.games?.[0]?.id;
-      if (id) openReview(id); else flash('No games in your account yet. Play one, then review it here.');
-    } catch { flash('Couldn’t load your games. Try again.'); }
+      const top = d?.games?.[0] as { id: number; playedAt?: string } | undefined;
+      const topAt = top?.playedAt ? new Date(top.playedAt).getTime() : 0;
+      if (last && !(top && top.id !== last.savedId && topAt > last.at)) {
+        openReview(last.savedId ?? await saveLichessGame(last.id, last.side, true));
+      } else if (top) openReview(top.id);
+      else flash('No games in your account yet. Play one, then review it here.');
+    } catch (e) { flash(e instanceof Error ? e.message : 'Couldn’t load your games. Try again.'); }
     finally { setReviewBusy(false); }
   };
   // A Lichess game you just played: bring it into your games, then open its review.
@@ -490,14 +497,9 @@ export default function StreamerStudio() {
     if (!followGame) return;
     setReviewBusy(true);
     try {
-      const pgn = await fetch(`https://lichess.org/game/export/${encodeURIComponent(followGame)}?clocks=false&evals=false`).then((r) => (r.ok ? r.text() : ''));
-      if (!pgn.trim()) throw new Error('Lichess didn’t send the game. Try again in a moment.');
-      const r = await apiFetch('/api/games/import-pgn', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pgn }) });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error || 'Couldn’t add the game to your account.');
-      const id = d.ids?.[0];
-      if (!id) throw new Error(d.notYours ? 'That game isn’t yours (link this Lichess username to your account first).' : 'Couldn’t add the game to your account.');
-      openReview(id);
+      const u = s.followUser.trim().toLowerCase();
+      const side = (lichess?.black?.name ?? '').toLowerCase() === u ? 'black' : (lichess?.white?.name ?? '').toLowerCase() === u ? 'white' : undefined;
+      openReview(await saveLichessGame(followGame, side));
     } catch (e) { flash(e instanceof Error ? e.message : 'Couldn’t open the review.'); }
     finally { setReviewBusy(false); }
   };

@@ -11,6 +11,7 @@ import { ChessBoard } from '@/components/ChessBoard';
 import { GameOverOverlay, OverlayButton } from '@/components/GameOverOverlay';
 import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
 import { apiFetch } from '@/lib/api';
+import { rememberLichessGame } from '@/lib/lastLichessGame';
 import { useUser } from '@/hooks/use-user';
 import { playMoveSound } from '@/context/SettingsContext';
 import { MaterialStrip, EvalBar } from '@/components/GameStatusStrip';
@@ -336,9 +337,15 @@ export function LichessPlay() {
       const saved = d?.ids?.[0];
       if (typeof saved !== 'number') throw new Error('not saved'); // never point "Review" at some other game
       setSavedId(saved); setSavedFor(id); setSaving('saved');
+      rememberLichessGame({ id, side: myColor === 'b' ? 'black' : 'white', at: Date.now(), savedId: saved });
     } catch { setSaving('failed'); }
   }, [gameId, auth, authUser?.lichessUsername, refreshAuth, myColor]);
-  useEffect(() => { if (phase === 'over' && saving === 'idle' && plies >= 4 && st?.status !== 'aborted') void saveGame(); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (phase !== 'over' || plies < 4 || st?.status === 'aborted') return;
+    // remembered straight away, so "review my last game" finds it even before the save finishes
+    if (gameId) rememberLichessGame({ id: gameId, side: myColor === 'b' ? 'black' : 'white', at: Date.now() });
+    if (saving === 'idle') void saveGame();
+  }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Rated game over: how did the ratings move? The game itself only carries the ratings
   // from the start. Your account rating updates the moment the game ends, so read that;

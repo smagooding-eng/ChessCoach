@@ -877,9 +877,9 @@ function pgnPlayedAt(pgn: string): Date {
 
 router.post("/games/import-pgn", requireAuth, async (req, res): Promise<void> => {
   const { pgn, viaChessScout } = req.body as { pgn?: string; viaChessScout?: boolean };
-  // Played on ChessScout's board: the board knows which colour they played, so that
-  // decides it (not a name match, which can miss or hit an older copy of the game).
-  const side = viaChessScout === true && (req.body?.side === "white" || req.body?.side === "black") ? req.body.side as "white" | "black" : null;
+  // Played on ChessScout's board (or followed in the studio): the board knows which colour
+  // they played, so that decides it (not a name match, which can miss or hit an older copy of the game).
+  const side = req.body?.side === "white" || req.body?.side === "black" ? req.body.side as "white" | "black" : null;
   if (!pgn || typeof pgn !== "string" || !pgn.trim()) {
     res.status(400).json({ error: "Choose a PGN file or paste PGN text first." });
     return;
