@@ -14,6 +14,7 @@ import {
   MojiHead, loadThree, lookFromCamera, DEFAULT_MOJI, MOJI_SKINS, MOJI_HAIR_COLORS, MOJI_EYE_COLORS, MOJI_FRAMES, MOJI_HAIRS, MOJI_BEARDS, MOJI_MUSTACHES, MOJI_GLASSES,
   type MojiLook,
 } from '@/lib/streamer/mojiHead';
+import { SpriteAvatar } from '@/lib/streamer/spriteAvatar';
 import { drawComposite, drawBoardPanel, headSizes, type BoardFeed, type TextRun } from '@/lib/streamer/compositor';
 import { CloudRecorder, type RecStatus } from '@/lib/streamer/recorder';
 import { LiveHost } from '@/lib/streamer/live';
@@ -26,7 +27,7 @@ type PanelId = 'board' | 'cam' | 'tag' | 'head';
 interface Rect { x: number; y: number; w: number; h: number; z: number; hidden?: boolean; round?: boolean }
 type Layout = Record<PanelId, Rect>;
 type Aspect = '9:16' | '16:9';
-type Disguise = 'none' | 'moji' | 'pixelate' | 'blur';
+type Disguise = 'none' | 'moji' | 'character' | 'pixelate' | 'blur';
 type Bg = 'brand' | 'blur' | 'room' | 'color';
 type Tab = 'layout' | 'board' | 'camera' | 'voice' | 'videos' | 'live';
 
@@ -73,7 +74,7 @@ const DEFAULTS: Settings = {
   boardSource: 'app', followUser: '', appPath: '/live', zoom: 1, panX: 0, panY: 0,
   frame: 'auto', framePad: 'players',
   camOn: false, camId: '', facing: 'user', mirror: true,
-  disguise: 'moji', moji: DEFAULT_MOJI, customVoice: DEFAULT_CUSTOM, bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3,
+  disguise: 'character', moji: DEFAULT_MOJI, customVoice: DEFAULT_CUSTOM, bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3,
   voice: 'off', pitch: 0, micId: '', output: 'none',
   name: 'Anonymous Knight', subtitle: 'Playing on chessscout.net',
   headline: 'The road to 1500 ELO', goal: 1500, ratingFrom: 'auto', manualRating: 0,
@@ -92,6 +93,8 @@ function loadSettings(): Settings {
       const saved = JSON.parse(raw) as Partial<Settings>;
       const merged = { ...DEFAULTS, ...saved };
       if ((merged.disguise as string) === 'avatar') merged.disguise = 'moji'; // the old avatars became the 3D head
+      // Once: your own character becomes the avatar (the 3D head stays one tap away).
+      if (!(saved as { charV1?: number }).charV1) { if (merged.disguise === 'moji') merged.disguise = 'character'; (merged as { charV1?: number }).charV1 = 1; }
       merged.moji = { ...DEFAULT_MOJI, ...(saved.moji ?? {}) };
       if (!merged.layout.head) {
         // first time with the headline: a ready-made layout makes room for it; your own arrangement gets it on top
@@ -265,6 +268,15 @@ export default function StreamerStudio() {
     });
   }, [s.disguise]);
   useEffect(() => () => moji.current?.dispose(), []);
+
+  // ---- your character (drawn from your character sheet), loaded when it's picked ----
+  const sprite = useRef<SpriteAvatar | null>(null);
+  const [spriteStatus, setSpriteStatus] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle');
+  useEffect(() => {
+    if (s.disguise !== 'character' || sprite.current) return;
+    setSpriteStatus('loading');
+    void SpriteAvatar.load().then((a) => { if (a) { sprite.current = a; setSpriteStatus('ready'); } else setSpriteStatus('failed'); });
+  }, [s.disguise]);
   const [matching, setMatching] = useState(false);
   const matchMyLook = useCallback(async () => {
     setMatching(true);
@@ -575,7 +587,7 @@ export default function StreamerStudio() {
   useEffect(() => {
     let raf = 0;
     const pose = { x: 0, y: 0, size: 0, roll: 0 }; // where the face is, to hide it
-    const ex = { yaw: 0, pitch: 0, mouth: 0, smile: 0, pucker: 0, blinkL: 0, blinkR: 0, brow: 0, lookX: 0, lookY: 0 }; // for the 3D head, screen terms
+    const ex = { yaw: 0, pitch: 0, mouth: 0, smile: 0, pucker: 0, blinkL: 0, blinkR: 0, brow: 0, browDown: 0, lookX: 0, lookY: 0 }; // for the 3D head, screen terms
     let lastSeen = 0, nextBlink = performance.now() + 2500, blinkUntil = 0;
     const tiny = document.createElement('canvas');
     const tctx = tiny.getContext('2d');
@@ -629,6 +641,7 @@ export default function StreamerStudio() {
         ex.yaw += ((mirror ? -face.yaw : face.yaw) - ex.yaw) * 0.6; ex.pitch += (face.pitch - ex.pitch) * 0.6;
         ex.mouth = face.mouth; ex.smile = face.smile; ex.brow += (face.brow - ex.brow) * 0.5;
         ex.pucker = Math.min(1, ((bs.mouthPucker ?? 0) + (bs.mouthFunnel ?? 0)) * 0.8);
+        ex.browDown += (((bs.browDownLeft ?? 0) + (bs.browDownRight ?? 0)) / 2 - ex.browDown) * 0.5;
         // MediaPipe's left/right are the picture's; a mirrored view swaps them on screen
         ex.blinkL = mirror ? face.blinkR : face.blinkL; ex.blinkR = mirror ? face.blinkL : face.blinkR;
         ex.lookX = mirror ? -face.lookX : face.lookX; ex.lookY = face.lookY;
@@ -637,6 +650,14 @@ export default function StreamerStudio() {
 
       if (st.disguise === 'none') {
         if (hasVideo) drawVideo(); else brand();
+      } else if (st.disguise === 'character') {
+        // Your character on the studio background (or your room / blurred room, with your face hidden).
+        if (hasVideo && tracked && st.bg === 'room') {
+          drawVideo();
+          const r = pose.size * 0.62;
+          c.save(); c.beginPath(); c.ellipse(pose.x, pose.y, r * 1.1, r * 1.4, pose.roll, 0, Math.PI * 2); c.clip(); drawVideo(Math.max(10, r / 3)); c.restore();
+        } else if (hasVideo && (st.bg === 'blur' || st.bg === 'room')) drawVideo(40);
+        else brand();
       } else if (!tracked) {
         // Privacy shield: no face found -> never show the raw camera.
         if (hasVideo) drawVideo(40); else brand();
@@ -674,7 +695,20 @@ export default function StreamerStudio() {
         c.drawImage(img, cx - S / 2, cy - S / 2, S, S);
       }
 
-      if (!hasVideo && st.disguise !== 'moji') {
+      if (st.disguise === 'character' && sprite.current) {
+        let S: number, cx: number, cy: number;
+        const vlevel = voice.current.running ? voice.current.level() : 0;
+        if (tracked) { S = pose.size * 2.4; cx = pose.x; cy = pose.y; }
+        else {
+          // no face in view (or no camera): front-on, bouncing with your voice
+          Object.assign(ex, { yaw: ex.yaw * 0.9, mouth: 0, smile: 0, blinkL: 0, blinkR: 0, browDown: 0 });
+          pose.roll *= 0.9;
+          S = Math.min(W, H) * 0.8 * (st.avatarScale / 1.3); cx = W / 2; cy = H * 0.5;
+        }
+        sprite.current.draw(c, { yaw: ex.yaw, mouth: ex.mouth, smile: ex.smile, blinkL: ex.blinkL, blinkR: ex.blinkR, browDown: ex.browDown, voice: vlevel }, cx, cy, S, pose.roll, t);
+      }
+
+      if (!hasVideo && st.disguise !== 'moji' && st.disguise !== 'character') {
         c.fillStyle = RD.muted; c.font = `${Math.round(H * 0.06)}px "DM Sans", sans-serif`; c.textAlign = 'center';
         c.fillText(st.camOn ? 'Starting camera…' : 'Camera off', W / 2, H / 2);
       }
@@ -1116,6 +1150,7 @@ export default function StreamerStudio() {
 
             <Label>Hide my face</Label>
             <div className="flex flex-wrap gap-2">
+              <Chip on={s.disguise === 'character'} onClick={() => set({ disguise: 'character' })}>🧔 My character</Chip>
               <Chip on={s.disguise === 'moji'} onClick={() => set({ disguise: 'moji' })}>🙂 3D cartoon head</Chip>
               <Chip on={s.disguise === 'pixelate'} onClick={() => set({ disguise: 'pixelate' })}>▦ Pixelate face</Chip>
               <Chip on={s.disguise === 'blur'} onClick={() => set({ disguise: 'blur' })}>◌ Blur face</Chip>
@@ -1126,6 +1161,13 @@ export default function StreamerStudio() {
                 {trackStatus === 'loading' && 'Loading face tracking…'}
                 {trackStatus === 'ready' && 'Face tracking on. If your face is ever lost, the camera is hidden until it’s found again.'}
                 {trackStatus === 'failed' && 'Face tracking couldn’t load on this device, so your camera stays hidden.'}
+              </Note>
+            )}
+            {s.disguise === 'character' && (
+              <Note>
+                {spriteStatus === 'loading' && 'Loading your character…'}
+                {spriteStatus === 'failed' && 'Your character’s pictures couldn’t load. Check your connection and pick it again.'}
+                {spriteStatus === 'ready' && 'Your character from your character sheet. Turn your head to turn his; smile, laugh, wink, look surprised or frown and he does too; he bounces when you talk. The background setting decides what’s behind him.'}
               </Note>
             )}
             {s.disguise === 'moji' && (<>
