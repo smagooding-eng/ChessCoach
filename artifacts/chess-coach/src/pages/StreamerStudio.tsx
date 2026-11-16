@@ -36,7 +36,7 @@ interface Settings {
   boardSource: 'app' | 'screen' | 'follow'; followUser: string; appPath: string; zoom: number; panX: number; panY: number;
   frame: 'auto' | 'manual'; framePad: 'board' | 'players';
   camOn: boolean; camId: string; facing: 'user' | 'environment'; mirror: boolean;
-  disguise: Disguise; moji: MojiLook; bg: Bg; bgColor: string; avatarScale: number;
+  disguise: Disguise; moji: MojiLook; bg: Bg; bgColor: string; avatarScale: number; charScale: number;
   customVoice: CustomVoice;
   voice: VoicePreset; pitch: number; micId: string; output: string;
   name: string; subtitle: string;
@@ -74,7 +74,7 @@ const DEFAULTS: Settings = {
   boardSource: 'app', followUser: '', appPath: '/live', zoom: 1, panX: 0, panY: 0,
   frame: 'auto', framePad: 'players',
   camOn: false, camId: '', facing: 'user', mirror: true,
-  disguise: 'character', moji: DEFAULT_MOJI, customVoice: DEFAULT_CUSTOM, bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3,
+  disguise: 'character', moji: DEFAULT_MOJI, customVoice: DEFAULT_CUSTOM, bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3, charScale: 1.8,
   voice: 'off', pitch: 0, micId: '', output: 'none',
   name: 'Anonymous Knight', subtitle: 'Playing on chessscout.net',
   headline: 'The road to 1500 ELO', goal: 1500, ratingFrom: 'auto', manualRating: 0,
@@ -128,6 +128,7 @@ export default function StreamerStudio() {
   const [s, setS] = useState<Settings>(loadSettings);
   const sRef = useRef(s); sRef.current = s;
   const set = useCallback((patch: Partial<Settings>) => setS((p) => ({ ...p, ...patch })), []);
+  const pinch = useRef<{ d: number; s: number } | null>(null);
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* ignore */ } }, [s]);
 
   const [tab, setTab] = useState<Tab>('layout');
@@ -698,12 +699,12 @@ export default function StreamerStudio() {
       if (st.disguise === 'character' && sprite.current) {
         let S: number, cx: number, cy: number;
         const vlevel = voice.current.running ? voice.current.level() : 0;
-        if (tracked) { S = pose.size * 2.4; cx = pose.x; cy = pose.y; }
+        if (tracked) { S = (pose.size / st.avatarScale) * 2.4 * st.charScale; cx = pose.x; cy = pose.y; }
         else {
           // no face in view (or no camera): front-on, bouncing with your voice
           Object.assign(ex, { yaw: ex.yaw * 0.9, mouth: 0, smile: 0, blinkL: 0, blinkR: 0, browDown: 0 });
           pose.roll *= 0.9;
-          S = Math.min(W, H) * 0.8 * (st.avatarScale / 1.3); cx = W / 2; cy = H * 0.5;
+          S = Math.min(W, H) * 0.8 * (st.charScale / 1.3); cx = W / 2; cy = H * 0.5;
         }
         sprite.current.draw(c, { yaw: ex.yaw, mouth: ex.mouth, smile: ex.smile, blinkL: ex.blinkL, blinkR: ex.blinkR, browDown: ex.browDown, voice: vlevel }, cx, cy, S, pose.roll, t);
       }
@@ -953,7 +954,12 @@ export default function StreamerStudio() {
       ))}
       {panel('cam', 'Camera', (
         <div className="absolute inset-0" style={{ background: '#050A0B' }}>
-          <canvas ref={camCanvas} className="absolute inset-0 w-full h-full" />
+          <canvas ref={camCanvas} className="absolute inset-0 w-full h-full"
+            // My character: scroll or pinch on the video to make him bigger or smaller
+            onWheel={(e) => { if (sRef.current.disguise !== 'character') return; const v = sRef.current.charScale * (e.deltaY < 0 ? 1.06 : 1 / 1.06); set({ charScale: Math.min(3.2, Math.max(0.6, +v.toFixed(2))) }); }}
+            onTouchStart={(e) => { if (e.touches.length === 2 && sRef.current.disguise === 'character') pinch.current = { d: Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY), s: sRef.current.charScale }; }}
+            onTouchMove={(e) => { const p = pinch.current; if (!p || e.touches.length !== 2) return; const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); set({ charScale: Math.min(3.2, Math.max(0.6, +(p.s * d / p.d).toFixed(2))) }); }}
+            onTouchEnd={() => { pinch.current = null; }} />
         </div>
       ))}
       {headRef.current && panel('head', 'Headline', (() => {
@@ -1169,6 +1175,13 @@ export default function StreamerStudio() {
                 {spriteStatus === 'failed' && 'Your character’s pictures couldn’t load. Check your connection and pick it again.'}
                 {spriteStatus === 'ready' && 'Your character from your character sheet. Turn your head to turn his; smile, laugh, wink, look surprised or frown and he does too; he bounces when you talk. The background setting decides what’s behind him.'}
               </Note>
+            )}
+            {s.disguise === 'character' && (
+              <div className="flex items-end gap-2">
+                <button onClick={() => set({ charScale: Math.max(0.6, +(s.charScale - 0.15).toFixed(2)) })} aria-label="Smaller" className="mb-1 h-9 w-9 shrink-0 rounded-lg text-[18px] font-black" style={{ background: RD.cardLight, border: `1px solid ${RD.border}`, color: RD.text }}>−</button>
+                <div className="min-w-0 flex-1"><Slider label="Character size" min={0.6} max={3.2} step={0.05} value={s.charScale} onChange={(v) => set({ charScale: v })} /></div>
+                <button onClick={() => set({ charScale: Math.min(3.2, +(s.charScale + 0.15).toFixed(2)) })} aria-label="Bigger" className="mb-1 h-9 w-9 shrink-0 rounded-lg text-[18px] font-black" style={{ background: RD.cardLight, border: `1px solid ${RD.border}`, color: RD.text }}>＋</button>
+              </div>
             )}
             {s.disguise === 'moji' && (<>
               <Note>
