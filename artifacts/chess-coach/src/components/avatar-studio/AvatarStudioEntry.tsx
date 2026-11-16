@@ -2,11 +2,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'wouter';
 import { RD } from '@/lib/redesignTheme';
-import { loadAvatarConfig } from '@/lib/avatarStudio/api';
+import { listCharacters } from '@/lib/avatarStudio/api';
 
 export function useHasSavedAvatar(): boolean | null {
   const [has, setHas] = useState<boolean | null>(null);
-  useEffect(() => { let on = true; loadAvatarConfig().then((c) => { if (on) setHas(!!c); }).catch(() => { if (on) setHas(null); }); return () => { on = false; }; }, []);
+  useEffect(() => { let on = true; listCharacters().then((c) => { if (on) setHas(c.length > 0); }).catch(() => { if (on) setHas(null); }); return () => { on = false; }; }, []);
   return has;
 }
 
@@ -28,7 +28,7 @@ export function AvatarStudioCard() {
     <Link href="/avatar-studio" className="flex items-center justify-between gap-3 rounded-2xl p-4" style={{ background: '#0D1516', border: `1px solid ${RD.border}`, color: RD.text }}>
       <span>
         <span className="block text-[15px] font-extrabold">🧑‍🎨 3D Avatar</span>
-        <span className="block text-[12px]" style={{ color: RD.muted }}>Make a cartoon 3D character of yourself.</span>
+        <span className="block text-[12px]" style={{ color: RD.muted }}>Create animated 3D characters of yourself.</span>
       </span>
       <span className="shrink-0 rounded-xl px-3 py-2 text-[13px] font-extrabold" style={{ background: RD.green, color: '#06110A' }}>{has ? 'Edit avatar' : 'Create avatar'}</span>
     </Link>
