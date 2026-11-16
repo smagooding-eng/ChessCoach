@@ -4,6 +4,7 @@ import { PieceTile } from '@/components/DesignSystem';
 import { useUser } from '@/hooks/use-user';
 import { useChessPlayer } from '@/hooks/use-chess-player';
 import { EditableAvatar } from '@/components/EditableAvatar';
+import { AvatarStudioLink } from '@/components/avatar-studio/AvatarStudioEntry';
 import { useMyAnalysisSummary } from '@/hooks/use-analysis';
 import { useLiveRatings } from '@/hooks/use-live-ratings';
 import { useMyGames } from '@/hooks/use-games';
@@ -1761,7 +1762,10 @@ function ProfileClassic() {
           style={{ background: `radial-gradient(circle, ${G}22 0%, transparent 70%)` }}
         />
         <div className="relative flex items-center gap-4">
-          <EditableAvatar size={72} radius="16px" border={`2px solid ${G}`} fallback={<PieceTile piece="♚" size={68} />} />
+          <div className="flex shrink-0 flex-col items-center">
+            <EditableAvatar size={72} radius="16px" border={`2px solid ${G}`} fallback={<PieceTile piece="♚" size={68} />} />
+            <AvatarStudioLink />
+          </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               {player?.title && (
@@ -2046,8 +2050,11 @@ function ProfileRedesign() {
         <section className="relative overflow-hidden rounded-[22px] p-5 lg:col-span-2" style={{ ...card, border: '1px solid rgba(129,182,76,.22)' }}>
           <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full" style={{ background: 'radial-gradient(circle, rgba(129,182,76,.16) 0%, transparent 70%)' }} />
           <div className="relative flex items-center gap-4">
-            <EditableAvatar size={76} border={`2.5px solid ${RD.green}`}
-              fallback={<span className="text-[30px] font-black" style={{ color: RD.green }}>{(player?.name || username || '?').charAt(0).toUpperCase()}</span>} />
+            <div className="flex shrink-0 flex-col items-center">
+              <EditableAvatar size={76} border={`2.5px solid ${RD.green}`}
+                fallback={<span className="text-[30px] font-black" style={{ color: RD.green }}>{(player?.name || username || '?').charAt(0).toUpperCase()}</span>} />
+              <AvatarStudioLink />
+            </div>
             <div className="min-w-0 flex-1">
               <div className="mb-1 flex flex-wrap items-center gap-1.5">
                 {player?.title && <span className="rounded-md px-1.5 py-0.5 text-[10.5px] font-extrabold" style={chip('rgba(232,180,71,.16)', RD.gold)}>{player.title}</span>}

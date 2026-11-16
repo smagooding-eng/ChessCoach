@@ -133,6 +133,7 @@ const ArticlePage = lazyRetry(() => import("@/pages/Articles").then(m => ({ defa
 const ShareCard = lazyRetry(() => import("@/pages/ShareCard").then(m => ({ default: m.ShareCard })));
 const DownloadPage = lazyRetry(() => import("@/pages/Download"));
 const SettingsPage = lazyRetry(() => import("@/pages/Settings"));
+const AvatarStudioPage = lazyRetry(() => import("@/pages/AvatarStudioPage"));
 const ScanArchivePage = lazyRetry(() => import("@/pages/ScanArchive"));
 const PrivacyPage = lazyRetry(() => import("@/pages/Privacy"));
 const RafflePage = lazyRetry(() => import("@/pages/Raffle"));
@@ -376,6 +377,7 @@ const PLiveHistory   = () => <ProtectedRoute component={LiveHistory} fallbackNav
 const PGameLookup    = () => <ProtectedRoute component={GameLookup} />;
 const PSubscription  = () => <ProtectedRoute component={Subscription} />;
 const PProfile       = () => <ProtectedRoute component={Profile} />;
+const PAvatarStudio  = () => <ProtectedRoute component={AvatarStudioPage} />;
 const PPuzzles       = () => <ProtectedRoute component={Puzzles} />;
 const PShop          = () => <ProtectedRoute component={ShopPage} />;
 const PSolvedPuzzles = () => <ProtectedRoute component={SolvedPuzzles} />;
@@ -688,6 +690,7 @@ function Router() {
       <Route path="/admin"            component={PAdmin} />
       <Route path="/subscription"    component={PSubscription} />
       <Route path="/profile"          component={PProfile} />
+      <Route path="/avatar-studio"    component={PAvatarStudio} />
 
       <Route component={NotFound} />
     </Switch></>

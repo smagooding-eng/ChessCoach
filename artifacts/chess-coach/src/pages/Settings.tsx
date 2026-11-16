@@ -7,6 +7,8 @@ import { BOARD_GROUPS, boardGroupOf } from '@/lib/boardGroups';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import { LanguageSettings } from '@/components/LanguagePicker';
+import { AvatarStudioCard } from '@/components/avatar-studio/AvatarStudioEntry';
+import { useUser } from '@/hooks/use-user';
 import { RD, REDESIGN_ON } from '@/lib/redesignTheme';
 import { PIECE_THEME_TYPES, themeTypeOf } from '@/lib/pieceThemes';
 import {
@@ -79,6 +81,7 @@ function previewSoundPack(pack: SoundPack) {
 }
 
 export default function SettingsPage() {
+  const { authUser } = useUser();
   const {
     boardTheme, setBoardTheme,
     boardTexture, setBoardTexture,
@@ -197,6 +200,8 @@ export default function SettingsPage() {
       </div>
       </>
       )}
+
+      {authUser && <AvatarStudioCard />}
 
       <LanguageSettings text={TEXT_LIGHT} muted={TEXT_MUTED} card={BG_CARD} border="rgba(255,255,255,0.1)" />
 
