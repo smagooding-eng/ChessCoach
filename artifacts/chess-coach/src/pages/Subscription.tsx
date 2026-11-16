@@ -117,7 +117,7 @@ export function Subscription() {
     try {
       const res = await apiFetch('/api/stripe/checkout-trial', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ priceId }),
+        body: JSON.stringify({ priceId, source: searchParams?.get('from') ?? 'subscription' }),
       });
       const data = await res.json();
       if (data.url) window.location.href = data.url;

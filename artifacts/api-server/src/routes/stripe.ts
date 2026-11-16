@@ -423,6 +423,8 @@ router.post('/stripe/checkout-trial', async (req: Request, res: Response) => {
       success_url: `${origin}${basePath}/subscription?success=true&trial=1`,
       cancel_url: `${origin}${basePath}/subscription?offer=trial`,
     });
+    const { logTrialEvent, trialSource } = await import('./trialTracking');
+    await logTrialEvent(req.user.id, 'checkout', trialSource(req.body?.source));
     res.json({ url: session.url });
   } catch (err: any) {
     console.error('Trial checkout error:', err?.message);

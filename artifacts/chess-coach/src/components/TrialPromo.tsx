@@ -20,6 +20,9 @@ const FEATURES = [
 ];
 
 type Price = { id: string; unit_amount: number; recurring?: { interval?: string } };
+const track = (event: 'shown' | 'start' | 'dismiss') => {
+  apiFetch('/api/trial/track', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event }) }).catch(() => {});
+};
 
 export function TrialPromo() {
   const { authUser, isPremium, isSubscriptionLoaded } = useUser();
@@ -45,6 +48,7 @@ export function TrialPromo() {
         setDays(Number(d.days) || 3);
         try { localStorage.setItem(SEEN(authUser.id), String(Date.now())); } catch { /* storage off */ }
         setOpen(true);
+        track('shown');
         const p = await apiFetchLocal('/api/stripe/products').then((x) => (x.ok ? x.json() : null)).catch(() => null);
         const monthly = (p?.data?.[0]?.prices as Price[] | undefined)?.find((x) => x.recurring?.interval === 'month');
         if (!gone && monthly) setPrice(monthly);
@@ -55,13 +59,15 @@ export function TrialPromo() {
 
   if (!open) return null;
 
+  const close = () => { track('dismiss'); setOpen(false); };
   const start = async () => {
-    if (!price) { window.location.href = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/subscription?offer=trial`; return; }
+    track('start');
+    if (!price) { window.location.href = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/subscription?offer=trial&from=promo`; return; }
     setBusy(true); setErr('');
     try {
       const r = await apiFetch('/api/stripe/checkout-trial', {
         method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceId: price.id }),
+        body: JSON.stringify({ priceId: price.id, source: 'promo' }),
       });
       const d = await r.json().catch(() => ({}));
       if (d.url) { window.location.href = d.url; return; }
@@ -75,7 +81,7 @@ export function TrialPromo() {
     <div className="tp-veil fixed inset-0 z-[90] grid place-items-center p-4" role="dialog" aria-modal="true" aria-label={`Try Pro free for ${days} days`}>
       <style>{CSS}</style>
       <div className="tp-card relative w-full max-w-[420px] overflow-hidden rounded-[24px]">
-        <button onClick={() => setOpen(false)} aria-label="Close" className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-full" style={{ background: 'rgba(255,255,255,.06)', color: '#87918E' }}>
+        <button onClick={close} aria-label="Close" className="absolute right-3 top-3 z-10 grid h-9 w-9 place-items-center rounded-full" style={{ background: 'rgba(255,255,255,.06)', color: '#87918E' }}>
           <X size={18} />
         </button>
 
@@ -117,7 +123,7 @@ export function TrialPromo() {
           <p className="tp-in mt-3 text-[12px] leading-snug" style={{ color: '#87918E', animationDelay: '3.45s' }}>
             Card required to start. You won’t be charged for {days} days, {after}. Cancel any time before then in one tap.
           </p>
-          <button onClick={() => setOpen(false)} className="tp-in mt-2 text-[13.5px] font-bold" style={{ color: '#AEB6B3', animationDelay: '3.5s' }}>Maybe later</button>
+          <button onClick={close} className="tp-in mt-2 text-[13.5px] font-bold" style={{ color: '#AEB6B3', animationDelay: '3.5s' }}>Maybe later</button>
         </div>
       </div>
     </div>

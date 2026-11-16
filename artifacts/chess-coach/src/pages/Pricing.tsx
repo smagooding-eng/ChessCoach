@@ -103,7 +103,7 @@ export default function PricingPage() {
               <li>{t('Join every Pro tournament free')}</li>
               <li>{t('Host Pro tournaments and earn $1 per new Pro signup')}</li>
             </ul>
-            <Link href={isAuthenticated ? '/subscription?offer=trial' : '/setup?signup=1'} className="block text-center py-2.5 rounded-xl text-sm font-black"
+            <Link href={isAuthenticated ? '/subscription?offer=trial&from=pricing' : '/setup?signup=1'} className="block text-center py-2.5 rounded-xl text-sm font-black"
               style={{ background: G, color: '#fff' }}>
               {t('Try Pro free for 3 days')}
             </Link>

@@ -843,6 +843,8 @@ export function Admin() {
           <ShopManagementPanel />
 
           <LandingFunnelPanel />
+
+          <TrialStatsPanel />
         </>
       )}
 
@@ -3202,6 +3204,114 @@ function LandingFunnelPanel() {
             {data.byDevice && <DeviceSignupsSection data={data.byDevice} />}
             {data.checkoutClicks && <CheckoutClicksSection data={data.checkoutClicks} />}
           </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+type TrialStats = {
+  promo: { shown: number; start: number; dismiss: number };
+  checkout: { total: number; promo: number; subscription: number; pricing: number; email: number };
+  trials: { started: number; inTrial: number; cancelling: number; paid: number; paidCancelling: number; paymentFailed: number; ended: number };
+  recent: { email: string | null; status: string; startedAt: string; trialEnd: string | null; outcome: string }[];
+  stripeError: string | null;
+};
+const TRIAL_OUTCOME: Record<string, { label: string; color: string }> = {
+  in_trial: { label: 'In trial', color: '#35C6F4' },
+  cancelling: { label: 'Cancelling (in trial)', color: '#E8B447' },
+  paid: { label: 'Paid', color: '#81B64C' },
+  paid_cancelling: { label: 'Paid, cancelling', color: '#81B64C' },
+  payment_failed: { label: 'Payment failed', color: '#FF5058' },
+  ended: { label: 'Ended', color: '#87918E' },
+  not_started: { label: 'Checkout not finished', color: '#87918E' },
+};
+
+// The 3-day Pro trial: the promo, trial checkout, and what Stripe says happened after.
+function TrialStatsPanel() {
+  const [data, setData] = useState<TrialStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState<DateRange>({ startDate: '', endDate: '' });
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    if (!range.startDate || !range.endDate) return;
+    setLoading(true); setErr('');
+    apiFetch(`/api/admin/trial-stats?startDate=${range.startDate}&endDate=${range.endDate}`, { credentials: 'include' })
+      .then(async (r) => { const d = await r.json().catch(() => null); if (!r.ok) { setErr(d?.details || d?.error || `HTTP ${r.status}`); return null; } return d; })
+      .then((d) => setData(d))
+      .catch((e) => setErr(e instanceof Error ? e.message : 'Network error'))
+      .finally(() => setLoading(false));
+  }, [range]);
+  const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : '—');
+  const Stat = ({ label, value, sub }: { label: string; value: number | string; sub?: string }) => (
+    <div className="rounded-lg border border-border/30 bg-background/40 px-3 py-2.5">
+      <p className="text-[11px] text-muted-foreground">{label}</p>
+      <p className="text-xl font-black leading-tight">{value}</p>
+      {sub && <p className="text-[11px] text-muted-foreground">{sub}</p>}
+    </div>
+  );
+  const finished = data ? data.trials.paid + data.trials.paymentFailed + data.trials.ended : 0;
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-border/40 bg-card overflow-hidden">
+      <div className="px-5 py-3 border-b border-border/30 flex items-center justify-between">
+        <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2"><TrendingUp className="w-4 h-4" /> 3-day Pro trial</h3>
+        <DateRangeFilter onChange={setRange} defaultPreset="30d" />
+      </div>
+      <div className="p-4 space-y-4">
+        {loading ? (
+          <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>
+        ) : !data ? (
+          <p className="text-xs text-muted-foreground text-center py-4">Failed to load trial stats.{err ? ` (${err})` : ''}</p>
+        ) : (
+          <>
+            <div>
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Promo (members)</p>
+              <div className="grid grid-cols-3 gap-2">
+                <Stat label="Saw it" value={data.promo.shown} />
+                <Stat label="Tapped Start" value={data.promo.start} sub={pct(data.promo.start, data.promo.shown)} />
+                <Stat label="Closed it" value={data.promo.dismiss} sub={pct(data.promo.dismiss, data.promo.shown)} />
+              </div>
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Opened trial checkout</p>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                <Stat label="Total" value={data.checkout.total} />
+                <Stat label="From promo" value={data.checkout.promo} />
+                <Stat label="Subscription page" value={data.checkout.subscription} />
+                <Stat label="Pricing page" value={data.checkout.pricing} />
+                <Stat label="Email offer" value={data.checkout.email} />
+              </div>
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Trials (from Stripe)</p>
+              {data.stripeError && <p className="mb-2 text-xs text-red-400">Stripe: {data.stripeError}</p>}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                <Stat label="Started" value={data.trials.started} sub={pct(data.trials.started, data.checkout.total) + ' of checkouts'} />
+                <Stat label="In trial now" value={data.trials.inTrial} />
+                <Stat label="Cancelling (in trial)" value={data.trials.cancelling} />
+                <Stat label="Paid" value={data.trials.paid} sub={finished ? `${pct(data.trials.paid, finished)} of finished trials` : undefined} />
+                <Stat label="Payment failed" value={data.trials.paymentFailed} />
+                <Stat label="Ended" value={data.trials.ended} />
+              </div>
+            </div>
+            {data.recent.length > 0 && (
+              <div>
+                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Latest trials</p>
+                <div className="divide-y divide-border/30 rounded-lg border border-border/30">
+                  {data.recent.map((t, i) => {
+                    const o = TRIAL_OUTCOME[t.outcome] ?? { label: t.status, color: '#87918E' };
+                    return (
+                      <div key={i} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
+                        <span className="truncate">{t.email ?? 'Unknown member'}</span>
+                        <span className="shrink-0 text-muted-foreground">{new Date(t.startedAt).toLocaleDateString()}</span>
+                        <span className="shrink-0 font-bold" style={{ color: o.color }}>{o.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </motion.div>
