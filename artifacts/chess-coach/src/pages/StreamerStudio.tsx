@@ -64,7 +64,7 @@ interface Settings {
   boardSource: 'app' | 'screen' | 'follow'; followUser: string; appPath: string; zoom: number; panX: number; panY: number;
   frame: 'auto' | 'manual'; framePad: 'board' | 'players';
   camOn: boolean; camId: string; facing: 'user' | 'environment'; mirror: boolean;
-  disguise: Disguise; moji: MojiLook; bg: Bg; bgColor: string; avatarScale: number; charScale: number; bgImage: string;
+  disguise: Disguise; moji: MojiLook; bg: Bg; bgColor: string; avatarScale: number; charScale: number; bgImage: string; charFollow?: boolean;
   customVoice: CustomVoice;
   voice: VoicePreset; pitch: number; micId: string; output: string;
   name: string; subtitle: string;
@@ -781,7 +781,13 @@ export default function StreamerStudio() {
       if (st.disguise === 'character' && sprite.current) {
         let S: number, cx: number, cy: number;
         const vlevel = voice.current.running ? voice.current.level() : 0;
-        if (tracked) { S = (pose.size / st.avatarScale) * 2.4 * st.charScale; cx = pose.x; cy = pose.y; }
+        if (tracked && st.charFollow) { S = (pose.size / st.avatarScale) * 2.4 * st.charScale; cx = pose.x; cy = pose.y; }
+        else if (tracked) {
+          // kept in the middle: same size whether you lean in or sit back, only a slight sway with your head
+          S = Math.min(W, H) * 0.8 * (st.charScale / 1.3);
+          cx = W / 2 + Math.max(-0.04, Math.min(0.04, (pose.x - W / 2) / W * 0.12)) * W;
+          cy = H * 0.5 + Math.max(-0.03, Math.min(0.03, (pose.y - H / 2) / H * 0.08)) * H;
+        }
         else {
           // no face in view (or no camera): front-on, bouncing with your voice
           Object.assign(ex, { yaw: ex.yaw * 0.9, mouth: 0, smile: 0, blinkL: 0, blinkR: 0, browDown: 0, puck: 0, funnel: 0, roll: 0, stretch: 0 });
@@ -1279,6 +1285,12 @@ export default function StreamerStudio() {
                 <button onClick={() => set({ charScale: Math.max(0.6, +(s.charScale - 0.15).toFixed(2)) })} aria-label="Smaller" className="mb-1 h-9 w-9 shrink-0 rounded-lg text-[18px] font-black" style={{ background: RD.cardLight, border: `1px solid ${RD.border}`, color: RD.text }}>−</button>
                 <div className="min-w-0 flex-1"><Slider label="Character size" min={0.6} max={3.2} step={0.05} value={s.charScale} onChange={(v) => set({ charScale: v })} /></div>
                 <button onClick={() => set({ charScale: Math.min(3.2, +(s.charScale + 0.15).toFixed(2)) })} aria-label="Bigger" className="mb-1 h-9 w-9 shrink-0 rounded-lg text-[18px] font-black" style={{ background: RD.cardLight, border: `1px solid ${RD.border}`, color: RD.text }}>＋</button>
+              </div>
+            )}
+            {s.disguise === 'character' && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Chip on={!s.charFollow} onClick={() => set({ charFollow: false })}>⊙ Stay centred</Chip>
+                <Chip on={!!s.charFollow} onClick={() => set({ charFollow: true })}>↔ Follow my head</Chip>
               </div>
             )}
 
