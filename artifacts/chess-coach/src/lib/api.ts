@@ -4,6 +4,10 @@ function resolveBase(): string {
   if (import.meta.env.VITE_API_URL) {
     return (import.meta.env.VITE_API_URL as string).replace(/\/+$/, "");
   }
+  // The live site: the API on Render, even when the build wasn't given VITE_API_URL
+  if (typeof window !== "undefined" && /(^|\.)chessscout\.net$|\.workers\.dev$/.test(window.location.hostname)) {
+    return "https://chesscoach-api-kbf8.onrender.com";
+  }
   if (typeof window !== "undefined" && window.location.hostname === "localhost") {
     return "";
   }

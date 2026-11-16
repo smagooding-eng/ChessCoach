@@ -21,7 +21,11 @@ const CHESSCOM_GREEN = '#81b64c';
 
 // Loaded once per module -- loadStripe() caches internally, but this
 // keeps us from re-triggering the script load on every render.
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string);
+// The key comes with the build when it was set there, otherwise from the API (/api/stripe/config).
+const stripePromise = (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY
+  ? Promise.resolve(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string)
+  : apiFetch('/api/stripe/config').then((r) => r.json()).then((d: { publishableKey?: string }) => d.publishableKey ?? '').catch(() => '')
+).then((k) => (k ? loadStripe(k) : null));
 
 interface EmbeddedCheckoutFormProps {
   priceId: string;
