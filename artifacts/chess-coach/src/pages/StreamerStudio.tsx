@@ -33,12 +33,25 @@ type PanelId = 'board' | 'cam' | 'tag' | 'head' | 'notes';
 interface Rect { x: number; y: number; w: number; h: number; z: number; hidden?: boolean; round?: boolean }
 type Layout = Record<PanelId, Rect>;
 type BaseLayout = Omit<Layout, 'notes'> & { notes?: Rect };
-/** Review notes (the coach's note, eval bar and names) go under the board, or as low as fits. */
+/** Where the review notes go: the biggest empty strip across the board's width (never over the
+ *  camera, headline or name tag); with no room at all, over the bottom of the board. */
+function placeNotes(l: BaseLayout): Rect {
+  const b = l.board;
+  const others = (['cam', 'head', 'tag', 'board'] as const).map((k) => l[k]).filter((r) => r && !r.hidden && r.x < b.x + b.w && r.x + r.w > b.x);
+  const free = (y: number) => !others.some((r) => y >= r.y && y < r.y + r.h);
+  // the strip nearest the board wins when two are about as big
+  const dist = (y: number, h: number) => Math.max(0, y - (b.y + b.h), b.y - (y + h));
+  const score = (y: number, h: number) => Math.min(h, 12) - dist(y, h) * 0.05;
+  let best = { y: 0, h: 0 }, run = -1;
+  for (let y = 0; y <= 100; y += 0.5) {
+    if (y < 100 && free(y)) { if (run < 0) run = y; }
+    else if (run >= 0) { const h = y - run; if (h >= 5 && (best.h < 5 || score(run, h) > score(best.y, best.h))) best = { y: run, h }; run = -1; }
+  }
+  if (best.h >= 5) { const h = Math.min(12, best.h); return { x: b.x, y: best.y + (best.h - h) / 2, w: b.w, h, z: 6 }; }
+  return { x: b.x, y: b.y + b.h - 12, w: b.w, h: 12, z: b.z };
+}
 function withNotes(l: BaseLayout): Layout {
-  if (l.notes) return l as Layout;
-  const b = l.board, h = 11;
-  const y = b.y + b.h + h <= 100 ? b.y + b.h : b.y >= h ? b.y - h : 100 - h;
-  return { ...l, notes: { x: b.x, y, w: b.w, h, z: 6 } };
+  return l.notes ? (l as Layout) : { ...l, notes: placeNotes(l) };
 }
 type Aspect = '9:16' | '16:9';
 type Disguise = 'none' | 'moji' | 'character' | 'pixelate' | 'blur';
@@ -120,7 +133,9 @@ function loadSettings(): Settings {
         const pre = PRESETS[merged.aspect]?.find((p) => p.id === merged.preset);
         merged.layout = pre ? pre.layout : { ...merged.layout, head: { x: 0, y: 0, w: 100, h: 8, z: 9 } };
       }
-      merged.layout = withNotes(merged.layout); // layouts saved before the review-notes panel
+      // layouts saved before the review-notes panel, or with its first position (which could cover the camera)
+      if (!(saved as { notesV2?: number }).notesV2) { merged.layout = { ...merged.layout, notes: placeNotes(merged.layout) }; (merged as { notesV2?: number }).notesV2 = 1; }
+      merged.layout = withNotes(merged.layout);
       return merged;
     }
   } catch { /* ignore */ }
