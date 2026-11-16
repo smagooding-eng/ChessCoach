@@ -132,7 +132,7 @@ export function CoursesRedesign({
 
         {/* YOUR NEXT MOVE */}
         {nextCourse && (
-          <section className="relative overflow-hidden rounded-[22px]" style={{ border: `1.5px solid ${RD.green}`, boxShadow: '0 0 0 1px rgba(129,182,76,.18), 0 18px 50px -22px rgba(129,182,76,.5)' }}>
+          <section className="relative overflow-hidden rounded-[22px]" style={{ ...(photoLook ? { background: RD.card } : {}), border: `1.5px solid ${RD.green}`, boxShadow: '0 0 0 1px rgba(129,182,76,.18), 0 18px 50px -22px rgba(129,182,76,.5)' }}>
             {!photoLook && <img src={siteImg(`${ART_BASE}course-training-hero.webp`)} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: '82% center' }} />}
             {!photoLook && <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.94) 0%, rgba(5,10,11,.78) 48%, rgba(5,10,11,.05) 100%)' }} />}
             <div className="relative z-10 p-5">
@@ -151,7 +151,7 @@ export function CoursesRedesign({
 
         {/* Stats: flat columns */}
         {courses.length > 0 && (
-          <div className="grid grid-cols-3 text-center">
+          <div className={`grid grid-cols-3 text-center ${photoLook ? 'rounded-[18px] py-3' : ''}`} style={photoLook ? card : undefined}>
             {[{ v: lessonsDone, l: 'Lessons completed' }, { v: started, l: 'Courses started' }, { v: `${overall}%`, l: 'Training progress' }].map((s, i) => (
               <div key={s.l} className="px-2 py-1" style={{ borderLeft: i ? `1px solid ${RD.border}` : undefined }}>
                 <b className="block text-[30px] font-extrabold leading-tight">{s.v}</b>
@@ -193,7 +193,7 @@ export function CoursesRedesign({
         {recommended && (
           <section className="grid gap-2.5">
             <h2 className="px-1 text-[20px] font-extrabold">Recommended for you</h2>
-            <Link href={`/courses/${recommended.id}`} className="relative block overflow-hidden rounded-[22px]" style={{ border: `1px solid ${RD.border}` }}>
+            <Link href={`/courses/${recommended.id}`} className="relative block overflow-hidden rounded-[22px]" style={{ ...(photoLook ? { background: RD.card } : {}), border: `1px solid ${RD.border}` }}>
               {!photoLook && <img src={siteImg(`${ART_BASE}${artFor(recommended).img}.webp`)} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: '75% center' }} />}
               {!photoLook && <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.92) 0%, rgba(5,10,11,.7) 55%, rgba(5,10,11,.1) 100%)' }} />}
               <div className={`relative z-10 flex flex-col p-5 ${photoLook ? '' : 'min-h-[210px]'}`}>
