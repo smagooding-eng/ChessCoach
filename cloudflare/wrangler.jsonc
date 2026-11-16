@@ -9,6 +9,8 @@
   "main": "worker.ts",
   "compatibility_date": "2026-11-01",
   "compatibility_flags": ["nodejs_compat"],
+  // builds the site first (skipped when Cloudflare's build step already did)
+  "build": { "command": "sh build.sh" },
   "assets": {
     "directory": "../artifacts/chess-coach/dist/public",
     "binding": "ASSETS",
