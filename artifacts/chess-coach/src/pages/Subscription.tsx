@@ -99,7 +99,7 @@ export function Subscription() {
     }
   }, [linkedPrice, isAuthenticated, isPremium, products]);
 
-  // The "N days of Pro free" offer (sent to people who didn't finish checkout).
+  // The "N days of Pro free" trial (card required), for members who have never paid.
   const [trialOffer, setTrialOffer] = useState<{ eligible: boolean; days: number } | null>(null);
   const [trialLoading, setTrialLoading] = useState(false);
   const [trialError, setTrialError] = useState('');
@@ -305,8 +305,8 @@ export function Subscription() {
       ) : (
         <div className="max-w-3xl mx-auto">
           {trialOffer?.eligible && monthlyPrice && (
-            <div className="mb-6 rounded-xl p-5 text-left" style={{ background: 'rgba(129,182,76,0.10)', border: '2px solid rgba(129,182,76,0.55)' }}>
-              <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-primary">Your offer</p>
+            <div className="mb-6 rounded-xl p-5 text-left" style={{ background: '#0D1516', border: '2px solid #81B64C' }}>
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.16em]" style={{ color: '#E8B447' }}>Free trial</p>
               <h3 className="mt-1 text-xl font-black">Try Pro free for {trialOffer.days} days</h3>
               <p className="mt-1.5 text-sm text-muted-foreground">
                 Add a card to start. You won't be charged during the {trialOffer.days} days. After that, Pro continues at ${(monthlyPrice.unit_amount / 100).toFixed(0)}/month and your card is billed automatically, unless you cancel before the trial ends.

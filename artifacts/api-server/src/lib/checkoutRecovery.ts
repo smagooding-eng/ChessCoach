@@ -20,8 +20,6 @@ import { sendEmail } from "./email";
 import { logger } from "./logger";
 
 export const TRIAL_DAYS = 3;
-/** How long the trial offer stays open after its email. */
-const TRIAL_OFFER_VALID_DAYS = 14;
 const BATCH = 40;
 const GAP_MS = 600;
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -85,7 +83,7 @@ export function trialOfferHtml(name: string | null, unsubUrl: string): string {
       emailP(`Add a card to start. You won't be charged during the ${TRIAL_DAYS} days. After that, Pro continues at your plan's normal price and your card is billed automatically, unless you cancel before the trial ends (one tap in <strong style="color:${EMAIL.text};">Profile &rsaquo; Manage subscription</strong>).`, { center: true, mb: 22 }),
     ].join(''),
     cta: { label: `Start my ${TRIAL_DAYS} free days &rarr;`, href: `${EMAIL.site}/subscription?offer=trial` },
-    footerNote: 'This offer is open for two weeks and is only for your account. We only send this once.',
+    footerNote: 'One free trial per account. We only send this email once.',
     unsubscribeUrl: unsubUrl,
   });
 }
@@ -152,14 +150,14 @@ export async function runCheckoutRecovery(): Promise<void> {
 }
 
 /** Was this person sent the trial offer (still open) and have they never paid? */
+/** The 3-day Pro trial (card required): open to every member who has never paid or
+ *  trialled (any subscription past "incomplete" counts), so it's one trial per person. */
 export async function trialOfferEligible(userId: string): Promise<boolean> {
   if (!(await hasStripeTables())) return false;
   const r = rowsOf<{ ok: boolean }>(await db.execute(sql`
     SELECT EXISTS (
       SELECT 1 FROM users u
-      JOIN email_drip_log d ON d.user_id = u.id AND d.drip_type = 'checkout_trial_offer'
       WHERE u.id = ${userId}
-        AND d.sent_at >= now() - make_interval(days => ${TRIAL_OFFER_VALID_DAYS})
         AND u.is_premium_override = false
         AND (u.stripe_customer_id IS NULL OR NOT ${EVER_PAID})
     ) AS ok`));

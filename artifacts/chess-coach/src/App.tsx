@@ -28,6 +28,7 @@ import { GamesRedesign } from "@/pages/GamesRedesign";
 import { AnalysisRedesign } from "@/pages/AnalysisRedesign";
 import { ImportStatusWatcher } from "@/components/ImportStatusWatcher";
 import { AutoPushPrompt } from "@/components/AutoPushPrompt";
+import { TrialPromo } from "@/components/TrialPromo";
 import { useDashboardRedesignFlag } from "@/hooks/use-app-config";
 import { BackgroundJobsWatcher } from "@/components/BackgroundJobsWatcher";
 import { AudioAutoplayUnlock } from "@/components/AudioAutoplayUnlock";
@@ -754,6 +755,7 @@ function App() {
                     <ChallengeNotifyPrompt />
                     <BackgroundJobsWatcher />
                     <AutoPushPrompt />
+                    <TrialPromo />
                     <RealtimeBridge />
                   </NotInKidMode>
                   <AudioAutoplayUnlock />

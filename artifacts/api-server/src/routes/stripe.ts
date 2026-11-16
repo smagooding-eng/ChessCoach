@@ -418,7 +418,7 @@ router.post('/stripe/checkout-trial', async (req: Request, res: Response) => {
       subscription_data: {
         trial_period_days: TRIAL_DAYS,
         trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
-        metadata: { offer: 'checkout_recovery_trial' },
+        metadata: { offer: 'free_trial' },
       },
       success_url: `${origin}${basePath}/subscription?success=true&trial=1`,
       cancel_url: `${origin}${basePath}/subscription?offer=trial`,

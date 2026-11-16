@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { setPageMeta } from '@/lib/pageMeta';
 import { t, noGT } from '@/lib/i18n';
 import { LanguageSelect } from '@/components/LanguagePicker';
+import { useUser } from '@/hooks/use-user';
 
 const G = '#81b64c';
 const BG = '#141413';
@@ -40,6 +41,7 @@ function Cell({ value }: { value: boolean | string }) {
 }
 
 export default function PricingPage() {
+  const { isAuthenticated } = useUser();
   useEffect(() => {
     setPageMeta(
       'Pricing — ChessScout.net',
@@ -60,7 +62,7 @@ export default function PricingPage() {
 
         <h1 className="text-3xl sm:text-4xl font-black mb-3 text-center" style={{ color: TEXT }}>{t('Simple Pricing')}</h1>
         <p className="text-sm text-center mb-10" style={{ color: MUTED }}>
-          {t('Free forever, or $5/month for everything. No trial to track, no credits to count.')}
+          {t('Free forever, or $5/month for everything. Try Pro free for 3 days first, no credits to count.')}
         </p>
 
         <div className="grid sm:grid-cols-2 gap-4 mb-12">
@@ -101,10 +103,11 @@ export default function PricingPage() {
               <li>{t('Join every Pro tournament free')}</li>
               <li>{t('Host Pro tournaments and earn $1 per new Pro signup')}</li>
             </ul>
-            <Link href="/#pricing" className="block text-center py-2.5 rounded-xl text-sm font-black"
+            <Link href={isAuthenticated ? '/subscription?offer=trial' : '/setup?signup=1'} className="block text-center py-2.5 rounded-xl text-sm font-black"
               style={{ background: G, color: '#fff' }}>
-              {t('Upgrade to Pro')}
+              {t('Try Pro free for 3 days')}
             </Link>
+            <p className="mt-2 text-center text-[11px]" style={{ color: MUTED }}>{t('Card required. Not charged for 3 days, then $5/mo. Cancel anytime.')}</p>
           </div>
         </div>
 
