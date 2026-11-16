@@ -25,6 +25,7 @@ const GOOD = new Set(["best", "excellent", "great", "brilliant"]);
 type Row = Record<string, unknown>;
 const rowsOf = <T = Row>(r: unknown): T[] => (Array.isArray(r) ? (r as T[]) : ((r as { rows?: T[] })?.rows ?? []));
 
+let brilliantBackfilled = false;
 export async function ensureContentTables(): Promise<void> {
   await db.execute(sql`CREATE TABLE IF NOT EXISTS content_moments (
     id SERIAL PRIMARY KEY,
@@ -46,6 +47,13 @@ export async function ensureContentTables(): Promise<void> {
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_content_moments_tags ON content_moments USING GIN (tags)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_content_moments_score ON content_moments (score DESC, id DESC)`);
   await db.execute(sql`CREATE TABLE IF NOT EXISTS content_scanned (game_id INTEGER PRIMARY KEY, scanned_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
+  // Sound piece sacrifices already found count as brilliant too (once per server start; cheap).
+  if (!brilliantBackfilled) {
+    brilliantBackfilled = true;
+    await db.execute(sql`UPDATE content_moments SET tags = array_append(tags, 'brilliant'), score = GREATEST(score, ${SCORE.brilliant})
+      WHERE 'sacrifice' = ANY(tags) AND NOT ('brilliant' = ANY(tags)) AND classification IN ('best', 'great')
+        AND (eval_after IS NULL OR (CASE WHEN split_part(fen_before, ' ', 2) = 'w' THEN eval_after ELSE -eval_after END) BETWEEN -80 AND 600)`).catch(() => {});
+  }
   // Engine reviews made just for the Studio (games nobody had reviewed yet). Kept apart from
   // games.review_data so a player's own game page is never changed by them.
   await db.execute(sql`CREATE TABLE IF NOT EXISTS content_reviews (game_id INTEGER PRIMARY KEY, review JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
@@ -106,6 +114,14 @@ async function scanGame(g: Row, trapList: { name: string; line: string[] }[]): P
     for (const t of board) {
       if (t === "checkmate" || t === "promotion") tags.add(t);
       else if (["fork", "pin", "skewer", "discovered", "sacrifice"].includes(t) && GOOD.has(cls)) tags.add(t);
+    }
+    // Brilliant, as players know it: the engine's top move gives up a piece and the position
+    // holds, when the player wasn't already winning easily. (The engine's own "brilliant"
+    // label is much rarer, so these are what fill the Brilliant list.)
+    if (tags.has("sacrifice") && (cls === "best" || cls === "great")) {
+      const pov = (cp: unknown) => (typeof cp === "number" ? (m.color === "white" ? cp : -cp) : null);
+      const before = pov(i > 0 ? moves[i - 1].evalAfterCp : 20), after = pov(m.evalAfterCp);
+      if ((before == null || before <= 400) && (after == null || after >= -80)) tags.add("brilliant");
     }
     if (trapHit && i === trapHit.line.length - 1) tags.add("trap");
     const notable = [...tags].some((t) => SCORE[t]);
