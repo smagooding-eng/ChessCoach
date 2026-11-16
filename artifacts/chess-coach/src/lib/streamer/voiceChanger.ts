@@ -302,7 +302,7 @@ export class VoiceChanger {
     const t = low + mid + high || 1;
     return { low: low / t, mid: mid / t, high: high / t };
   }
-  private specBuf: Uint8Array | null = null;
+  private specBuf: Uint8Array<ArrayBuffer> | null = null;
 
   /** 0..1 loudness of the changed voice */
   level(): number {
