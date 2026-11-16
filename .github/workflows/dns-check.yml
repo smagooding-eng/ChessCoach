@@ -89,3 +89,10 @@ jobs:
           chunk=$(grep -o 'StreamerStudio-[A-Za-z0-9_-]*\.js' /tmp/main.js | head -1)
           curl -sS "https://chessscout.net/assets/$chunk" -o /tmp/studio.js
           echo "::notice title=studio chunk::$chunk has 'Stay centred': $(grep -c 'Stay centred' /tmp/studio.js) / has charFollow: $(grep -c charFollow /tmp/studio.js)"
+          # markers of recent changes, newest first, to date the live build
+          for m in 'cs_last_lichess_game' 'turn/' 'v_ah' 'Pro report' 'cs_free_review'; do
+            n=0; for f in /tmp/main.js /tmp/studio.js; do n=$((n + $(grep -c "$m" $f))); done
+            for c in $(grep -o '[A-Za-z0-9_-]*-[A-Za-z0-9_-]\{8\}\.js' /tmp/main.js | sort -u | head -400); do :; done
+            echo "::notice title=marker $m::$n"
+          done
+          ls -la /tmp/main.js /tmp/studio.js | awk '{print $5, $9}' | tr '\n' ' ' | sed 's/^/::notice title=sizes::/'; echo
