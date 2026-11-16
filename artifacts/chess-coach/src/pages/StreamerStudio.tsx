@@ -8,6 +8,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as RPointerEvent, ReactNode } from 'react';
 import { Link } from 'wouter';
 import { RD } from '@/lib/redesignTheme';
+import { BG_PHOTOS } from '@/context/SettingsContext';
+
+// A picture you upload as the background is kept on this device (not in the settings).
+const BG_UPLOAD_KEY = 'cs_studio_bg_upload';
+const bgSrc = (v: string): string => { if (v !== 'upload') return v; try { return localStorage.getItem(BG_UPLOAD_KEY) ?? ''; } catch { return ''; } };
+const THEME_BGS = BG_PHOTOS.filter((b) => !!b.src);
 import { VoiceChanger, VOICE_PRESETS, VOICE_GROUPS, DEFAULT_CUSTOM, type VoicePreset, type CustomVoice } from '@/lib/streamer/voiceChanger';
 import { FaceTracker, type FacePose } from '@/lib/streamer/faceTracker';
 import {
@@ -28,7 +34,7 @@ interface Rect { x: number; y: number; w: number; h: number; z: number; hidden?:
 type Layout = Record<PanelId, Rect>;
 type Aspect = '9:16' | '16:9';
 type Disguise = 'none' | 'moji' | 'character' | 'pixelate' | 'blur';
-type Bg = 'brand' | 'blur' | 'room' | 'color';
+type Bg = 'brand' | 'blur' | 'room' | 'color' | 'image';
 type Tab = 'layout' | 'board' | 'camera' | 'voice' | 'videos' | 'live';
 
 interface Settings {
@@ -36,7 +42,7 @@ interface Settings {
   boardSource: 'app' | 'screen' | 'follow'; followUser: string; appPath: string; zoom: number; panX: number; panY: number;
   frame: 'auto' | 'manual'; framePad: 'board' | 'players';
   camOn: boolean; camId: string; facing: 'user' | 'environment'; mirror: boolean;
-  disguise: Disguise; moji: MojiLook; bg: Bg; bgColor: string; avatarScale: number; charScale: number;
+  disguise: Disguise; moji: MojiLook; bg: Bg; bgColor: string; avatarScale: number; charScale: number; bgImage: string;
   customVoice: CustomVoice;
   voice: VoicePreset; pitch: number; micId: string; output: string;
   name: string; subtitle: string;
@@ -74,7 +80,7 @@ const DEFAULTS: Settings = {
   boardSource: 'app', followUser: '', appPath: '/live', zoom: 1, panX: 0, panY: 0,
   frame: 'auto', framePad: 'players',
   camOn: false, camId: '', facing: 'user', mirror: true,
-  disguise: 'character', moji: DEFAULT_MOJI, customVoice: DEFAULT_CUSTOM, bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3, charScale: 1.8,
+  disguise: 'character', moji: DEFAULT_MOJI, customVoice: DEFAULT_CUSTOM, bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3, charScale: 1.8, bgImage: '',
   voice: 'off', pitch: 0, micId: '', output: 'none',
   name: 'Anonymous Knight', subtitle: 'Playing on chessscout.net',
   headline: 'The road to 1500 ELO', goal: 1500, ratingFrom: 'auto', manualRating: 0,
@@ -198,6 +204,18 @@ export default function StreamerStudio() {
     };
   }
   const flash = useCallback((m: string) => { setMsg(m); window.setTimeout(() => setMsg((x) => (x === m ? null : x)), 6000); }, []);
+  const uploadBg = useCallback(async (f: File) => {
+    if (!f.type.startsWith('image/')) { flash('Pick a picture (JPG, PNG or WebP).'); return; }
+    try {
+      const bmp = await createImageBitmap(f);
+      const k = Math.min(1, 1920 / Math.max(bmp.width, bmp.height));
+      const cv = document.createElement('canvas'); cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k);
+      cv.getContext('2d')!.drawImage(bmp, 0, 0, cv.width, cv.height);
+      const url = cv.toDataURL('image/jpeg', 0.86);
+      localStorage.setItem(BG_UPLOAD_KEY, url);
+      set({ bg: 'image', bgImage: 'upload' });
+    } catch { flash('That picture couldn’t be used. Try a smaller one.'); }
+  }, [set, flash]);
 
   // ---- stage size: keep the aspect, fit the space ----
   useEffect(() => {
@@ -590,6 +608,7 @@ export default function StreamerStudio() {
     const pose = { x: 0, y: 0, size: 0, roll: 0 }; // where the face is, to hide it
     const ex = { yaw: 0, pitch: 0, mouth: 0, smile: 0, pucker: 0, blinkL: 0, blinkR: 0, brow: 0, browDown: 0, lookX: 0, lookY: 0 }; // for the 3D head, screen terms
     let lastSeen = 0, nextBlink = performance.now() + 2500, blinkUntil = 0;
+    const bgPic: { src: string; img: HTMLImageElement | null } = { src: '', img: null };
     const tiny = document.createElement('canvas');
     const tctx = tiny.getContext('2d');
     const loop = () => {
@@ -621,6 +640,12 @@ export default function StreamerStudio() {
       };
       const brand = () => {
         if (st.bg === 'color') { c.fillStyle = st.bgColor; c.fillRect(0, 0, W, H); return; }
+        if (st.bg === 'image' && st.bgImage) {
+          const src = bgSrc(st.bgImage);
+          if (bgPic.src !== src) { bgPic.src = src; bgPic.img = null; if (src) { const im = new Image(); im.onload = () => { if (bgPic.src === src) bgPic.img = im; }; im.src = src; } }
+          const im = bgPic.img;
+          if (im) { const k = Math.max(W / im.naturalWidth, H / im.naturalHeight); c.drawImage(im, (W - im.naturalWidth * k) / 2, (H - im.naturalHeight * k) / 2, im.naturalWidth * k, im.naturalHeight * k); return; }
+        }
         const g = c.createRadialGradient(W * 0.5, H * 0.35, 0, W * 0.5, H * 0.5, Math.max(W, H) * 0.75);
         g.addColorStop(0, '#16302a'); g.addColorStop(0.55, '#0B1213'); g.addColorStop(1, '#050A0B');
         c.fillStyle = g; c.fillRect(0, 0, W, H);
@@ -1183,6 +1208,29 @@ export default function StreamerStudio() {
                 <button onClick={() => set({ charScale: Math.min(3.2, +(s.charScale + 0.15).toFixed(2)) })} aria-label="Bigger" className="mb-1 h-9 w-9 shrink-0 rounded-lg text-[18px] font-black" style={{ background: RD.cardLight, border: `1px solid ${RD.border}`, color: RD.text }}>＋</button>
               </div>
             )}
+
+            <Label>Background</Label>
+            <p className="-mt-1 mb-2 text-[11.5px]" style={{ color: RD.muted }}>Behind your character, and whenever the camera is off.</p>
+            <div className="flex flex-wrap gap-2">
+              <Chip on={s.bg === 'brand'} onClick={() => set({ bg: 'brand' })}>♞ ChessScout</Chip>
+              <Chip on={s.bg === 'room'} onClick={() => set({ bg: 'room' })}>🏠 My room</Chip>
+              <Chip on={s.bg === 'blur'} onClick={() => set({ bg: 'blur' })}>◌ Blurred room</Chip>
+              <Chip on={s.bg === 'color'} onClick={() => set({ bg: 'color' })}>🎨 Colour</Chip>
+              <label className="cursor-pointer select-none rounded-xl px-3 py-2 text-[13px] font-semibold transition-colors"
+                style={s.bg === 'image' && s.bgImage === 'upload' ? { background: RD.green, color: '#06110A' } : { background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }}>🖼️ My picture
+                <input type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void uploadBg(f); }} />
+              </label>
+            </div>
+            {s.bg === 'color' && <input type="color" value={s.bgColor} onChange={(e) => set({ bgColor: e.target.value })} className="mt-2 h-9 w-16 cursor-pointer rounded" />}
+            {(s.bg === 'room' || s.bg === 'blur') && !s.camOn && <Note>Turn the camera on to see your room.</Note>}
+            <div className="mt-2 grid grid-cols-4 gap-1.5 sm:grid-cols-6">
+              {THEME_BGS.map((b) => (
+                <button key={b.id} onClick={() => set({ bg: 'image', bgImage: b.src! })} title={b.label} className="overflow-hidden rounded-lg"
+                  style={{ aspectRatio: '16 / 10', outline: s.bg === 'image' && s.bgImage === b.src ? `2px solid ${RD.green}` : `1px solid ${RD.border}`, outlineOffset: s.bg === 'image' && s.bgImage === b.src ? 1 : 0 }}>
+                  <img src={b.thumb ?? b.src} alt={b.label} loading="lazy" className="h-full w-full object-cover" />
+                </button>
+              ))}
+            </div>
             {s.disguise === 'moji' && (<>
               <Note>
                 {mojiStatus === 'loading' && 'Loading the 3D head…'}
