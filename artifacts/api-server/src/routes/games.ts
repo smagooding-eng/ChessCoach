@@ -1245,6 +1245,22 @@ async function saveReview(gameId: number, reviewResult: unknown): Promise<"saved
   return "saved";
 }
 
+/** The side the coach's summary is written for: the owner's own account names first
+ *  (an imported game can be stored under another name), then the name it was imported under. */
+async function coachSideFor(game: typeof gamesTable.$inferSelect): Promise<"white" | "black" | undefined> {
+  const names: string[] = [];
+  if (game.userId) {
+    try {
+      const [u] = await db.select({ a: usersTable.scoutUsername, b: usersTable.chesscomUsername, c: usersTable.lichessUsername }).from(usersTable).where(eq(usersTable.id, game.userId));
+      if (u) names.push(...[u.a, u.b, u.c].filter((n): n is string => !!n).map((n) => n.toLowerCase()));
+    } catch { /* fall back to the stored name */ }
+  }
+  if (game.username) names.push(game.username.toLowerCase());
+  const w = game.whiteUsername.toLowerCase(), b = game.blackUsername.toLowerCase();
+  for (const n of names) { if (n === w) return "white"; if (n === b) return "black"; }
+  return undefined;
+}
+
 async function aiCoachForOwner(ownerId: string | null | undefined): Promise<boolean> {
   if (!ownerId) return false;
   try { return await isUserPremium(ownerId); } catch { return false; }
@@ -1273,6 +1289,7 @@ async function reviewOneGame(
     onProgress,
     userId,
     aiCoach: aiCoachOverride ?? await aiCoachForOwner(game.userId),
+    coachSide: await coachSideFor(game),
   });
 
   await saveReview(game.id, reviewResult);
@@ -1633,6 +1650,7 @@ async function runReviewJob(gameId: number, jobId: string, log: Logger): Promise
       },
       userId: game.userId ?? undefined,
       aiCoach: await aiCoachForOwner(game.userId),
+      coachSide: await coachSideFor(game),
     });
 
     await saveReview(gameId, reviewResult);

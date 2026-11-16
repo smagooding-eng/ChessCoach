@@ -305,7 +305,7 @@ export function ProAnalysis(props: ProAnalysisProps) {
       {/* Hero: result, players, accuracy, game rating */}
       <div className="rounded-[20px] p-4" style={card}>
         <div className="flex items-center justify-between gap-2">
-          <span className="rounded-full px-3 py-1 text-[12.5px] font-black" style={{ background: result.bg, color: result.fg }}>{result.t}</span>
+          <span className="flex items-center gap-2 rounded-full px-3 py-1 text-[12.5px] font-black" style={{ background: RD.cardLight, color: RD.text, border: `1px solid ${RD.border}` }}><span className="h-2 w-2 rounded-full" style={{ background: result.fg }} />{result.t}</span>
           {game.opening && (
             <span className="flex min-w-0 items-center gap-1.5 text-[12.5px] font-semibold" style={{ color: RD.muted }}>
               <BookOpen className="h-3.5 w-3.5 shrink-0" style={{ color: RD.green }} />
@@ -406,71 +406,80 @@ export function ProAnalysis(props: ProAnalysisProps) {
           </div>
 
           {/* Coach's summary */}
-          {summary && (
-            <div className="rounded-[20px] p-4" style={card}>
-              <div className="mb-3 flex items-center gap-2.5">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[11px]" style={{ background: 'rgba(129,182,76,.16)' }}>
-                  <BrainCircuit className="h-[18px] w-[18px]" style={{ color: RD.green }} />
-                </span>
-                <span className="text-[16px] font-extrabold" style={{ color: RD.text }}>Coach's summary</span>
+          {summary && (() => {
+            // only your own mistakes (older reports could include the opponent's)
+            const mineOnly = summary.keyMistakes.filter((km) => {
+              const black = /^\s*\d+\s*\.\.\./.test(km.move), white = !black && /^\s*\d+\s*\.\s*[^.\s]/.test(km.move);
+              return (!black && !white) || (black ? me === 'b' : me === 'w');
+            });
+            return (
+              <div className="rounded-[20px] p-4" style={card}>
+                <div className="flex items-center gap-2.5">
+                  <BrainCircuit className="h-[18px] w-[18px] shrink-0" style={{ color: RD.green }} />
+                  <span className="text-[15px] font-extrabold" style={{ color: RD.text }}>Coach's summary</span>
+                </div>
+                <p className="mt-2.5 text-[15px] leading-relaxed" style={{ color: soft }}>{summary.overview}</p>
+
+                {mineOnly.length > 0 && (
+                  <div className="mt-5">
+                    <SectionTitle>Key mistakes</SectionTitle>
+                    <div className="overflow-hidden rounded-[14px]" style={{ border: `1px solid ${RD.border}` }}>
+                      {mineOnly.map((km, i) => {
+                        const ply = keyMistakePly(km);
+                        const rm = reviewMoves.find((r) => r.moveIndex === ply - 1);
+                        return (
+                          <button key={i} onClick={() => goBoard(ply)} className="block w-full px-3.5 py-3.5 text-left transition-colors hover:bg-white/[0.03]" style={{ borderTop: i ? `1px solid ${RD.border}` : undefined }}>
+                            <div className="flex items-center gap-2.5">
+                              {rm && BAD.has(rm.classification) ? <Glyph c={rm.classification} size={22} /> : null}
+                              <span className="text-[14px] font-black tabular-nums" style={{ color: RD.text }}>{km.move}</span>
+                              {rm && BAD.has(rm.classification) && <span className="text-[12px] font-bold" style={{ color: CLS[rm.classification].color }}>{CLS[rm.classification].label}</span>}
+                              <ChevronRight className="ml-auto h-4 w-4 shrink-0" style={{ color: RD.muted }} />
+                            </div>
+                            <p className="mt-1.5 text-[14px] leading-snug" style={{ color: RD.text }}>{km.whatWentWrong}</p>
+                            {km.whatYouShouldHaveDone && (
+                              <p className="mt-1.5 text-[13.5px] leading-snug" style={{ color: soft }}>
+                                <span className="font-extrabold" style={{ color: RD.green }}>Better: </span>{km.whatYouShouldHaveDone}
+                              </p>
+                            )}
+                            {km.tip && <p className="mt-1 text-[12.5px] leading-snug" style={{ color: RD.muted }}>{km.tip}</p>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {(summary.strengths.length > 0 || summary.improvementAreas.length > 0) && (
+                  <div className="mt-5 grid gap-5 md:grid-cols-2">
+                    {summary.strengths.length > 0 && (
+                      <div>
+                        <SectionTitle>What you did well</SectionTitle>
+                        <ul className="space-y-2.5">
+                          {summary.strengths.map((t, i) => (
+                            <li key={i} className="flex items-start gap-2.5 text-[14px] leading-snug" style={{ color: RD.text }}>
+                              <Check className="mt-0.5 h-4 w-4 shrink-0" style={{ color: RD.green }} strokeWidth={3} />{t}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {summary.improvementAreas.length > 0 && (
+                      <div>
+                        <SectionTitle>Work on</SectionTitle>
+                        <ul className="space-y-2.5">
+                          {summary.improvementAreas.map((t, i) => (
+                            <li key={i} className="flex items-start gap-2.5 text-[14px] leading-snug" style={{ color: RD.text }}>
+                              <Target className="mt-0.5 h-4 w-4 shrink-0" style={{ color: RD.gold }} />{t}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <p className="text-[15px] leading-relaxed" style={{ color: soft }}>{summary.overview}</p>
-
-              {summary.keyMistakes.length > 0 && (
-                <div className="mt-5 space-y-2.5">
-                  <SectionTitle>Key mistakes</SectionTitle>
-                  {summary.keyMistakes.map((km, i) => (
-                    <button key={i} onClick={() => goBoard(keyMistakePly(km))} className="block w-full rounded-[16px] p-3.5 text-left transition-transform active:scale-[0.99]" style={{ background: RD.cardLight, border: `1px solid ${RD.border}` }}>
-                      <div className="flex items-start gap-2.5">
-                        <span className="shrink-0 rounded-[9px] px-2 py-1 text-[13px] font-black" style={{ background: 'rgba(255,80,88,.14)', color: '#FF7A80' }}>{km.move}</span>
-                        <p className="flex-1 pt-0.5 text-[14px] font-semibold leading-snug" style={{ color: RD.text }}>{km.whatWentWrong}</p>
-                        <ChevronRight className="mt-1 h-4 w-4 shrink-0" style={{ color: RD.muted }} />
-                      </div>
-                      <div className="mt-3 space-y-2">
-                        <div className="flex items-start gap-2.5 rounded-[11px] px-3 py-2" style={{ background: 'rgba(129,182,76,.10)' }}>
-                          <Check className="mt-0.5 h-4 w-4 shrink-0" style={{ color: RD.green }} strokeWidth={3} />
-                          <p className="text-[13.5px] leading-snug" style={{ color: soft }}>{km.whatYouShouldHaveDone}</p>
-                        </div>
-                        <div className="flex items-start gap-2.5 px-1">
-                          <Lightbulb className="mt-0.5 h-4 w-4 shrink-0" style={{ color: RD.gold }} />
-                          <p className="text-[13px] leading-snug" style={{ color: RD.muted }}>{km.tip}</p>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {(summary.strengths.length > 0 || summary.improvementAreas.length > 0) && (
-                <div className="mt-5 grid gap-3 md:grid-cols-2">
-                  {summary.strengths.length > 0 && (
-                    <div>
-                      <SectionTitle>What you did well</SectionTitle>
-                      <ul className="space-y-1.5">
-                        {summary.strengths.map((s, i) => (
-                          <li key={i} className="flex items-start gap-2.5 rounded-[12px] px-3 py-2.5 text-[14px] leading-snug" style={{ background: 'rgba(129,182,76,.08)', color: RD.text }}>
-                            <Check className="mt-0.5 h-4 w-4 shrink-0" style={{ color: RD.green }} strokeWidth={3} />{s}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {summary.improvementAreas.length > 0 && (
-                    <div>
-                      <SectionTitle>Work on</SectionTitle>
-                      <ul className="space-y-1.5">
-                        {summary.improvementAreas.map((a, i) => (
-                          <li key={i} className="flex items-start gap-2.5 rounded-[12px] px-3 py-2.5 text-[14px] leading-snug" style={{ background: 'rgba(232,180,71,.08)', color: RD.text }}>
-                            <Target className="mt-0.5 h-4 w-4 shrink-0" style={{ color: RD.gold }} />{a}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+            );
+          })()}
 
           {/* Turning points */}
           {turning.length > 0 && (

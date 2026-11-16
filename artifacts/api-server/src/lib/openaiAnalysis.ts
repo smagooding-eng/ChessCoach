@@ -928,6 +928,8 @@ export async function reviewFullGame(input: {
    *  the deterministic fact-based explanations), at no OpenAI cost.
    *  Defaults to false so a new call site can never spend by accident. */
   aiCoach?: boolean;
+  /** Whose game this is: the summary (key mistakes, strengths, work on) is about this side only. */
+  coachSide?: "white" | "black";
 }): Promise<GameReviewResult> {
   const { moves, opening, eco, result, whiteUsername, blackUsername, startFen, onProgress, userId } = input;
   const aiCoach = input.aiCoach === true;
@@ -984,7 +986,8 @@ Rules:
 
 Per move: classification, explanation (1 sentence), pros (1-2 items), cons (1-2 items), betterMove.
 ${includeSummary ? `
-Also provide "gameSummary": overview (2 sentences), keyMistakes (up to 3: moveIndex, move, whatWentWrong, whatYouShouldHaveDone, tip), strengths (1-3), improvementAreas (2-3).` : ""}
+Also provide "gameSummary": overview (2 sentences), keyMistakes (up to 3: moveIndex, move, whatWentWrong, whatYouShouldHaveDone, tip), strengths (1-3), improvementAreas (2-3).${input.coachSide ? `
+The summary coaches ONE player: ${input.coachSide === "white" ? whiteUsername : blackUsername}, who played ${input.coachSide.toUpperCase()}. Address them as "you". keyMistakes must be ${input.coachSide} moves only (never the opponent's), and strengths and improvementAreas are about their play only.` : ""}` : ""}
 
 You MUST cover ALL ${chunkEnd - chunkStart + 1} moves listed above. Do not skip any.
 
@@ -1139,6 +1142,8 @@ JSON format:
             whatYouShouldHaveDone: km.whatYouShouldHaveDone ?? "",
             tip: km.tip ?? "",
           }))
+          // only the coached player's own moves (the move index says whose move it was)
+          .filter(km => !input.coachSide || !moves[km.moveIndex] || moves[km.moveIndex].color === input.coachSide)
         : [],
       strengths: Array.isArray(gameSummaryRaw.strengths) ? gameSummaryRaw.strengths : [],
       improvementAreas: Array.isArray(gameSummaryRaw.improvementAreas) ? gameSummaryRaw.improvementAreas : [],
