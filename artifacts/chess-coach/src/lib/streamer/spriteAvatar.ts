@@ -26,6 +26,8 @@ type Viseme = 'v_ah' | 'v_eh' | 'v_ih' | 'v_oh' | 'v_oo' | 'v_fv' | 'v_th' | 'v_
 
 export class SpriteAvatar {
   private imgs = new Map<SpriteName, HTMLImageElement>();
+  /** Talking faces at head angles (turn/ah_m30.webp …), loaded in the background. */
+  private turnImgs = new Map<string, HTMLImageElement>();
   private cur: SpriteName = 'front';
   private prev: SpriteName = 'front';
   private changedAt = 0;
@@ -46,6 +48,9 @@ export class SpriteAvatar {
       await Promise.all(SHANN_SPRITES.names.map((n) => new Promise<void>((res, rej) => {
         const im = new Image(); im.decoding = 'async'; im.onload = () => res(); im.onerror = () => rej(new Error(n)); im.src = `${root}${n}.webp`; a.imgs.set(n, im);
       })));
+      // the turned talking faces: not needed to start, so they load afterwards
+      const VIS = ['ah', 'eh', 'ih', 'oh', 'oo', 'fv', 'th', 'sz', 'l', 'r'], ANG = ['m90', 'm60', 'm45', 'm30', 'm15', 'p15', 'p30', 'p45', 'p60', 'p90'];
+      for (const v of VIS) for (const g of ANG) { const im = new Image(); im.decoding = 'async'; im.onload = () => a.turnImgs.set(`${v}_${g}`, im); im.src = `${root}turn/${v}_${g}.webp`; }
       return a;
     } catch { return null; }
   }
@@ -104,7 +109,7 @@ export class SpriteAvatar {
     // talking: one of the talking faces, changing with the sound, while you face the camera
     const speaking = f.voice > 0.07 || f.mouth > 0.12;
     if (speaking) this.talkUntil = t + 160;
-    const talking = t < this.talkUntil && !this.cur.startsWith('q_') && !this.cur.startsWith('p_') && this.cur !== 'wink';
+    const talking = t < this.talkUntil && this.cur !== 'wink';
     if (talking && speaking && t - this.visAt >= 85) { const v = this.viseme(f); if (v !== this.vis) { this.visPrev = this.vis; this.vis = v; this.visAt = t; } }
     if (!talking) { this.vis = null; this.visPrev = null; }
     this.bounce += (Math.min(1, f.voice * 1.2) - this.bounce) * 0.2;
@@ -119,7 +124,19 @@ export class SpriteAvatar {
       const im = n && this.imgs.get(n); if (!im || a <= 0) return;
       c.globalAlpha = a; c.drawImage(im, ox, oy, W2, H);
     };
-    if (this.vis) {
+    const turned = this.cur.startsWith('q_') || this.cur.startsWith('p_');
+    if (this.vis && turned) {
+      // head turned: the talking face drawn at the nearest angle
+      const deg = Math.abs(f.yaw) * 90, opts = this.cur.startsWith('p_') ? [60, 90] : [15, 30, 45, 60];
+      const ang = opts.reduce((b, x) => (Math.abs(x - deg) < Math.abs(b - deg) ? x : b), opts[0]);
+      const key = (v: Viseme | null) => v && `${v.slice(2)}_${f.yaw < 0 ? 'm' : 'p'}${ang}`;
+      const now = this.turnImgs.get(key(this.vis)!), before = this.visPrev ? this.turnImgs.get(key(this.visPrev)!) : undefined;
+      if (now) {
+        const kv = Math.min(1, (t - this.visAt) / 70);
+        if (before) { c.globalAlpha = 1; c.drawImage(before, ox, oy, W2, H); } else draw(this.cur, 1);
+        c.globalAlpha = kv; c.drawImage(now, ox, oy, W2, H);
+      } else draw(this.cur, 1); // still loading
+    } else if (this.vis) {
       const kv = Math.min(1, (t - this.visAt) / 70); // quick blend between mouth shapes
       draw(this.visPrev ?? this.cur, 1); draw(this.vis, kv);
     } else {
