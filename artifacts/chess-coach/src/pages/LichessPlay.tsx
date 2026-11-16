@@ -151,6 +151,9 @@ export function LichessPlay() {
   const [now, setNow] = useState(Date.now());
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved' | 'failed' | 'notyours'>('idle');
   const [savedId, setSavedId] = useState<number | null>(null);
+  // A new game (a rematch or an accepted challenge arrives as gameStart) starts unsaved:
+  // otherwise it was never saved and "Review this game" opened the previous game.
+  useEffect(() => { setSaving('idle'); setSavedId(null); }, [gameId]);
   const seekAbort = useRef<AbortController | null>(null);
   const autoStarted = useRef(false);
   const connectNote = params.get('lichess');
