@@ -151,9 +151,10 @@ export function LichessPlay() {
   const [now, setNow] = useState(Date.now());
   const [saving, setSaving] = useState<'idle' | 'saving' | 'saved' | 'failed' | 'notyours'>('idle');
   const [savedId, setSavedId] = useState<number | null>(null);
+  const [savedFor, setSavedFor] = useState<string | null>(null); // the Lichess game the saved id belongs to
   // A new game (a rematch or an accepted challenge arrives as gameStart) starts unsaved:
   // otherwise it was never saved and "Review this game" opened the previous game.
-  useEffect(() => { setSaving('idle'); setSavedId(null); }, [gameId]);
+  useEffect(() => { setSaving('idle'); setSavedId(null); setSavedFor(null); }, [gameId]);
   const seekAbort = useRef<AbortController | null>(null);
   const autoStarted = useRef(false);
   const connectNote = params.get('lichess');
@@ -311,6 +312,7 @@ export function LichessPlay() {
   // Finished: save it into their ChessScout games for review.
   const saveGame = useCallback(async () => {
     if (!gameId || !auth) return;
+    const id = gameId; // the game that ended, even if another starts meanwhile
     setSaving('saving');
     try {
       // Their Lichess name is how the import knows which side is theirs.
@@ -318,14 +320,22 @@ export function LichessPlay() {
         await apiFetch('/api/auth/update-profile', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lichessUsername: auth.username }) }).catch(() => {});
         await refreshAuth();
       }
+      // Right after the end Lichess can still hand out the game as unfinished (Result "*"),
+      // which the import skips: wait for the finished game.
       let pgn: string | null = null;
-      for (let k = 0; k < 3 && !pgn; k++) { pgn = await exportPgn(gameId); if (!pgn) await new Promise((r) => setTimeout(r, 1500)); }
+      for (let k = 0; k < 8; k++) {
+        const p = await exportPgn(id);
+        if (p && !/\[Result\s+"\*"\]/.test(p)) { pgn = p; break; }
+        await new Promise((r) => setTimeout(r, 1500));
+      }
       if (!pgn) throw new Error('no pgn');
       const r = await apiFetch('/api/games/import-pgn', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pgn, viaChessScout: true }) });
       const d = await r.json().catch(() => null) as { ids?: number[]; notYours?: number } | null;
       if (!r.ok) throw new Error('import');
       if (d?.notYours) { setSaving('notyours'); return; }
-      setSavedId(d?.ids?.[0] ?? null); setSaving('saved');
+      const saved = d?.ids?.[0];
+      if (typeof saved !== 'number') throw new Error('not saved'); // never point "Review" at some other game
+      setSavedId(saved); setSavedFor(id); setSaving('saved');
     } catch { setSaving('failed'); }
   }, [gameId, auth, authUser?.lichessUsername, refreshAuth]);
   useEffect(() => { if (phase === 'over' && saving === 'idle' && plies >= 4 && st?.status !== 'aborted') void saveGame(); }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -435,7 +445,7 @@ export function LichessPlay() {
           boardOverlay={phase === 'over' && (!full.rated || typeof myDiff === 'number' || ratingWaitOver) ? (
             <GameOverOverlay gameKey={full.id} outcome={outcome} yourColor={myColor === 'w' ? 'white' : 'black'} ratingDelta={myDiff ?? null} subtitle={ratingLine ? `${LICHESS_STATUS_TEXT[st.status] ?? ''}${LICHESS_STATUS_TEXT[st.status] ? ' · ' : ''}${ratingLine}` : LICHESS_STATUS_TEXT[st.status]}
               actions={<>
-                {saving === 'saved' && <OverlayButton primary onClick={() => navigate(savedId ? `/games/${savedId}` : '/games')}><Sparkles size={15} /> Review this game</OverlayButton>}
+                {saving === 'saved' && savedId && savedFor === gameId && <OverlayButton primary onClick={() => navigate(`/games/${savedId}`)}><Sparkles size={15} /> Review this game</OverlayButton>}
                 {full.speed === 'correspondence'
                   ? <OverlayButton onClick={() => navigate('/daily')}>Daily games</OverlayButton>
                   : <OverlayButton onClick={newGame}><RotateCcw size={15} /> New game</OverlayButton>}
@@ -495,7 +505,7 @@ export function LichessPlay() {
             {/* The engine's view only once the game is over (never during a game). */}
             <EvalBar fen={pos.chess.fen()} />
             {saving === 'saving' && <p className="text-[12.5px]" style={{ color: PT.muted }}><Loader2 className="mr-1 inline h-3.5 w-3.5 animate-spin" />Saving it to your games…</p>}
-            {saving === 'saved' && <button onClick={() => navigate(savedId ? `/games/${savedId}` : '/games')} className="w-full rounded-xl py-3 text-[14px] font-extrabold" style={greenBtn}>Review this game</button>}
+            {saving === 'saved' && savedId && savedFor === gameId && <button onClick={() => navigate(`/games/${savedId}`)} className="w-full rounded-xl py-3 text-[14px] font-extrabold" style={greenBtn}>Review this game</button>}
             {saving === 'notyours' && <p className="text-[12.5px]" style={{ color: PT.muted }}>This Lichess account ({auth.username}) isn't the one linked to your ChessScout account, so the game wasn't added. Change your Lichess username in Settings to save these games.</p>}
             {saving === 'failed' && <button onClick={() => void saveGame()} className="w-full rounded-xl py-2.5 text-[13px] font-bold" style={ghostBtn}>Couldn't save it to your games. Try again</button>}
             {full.speed === 'correspondence'
