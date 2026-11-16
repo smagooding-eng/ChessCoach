@@ -9,14 +9,20 @@ export interface SpriteFace {
   smile: number;      // 0..1
   blinkL: number; blinkR: number; // 0..1 closed
   browDown: number;   // 0..1 frown
-  voice: number;      // 0..1 how loud you're talking (bounce)
+  voice: number;      // 0..1 how loud you're talking
+  /** Your mouth's shape from the camera (MediaPipe): pursed/rounded, lower lip tucked, stretched. */
+  pucker?: number; funnel?: number; rollLower?: number; stretch?: number;
+  /** Where the voice's energy is (low = rounded vowels, high = s/f/th hiss). */
+  spec?: { low: number; mid: number; high: number };
 }
 
 export const SHANN_SPRITES = {
   base: 'avatars/studio/shann',
-  names: ['front', 'q_left', 'q_right', 'p_left', 'p_right', 'smile', 'laugh', 'serious', 'surprised', 'focused', 'wink'] as const,
+  names: ['front', 'q_left', 'q_right', 'p_left', 'p_right', 'smile', 'laugh', 'serious', 'surprised', 'focused', 'wink',
+    'v_ah', 'v_eh', 'v_ih', 'v_oh', 'v_oo', 'v_fv', 'v_th', 'v_sz', 'v_l', 'v_r'] as const,
 };
 type SpriteName = typeof SHANN_SPRITES.names[number];
+type Viseme = 'v_ah' | 'v_eh' | 'v_ih' | 'v_oh' | 'v_oo' | 'v_fv' | 'v_th' | 'v_sz' | 'v_l' | 'v_r';
 
 export class SpriteAvatar {
   private imgs = new Map<SpriteName, HTMLImageElement>();
@@ -28,7 +34,9 @@ export class SpriteAvatar {
   private bounce = 0;
   private cand: SpriteName = 'front'; private candSince = 0; // a change has to last a moment
   private sm: { x: number; y: number; s: number; roll: number } | null = null; // smoothed placement
-  private jaw = 0;              // 0..1 how open the mouth is (talking)
+  private vis: Viseme | null = null; private visPrev: Viseme | null = null; private visAt = 0; // talking mouth shape
+  private talkUntil = 0;        // talking stays on briefly between words
+  private alt = 0;              // alternates similar shapes so speech looks lively
 
   /** Loads every picture; null if any is missing. */
   static async load(base = SHANN_SPRITES.base): Promise<SpriteAvatar | null> {
@@ -52,7 +60,7 @@ export class SpriteAvatar {
     const side = f.yaw > 0 ? 'right' : 'left';
     if (this.turn !== 'front') return `${this.turn}_${side}` as SpriteName;
     // facing the camera: the expression
-    // Expressions need a clear face: talking moves the jaw instead (see draw).
+    // Expressions need a clear face: talking shows the talking faces instead (see draw).
     const wink = Math.abs(f.blinkL - f.blinkR) > 0.55 && Math.max(f.blinkL, f.blinkR) > 0.7;
     if (wink) return 'wink';
     if (f.smile > 0.62) return f.mouth > 0.45 ? 'laugh' : 'smile';
@@ -60,6 +68,26 @@ export class SpriteAvatar {
     if (f.browDown > 0.62) return 'focused';
     if (f.browDown > 0.45) return 'serious';
     return 'front';
+  }
+
+  /** Which talking face fits the sound (and your mouth, when the camera sees it). */
+  private viseme(f: SpriteFace): Viseme {
+    const jaw = f.mouth, pk = Math.max(f.pucker ?? 0, f.funnel ?? 0), roll = f.rollLower ?? 0, smile = Math.max(f.smile, f.stretch ?? 0);
+    if (jaw > 0.08 || pk > 0.35 || roll > 0.3) { // the camera sees your mouth
+      if (pk > 0.4) return jaw > 0.25 ? 'v_oh' : 'v_oo';
+      if (roll > 0.35 && jaw < 0.3) return 'v_fv';
+      if (jaw > 0.45) return 'v_ah';
+      if (jaw > 0.25) return smile > 0.3 ? 'v_eh' : 'v_l';
+      return smile > 0.35 ? 'v_sz' : 'v_ih';
+    }
+    const sp = f.spec, v = f.voice;
+    this.alt = (this.alt + 1) % 6;
+    if (sp && sp.high > 0.3) return (['v_sz', 'v_fv', 'v_sz', 'v_th', 'v_sz', 'v_fv'] as Viseme[])[this.alt];
+    if (sp && sp.low > 0.62 && v > 0.12) return v > 0.3 ? 'v_oh' : 'v_oo';
+    if (v > 0.5) return 'v_ah';
+    if (v > 0.32) return this.alt % 2 ? 'v_eh' : 'v_ah';
+    if (v > 0.18) return (['v_ih', 'v_l', 'v_eh', 'v_ih', 'v_r', 'v_l'] as Viseme[])[this.alt];
+    return this.alt % 2 ? 'v_r' : 'v_ih';
   }
 
   /** Draws the character centred at (cx, cy); S is the picture's width on the canvas. */
@@ -73,48 +101,31 @@ export class SpriteAvatar {
     if (!this.sm) this.sm = { x: cx, y: cy, s: S, roll };
     const m = this.sm;
     m.x += (cx - m.x) * 0.12; m.y += (cy - m.y) * 0.12; m.s += (S - m.s) * 0.08; m.roll += (roll * 0.5 - m.roll) * 0.1;
-    // talking opens the mouth: your voice, or your own mouth when the camera sees it
-    const open = Math.min(1, Math.max(f.voice * 1.5, (f.mouth - 0.12) * 1.6));
-    this.jaw += (open - this.jaw) * (open > this.jaw ? 0.55 : 0.3);
+    // talking: one of the talking faces, changing with the sound, while you face the camera
+    const speaking = f.voice > 0.07 || f.mouth > 0.12;
+    if (speaking) this.talkUntil = t + 160;
+    const talking = t < this.talkUntil && !this.cur.startsWith('q_') && !this.cur.startsWith('p_') && this.cur !== 'wink';
+    if (talking && speaking && t - this.visAt >= 85) { const v = this.viseme(f); if (v !== this.vis) { this.visPrev = this.vis; this.vis = v; this.visAt = t; } }
+    if (!talking) { this.vis = null; this.visPrev = null; }
     this.bounce += (Math.min(1, f.voice * 1.2) - this.bounce) * 0.2;
     const k = Math.min(1, (t - this.changedAt) / 160); // cross-fade
-    const W2 = m.s, H = W2 * 1.25, px = W2 / 512;   // pictures are 512 x 640
+    const W2 = m.s, H = W2 * 1.25;   // pictures are 512 x 640
     const dy = -this.bounce * W2 * 0.012;
     c.save();
     c.translate(m.x, m.y + dy); c.rotate(m.roll);
     c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
     const ox = -W2 / 2, oy = -H * 0.44;
-    const draw = (n: SpriteName, a: number) => {
-      const im = this.imgs.get(n); if (!im || a <= 0) return;
-      c.globalAlpha = a;
-      if (n === 'front' && this.jaw > 0.04) this.drawTalking(c, im, ox, oy, W2, H, px);
-      else c.drawImage(im, ox, oy, W2, H);
+    const draw = (n: SpriteName | null, a: number) => {
+      const im = n && this.imgs.get(n); if (!im || a <= 0) return;
+      c.globalAlpha = a; c.drawImage(im, ox, oy, W2, H);
     };
-    if (k < 1) draw(this.prev, 1);
-    draw(this.cur, k);
-    c.restore();
-  }
-
-  /** The front picture with the jaw dropped: the mouth opens and the chin and beard move down. */
-  private drawTalking(c: CanvasRenderingContext2D, im: HTMLImageElement, ox: number, oy: number, W: number, H: number, px: number) {
-    const d = this.jaw * 24 * px;               // up to 24 picture-pixels
-    const P = (x: number, y: number) => [ox + x * px, oy + y * px] as const;
-    c.drawImage(im, ox, oy, W, H);
-    // the open mouth behind the lips
-    const [mx, my] = P(255, 316);
-    c.save();
-    c.beginPath(); c.ellipse(mx, my + d / 2, 44 * px * (0.8 + this.jaw * 0.2), d / 2 + 2 * px, 0, 0, Math.PI * 2);
-    c.fillStyle = '#240C0D'; c.fill(); c.clip();
-    c.fillStyle = 'rgba(238,230,216,.95)'; c.fillRect(mx - 28 * px, my - 2 * px, 56 * px, Math.min(d * 0.3, 6 * px) + 2 * px); // top teeth
-    c.fillStyle = '#7A2E35'; c.beginPath(); c.ellipse(mx, my + d + 2 * px, 24 * px, d * 0.3 + px, 0, 0, Math.PI * 2); c.fill(); // tongue
-    c.restore();
-    // the lower lip, chin and beard, moved down
-    c.save();
-    c.beginPath();
-    const pts: [number, number][] = [[198, 317], [255, 319], [312, 317], [352, 330], [378, 372], [372, 440], [340, 505], [255, 520], [170, 505], [140, 440], [134, 372], [158, 330]];
-    pts.forEach(([x, y], i) => { const [X, Y] = P(x, y); if (i) c.lineTo(X, Y + d); else c.moveTo(X, Y + d); }); // the jaw in its new place
-    c.closePath(); c.clip();
-    c.drawImage(im, ox, oy + d, W, H);
+    if (this.vis) {
+      const kv = Math.min(1, (t - this.visAt) / 70); // quick blend between mouth shapes
+      draw(this.visPrev ?? this.cur, 1); draw(this.vis, kv);
+    } else {
+      if (k < 1) draw(this.prev, 1);
+      draw(this.cur, k);
+    }
     c.restore();
   }
 }

@@ -657,7 +657,7 @@ export default function StreamerStudio() {
   useEffect(() => {
     let raf = 0;
     const pose = { x: 0, y: 0, size: 0, roll: 0 }; // where the face is, to hide it
-    const ex = { yaw: 0, pitch: 0, mouth: 0, smile: 0, pucker: 0, blinkL: 0, blinkR: 0, brow: 0, browDown: 0, lookX: 0, lookY: 0 }; // for the 3D head, screen terms
+    const ex = { yaw: 0, pitch: 0, mouth: 0, smile: 0, pucker: 0, blinkL: 0, blinkR: 0, brow: 0, browDown: 0, lookX: 0, lookY: 0, puck: 0, funnel: 0, roll: 0, stretch: 0 }; // for the 3D head, screen terms
     let lastSeen = 0, nextBlink = performance.now() + 2500, blinkUntil = 0;
     const bgPic: { src: string; img: HTMLImageElement | null } = { src: '', img: null };
     const tiny = document.createElement('canvas');
@@ -719,6 +719,10 @@ export default function StreamerStudio() {
         ex.mouth = face.mouth; ex.smile = face.smile; ex.brow += (face.brow - ex.brow) * 0.5;
         ex.pucker = Math.min(1, ((bs.mouthPucker ?? 0) + (bs.mouthFunnel ?? 0)) * 0.8);
         ex.browDown += (((bs.browDownLeft ?? 0) + (bs.browDownRight ?? 0)) / 2 - ex.browDown) * 0.5;
+        // mouth shapes for the talking faces
+        ex.puck = bs.mouthPucker ?? 0; ex.funnel = bs.mouthFunnel ?? 0;
+        ex.roll = ((bs.mouthRollLower ?? 0) + (bs.mouthUpperUpLeft ?? 0) * 0.3 + (bs.mouthUpperUpRight ?? 0) * 0.3);
+        ex.stretch = ((bs.mouthStretchLeft ?? 0) + (bs.mouthStretchRight ?? 0)) / 2;
         // MediaPipe's left/right are the picture's; a mirrored view swaps them on screen
         ex.blinkL = mirror ? face.blinkR : face.blinkL; ex.blinkR = mirror ? face.blinkL : face.blinkR;
         ex.lookX = mirror ? -face.lookX : face.lookX; ex.lookY = face.lookY;
@@ -778,11 +782,13 @@ export default function StreamerStudio() {
         if (tracked) { S = (pose.size / st.avatarScale) * 2.4 * st.charScale; cx = pose.x; cy = pose.y; }
         else {
           // no face in view (or no camera): front-on, bouncing with your voice
-          Object.assign(ex, { yaw: ex.yaw * 0.9, mouth: 0, smile: 0, blinkL: 0, blinkR: 0, browDown: 0 });
+          Object.assign(ex, { yaw: ex.yaw * 0.9, mouth: 0, smile: 0, blinkL: 0, blinkR: 0, browDown: 0, puck: 0, funnel: 0, roll: 0, stretch: 0 });
           pose.roll *= 0.9;
           S = Math.min(W, H) * 0.8 * (st.charScale / 1.3); cx = W / 2; cy = H * 0.5;
         }
-        sprite.current.draw(c, { yaw: ex.yaw, mouth: ex.mouth, smile: ex.smile, blinkL: ex.blinkL, blinkR: ex.blinkR, browDown: ex.browDown, voice: vlevel }, cx, cy, S, pose.roll, t);
+        const spec = voice.current.running ? voice.current.spectrum() : undefined;
+        sprite.current.draw(c, { yaw: ex.yaw, mouth: ex.mouth, smile: ex.smile, blinkL: ex.blinkL, blinkR: ex.blinkR, browDown: ex.browDown, voice: vlevel,
+          pucker: ex.puck, funnel: ex.funnel, rollLower: ex.roll, stretch: ex.stretch, spec }, cx, cy, S, pose.roll, t);
       }
 
       if (!hasVideo && st.disguise !== 'moji' && st.disguise !== 'character') {

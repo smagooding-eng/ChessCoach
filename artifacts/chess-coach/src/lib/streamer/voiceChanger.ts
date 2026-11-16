@@ -289,6 +289,21 @@ export class VoiceChanger {
     o.connect(og); og.connect(d); o.start(t); o.stop(t + 0.12);
   }
 
+  /** Where the voice's energy is right now: low (rounded vowels), mid (open vowels), high
+   *  (s, f, th hiss), as shares of the total; for picking mouth shapes. */
+  spectrum(): { low: number; mid: number; high: number } {
+    if (!this.analyser || !this.ctx) return { low: 0, mid: 0, high: 0 };
+    const n = this.analyser.frequencyBinCount;
+    if (!this.specBuf || this.specBuf.length !== n) this.specBuf = new Uint8Array(new ArrayBuffer(n));
+    this.analyser.getByteFrequencyData(this.specBuf);
+    const hz = this.ctx.sampleRate / this.analyser.fftSize;
+    let low = 0, mid = 0, high = 0;
+    for (let i = 1; i < n; i++) { const f = i * hz, v = this.specBuf[i]; if (f < 700) low += v; else if (f < 2400) mid += v; else if (f > 3500 && f < 9000) high += v; }
+    const t = low + mid + high || 1;
+    return { low: low / t, mid: mid / t, high: high / t };
+  }
+  private specBuf: Uint8Array | null = null;
+
   /** 0..1 loudness of the changed voice */
   level(): number {
     if (!this.analyser || !this.levelBuf) return 0;
