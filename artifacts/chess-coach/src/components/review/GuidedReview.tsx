@@ -413,6 +413,9 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
   }
   const accent = mode.kind === 'reply' ? '#4299E1' : mode.kind === 'best' || (mode.kind === 'retry' && mode.state === 'right') ? CLS.best.color : rev && mode.kind === 'main' ? CLS[rev.classification].color : GREEN;
   const animKey = `${ply}-${mode.kind}-${mode.kind === 'retry' ? mode.state : ''}`;
+  // For Streamer Studio's board-only view: what the note says, as data (see data-studio below).
+  const studioCls = mode.kind === 'best' || (mode.kind === 'retry' && mode.state === 'right') ? 'best' : rev && move && mode.kind === 'main' && ply > 0 ? rev.classification : null;
+  const studioEval = rev && move && mode.kind === 'main' && ply > 0 ? evalLabel(rev.evalAfterCp) ?? '' : '';
 
   const atEnd = ply >= max && mode.kind === 'main';
   let look: BoardLook | null = null;
@@ -476,7 +479,7 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
       {/* Phones: one column. Wide desktop (lg): board on the left, the coach, summary, moves and buttons on the right. */}
       <div className="mx-auto flex w-full max-w-[560px] min-h-0 flex-1 flex-col lg:grid lg:max-w-[1180px] lg:grid-cols-[minmax(0,1fr)_400px] lg:grid-rows-[auto_minmax(0,1fr)_auto_auto] lg:gap-x-6 lg:px-6 lg:pb-4">
         {/* Top card: fixed height so the board never shifts */}
-        <div className="relative z-20 h-[92px] shrink-0 px-3 pb-2 pt-1 lg:col-start-2 lg:row-start-1 lg:px-0">
+        <div data-studio="coach" data-accent={accent} data-glyph={studioCls ? CLS[studioCls].glyph : ''} data-glyphcolor={studioCls ? CLS[studioCls].color : ''} data-eval={studioEval} className="relative z-20 h-[92px] shrink-0 px-3 pb-2 pt-1 lg:col-start-2 lg:row-start-1 lg:px-0">
           {/* Tap to read the whole explanation; it opens over the board, so nothing moves. */}
           <div onClick={canExpand ? () => setExpanded((v) => !v) : undefined}
             className={`absolute inset-x-3 top-1 overflow-hidden rounded-[14px] px-3.5 py-2.5 ${expanded ? 'min-h-[84px] shadow-2xl' : 'h-[84px]'} ${canExpand ? 'cursor-pointer' : ''}`}
@@ -513,11 +516,14 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
             />
             </LookOverride>
           </div>
-          {/* Evaluation bar, then the material each side has won */}
+          {/* Evaluation bar, then the material each side has won (Streamer Studio shows these
+              beside a board-only view: data-studio marks them) */}
+          <div data-studio="evalnames" data-cp={cpNow ?? ''} data-white={whiteName} data-black={blackName}>
           <div className="mt-1.5 px-0.5"><EvalBarH cp={cpNow} /></div>
           <div className="mt-1 flex items-center justify-between gap-2 px-1 text-[11.5px] text-[#C9CFCD]">
             <span className="flex min-w-0 items-center gap-1.5"><span className="truncate font-bold">{whiteName}</span><MaterialStrip fen={boardFen} color="w" /></span>
             <span className="flex min-w-0 items-center justify-end gap-1.5"><MaterialStrip fen={boardFen} color="b" /><span className="truncate font-bold">{blackName}</span></span>
+          </div>
           </div>
         </div>
 

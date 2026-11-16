@@ -9,11 +9,19 @@ export type BoardFeed =
   | { kind: 'video'; video: HTMLVideoElement; zoom: number; panX: number; panY: number }
   | { kind: 'none' };
 
+/** A game review's coach note and the eval bar + names, for a board-only view (see GuidedReview data-studio). */
+export interface ReviewNotes {
+  title: string; text: string; accent: string; glyph: string; glyphColor: string; evalText: string;
+  cp: number | null; white: string; black: string;
+}
+
 // A text run: the headline's rating line is drawn as coloured pieces side by side.
 export interface TextRun { text: string; color: string }
 
 export interface CompositeInput {
-  layout: Record<'board' | 'cam' | 'tag', PanelRect> & { head?: PanelRect };
+  layout: Record<'board' | 'cam' | 'tag', PanelRect> & { head?: PanelRect; notes?: PanelRect };
+  /** Review notes, shown in the notes panel when the board is on its own. */
+  notes?: ReviewNotes | null;
   /** The headline panel ("The road to 1500 ELO") and the rating line under it. */
   head?: { title: string; runs: TextRun[] } | null;
   board: BoardFeed;
@@ -101,10 +109,10 @@ export function drawComposite(c: CanvasRenderingContext2D, W: number, H: number,
   let tx = sx + ih + gap;
   label.forEach((t, i) => { c.fillStyle = i === 1 ? '#81B64C' : '#F5F7F6'; c.fillText(t, tx, cy); tx += widths[i]; });
 
-  const order = (Object.keys(inp.layout) as ('board' | 'cam' | 'tag' | 'head')[]).filter((k) => !!inp.layout[k]).sort((a, b) => inp.layout[a]!.z - inp.layout[b]!.z);
+  const order = (Object.keys(inp.layout) as ('board' | 'cam' | 'tag' | 'head' | 'notes')[]).filter((k) => !!inp.layout[k]).sort((a, b) => inp.layout[a]!.z - inp.layout[b]!.z);
   for (const id of order) {
     const r = inp.layout[id]!;
-    if (r.hidden || (id === 'head' && !inp.head)) continue;
+    if (r.hidden || (id === 'head' && !inp.head) || (id === 'notes' && !inp.notes)) continue;
     const x = (r.x / 100) * W, y = (r.y / 100) * H, w = (r.w / 100) * W, h = (r.h / 100) * H;
     c.save();
     if (r.round) { c.beginPath(); c.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); c.clip(); }
@@ -132,6 +140,8 @@ export function drawComposite(c: CanvasRenderingContext2D, W: number, H: number,
       } else { c.fillStyle = '#0D1516'; c.fillRect(x, y, w, h); }
     } else if (id === 'head') {
       drawHead(c, inp.head!, x, y, w, h);
+    } else if (id === 'notes') {
+      drawReviewNotes(c, inp.notes!, x, y, w, h);
     } else {
       c.fillStyle = '#0D1516'; c.fillRect(x, y, w, h);
       c.fillStyle = '#81B64C'; c.fillRect(x, y, w, Math.max(2, h * 0.03));
@@ -177,4 +187,62 @@ function drawHead(c: CanvasRenderingContext2D, head: { title: string; runs: Text
   let tx = cx - (total * k) / 2;
   c.textAlign = 'left';
   head.runs.forEach((r, i) => { c.fillStyle = r.color; c.fillText(r.text, tx, y + h * 0.84, widths[i] * k); tx += widths[i] * k; });
+}
+
+function wrapLines(c: CanvasRenderingContext2D, text: string, maxW: number, maxLines: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean), out: string[] = [];
+  let line = '';
+  for (const w of words) {
+    const t = line ? `${line} ${w}` : w;
+    if (c.measureText(t).width <= maxW || !line) line = t; else { out.push(line); line = w; if (out.length === maxLines) break; }
+  }
+  if (out.length < maxLines && line) out.push(line);
+  if (out.length === maxLines && words.join(' ') !== out.join(' ')) { let last = out[maxLines - 1]; while (last && c.measureText(`${last}…`).width > maxW) last = last.slice(0, -1); out[maxLines - 1] = `${last}…`; }
+  return out;
+}
+
+/** The coach's note (a card with the move's grade) over the eval bar and the players' names. */
+export function drawReviewNotes(c: CanvasRenderingContext2D, n: ReviewNotes, x: number, y: number, w: number, h: number) {
+  c.fillStyle = '#050A0B'; c.fillRect(x, y, w, h);
+  const pad = Math.max(4, Math.min(w, h) * 0.05);
+  const barH = Math.max(6, h * 0.08), namesH = Math.max(12, h * 0.16);
+  const cardH = h - pad * 2 - barH - namesH - pad * 0.6;
+  const cx = x + pad, cw = w - pad * 2, cy = y + pad;
+  // card
+  rr(c, cx, cy, cw, cardH, Math.min(14, cardH * 0.14)); c.fillStyle = '#162022'; c.fill();
+  c.save(); rr(c, cx, cy, cw, cardH, Math.min(14, cardH * 0.14)); c.clip(); c.fillStyle = n.accent || '#81B64C'; c.fillRect(cx, cy, Math.max(3, cw * 0.008), cardH); c.restore();
+  const fs = Math.max(11, Math.min(cardH * 0.24, cw * 0.05)), small = fs * 0.78;
+  let tx = cx + cw * 0.035 + 4;
+  const ty = cy + cardH * 0.08 + fs * 0.6;
+  if (n.glyph) {
+    const r = fs * 0.62;
+    c.beginPath(); c.arc(tx + r, ty, r, 0, Math.PI * 2); c.fillStyle = n.glyphColor || '#81B64C'; c.fill();
+    c.fillStyle = '#fff'; c.font = `900 ${fs * (n.glyph.length > 1 ? 0.5 : 0.7)}px "DM Sans", sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(n.glyph, tx + r, ty + 1);
+    tx += r * 2 + fs * 0.35;
+  }
+  let right = cx + cw - cw * 0.03;
+  if (n.evalText) {
+    c.font = `800 ${small}px "DM Sans", sans-serif`;
+    const ew = c.measureText(n.evalText).width + small * 0.9, eh = small * 1.5;
+    rr(c, right - ew, ty - eh / 2, ew, eh, eh * 0.25); c.fillStyle = 'rgba(255,255,255,.1)'; c.fill();
+    c.fillStyle = '#F5F7F6'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(n.evalText, right - ew / 2, ty + 1);
+    right -= ew + small * 0.6;
+  }
+  c.fillStyle = '#F5F7F6'; c.font = `800 ${fs}px "DM Sans", sans-serif`; c.textAlign = 'left'; c.textBaseline = 'middle';
+  c.fillText(n.title, tx, ty, Math.max(10, right - tx));
+  if (n.text) {
+    c.font = `500 ${small}px "DM Sans", sans-serif`; c.fillStyle = 'rgba(245,247,246,.84)'; c.textBaseline = 'top';
+    const lines = wrapLines(c, n.text, cx + cw - (cx + cw * 0.035 + 4) - cw * 0.03, Math.max(1, Math.floor((cardH - (ty - cy) - fs * 0.7) / (small * 1.3))));
+    lines.forEach((l, i) => c.fillText(l, cx + cw * 0.035 + 4, ty + fs * 0.75 + i * small * 1.3));
+  }
+  // eval bar: white's share from the left
+  const by = cy + cardH + pad * 0.6, cp = n.cp ?? 0;
+  const share = Math.abs(cp) >= 9000 ? (cp > 0 ? 1 : 0) : 0.5 + 0.5 * (2 / (1 + Math.exp(-0.00368208 * Math.max(-1500, Math.min(1500, cp)))) - 1);
+  rr(c, cx, by, cw, barH, barH / 2); c.fillStyle = '#2B2F31'; c.fill();
+  c.save(); rr(c, cx, by, cw, barH, barH / 2); c.clip(); c.fillStyle = '#EDEDED'; c.fillRect(cx, by, cw * share, barH); c.restore();
+  // names
+  const ny = by + barH + namesH / 2 + 1;
+  c.font = `800 ${Math.max(10, namesH * 0.62)}px "DM Sans", sans-serif`; c.fillStyle = '#C9CFCD'; c.textBaseline = 'middle';
+  c.textAlign = 'left'; c.fillText(n.white, cx + 2, ny, cw * 0.48);
+  c.textAlign = 'right'; c.fillText(n.black, cx + cw - 2, ny, cw * 0.48);
 }

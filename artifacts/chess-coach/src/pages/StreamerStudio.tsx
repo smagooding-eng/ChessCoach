@@ -21,7 +21,7 @@ import {
   type MojiLook,
 } from '@/lib/streamer/mojiHead';
 import { SpriteAvatar } from '@/lib/streamer/spriteAvatar';
-import { drawComposite, drawBoardPanel, headSizes, type BoardFeed, type TextRun } from '@/lib/streamer/compositor';
+import { drawComposite, drawBoardPanel, drawReviewNotes, headSizes, type BoardFeed, type TextRun, type ReviewNotes } from '@/lib/streamer/compositor';
 import { CloudRecorder, type RecStatus } from '@/lib/streamer/recorder';
 import { LiveHost } from '@/lib/streamer/live';
 import { apiFetch } from '@/lib/api';
@@ -29,9 +29,17 @@ import { useUser } from '@/hooks/use-user';
 import { useLichessGame } from '@/components/watch/LiveVideo';
 import { useSettings, PIECE_SHAPES } from '@/context/SettingsContext';
 
-type PanelId = 'board' | 'cam' | 'tag' | 'head';
+type PanelId = 'board' | 'cam' | 'tag' | 'head' | 'notes';
 interface Rect { x: number; y: number; w: number; h: number; z: number; hidden?: boolean; round?: boolean }
 type Layout = Record<PanelId, Rect>;
+type BaseLayout = Omit<Layout, 'notes'> & { notes?: Rect };
+/** Review notes (the coach's note, eval bar and names) go under the board, or as low as fits. */
+function withNotes(l: BaseLayout): Layout {
+  if (l.notes) return l as Layout;
+  const b = l.board, h = 11;
+  const y = b.y + b.h + h <= 100 ? b.y + b.h : b.y >= h ? b.y - h : 100 - h;
+  return { ...l, notes: { x: b.x, y, w: b.w, h, z: 6 } };
+}
 type Aspect = '9:16' | '16:9';
 type Disguise = 'none' | 'moji' | 'character' | 'pixelate' | 'blur';
 type Bg = 'brand' | 'blur' | 'room' | 'color' | 'image';
@@ -51,7 +59,7 @@ interface Settings {
   broadcast: boolean; recordLive: boolean; title: string;
 }
 
-const PRESETS: Record<Aspect, { id: string; label: string; layout: Layout }[]> = {
+const RAW_PRESETS: Record<Aspect, { id: string; label: string; layout: BaseLayout }[]> = {
   '9:16': [
     { id: 'board-top', label: 'Board top · camera bottom', layout: { head: { x: 0, y: 0, w: 100, h: 8, z: 4 }, board: { x: 0, y: 8, w: 100, h: 56.25, z: 1 }, cam: { x: 0, y: 64.25, w: 100, h: 28.75, z: 2 }, tag: { x: 0, y: 93, w: 100, h: 7, z: 3 } } },
     { id: 'board-bottom', label: 'Camera top · board bottom', layout: { tag: { x: 0, y: 0, w: 100, h: 7, z: 3 }, head: { x: 0, y: 7, w: 100, h: 8, z: 4 }, cam: { x: 0, y: 15, w: 100, h: 28.75, z: 2 }, board: { x: 0, y: 43.75, w: 100, h: 56.25, z: 1 } } },
@@ -62,6 +70,11 @@ const PRESETS: Record<Aspect, { id: string; label: string; layout: Layout }[]> =
     { id: 'board-right', label: 'Camera left · board right', layout: { head: { x: 0, y: 0, w: 43.75, h: 16, z: 4 }, cam: { x: 0, y: 16, w: 43.75, h: 70, z: 2 }, tag: { x: 0, y: 86, w: 43.75, h: 14, z: 3 }, board: { x: 43.75, y: 0, w: 56.25, h: 100, z: 1 } } },
     { id: 'pip', label: 'Board centre · camera corner', layout: { board: { x: 21.875, y: 0, w: 56.25, h: 100, z: 1 }, head: { x: 1.5, y: 3, w: 19, h: 18, z: 4 }, cam: { x: 79, y: 3, w: 19.5, h: 34.67, z: 2 }, tag: { x: 1.5, y: 84, w: 19, h: 13, z: 3 } } },
   ],
+};
+
+const PRESETS: Record<Aspect, { id: string; label: string; layout: Layout }[]> = {
+  '9:16': RAW_PRESETS['9:16'].map((p) => ({ ...p, layout: withNotes(p.layout) })),
+  '16:9': RAW_PRESETS['16:9'].map((p) => ({ ...p, layout: withNotes(p.layout) })),
 };
 
 const APP_PAGES: { path: string; label: string }[] = [
@@ -107,6 +120,7 @@ function loadSettings(): Settings {
         const pre = PRESETS[merged.aspect]?.find((p) => p.id === merged.preset);
         merged.layout = pre ? pre.layout : { ...merged.layout, head: { x: 0, y: 0, w: 100, h: 8, z: 9 } };
       }
+      merged.layout = withNotes(merged.layout); // layouts saved before the review-notes panel
       return merged;
     }
   } catch { /* ignore */ }
@@ -160,6 +174,11 @@ export default function StreamerStudio() {
   const camStream = useRef<MediaStream | null>(null);
   const boardFrame = useRef<HTMLIFrameElement>(null);
   const [boardBox, setBoardBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  // A game review's coach note and eval bar + names, copied from the page for a board-only view
+  const [notes, setNotes] = useState<ReviewNotes | null>(null);
+  const notesRef = useRef<ReviewNotes | null>(null); notesRef.current = notes;
+  const showNotesRef = useRef(false);
+  const notesCanvas = useRef<HTMLCanvasElement>(null);
   // Your ChessScout ratings, refreshed every 30s so the headline moves as games finish.
   const [ratings, setRatings] = useState<Record<string, { rating: number; gamesPlayed: number }> | null>(null);
   const ratingStart = useRef<Record<string, number>>({});
@@ -491,7 +510,7 @@ export default function StreamerStudio() {
 
   // ---- auto-frame: find the chessboard inside the ChessScout page and fit it to the panel ----
   useEffect(() => {
-    if (s.boardSource !== 'app') { setBoardBox(null); if (s.boardSource !== 'follow') feed.current = null; return undefined; }
+    if (s.boardSource !== 'app') { setBoardBox(null); setNotes(null); if (s.boardSource !== 'follow') feed.current = null; return undefined; }
     const id = window.setInterval(() => {
       try {
         const doc = boardFrame.current?.contentDocument;
@@ -520,6 +539,21 @@ export default function StreamerStudio() {
         if (found && bestEl && !peekRef.current && vh >= VIRTUAL_H - 1 && (found.y < 0 || found.y + found.h > vh)) {
           (bestEl as Element).scrollIntoView({ block: 'center' });
           return;
+        }
+        {
+          const co = doc.querySelector('[data-studio="coach"]') as HTMLElement | null, ev = doc.querySelector('[data-studio="evalnames"]') as HTMLElement | null;
+          let n: ReviewNotes | null = null;
+          if (co || ev) {
+            const ps = co ? [...co.querySelectorAll('p')] : [];
+            const cpRaw = ev?.getAttribute('data-cp') ?? '';
+            n = {
+              title: (ps[0]?.textContent ?? '').trim(), text: (ps[1]?.textContent ?? '').replace(/\s*More$/, '').trim(),
+              accent: co?.getAttribute('data-accent') || RD.green, glyph: co?.getAttribute('data-glyph') ?? '', glyphColor: co?.getAttribute('data-glyphcolor') ?? '',
+              evalText: co?.getAttribute('data-eval') ?? '', cp: cpRaw === '' ? null : Number(cpRaw),
+              white: ev?.getAttribute('data-white') ?? '', black: ev?.getAttribute('data-black') ?? '',
+            };
+          }
+          setNotes((p) => (JSON.stringify(p) === JSON.stringify(n) ? p : n));
         }
         if (sRef.current.frame !== 'auto') { setBoardBox(null); return; }
         setBoardBox((prev) => {
@@ -584,7 +618,7 @@ export default function StreamerStudio() {
       drawComposite(c, W, H, {
         layout: st.layout, board, cam: camCanvas.current, name: st.name, subtitle: st.subtitle,
         light: looks.current.light, dark: looks.current.dark, pieceSrc: looks.current.pieceSrc,
-        live: host.current.live, head: headRef.current,
+        live: host.current.live, head: headRef.current, notes: showNotesRef.current ? notesRef.current : null,
       });
     };
     raf = requestAnimationFrame(loop);
@@ -896,6 +930,16 @@ export default function StreamerStudio() {
   // ChessScout page: auto-fit the board (plus the player bars), or zoom/pan by hand
   let ifScale = (boardRect.width / VIRTUAL_W) * z, ifLeft = 0, ifTop = 0, ifH = VIRTUAL_H;
   const fitBoard = s.frame === 'auto' && !!boardBox && !peek;
+  // Board only on a game review: the coach's note and the eval bar + names get their own panel
+  const showNotes = !!notes && s.boardSource === 'app' && fitBoard && s.framePad === 'board';
+  showNotesRef.current = showNotes;
+  const notesPx = s.layout.notes ? px(s.layout.notes) : null;
+  useEffect(() => {
+    const cv = notesCanvas.current; if (!cv || !notes || !notesPx) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1), W = Math.max(2, Math.round(notesPx.width * dpr)), H = Math.max(2, Math.round(notesPx.height * dpr));
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+    const c = cv.getContext('2d'); if (c) drawReviewNotes(c, notes, 0, 0, W, H);
+  }, [notes, showNotes, notesPx?.width, notesPx?.height]); // eslint-disable-line react-hooks/exhaustive-deps
   if (s.frame === 'auto' && !fitBoard) {
     // no game on screen (lobby, picking an opponent) or peeking: show the page itself, scrollable, at phone width
     ifScale = boardRect.width / VIRTUAL_W;
@@ -976,6 +1020,9 @@ export default function StreamerStudio() {
             </div>
           )}
         </div>
+      ))}
+      {notes && showNotes && panel('notes', 'Review notes', (
+        <canvas ref={notesCanvas} className="absolute inset-0 w-full h-full pointer-events-none" />
       ))}
       {panel('cam', 'Camera', (
         <div className="absolute inset-0" style={{ background: '#050A0B' }}>
@@ -1141,7 +1188,7 @@ export default function StreamerStudio() {
                 <Chip on={s.frame === 'auto' && s.framePad === 'board'} onClick={() => set({ frame: 'auto', framePad: 'board' })}>Board only</Chip>
                 <Chip on={s.frame === 'manual'} onClick={() => set({ frame: 'manual' })}>Whole page</Chip>
               </div>
-              <Note>{s.frame === 'auto' ? (boardBox ? 'The board is found and fitted automatically, even when it moves.' : 'No game on screen yet: pick or start a game right in the panel, and the board fills the panel as soon as it starts. Use ⤢ Whole page on the panel any time to get back to the page.') : 'Zoom and move below to show the part of the page you want.'}</Note>
+              <Note>{s.frame === 'auto' ? (boardBox ? `The board is found and fitted automatically, even when it moves.${s.framePad === 'board' ? ' On a game review, the coach’s note, eval bar and names go in their own Review notes panel (move it in Edit layout).' : ''}` : 'No game on screen yet: pick or start a game right in the panel, and the board fills the panel as soon as it starts. Use ⤢ Whole page on the panel any time to get back to the page.') : 'Zoom and move below to show the part of the page you want.'}</Note>
             </>) : (<>
               {!IS_PHONE && <button onClick={pickScreen} className="mt-3 w-full py-2.5 rounded-xl font-bold text-sm" style={{ background: RD.green, color: '#06110A' }}>{screenOn && !clip ? 'Pick a different window' : 'Pick a window or tab'}</button>}
               <button onClick={() => clipInput.current?.click()} className="mt-2 w-full py-2.5 rounded-xl font-bold text-sm" style={IS_PHONE ? { background: RD.green, color: '#06110A' } : { background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }}>{clip ? 'Pick a different screen recording' : '📼 Use a screen recording'}</button>
