@@ -72,3 +72,20 @@ jobs:
           echo "::notice title=http redirect::$(curl -sS -o /dev/null -w '%{http_code} -> %{redirect_url}' --max-time 15 http://chessscout.net/ 2>&1)"
           echo "::notice title=TLS cert::$(echo | openssl s_client -connect chessscout.net:443 -servername chessscout.net 2>/dev/null | openssl x509 -noout -issuer -enddate 2>/dev/null | tr '\n' ' ')"
           echo "::notice title=API health::$(curl -sS -o /dev/null -w '%{http_code} %{time_total}s' --max-time 30 https://chesscoach-api-kbf8.onrender.com/api/healthz 2>&1)"
+  site:
+    # What the live site serves: which build of the app, and whether its pictures load
+    runs-on: ubuntu-latest
+    steps:
+      - name: Live site
+        run: |
+          h() { curl -sS -o /dev/null -w "status=%{http_code} type=%{content_type} bytes=%{size_download}" "$1"; }
+          echo "::notice title=photo::$(h https://chessscout.net/photo/assets/courses/course-library.webp)"
+          echo "::notice title=board thumb::$(h https://chessscout.net/boards/walnut/board.webp)"
+          curl -sSD /tmp/hdr https://chessscout.net/admin/streamer -o /tmp/page.html
+          echo "::notice title=page headers::$(grep -iE '^(server|cache-control|cf-ray|x-vercel|age|etag):' /tmp/hdr | tr -d '\r' | tr '\n' ' ')"
+          js=$(grep -o '/assets/index-[A-Za-z0-9_-]*\.js' /tmp/page.html | head -1)
+          echo "::notice title=app bundle::$js"
+          curl -sS "https://chessscout.net$js" -o /tmp/main.js
+          chunk=$(grep -o 'StreamerStudio-[A-Za-z0-9_-]*\.js' /tmp/main.js | head -1)
+          curl -sS "https://chessscout.net/assets/$chunk" -o /tmp/studio.js
+          echo "::notice title=studio chunk::$chunk has 'Stay centred': $(grep -c 'Stay centred' /tmp/studio.js) / has charFollow: $(grep -c charFollow /tmp/studio.js)"
