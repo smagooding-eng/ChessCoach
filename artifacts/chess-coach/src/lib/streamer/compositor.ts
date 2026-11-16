@@ -217,7 +217,7 @@ export function drawReviewNotes(c: CanvasRenderingContext2D, n: ReviewNotes, x: 
   c.save(); c.beginPath(); c.rect(x, y, w, h); c.clip();
   c.fillStyle = '#050A0B'; c.fillRect(x, y, w, h);
   const pad = Math.max(5, Math.min(w, h) * 0.035);
-  const base = Math.max(10, Math.min(w * 0.05, h * 0.075, 24));
+  const base = Math.max(10, Math.min(w * 0.064, h * 0.075, 26));
   const barH = Math.max(5, base * 0.45), namesH = base * 1.25;
   const cx = x + pad, cw = w - pad * 2, cy = y + pad, ch = h - pad * 2 - barH - namesH - pad * 0.5;
   rr(c, cx, cy, cw, ch, Math.min(14, base * 0.7)); c.fillStyle = '#162022'; c.fill();
