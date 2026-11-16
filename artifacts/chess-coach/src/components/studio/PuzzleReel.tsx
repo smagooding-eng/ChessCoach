@@ -18,7 +18,7 @@ import { StudioMusic, type MusicStyle } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
 import { HookPicker } from './HookPicker';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, PinnedBox, hiddenAnswer, useBackToClose } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, PinnedBox, hiddenAnswer, useBackToClose, useFollowEnd, FollowEndCard } from './reelKit';
 
 const G = '#81B64C', BG = '#0B1112', TEXT = '#F5F7F6', MUTED = '#8E9996', GOLD = '#E8B447';
 const ABC_COLORS = ['#3D8BFD', '#F2A93B', '#B05CE8'];
@@ -152,7 +152,9 @@ export function PuzzleReel({ opts: initial, render = false, onClose }: { opts?: 
   const solution = p?.moves.split(' ').filter(Boolean) ?? [];
   const answerPlies = opts.mode === 'mate2' ? solution.length : 1;
 
+  const followEnd = useFollowEnd(); // the Follow + free review end card
   const play = (onDone?: () => void) => {
+    followEnd.reset();
     if (!p) return;
     clear();
     try { const m = mus(); routeSoundsTo(m.unlock(), m.sfx); m.stop(); if (opts.music !== 'off') m.start(opts.music); } catch { /* ignore */ }
@@ -164,10 +166,10 @@ export function PuzzleReel({ opts: initial, render = false, onClose }: { opts?: 
       for (let i = 1; i <= answerPlies; i++) at(t + 300 + (i - 1) * 900, () => { setPly(i); playMoveSound(i === answerPlies ? 'check' : i % 2 === 0 ? 'move' : 'capture'); });
       const t2 = t + 300 + answerPlies * 900 + 700;
       at(t2, () => { setPhase('end'); mus().accent('impact'); });
-      at(t2 + 2400, () => { music.current?.stop(); onDone?.(); });
+      at(t2 + 2400, () => { followEnd.finish(() => { music.current?.stop(); onDone?.(); }); });
     } else {
       at(t, () => { setPhase('end'); mus().accent('impact'); });
-      at(t + 2200, () => { music.current?.stop(); onDone?.(); });
+      at(t + 2200, () => { followEnd.finish(() => { music.current?.stop(); onDone?.(); }); });
     }
   };
   useEffect(() => { if (!render && p) play(); }, [p?.id, opts.mode, opts.reveal, opts.seconds]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -223,6 +225,7 @@ export function PuzzleReel({ opts: initial, render = false, onClose }: { opts?: 
   const frame = (
     <div className="relative overflow-hidden" style={{ fontFamily: 'Inter, system-ui, sans-serif', ...reelFrameSize(clean || render), background: `radial-gradient(ellipse at 50% 0%, #12301F 0%, ${BG} 60%)` }}
       onClick={() => { if (clean && phase === 'end') setClean(false); }}>
+      <FollowEndCard show={followEnd.on} />
       {p && (
         <div className="flex h-full flex-col items-center justify-center gap-[2.2cqh] px-[5cqw]">
           <div className="text-center">

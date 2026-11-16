@@ -16,7 +16,7 @@ import { StudioMusic, type MusicStyle } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
 import { HookPicker, hookLine } from './HookPicker';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, PinnedBox, useBackToClose } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, PinnedBox, useBackToClose, useFollowEnd, FollowEndCard } from './reelKit';
 import { TRAPS, trapById, type TrapStepKind } from './traps';
 
 type Speed = 'fast' | 'normal' | 'slow';
@@ -139,7 +139,9 @@ export function TrapReel({ opts: initial, render = false, onClose }: { opts?: Tr
   const at = (ms: number, f: () => void) => { timers.current.push(setTimeout(f, ms)); };
   useEffect(() => () => { clear(); music.current?.stop(); routeSoundsTo(null, null); }, []);
 
+  const followEnd = useFollowEnd(); // the Follow + free review end card
   const play = (onDone?: () => void, o: TrapReelOpts = opts) => {
+    followEnd.reset();
     clear(); voiceAudio.current?.pause();
     const id = ++playId.current;
     if (o.voice === false) { run(onDone, o); return; }
@@ -228,7 +230,7 @@ export function TrapReel({ opts: initial, render = false, onClose }: { opts?: Tr
     at(t, () => { setScene('stamp'); setCallout(null); mus().accent('impact'); });
     const outro = speakable(`Save it for your next game. ${o.question}`);
     at(t + 1900, () => { setScene('end'); mus().accent('chime'); say(outro); });
-    at(t + 1900 + Math.max(3400, vlen(outro) + 600), () => { music.current?.stop(); onDone?.(); });
+    at(t + 1900 + Math.max(3400, vlen(outro) + 600), () => { followEnd.finish(() => { music.current?.stop(); onDone?.(); }); });
   };
   useEffect(() => { if (!render) play(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const enterClean = () => { clear(); music.current?.stop(); setClean(true); setBlank(true); setScene('idle'); at(5000, () => { setBlank(false); play(); }); };
@@ -354,6 +356,7 @@ export function TrapReel({ opts: initial, render = false, onClose }: { opts?: Tr
   const frame = (
     <div className="relative overflow-hidden" style={{ fontFamily: 'Inter, system-ui, sans-serif', ...reelFrameSize(clean || render), background: `radial-gradient(ellipse at 50% 0%, #15301F 0%, ${BG} 60%)` }}
       onClick={() => { if (clean && (scene === 'end' || scene === 'idle')) setClean(false); }}>
+      <FollowEndCard show={followEnd.on} />
       {!blank && (showing ? playScene : scene === 'end' ? end : voicePrep ? <div className="grid h-full place-items-center"><Loader2 className="h-8 w-8 animate-spin text-white/50" /></div> : null)}
       {!blank && showing && <p className="absolute inset-x-0 bottom-[2cqh] text-center font-black" style={{ fontSize: '2cqh', color: 'rgba(245,247,246,.55)' }}>Chess<span style={{ color: G }}>Scout</span>.net</p>}
     </div>

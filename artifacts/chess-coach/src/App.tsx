@@ -155,6 +155,7 @@ const TermsPage = lazyRetry(() => import("@/pages/Terms"));
 const CreditsPage = lazyRetry(() => import("@/pages/Credits"));
 const VsAimchessPage = lazyRetry(() => import("@/pages/VsAimchess"));
 const PricingPage = lazyRetry(() => import("@/pages/Pricing"));
+const FreeReviewPage = lazyRetry(() => import("@/pages/FreeReview"));
 const VsImproveMyChessPage = lazyRetry(() => import("@/pages/VsImproveMyChess"));
 const VsFreeAnalysisPage = lazyRetry(() => import("@/pages/VsFreeAnalysis"));
 const Dashboard = lazyRetry(() => import("@/pages/Dashboard").then(m => ({ default: m.Dashboard })));
@@ -618,6 +619,7 @@ function Router() {
       <Route path="/credits" component={CreditsPage} />
       <Route path="/vs/aimchess" component={VsAimchessPage} />
       <Route path="/pricing" component={PricingPage} />
+      <Route path="/review" component={FreeReviewPage} />
       <Route path="/vs/improve-my-chess" component={VsImproveMyChessPage} />
       <Route path="/vs/free-chess-analysis" component={VsFreeAnalysisPage} />
       <Route path="/welcome" component={PWelcome} />

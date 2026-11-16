@@ -1881,4 +1881,125 @@ router.post("/games/:id/review", async (req, res): Promise<void> => {
   runReviewJob(params.data.id, jobId, req.log).catch(() => {});
 });
 
+// ── One free AI game review (the Instagram link: chessscout.net/review) ─────────
+// A signed-up player picks one of their recent Chess.com / Lichess games and gets the
+// full AI coach review once, free. Pro players can use it any time. A daily cap keeps
+// the OpenAI cost bounded.
+const FREE_REVIEW_DAILY_CAP = 300;
+type FreeRecent = { ref: string; white: string; black: string; whiteRating: number; blackRating: number; result: string; opening: string | null; playedAt: string; timeControl: string };
+
+async function ensureFreeReviewTable(): Promise<void> {
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS free_ai_reviews (user_id varchar PRIMARY KEY, game_id integer NOT NULL, created_at timestamptz NOT NULL DEFAULT now())`);
+}
+
+/** The player's 10 most recent finished games, newest first, with the metadata and PGN. */
+async function recentForFreeReview(platform: "chesscom" | "lichess", username: string) {
+  if (platform === "lichess") {
+    const games = (await fetchLichessGames(username, 1)).filter((g) => !!g.pgn);
+    const list = (games.length ? games : (await fetchLichessGames(username, 6)).filter((g) => !!g.pgn)).slice(0, 10);
+    return list.map((g) => ({ meta: extractLichessGameMetadata(g, username), pgn: g.pgn!, ref: g.id }));
+  }
+  const archives = await fetchChessComArchiveList(username);
+  const out: { meta: ReturnType<typeof extractGameMetadata>; pgn: string; ref: string }[] = [];
+  for (const a of archives.slice(-3).reverse()) {
+    const games = (await fetchChessComGamesForArchive(a)).filter((g) => !!g.pgn).sort((x, y) => y.end_time - x.end_time);
+    for (const g of games) { const meta = extractGameMetadata(g, username); out.push({ meta, pgn: g.pgn, ref: meta.chesscomGameId ?? g.url }); if (out.length >= 10) break; }
+    if (out.length >= 10) break;
+  }
+  return out;
+}
+
+router.get("/free-review/status", requireAuth, async (req, res): Promise<void> => {
+  await ensureFreeReviewTable();
+  const [used] = rowsOfAny<{ game_id: number }>(await db.execute(sql`SELECT game_id FROM free_ai_reviews WHERE user_id = ${req.user!.id}`));
+  const pro = await isUserPremium(req.user!.id).catch(() => false);
+  res.json({ used: !!used, gameId: used?.game_id ?? null, pro });
+});
+
+router.get("/free-review/recent", requireAuth, async (req, res): Promise<void> => {
+  const platform = req.query.platform === "lichess" ? "lichess" : "chesscom";
+  const username = String(req.query.username ?? "").trim();
+  if (!/^[A-Za-z0-9_-]{2,40}$/.test(username)) { res.status(400).json({ error: "Enter your username." }); return; }
+  try {
+    const list = await recentForFreeReview(platform, username);
+    const games: FreeRecent[] = list.map(({ meta, ref }) => ({
+      ref, white: meta.whiteUsername, black: meta.blackUsername, whiteRating: meta.whiteRating, blackRating: meta.blackRating,
+      result: meta.result, opening: meta.opening, playedAt: new Date(meta.playedAt).toISOString(), timeControl: meta.timeControl,
+    }));
+    res.json({ games });
+  } catch {
+    res.status(404).json({ error: platform === "lichess" ? "We couldn't find that Lichess username." : "We couldn't find that Chess.com username." });
+  }
+});
+
+router.post("/free-review", requireAuth, async (req, res): Promise<void> => {
+  const userId = req.user!.id;
+  const platform = req.body?.platform === "lichess" ? "lichess" : "chesscom";
+  const username = String(req.body?.username ?? "").trim();
+  const ref = String(req.body?.ref ?? "");
+  if (!/^[A-Za-z0-9_-]{2,40}$/.test(username) || !ref) { res.status(400).json({ error: "Pick a game first." }); return; }
+  await ensureFreeReviewTable();
+  const pro = await isUserPremium(userId).catch(() => false);
+  if (!pro) {
+    const [used] = rowsOfAny<{ game_id: number }>(await db.execute(sql`SELECT game_id FROM free_ai_reviews WHERE user_id = ${userId}`));
+    if (used) { res.status(409).json({ error: "You've already used your free AI review.", gameId: used.game_id }); return; }
+    const [{ n } = { n: 0 }] = rowsOfAny<{ n: number }>(await db.execute(sql`SELECT count(*)::int AS n FROM free_ai_reviews WHERE created_at > now() - interval '1 day'`));
+    if (n >= FREE_REVIEW_DAILY_CAP) { res.status(429).json({ error: "Today's free reviews are all taken. Come back tomorrow." }); return; }
+  }
+  let picked: Awaited<ReturnType<typeof recentForFreeReview>>[number] | undefined;
+  try { picked = (await recentForFreeReview(platform, username)).find((g) => g.ref === ref); } catch { /* below */ }
+  if (!picked) { res.status(404).json({ error: "We couldn't load that game. Try another one." }); return; }
+
+  // Link the username to the account if it isn't yet (it's how "you" is found in the game).
+  try {
+    const [u] = await db.select({ c: usersTable.chesscomUsername, l: usersTable.lichessUsername }).from(usersTable).where(eq(usersTable.id, userId));
+    if (platform === "chesscom" && !u?.c) await db.update(usersTable).set({ chesscomUsername: username }).where(eq(usersTable.id, userId));
+    if (platform === "lichess" && !u?.l) await db.update(usersTable).set({ lichessUsername: username }).where(eq(usersTable.id, userId));
+  } catch { /* the review still works */ }
+
+  // The game in their games (an existing copy if they already imported it).
+  const meta = picked.meta as Record<string, unknown> & { chesscomGameId?: string | null; lichessGameId?: string | null };
+  let gameId: number | undefined;
+  const existing = meta.chesscomGameId
+    ? await db.select({ id: gamesTable.id }).from(gamesTable).where(and(eq(gamesTable.userId, userId), eq(gamesTable.chesscomGameId, meta.chesscomGameId))).limit(1)
+    : meta.lichessGameId
+      ? await db.select({ id: gamesTable.id }).from(gamesTable).where(and(eq(gamesTable.userId, userId), eq(gamesTable.lichessGameId, meta.lichessGameId))).limit(1)
+      : [];
+  gameId = existing[0]?.id;
+  if (!gameId) {
+    const [row] = await db.insert(gamesTable).values({
+      userId, username: username.toLowerCase(), pgn: picked.pgn,
+      ...(platform === "chesscom" ? { platform: "chesscom" as const } : {}),
+      ...(picked.meta as object),
+    } as typeof gamesTable.$inferInsert).onConflictDoNothing().returning({ id: gamesTable.id });
+    gameId = row?.id;
+  }
+  if (!gameId) { res.status(500).json({ error: "Couldn't save that game. Try again." }); return; }
+
+  if (!pro) await db.execute(sql`INSERT INTO free_ai_reviews (user_id, game_id) VALUES (${userId}, ${gameId}) ON CONFLICT (user_id) DO NOTHING`);
+
+  // Already reviewed by the AI coach: nothing to do.
+  const [g] = await db.select().from(gamesTable).where(eq(gamesTable.id, gameId));
+  if (g?.reviewData && hasAiText(g.reviewData)) { res.json({ gameId }); return; }
+  const active = await findActiveReviewJob(gameId);
+  if (active) { res.json({ gameId }); return; }
+  const jobId = randomUUID();
+  await db.insert(backgroundJobsTable).values({ id: jobId, userId, type: "review", status: "pending", targetUsername: String(gameId) });
+  res.json({ gameId });
+  void (async () => {
+    try {
+      await db.update(gamesTable).set({ reviewData: null }).where(eq(gamesTable.id, gameId!));
+      const [fresh] = await db.select().from(gamesTable).where(eq(gamesTable.id, gameId!));
+      await reviewOneGame(fresh, (done, total) => {
+        db.update(backgroundJobsTable).set({ result: { progress: done, total } as unknown as Record<string, unknown> }).where(eq(backgroundJobsTable.id, jobId)).catch(() => {});
+      }, userId, true);
+      await db.update(backgroundJobsTable).set({ status: "done", completedAt: new Date() }).where(eq(backgroundJobsTable.id, jobId));
+    } catch (err) {
+      req.log.error({ err, gameId }, "Free AI review failed");
+      await db.update(backgroundJobsTable).set({ status: "error", error: "Review failed", completedAt: new Date() }).where(eq(backgroundJobsTable.id, jobId));
+      if (!pro) await db.execute(sql`DELETE FROM free_ai_reviews WHERE user_id = ${userId} AND game_id = ${gameId}`).catch(() => {}); // give the free review back
+    }
+  })();
+});
+
 export default router;

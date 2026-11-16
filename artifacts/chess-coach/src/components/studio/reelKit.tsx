@@ -2,6 +2,7 @@
 // MP4 renders fit the screen instead of being cut off on tall phones), the
 // caption box with a Copy button, and the board look ("remix the board").
 import { useEffect, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Copy, Check, Shuffle } from 'lucide-react';
 import { randomLook, lookLabel, type BoardLook } from '@/context/SettingsContext';
 
@@ -156,4 +157,49 @@ export function useBackToClose(onClose: () => void, active = true) {
       if (!popped && (window.history.state as Record<string, unknown> | null)?.csOverlay === id) window.history.back();
     };
   }, [active]);
+}
+
+// ── Follow end card ─────────────────────────────────────────────────────────
+// Every promo ends on the same 2.6-second card: follow, and the free AI game review
+// link. It plays after the reel's own ending (in previews and MP4 renders).
+export const FOLLOW_END_MS = 2600;
+export const FOLLOW_HANDLE = '@chessscout.net3';
+export const FREE_REVIEW_LINE = 'Free AI review of your game';
+export const FREE_REVIEW_URL = 'chessscout.net/review';
+
+/** play() calls end.reset() when it starts and end.finish(onDone) where it used to call onDone. */
+export function useFollowEnd() {
+  const [on, setOn] = useState(false);
+  const t = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (t.current) clearTimeout(t.current); }, []);
+  return {
+    on,
+    reset: () => { if (t.current) clearTimeout(t.current); t.current = null; setOn(false); },
+    finish: (onDone?: () => void) => { setOn(true); if (t.current) clearTimeout(t.current); t.current = setTimeout(() => { t.current = null; onDone?.(); }, FOLLOW_END_MS); },
+  };
+}
+
+/** The card itself, over the whole 9:16 frame (place it inside the frame element). */
+export function FollowEndCard({ show }: { show: boolean }) {
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.div key="followEnd" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}
+          className="pointer-events-none absolute inset-0 z-[60] grid place-items-center" style={{ background: 'radial-gradient(ellipse at 50% 35%, #15301F 0%, #050A0B 70%)' }}>
+          <motion.div initial={{ scale: 0.75, y: 30 }} animate={{ scale: 1, y: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 16 }} className="px-[8%] text-center">
+            <motion.img src={`${import.meta.env.BASE_URL}images/logo.svg`} alt="" initial={{ rotate: -25, scale: 0.4 }} animate={{ rotate: 0, scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 12, delay: 0.05 }}
+              className="mx-auto mb-[2cqh] drop-shadow-2xl" style={{ width: '13cqh', height: '13cqh' }} />
+            <p className="font-black leading-[1.05] text-white" style={{ fontSize: '5.4cqh' }}>Follow for more chess ♟️</p>
+            <motion.p animate={{ scale: [1, 1.07, 1] }} transition={{ duration: 1.1, repeat: Infinity, delay: 0.5 }}
+              className="mx-auto mt-[2.2cqh] w-fit rounded-full px-[1.1em] py-[0.4em] font-black text-white ring-2 ring-white"
+              style={{ fontSize: '2.8cqh', background: 'linear-gradient(180deg,#9BCB62,#81B64C 55%,#5F8F36)', boxShadow: '0 0.2em 0 #3E6420, 0 0.5em 1.4em rgba(0,0,0,.45)' }}>Follow {FOLLOW_HANDLE}</motion.p>
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }} className="mt-[4cqh]">
+              <p className="font-extrabold text-white/90" style={{ fontSize: '2.7cqh' }}>{FREE_REVIEW_LINE} 👇</p>
+              <p className="mt-[0.6cqh] font-black" style={{ fontSize: '3.3cqh', color: '#B8E08C' }}>{FREE_REVIEW_URL}</p>
+            </motion.div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 }

@@ -14,7 +14,7 @@ import { apiFetch } from '@/lib/api';
 import { StudioMusic, type MusicStyle } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
 import { ChessBoard } from '@/components/ChessBoard';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, PinnedBox, useBackToClose } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, PinnedBox, useBackToClose, useFollowEnd, FollowEndCard } from './reelKit';
 
 export interface CrowdMove { san: string; by: 'crowd' | 'engine'; day: number; note?: string }
 export interface CrowdGame { mode: 'engine' | 'both'; crowd: 'w' | 'b'; day: number; moves: CrowdMove[]; startedAt: string }
@@ -106,7 +106,9 @@ export function CrowdReel({ opts: initial, render = false, onClose }: { opts?: C
   };
 
   // ── Playback ──────────────────────────────────────────────────────────────
+  const followEnd = useFollowEnd(); // the Follow + free review end card
   const play = (onDone?: () => void, o: CrowdReelOpts | null = opts) => {
+    followEnd.reset();
     if (!o?.game) return;
     clear();
     const g = o.game;
@@ -127,7 +129,7 @@ export function CrowdReel({ opts: initial, render = false, onClose }: { opts?: C
     at(t, () => { setScene('ask'); mus().accent('chime'); });
     t += 5200;
     at(t, () => { setScene('end'); mus().accent('whoosh'); });
-    at(t + 3200, () => { music.current?.stop(); onDone?.(); });
+    at(t + 3200, () => { followEnd.finish(() => { music.current?.stop(); onDone?.(); }); });
   };
   useEffect(() => { if (!render && loaded && opts?.game) play(); }, [loaded]); // eslint-disable-line react-hooks/exhaustive-deps
   const enterClean = () => { clear(); music.current?.stop(); setClean(true); setBlank(true); setScene('idle'); at(5000, () => { setBlank(false); play(); }); };
@@ -169,6 +171,7 @@ export function CrowdReel({ opts: initial, render = false, onClose }: { opts?: C
   const frame = game && (
     <div className="relative overflow-hidden" style={{ fontFamily: 'Inter, system-ui, sans-serif', ...reelFrameSize(clean || render), background: `radial-gradient(ellipse at 50% 0%, #10261A 0%, ${BG} 62%)` }}
       onClick={() => { if (clean && (scene === 'end' || scene === 'idle')) setClean(false); }}>
+      <FollowEndCard show={followEnd.on} />
       <EngageOverlay text={opts.engage} show={scene === 'ask'} />
       {!blank && scene !== 'end' && scene !== 'idle' && (
         <div className="flex h-full flex-col px-[4cqw] pt-[4cqh]">

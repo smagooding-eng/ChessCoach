@@ -6,7 +6,7 @@
   "redirects": [
     {
       "source": "/ig",
-      "destination": "/?utm_source=instagram&utm_medium=bio&utm_campaign=bio_link",
+      "destination": "/review?utm_source=instagram&utm_medium=bio&utm_campaign=bio_link",
       "permanent": false
     },
     {

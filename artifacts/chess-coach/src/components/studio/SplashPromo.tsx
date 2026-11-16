@@ -9,7 +9,7 @@ import { routeSoundsTo } from '@/lib/sounds';
 import { StudioMusic } from './studioMusic';
 import { StudioSplash } from './StudioSplash';
 import { RenderMp4 } from './RenderMp4';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, useBackToClose } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, useBackToClose, useFollowEnd, FollowEndCard } from './reelKit';
 
 export interface SplashPromoOpts { line1: string; line2: string; tag: string; engage?: string }
 export const SPLASH_PROMO_DEFAULT: SplashPromoOpts = { line1: 'Chess.com is dead.', line2: 'ChessScout.net', tag: '' };
@@ -38,14 +38,16 @@ export function SplashPromo({ opts: initial = SPLASH_PROMO_DEFAULT, render = fal
   const later = (ms: number, f: () => void) => { timers.current.push(setTimeout(f, ms)); };
   useEffect(() => () => { clear(); routeSoundsTo(null, null); }, []);
 
+  const followEnd = useFollowEnd(); // the Follow + free review end card
   const play = (onDone?: () => void) => {
+    followEnd.reset();
     clear();
     try { const m = mus(); routeSoundsTo(m.unlock(), m.sfx); } catch { /* ignore */ }
     setRun((n) => n + 1); setPhase('line1');
     // The board and green pawn with the first line; the rook slides in at ~3.1s and jumps at 4s.
     later(4000 + 680, () => { playMoveSound('capture'); setPhase('smash'); }); // the splat
     later(5200, () => setPhase('line2'));
-    later(10_000, () => { setPhase('end'); onDone?.(); });
+    later(10_000, () => { setPhase('end'); followEnd.finish(onDone); });
   };
   useEffect(() => { if (!render) play(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const enterClean = () => { clear(); setClean(true); setBlank(true); setPhase('idle'); later(5000, () => { setBlank(false); play(); }); };
@@ -101,6 +103,7 @@ export function SplashPromo({ opts: initial = SPLASH_PROMO_DEFAULT, render = fal
   const frame = (
     <div className="relative overflow-hidden" style={{ ...reelFrameSize(clean || render), background: '#141413' }}
       onClick={() => { if (clean && (phase === 'end' || phase === 'idle')) setClean(false); }}>
+      <FollowEndCard show={followEnd.on} />
       <EngageOverlay text={opts.engage} show={phase === 'end'} />
       {!blank && phase !== 'idle' && <StudioSplash key={run} pawn="green" delay={4} above={above} below={below} />}
     </div>

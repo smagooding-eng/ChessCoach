@@ -18,7 +18,7 @@ import { HookPicker, hookLine } from './HookPicker';
 import { ThemedMiniBoard } from '@/components/ThemedMiniBoard';
 import { positionsFromSan } from '@/hooks/use-move-browser';
 import { Chess } from 'chess.js';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, PinnedBox, hiddenAnswer, useBackToClose } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, PinnedBox, hiddenAnswer, useBackToClose, useFollowEnd, FollowEndCard } from './reelKit';
 
 export interface NumbersReelOpts { hook: string; personal: string; twist: string; closer: string; question: string; music: MusicStyle; look?: ReelLook }
 export const NUMBERS_REEL_DEFAULT: NumbersReelOpts = {
@@ -79,7 +79,9 @@ export function NumbersReel({ opts: initial = NUMBERS_REEL_DEFAULT, render = fal
     ro.observe(el); return () => ro.disconnect();
   });
 
+  const followEnd = useFollowEnd(); // the Follow + free review end card
   const play = (onDone?: () => void) => {
+    followEnd.reset();
     clear(); setShown(1);
     try { const m = mus(); routeSoundsTo(m.unlock(), m.sfx); m.stop(); if (opts.music !== 'off') m.start(opts.music); } catch { /* ignore */ }
     const go = (ms: number, s: Scene) => at(ms, () => { setScene(s); setStep(0); if (ms > 0) mus().accent('whoosh'); });
@@ -110,7 +112,7 @@ export function NumbersReel({ opts: initial = NUMBERS_REEL_DEFAULT, render = fal
     const t4 = t3 + 2000 + PATTERNS.length * 380 + 1000;
     go(t4, 'end'); at(t4 + 100, () => mus().accent('chime'));
     at(t4 + 1400, () => setStep(1));
-    at(t4 + 3600, () => { music.current?.stop(); onDone?.(); });
+    at(t4 + 3600, () => { followEnd.finish(() => { music.current?.stop(); onDone?.(); }); });
   };
   useEffect(() => { if (!render) play(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const enterClean = () => { clear(); music.current?.stop(); setClean(true); setBlank(true); setScene('idle'); at(5000, () => { setBlank(false); play(); }); };
@@ -261,6 +263,7 @@ export function NumbersReel({ opts: initial = NUMBERS_REEL_DEFAULT, render = fal
   const frame = (
     <div ref={frameRef} className="relative overflow-hidden" style={{ ...font, ...reelFrameSize(clean || render), background: `radial-gradient(ellipse at 50% 30%, #10261A 0%, ${BG} 65%)` }}
       onClick={() => { if (clean && (scene === 'end' || scene === 'idle')) setClean(false); }}>
+      <FollowEndCard show={followEnd.on} />
       {!blank && (
         <AnimatePresence mode="wait">
           <motion.div key={scene} className="absolute inset-0" initial={{ opacity: 0, scale: 1.04 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97 }} transition={{ duration: 0.3 }}><LookOverride look={look}>{body}</LookOverride></motion.div>

@@ -11,7 +11,7 @@ import { routeSoundsTo } from '@/lib/sounds';
 import { StudioMusic } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
 import { HookPicker, hookLine } from './HookPicker';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, useBackToClose } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, useBackToClose, useFollowEnd, FollowEndCard } from './reelKit';
 
 // A complete knight's tour from b1 (checked: 64 different squares, every step a knight move).
 export const KNIGHT_TOUR = 'b1 a3 c2 a1 b3 c1 a2 b4 a6 b8 d7 f8 h7 g5 h3 g1 e2 g3 h1 f2 d1 b2 a4 c3 b5 a7 c8 b6 a8 c7 e8 g7 h5 f6 g8 h6 g4 h2 f1 d2 e4 c5 b7 a5 c4 d6 f7 h8 g6 h4 g2 e1 f3 e5 d3 f4 e6 d8 c6 d4 f5 e7 d5 e3'.split(' ');
@@ -70,7 +70,9 @@ export function KnightTour({ opts: initial = KNIGHT_TOUR_DEFAULT, render = false
   useEffect(() => () => { clear(); routeSoundsTo(null, null); music.current?.dispose?.(); }, []);
 
   const later = (ms: number, f: () => void) => { timers.current.push(setTimeout(f, ms)); };
+  const followEnd = useFollowEnd(); // the Follow + free review end card
   const play = (onDone?: () => void) => {
+    followEnd.reset();
     clear();
     try { const m = mus(); routeSoundsTo(m.unlock(), m.sfx); } catch { /* ignore */ }
     const dt = SPEEDS[opts.speed];
@@ -80,7 +82,7 @@ export function KnightTour({ opts: initial = KNIGHT_TOUR_DEFAULT, render = false
     for (let k = 2; k <= 64; k++) { const n = k; later(t, () => setStep(n)); later(t + hop, () => { setPainted(n); playMoveSound('move'); }); t += dt; }
     t += 500; later(t, () => setPhase('logo'));
     t += 2300; later(t, () => setPhase('site'));
-    t += 3200; later(t, () => { setPhase('end'); onDone?.(); });
+    t += 3200; later(t, () => { setPhase('end'); followEnd.finish(onDone); });
   };
   const reset = () => { clear(); setPhase('idle'); setStep(0); setPainted(0); };
 
@@ -124,6 +126,7 @@ export function KnightTour({ opts: initial = KNIGHT_TOUR_DEFAULT, render = false
     <div className="relative flex flex-col items-center justify-center overflow-hidden"
       style={{ ...reelFrameSize(clean || render), background: 'radial-gradient(120% 80% at 50% 35%, #1d2a17 0%, #0d110c 55%, #070807 100%)', color: '#fff' }}
       onClick={() => { if (clean && (phase === 'end' || phase === 'idle')) setClean(false); }}>
+      <FollowEndCard show={followEnd.on} />
       <EngageOverlay text={opts.engage} show={phase === 'site' || phase === 'end'} />
       {blank ? null : (<>
         <div className="absolute inset-x-0 top-[9cqh] px-[6cqw] text-center">

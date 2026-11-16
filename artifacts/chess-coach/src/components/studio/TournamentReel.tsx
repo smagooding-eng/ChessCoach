@@ -13,7 +13,7 @@ import { RenderMp4 } from './RenderMp4';
 import { HookPicker, hookLine } from './HookPicker';
 import { ThemedMiniBoard } from '@/components/ThemedMiniBoard';
 import { positionsFromSan } from '@/hooks/use-move-browser';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, useBackToClose } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, useBackToClose, useFollowEnd, FollowEndCard } from './reelKit';
 
 export interface TournamentReelOpts { hook: string; who: string; name: string; closer: string; music: MusicStyle; look?: ReelLook; engage?: string }
 export const TOURNAMENT_REEL_DEFAULT: TournamentReelOpts = {
@@ -88,7 +88,9 @@ export function TournamentReel({ opts: initial = TOURNAMENT_REEL_DEFAULT, render
   const whoList = opts.who.split(',').map((s) => s.trim()).filter(Boolean);
   const tapAt = (ms: number, id: string, sound = true) => at(ms, () => { setTap(id); if (sound) mus().accent('tick'); at(500, () => setTap('')); });
 
+  const followEnd = useFollowEnd(); // the Follow + free review end card
   const play = (onDone?: () => void) => {
+    followEnd.reset();
     clear();
     try { const m = mus(); routeSoundsTo(m.unlock(), m.sfx); m.stop(); if (opts.music !== 'off') m.start(opts.music); } catch { /* ignore */ }
     const go = (ms: number, s: Scene) => at(ms, () => { setScene(s); setStep(0); if (ms > 0) mus().accent('whoosh'); });
@@ -124,7 +126,7 @@ export function TournamentReel({ opts: initial = TOURNAMENT_REEL_DEFAULT, render
     go(t5, 'champ'); at(t5 + 150, () => mus().accent('impact'));
     const t6 = t5 + 2300;
     go(t6, 'end'); at(t6 + 100, () => mus().accent('chime'));
-    at(t6 + 3200, () => { music.current?.stop(); onDone?.(); });
+    at(t6 + 3200, () => { followEnd.finish(() => { music.current?.stop(); onDone?.(); }); });
   };
   useEffect(() => { if (!render) play(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const enterClean = () => { clear(); music.current?.stop(); setClean(true); setBlank(true); setScene('idle'); at(5000, () => { setBlank(false); play(); }); };
@@ -315,6 +317,7 @@ export function TournamentReel({ opts: initial = TOURNAMENT_REEL_DEFAULT, render
   const frame = (
     <div ref={frameRef} className="relative overflow-hidden" style={{ ...font, ...reelFrameSize(clean || render), background: `radial-gradient(ellipse at 50% 0%, #12301F 0%, ${BG} 60%)` }}
       onClick={() => { if (clean && (scene === 'end' || scene === 'idle')) setClean(false); }}>
+      <FollowEndCard show={followEnd.on} />
       <EngageOverlay text={opts.engage} show={scene === 'end'} />
       {!blank && (
         <AnimatePresence mode="wait">

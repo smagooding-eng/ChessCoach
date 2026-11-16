@@ -14,7 +14,7 @@ import { HookPicker, hookLine } from './HookPicker';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
 import { positionsFromSan } from '@/hooks/use-move-browser';
 import { MOTIFS } from '@/lib/tactics';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, useBackToClose } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, useBackToClose, useFollowEnd, FollowEndCard } from './reelKit';
 
 const G = '#81B64C', BG = '#0B1112', CARD = '#141D1F', LINE = '#243033', TEXT = '#F5F7F6', MUTED = '#8E9996', GOLD = '#E8B447', RED = '#E5484D', ORANGE = '#F2A93B';
 
@@ -159,7 +159,9 @@ export function SectionReel({ opts: initial, render = false, onClose }: { opts?:
   const at = (ms: number, f: () => void) => { timers.current.push(setTimeout(f, ms)); };
   useEffect(() => () => { clear(); music.current?.stop(); routeSoundsTo(null, null); }, []);
 
+  const followEnd = useFollowEnd(); // the Follow + free review end card
   const play = (onDone?: () => void) => {
+    followEnd.reset();
     clear();
     try { const m = mus(); routeSoundsTo(m.unlock(), m.sfx); m.stop(); if (opts.music !== 'off') m.start(opts.music); } catch { /* ignore */ }
     let t = 0;
@@ -177,7 +179,7 @@ export function SectionReel({ opts: initial, render = false, onClose }: { opts?:
       t += sceneMs(s);
     });
     at(t, () => { setK(scenes.length); setStep(0); mus().accent('impact'); });
-    at(t + 3400, () => { music.current?.stop(); onDone?.(); });
+    at(t + 3400, () => { followEnd.finish(() => { music.current?.stop(); onDone?.(); }); });
   };
   useEffect(() => { if (!render) play(); }, [opts.section]); // eslint-disable-line react-hooks/exhaustive-deps
   const enterClean = () => { clear(); music.current?.stop(); setClean(true); setBlank(true); setK(-1); at(5000, () => { setBlank(false); play(); }); };
@@ -354,6 +356,7 @@ export function SectionReel({ opts: initial, render = false, onClose }: { opts?:
   const frame = (
     <div className="relative overflow-hidden" style={{ fontFamily: 'Inter, system-ui, sans-serif', ...reelFrameSize(clean || render), background: `radial-gradient(ellipse at 50% 0%, #12301F 0%, ${BG} 60%)` }}
       onClick={() => { if (clean && (k < 0 || k >= scenes.length)) setClean(false); }}>
+      <FollowEndCard show={followEnd.on} />
       <EngageOverlay text={opts.engage} show={k >= scenes.length} />
       {!blank && (
         <AnimatePresence mode="wait">

@@ -15,7 +15,7 @@ import { StudioMusic, type MusicStyle } from './studioMusic';
 import { RenderMp4 } from './RenderMp4';
 import { HookPicker, hookLine } from './HookPicker';
 import { apiFetch } from '@/lib/api';
-import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, useBackToClose } from './reelKit';
+import { reelFrameSize, CaptionBox, LookPicker, useReelLook, type ReelLook, EngagePicker, EngageOverlay, withEngage, useBackToClose, useFollowEnd, FollowEndCard } from './reelKit';
 
 const GREEN = '#81B64C';
 type Kind = 'live' | 'review' | 'weak' | 'openings' | 'tactics' | 'endgames' | 'puzzles' | 'scan' | 'scout';
@@ -368,7 +368,9 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
   const lenOf = (sc: Scene) => opts.beat * 1000 * (!appFootage ? 1 : sc.kind === 'review' ? 1.5 : sc.kind === 'puzzles' ? 2.2 : FLOW[sc.kind] && !flowFailed[sc.kind] ? 2 : 1);
   // (Scout and Weaknesses find their second page from the account; until then they run as one page.)
   const total = () => 2800 + SCENES.reduce((a, sc) => a + lenOf(sc), 0) + 3400;
+  const followEnd = useFollowEnd(); // the Follow + free review end card
   const play = (onDone?: () => void) => {
+    followEnd.reset();
     // App footage: start once every page has loaded.
     if (!allReadyRef.current) { clear(); setPhase('idle'); pending.current = () => play(onDone); return; }
     clear(); if (!appFootage) setSeed((x) => x + 1); // (new looks would reload the app pages)
@@ -384,7 +386,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
       t += beat;
     });
     later(t, () => { setPhase('end'); mus().accent('impact'); });
-    later(t + 3400, () => { setPhase('done'); music.current?.stop(); onDone?.(); });
+    later(t + 3400, () => { followEnd.finish(() => { setPhase('done'); music.current?.stop(); onDone?.(); }); });
   };
   useEffect(() => { if (!render) play(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const enterClean = () => { clear(); music.current?.stop(); setClean(true); setBlank(true); setPhase('idle'); later(5000, () => { setBlank(false); play(); }); };
@@ -468,6 +470,7 @@ export function FeatureBlitz({ opts: initial = FEATURE_BLITZ_DEFAULT, render = f
   const frame = (
     <div className="relative overflow-hidden" style={{ ...reelFrameSize(clean || render), background: 'radial-gradient(120% 80% at 50% 30%, #1d2a17 0%, #0d110c 55%, #070807 100%)', color: '#fff', fontFamily: 'Inter, system-ui, sans-serif' }}
       onClick={() => { if (clean && (phase === 'done' || phase === 'idle')) setClean(false); }}>
+      <FollowEndCard show={followEnd.on} />
       <EngageOverlay text={opts.engage} show={phase === 'end' || phase === 'done'} />
       {/* Real app footage: every section's page stays loaded; the current one shows. */}
         {appFootage && showcase && (

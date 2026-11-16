@@ -8,6 +8,7 @@ import { OnboardingStartModal } from '@/components/OnboardingStartModal';
 import { startOnboardingImport } from '@/lib/onboardingImport';
 import { startBackgroundImport } from '@/lib/autoImport';
 import { ScoutUsernameInput, saveScoutUsername, type ScoutNameStatus } from '@/components/ScoutUsernameInput';
+import { readFreeReview } from '@/pages/FreeReview';
 
 const PENDING_CHALLENGE_KEY = 'cs_pending_challenge';
 
@@ -26,8 +27,10 @@ const INPUT: React.CSSProperties = { background: 'rgba(255,255,255,0.05)', color
 
 export function Welcome() {
   const { authUser, refreshAuth, login } = useUser();
-  const [chesscom, setChesscom] = useState('');
-  const [lichess, setLichess] = useState('');
+  // Came from the free AI review link: the username they gave there is filled in.
+  const [freeReview] = useState(() => readFreeReview());
+  const [chesscom, setChesscom] = useState(() => (freeReview?.platform === 'chesscom' ? freeReview.username : ''));
+  const [lichess, setLichess] = useState(() => (freeReview?.platform === 'lichess' ? freeReview.username : ''));
   const [scoutName, setScoutName] = useState(() => authUser?.scoutUsername ?? '');
   const [scoutStatus, setScoutStatus] = useState<ScoutNameStatus>('empty');
   const [saving, setSaving] = useState(false);
@@ -102,6 +105,12 @@ export function Welcome() {
         return;
       }
       await refreshAuth();
+      if (freeReview) {
+        // Back to pick the game for their free AI review; their games import in the background.
+        void startBackgroundImport(cc ? 'chesscom' : 'lichess', cc || lc, 3);
+        navigate('/review', { replace: true } as never);
+        return;
+      }
       setOnboarding({ username: cc || lc, platform: cc ? 'chesscom' : 'lichess' });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save');
