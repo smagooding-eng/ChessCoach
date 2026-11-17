@@ -946,11 +946,19 @@ router.post("/games/import-pgn", requireAuth, async (req, res): Promise<void> =>
         lichessGameId = site.replace(/^https?:\/\/lichess\.org\//i, "").split(/[/?#]/)[0].slice(0, 8) || null;
       }
 
-      const dupe = chesscomGameId
-        ? await db.select({ id: gamesTable.id }).from(gamesTable).where(and(eq(gamesTable.userId, userId), eq(gamesTable.chesscomGameId, chesscomGameId))).limit(1)
+      const cols = { id: gamesTable.id, w: gamesTable.whiteUsername, b: gamesTable.blackUsername };
+      let dupe = chesscomGameId
+        ? await db.select(cols).from(gamesTable).where(and(eq(gamesTable.userId, userId), eq(gamesTable.chesscomGameId, chesscomGameId))).limit(1)
         : lichessGameId
-          ? await db.select({ id: gamesTable.id }).from(gamesTable).where(and(eq(gamesTable.userId, userId), eq(gamesTable.lichessGameId, lichessGameId))).limit(1)
-          : await db.select({ id: gamesTable.id }).from(gamesTable).where(and(eq(gamesTable.userId, userId), eq(gamesTable.pgn, g))).limit(1);
+          ? await db.select(cols).from(gamesTable).where(and(eq(gamesTable.userId, userId), eq(gamesTable.lichessGameId, lichessGameId))).limit(1)
+          : await db.select(cols).from(gamesTable).where(and(eq(gamesTable.userId, userId), eq(gamesTable.pgn, g))).limit(1);
+      // "Already saved" only if it's the same game: same two players. A saved game carrying
+      // this game's id with other players is mislabelled (it opened a different game's
+      // review): its wrong id is cleared and this game is saved as its own.
+      if (dupe.length && ((dupe[0].w ?? '').toLowerCase() !== white.toLowerCase() || (dupe[0].b ?? '').toLowerCase() !== black.toLowerCase())) {
+        await db.update(gamesTable).set(chesscomGameId ? { chesscomGameId: null } : { lichessGameId: null }).where(eq(gamesTable.id, dupe[0].id)).catch(() => {});
+        dupe = [];
+      }
       if (dupe.length > 0) {
         // Already saved (e.g. by a sync): put it on their side if it was saved from the other
         // player's, and drop the review written for the wrong side so it's redone.
