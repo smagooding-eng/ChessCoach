@@ -157,7 +157,7 @@ const LANG_NAMES: Record<string, string> = { en: 'English', es: 'Español', pt: 
 interface SeoLink { label: string; href: string }
 interface SeoData {
   key: string; lang: string; path: string; image?: string; title: string; description: string; h1: string; intro: string;
-  sections: { h: string; p: string; links?: SeoLink[] }[]; faq: { q: string; a: string }[]; cta: SeoLink;
+  sections: { h: string; p: string; links?: SeoLink[] }[]; faq: { q: string; a: string }[]; cta: SeoLink; table?: { head: string[]; rows: string[][] };
   alternates: { lang: string; path: string }[]; related: SeoLink[];
 }
 const link = (l: SeoLink) => `<a href="${esc(l.href)}">${esc(l.label)}</a>`;
@@ -175,6 +175,7 @@ async function seoPage(key: string, lang: string): Promise<Page | null> {
 <h1>${esc(p.h1)}</h1>
 <p>${esc(p.intro)}</p>
 <p>${link(p.cta)}</p>
+${p.table ? `<table><thead><tr>${p.table.head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>\n${p.table.rows.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join('')}</tr>`).join('\n')}\n</tbody></table>` : ''}
 ${p.sections.map((x) => `<h2>${esc(x.h)}</h2>\n<p>${esc(x.p)}</p>${x.links?.length ? `\n<p>${x.links.map(link).join(' · ')}</p>` : ''}`).join('\n')}
 ${p.faq.length ? `${p.faq.map((f) => `<h3>${esc(f.q)}</h3>\n<p>${esc(f.a)}</p>`).join('\n')}` : ''}
 ${p.related.length ? `<nav><p>${p.related.map(link).join(' · ')}</p></nav>` : ''}

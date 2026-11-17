@@ -48,6 +48,8 @@ export interface SeoPage {
   faq: SeoFaq[];
   cta: SeoLink;
   related: string[];       // keys of other pages to link at the bottom
+  /** A comparison table shown after the intro (English-only pages). */
+  table?: { head: string[]; rows: string[][] };
   image?: string;          // og image file in /public
 }
 
@@ -226,14 +228,32 @@ export const SEO_PAGES: SeoPage[] = [
     title: "Pricing — ChessScout.net",
     description: "ChessScout.net pricing: a free plan and a $5/month Pro plan. See exactly what's included in each.",
     h1: "Simple pricing",
-    intro: "Free forever, or $5 a month for everything. No trial to track, no credits to count. Cancel anytime.",
+    intro: "Free forever, or $5 a month for everything. Try Pro free for 3 days first. No credits to count, cancel anytime.",
+    table: {
+      head: ["", "Free", "Pro"],
+      rows: [
+        ["Live and daily games, tournaments", "✓", "✓"],
+        ["Import games from Chess.com and Lichess", "Unlimited", "Unlimited"],
+        ["Game review with Stockfish, every move graded", "✓", "✓"],
+        ["Move explanations", "Rule-based", "AI coach on every move"],
+        ["Full in-depth analysis and game summary", "—", "✓"],
+        ["Puzzles", "Unlimited", "Unlimited, with AI explanations"],
+        ["Opponent scouting", "Stats", "Stats and an AI scouting report"],
+        ["Your weaknesses", "From your reviewed games", "Full AI analysis across your games"],
+        ["Personalized courses from your mistakes", "—", "✓"],
+        ["Scan Position from a photo", "—", "✓"],
+        ["Practice bots and Opening Trainer", "Unlimited", "Unlimited"],
+        ["Pro tournaments", "—", "Free entry, and host to earn $1 per new Pro signup"],
+        ["Price", "$0, forever", "$5 a month, 3-day free trial"],
+      ],
+    },
     sections: [
       { h: "Free", p: "Unlimited game import and Stockfish review, unlimited opponent scouts (stats), unlimited puzzles, weaknesses from your reviewed games, unlimited practice bots and Opening Trainer, unlimited Local Play, live and daily games, creating tournaments, the Beginner Path and Chess for Kids." },
       { h: "Pro: $5 a month", p: "Everything in Free, plus the AI coach on every game you review, personalized courses from your mistakes, AI scouting reports, full AI weakness analysis across your games, Scan Position from a photo, AI puzzle explanations and natural-voice lessons, free entry to every Pro tournament, and hosting Pro tournaments that earn $1 per new Pro signup." },
     ],
     faq: [
       { q: "Can I cancel anytime?", a: "Yes, from your account settings, with no phone call and no retention flow." },
-      { q: "Is there a free trial?", a: "There's no trial to track: the free plan is free forever, and Pro is $5 a month when you want it." },
+      { q: "Is there a free trial?", a: "Yes: 3 days of Pro free. A card is needed to start it; you're not charged for 3 days, then it's $5 a month unless you cancel, which takes one tap." },
     ],
     cta: { label: "Get started free", href: SIGNUP },
     related: ["chess-game-analysis", "play-chess-online", "scout-chess-opponent"],
@@ -330,7 +350,7 @@ export async function availableLangs(): Promise<Record<string, string[]>> {
 }
 
 export interface ResolvedSeoPage extends Translatable {
-  key: string; lang: string; path: string; image?: string;
+  key: string; lang: string; path: string; image?: string; table?: { head: string[]; rows: string[][] };
   alternates: { lang: string; path: string }[];
   related: { label: string; href: string }[];
   fallback: boolean;
@@ -373,6 +393,7 @@ export async function getSeoPage(key: string, lang: string): Promise<ResolvedSeo
     key, lang: useLang, path: localizedPath(page, useLang), image: page.image,
     title: text.title, description: text.description, h1: text.h1, intro: text.intro,
     sections: text.sections.map((s) => ({ ...s, links: s.links?.map(fix) })),
+    table: page.table,
     faq: text.faq, cta: fix(text.cta),
     alternates: langs.map((l) => ({ lang: l, path: localizedPath(page, l) })),
     related: relatedTitles.filter(Boolean) as { label: string; href: string }[],

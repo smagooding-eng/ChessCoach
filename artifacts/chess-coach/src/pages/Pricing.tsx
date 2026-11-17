@@ -83,11 +83,7 @@ export default function PricingPage() {
             </Link>
           </div>
 
-          <div className="rounded-xl p-6 relative" style={{ background: `${G}0a`, border: `1.5px solid ${G}50` }}>
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-black"
-              style={{ background: G, color: '#000' }}>
-              {t('MOST POPULAR')}
-            </div>
+          <div className="rounded-xl p-6 relative" style={{ background: CARD, border: `1.5px solid ${G}` }}>
             <h2 className="text-lg font-black mb-1 flex items-center gap-1.5" style={{ color: TEXT }}>
               <Crown className="w-4 h-4" style={{ color: G }} /> Pro
             </h2>
