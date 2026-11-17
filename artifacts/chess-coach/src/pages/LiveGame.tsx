@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { CountryFlag } from '@/components/CountryFlag';
 import { rememberPlayedGame } from '@/lib/lastLichessGame';
 import { ShareButton, SHARE_BASE } from '@/components/ShareButton';
 import { RatePlayCard } from '@/components/RatePlayCard';
@@ -29,13 +30,6 @@ function fmtClock(ms: number): string {
   return `${m}:${s.toString().padStart(2, '0')}.${Math.floor((ms % 1000) / 100)}`;
 }
 
-function countryToFlag(code?: string): string | null {
-  if (!code) return null;
-  const cc = code.trim().toUpperCase();
-  if (!/^[A-Z]{2}$/.test(cc)) return null;
-  const A = 0x1F1E6;
-  return String.fromCodePoint(A + (cc.charCodeAt(0) - 65), A + (cc.charCodeAt(1) - 65));
-}
 
 function awayText(ms: number): string {
   const s = Math.max(0, Math.ceil(ms / 1000));
@@ -43,7 +37,6 @@ function awayText(ms: number): string {
 }
 
 function PlayerStrip({ p, ms, active, isYou, awayMs }: { p: { username: string; rating: number; country?: string; title?: string | null; avatar?: string; isBot?: boolean }; ms: number; active: boolean; isYou: boolean; awayMs?: number | null }) {
-  const flag = countryToFlag(p.country);
   return (
     <div className="flex items-center justify-between p-2.5 rounded-xl"
       style={{ background: active ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.04)', border: active ? '1px solid rgba(255,255,255,0.22)' : '1px solid rgba(255,255,255,0.06)' }}>
@@ -52,14 +45,13 @@ function PlayerStrip({ p, ms, active, isYou, awayMs }: { p: { username: string; 
           {p.avatar
             ? <img src={p.avatar} alt={p.username} className="w-9 h-9 rounded-full object-cover bg-white/10" style={{ border: '1px solid rgba(255,255,255,0.15)' }} />
             : <div className="w-9 h-9 rounded-full flex items-center justify-center font-black text-sm" style={{ background: '#81B64C', color: '#FFFFFF' }}>{p.username[0]?.toUpperCase()}</div>}
-          {/* Bot opponents: a small tag on the avatar */}
-          {p.isBot && <span className="absolute -bottom-1 -right-1.5 rounded px-[3px] text-[7px] font-black uppercase leading-[11px] tracking-wide" style={{ background: 'rgba(11,18,19,0.92)', color: 'rgba(245,247,246,0.8)', border: '1px solid rgba(255,255,255,0.18)' }}>Bot</span>}
         </span>
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             {p.title && <span className="text-[10px] font-black px-1 py-0.5 rounded text-black" style={{ background: 'linear-gradient(135deg,#f5c460,#e5a631)' }}>{p.title}</span>}
-            {flag && <span className="text-sm leading-none" title={p.country ?? undefined} aria-label={p.country ?? undefined}>{flag}</span>}
-            {p.country && <span className="text-[10px] uppercase tracking-wider" style={{ color: TEXT_MUTED }}>{p.country}</span>}
+            {/* Bots show a small bot where the flag goes; tap or hover any flag to see what it is */}
+            <CountryFlag country={p.country} bot={p.isBot} size={14} />
+            {p.country && !p.isBot && <span className="text-[10px] uppercase tracking-wider" style={{ color: TEXT_MUTED }}>{p.country}</span>}
             {isYou && <span className="text-[9px] font-black uppercase tracking-[0.14em]" style={{ color: CHESSCOM_GREEN }}>You</span>}
           </div>
           <p className="text-sm font-bold truncate" style={{ color: TEXT_LIGHT }}>{p.username}</p>

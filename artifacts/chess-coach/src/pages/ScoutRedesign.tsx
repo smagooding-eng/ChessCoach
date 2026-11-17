@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CountryFlag } from '@/components/CountryFlag';
 import { Link } from 'wouter';
 import { AlertTriangle, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, History, Loader2, Search } from 'lucide-react';
 import { RD } from '@/lib/redesignTheme';
@@ -34,10 +35,6 @@ const SEV: Record<string, { bg: string; fg: string }> = {
   Low: { bg: 'rgba(129,182,76,.18)', fg: '#81B64C' },
 };
 
-const flag = (country?: string) => {
-  const code = country?.split('/').pop()?.toUpperCase();
-  return code && /^[A-Z]{2}$/.test(code) ? String.fromCodePoint(...[...code].map((c) => 127397 + c.charCodeAt(0))) : '';
-};
 
 export function ScoutRedesign(props: {
   inputUsername: string;
@@ -163,7 +160,7 @@ export function ScoutRedesign(props: {
                   <div className="flex flex-wrap items-center gap-2">
                     {p?.title && <span className="rounded-md px-1.5 py-0.5 text-[12px] font-extrabold text-white" style={{ background: '#C8383F' }}>{p.title}</span>}
                     <b className="truncate text-[21px] font-extrabold">{p?.name || result.username}</b>
-                    {flag(p?.country) && <span className="text-[18px]" aria-hidden="true">{flag(p?.country)}</span>}
+                    <CountryFlag country={p?.country} size={18} />
                   </div>
                   <p className="mt-1 text-[14px]" style={{ color: RD.muted }}>
                     Chess.com {best > 0 ? best : '—'} | {result.gamesAnalyzed.toLocaleString()} recent games
