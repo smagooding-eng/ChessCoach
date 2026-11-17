@@ -54,6 +54,12 @@ export function startGrowthScheduler() {
   //   await runAutoReviewTick();
   // });
 
+  // Monday 13:07 UTC (8:07am New York): everyone's week in chess (lib/weeklyReport.ts).
+  cron.schedule('7 13 * * 1', async () => {
+    await import('./weeklyReport').then(({ runWeeklyReports }) => runWeeklyReports())
+      .catch((err: unknown) => logger.error({ error: err instanceof Error ? err.message : 'Unknown' }, '[growth] Weekly report error'));
+  });
+
   // Weekly, not more often — this is a slow, compounding content channel.
   // Publishing one genuinely substantive article a week beats a burst of
   // thin ones, both for actual usefulness and for how Google treats it.

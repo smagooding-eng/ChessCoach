@@ -1510,6 +1510,7 @@ export async function startReviewServices(): Promise<void> {
   if (reviewServicesStarted) return;
   reviewServicesStarted = true;
   void startCatchupReviews().catch((err) => appLogger.warn({ err }, "catch-up reviews failed to start"));
+  void startSamedayReviews().catch((err) => appLogger.warn({ err }, "same-day reviews failed to start"));
   await db.execute(sql`CREATE TABLE IF NOT EXISTS review_after_upgrade (
     user_id VARCHAR PRIMARY KEY,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -1647,6 +1648,113 @@ export async function startCatchupReviews(): Promise<void> {
   // A few minutes after boot (once the server has settled), then hourly for whoever comes due.
   setTimeout(() => { void catchupTick(); }, 5 * 60_000).unref();
   setInterval(() => { void catchupTick(); }, 60 * 60_000).unref();
+}
+
+// ── Same-day reviews ───────────────────────────────────────────────────────
+// For members who've used ChessScout in the last 30 days and linked Chess.com or
+// Lichess: every few hours their new games are brought in and reviewed with Stockfish
+// (no AI, so no cost), and once a day at most they're told the move that decided their
+// latest game: a push when they have notifications on, otherwise an email at most every
+// 3 days (never alongside the weekly catch-up email). Skipped when they've already been
+// on ChessScout since the game. One game at a time with a pause between, so live play and
+// people's own reviews get the engine first. SAMEDAY_REVIEWS=0 turns it off.
+const SAMEDAY_GAMES = 3;
+let samedayRunning = false;
+
+async function samedayOne(u: { id: string; chesscom_username: string | null; lichess_username: string | null }): Promise<void> {
+  for (const [platform, name] of [["chesscom", u.chesscom_username], ["lichess", u.lichess_username]] as const) {
+    if (!name) continue;
+    try { await runImportJob({ userId: u.id, platformUsername: name, platform, months: 1, forceUpdate: false, log: appLogger }); }
+    catch (err) { appLogger.warn({ err, userId: u.id, platform }, "[sameday] import failed"); }
+  }
+  // Their games from the last day and a half on Chess.com / Lichess, newest first
+  const fresh = await db.select().from(gamesTable)
+    .where(and(eq(gamesTable.userId, u.id), sql`${gamesTable.platform} IN ('chesscom', 'lichess')`,
+      sql`${gamesTable.playedAt} > now() - interval '36 hours'`))
+    .orderBy(desc(gamesTable.playedAt)).limit(SAMEDAY_GAMES);
+  for (const g of fresh) {
+    if (g.reviewData) continue;
+    if (await hasActiveManualReview(u.id)) break;
+    try { await reviewOneGame(g, undefined, u.id, false); }
+    catch (err) { appLogger.warn({ err, gameId: g.id }, "[sameday] review failed"); }
+    await new Promise((r) => setTimeout(r, CATCHUP_GAP_MS));
+  }
+  await samedayNotify(u.id).catch((err) => appLogger.warn({ err, userId: u.id }, "[sameday] notify failed"));
+}
+
+async function samedayNotify(userId: string): Promise<void> {
+  const [st] = rowsOfAny<{ notified_at: string | null; game_id: number | null; emailed_at: string | null; catchup_emailed: string | null; seen: string; has_push: boolean;
+    email: string | null; first_name: string | null; email_opt_out: boolean }>(await db.execute(sql`
+    SELECT s.last_notified_at AS notified_at, s.last_game_id AS game_id, s.last_emailed_at AS emailed_at,
+      (SELECT c.last_emailed_at FROM catchup_reviews c WHERE c.user_id = u.id) AS catchup_emailed,
+      ${LAST_SEEN} AS seen, EXISTS (SELECT 1 FROM push_subscriptions ps WHERE ps.user_id = u.id) AS has_push,
+      u.email, u.first_name, u.email_opt_out
+    FROM users u LEFT JOIN sameday_reviews s ON s.user_id = u.id WHERE u.id = ${userId}`));
+  if (!st) return;
+  if (st.notified_at && Date.now() - new Date(st.notified_at).getTime() < 20 * 3600_000) return; // once a day at most
+  // Their newest freshly reviewed game, if they haven't been on ChessScout since playing it
+  const [g] = await db.select().from(gamesTable)
+    .where(and(eq(gamesTable.userId, userId), sql`${gamesTable.platform} IN ('chesscom', 'lichess')`,
+      sql`${gamesTable.playedAt} > now() - interval '36 hours'`, sql`${gamesTable.reviewData} IS NOT NULL`))
+    .orderBy(desc(gamesTable.playedAt)).limit(1);
+  if (!g || g.id === st.game_id) return;
+  if (g.playedAt && new Date(st.seen).getTime() > new Date(g.playedAt).getTime()) return;
+  const side = await coachSideFor(g);
+  const { gameMessage } = await import("../lib/gameNotify");
+  const msg = gameMessage({ id: g.id, result: g.result, username: g.username, white_username: g.whiteUsername, black_username: g.blackUsername, review_data: g.reviewData }, side ?? null);
+  if (!msg) return;
+  let pushed = false, emailed = false;
+  if (st.has_push) {
+    const { sendPushToUser, isPushConfigured } = await import("../lib/pushNotifications");
+    if (isPushConfigured()) pushed = ((await sendPushToUser(userId, { title: msg.title, body: msg.body, url: msg.url, tag: "cs:sameday" }).catch(() => ({ sent: 0 }))).sent ?? 0) > 0;
+  }
+  const recent = (t: string | null, days: number) => !!t && Date.now() - new Date(t).getTime() < days * 864e5;
+  if (!pushed && st.email && !st.email_opt_out && !recent(st.emailed_at, 3) && !recent(st.catchup_emailed, 3)) {
+    const { sendEmail } = await import("../lib/email");
+    const { unsubscribeHeaders, unsubscribeUrl } = await import("../lib/emailPrefs");
+    const { trackHtml } = await import("../lib/emailTracking");
+    const name = (st.first_name || "").trim().split(/\s+/)[0] || null;
+    const html = await trackHtml(msg.html(name, unsubscribeUrl(userId)), { kind: "drip", template: "sameday_review", email: st.email, userId, subject: msg.subject });
+    await sendEmail({ to: st.email, subject: msg.subject, html, headers: unsubscribeHeaders(userId) });
+    emailed = true;
+  }
+  if (!pushed && !emailed) return;
+  await db.execute(sql`INSERT INTO sameday_reviews (user_id, last_notified_at, last_game_id ${emailed ? sql`, last_emailed_at` : sql``})
+    VALUES (${userId}, now(), ${g.id} ${emailed ? sql`, now()` : sql``})
+    ON CONFLICT (user_id) DO UPDATE SET last_notified_at = now(), last_game_id = ${g.id} ${emailed ? sql`, last_emailed_at = now()` : sql``}`);
+  appLogger.info({ userId, gameId: g.id, pushed, emailed }, "[sameday] told them about their game");
+}
+
+async function samedayTick(): Promise<void> {
+  if (samedayRunning) return;
+  samedayRunning = true;
+  try {
+    for (;;) {
+      // Next linked member, active in the last 30 days, not checked in the last 3 hours
+      const [u] = rowsOfAny<{ id: string; chesscom_username: string | null; lichess_username: string | null }>(await db.execute(sql`
+        SELECT u.id, u.chesscom_username, u.lichess_username FROM users u
+        LEFT JOIN sameday_reviews s ON s.user_id = u.id
+        WHERE (u.chesscom_username IS NOT NULL OR u.lichess_username IS NOT NULL)
+          AND ${LAST_SEEN} > now() - interval '30 days'
+          AND u.id NOT IN (SELECT id FROM analytics_excluded_users)
+          AND (s.last_check_at IS NULL OR s.last_check_at < now() - interval '3 hours')
+        ORDER BY s.last_check_at ASC NULLS FIRST LIMIT 1`));
+      if (!u) break;
+      await db.execute(sql`INSERT INTO sameday_reviews (user_id, last_check_at) VALUES (${u.id}, now())
+        ON CONFLICT (user_id) DO UPDATE SET last_check_at = now()`);
+      try { await samedayOne(u); }
+      catch (err) { appLogger.warn({ err, userId: u.id }, "[sameday] member failed"); }
+    }
+  } finally { samedayRunning = false; }
+}
+
+export async function startSamedayReviews(): Promise<void> {
+  if (process.env.SAMEDAY_REVIEWS === "0") return;
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS sameday_reviews (
+    user_id VARCHAR PRIMARY KEY, last_check_at TIMESTAMPTZ, last_notified_at TIMESTAMPTZ,
+    last_game_id INTEGER, last_emailed_at TIMESTAMPTZ)`);
+  setTimeout(() => { void samedayTick(); }, 8 * 60_000).unref();
+  setInterval(() => { void samedayTick(); }, 30 * 60_000).unref();
 }
 
 router.get("/games/review-all-status/:jobId", requireAuth, async (req, res): Promise<void> => {
