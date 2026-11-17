@@ -1782,6 +1782,13 @@ async function runReviewJob(gameId: number, jobId: string, log: Logger): Promise
 
     const moves = parsePgnMoves(game.pgn);
     const startFen = extractStartFen(game.pgn);
+    let engineBasic: unknown[] | null = null;
+    let engineAcc = { whiteAccuracy: 0, blackAccuracy: 0 };
+    const writeInterim = (ms: unknown[], coached: number) => {
+      const interim = { moves: ms, ...engineAcc, coached, total: ms.length };
+      db.execute(sql`UPDATE background_jobs SET result = COALESCE(result, '{}'::jsonb) || ${JSON.stringify({ interim })}::jsonb
+        WHERE id = ${jobId}`).catch(() => {});
+    };
     const reviewResult = await reviewFullGame({
       moves,
       opening: game.opening,
@@ -1796,9 +1803,17 @@ async function runReviewJob(gameId: number, jobId: string, log: Logger): Promise
       },
       // Stockfish is done long before the AI coach: the engine review is shown meanwhile.
       onEngineReady: (r) => {
-        const interim = { moves: refreshBasicReview(markBookMoves(r.moves), false, game.opening ?? null), whiteAccuracy: r.whiteAccuracy, blackAccuracy: r.blackAccuracy };
-        db.execute(sql`UPDATE background_jobs SET result = COALESCE(result, '{}'::jsonb) || ${JSON.stringify({ interim })}::jsonb
-          WHERE id = ${jobId}`).catch(() => {});
+        engineBasic = refreshBasicReview(markBookMoves(r.moves), false, game.opening ?? null) as unknown[];
+        engineAcc = { whiteAccuracy: r.whiteAccuracy, blackAccuracy: r.blackAccuracy };
+        writeInterim(engineBasic, 0);
+      },
+      // Each part of the coach's notes goes in as it's written; moves it hasn't reached
+      // yet keep the engine review's explanations.
+      onCoachProgress: (r) => {
+        if (!engineBasic) return;
+        const covered = new Set(r.covered);
+        const merged = markBookMoves(r.moves) as unknown[];
+        writeInterim(engineBasic.map((m, i) => (covered.has(i) && merged[i] ? merged[i] : m)), covered.size);
       },
       userId: game.userId ?? undefined,
       aiCoach: await aiCoachForOwner(game.userId),

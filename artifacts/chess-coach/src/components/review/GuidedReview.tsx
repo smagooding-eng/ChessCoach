@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Chess } from 'chess.js';
 import { useHoldRepeat } from '@/hooks/use-hold-repeat';
 import { ArrowLeft, ChevronLeft, ChevronRight, FlipVertical2, ListTree, Star, RotateCcw, X, Sparkles } from 'lucide-react';
@@ -125,6 +125,8 @@ export interface GuidedReviewProps {
   endExtra?: React.ReactNode;
   /** The engine review is showing; the AI coach's notes are still being written. */
   coachPending?: boolean;
+  /** How far the coach's notes have got (moves covered so far, of all). */
+  coachProgress?: { done: number; total: number } | null;
   /** 'preparing' while the engine reviews the game; the moves can still be browsed. */
   status?: 'ready' | 'loading' | 'preparing' | 'error';
   progress?: { done: number; total: number } | null;
@@ -140,7 +142,7 @@ export interface GuidedReviewProps {
 
 type Mode = { kind: 'main' } | { kind: 'best'; step: number } | { kind: 'reply'; step: number } | { kind: 'retry'; state: 'trying' | 'right' | 'wrong' };
 
-export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flipped, onFlip, whiteName, blackName, accuracy, result, onExit, onReport, onBack, endExtra, coachPending = false, status = 'ready', progress, errorText, onRetryReview, canFullAnalysis = true, onUpgrade, canRemix = false }: GuidedReviewProps) {
+export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flipped, onFlip, whiteName, blackName, accuracy, result, onExit, onReport, onBack, endExtra, coachPending = false, coachProgress = null, status = 'ready', progress, errorText, onRetryReview, canFullAnalysis = true, onUpgrade, canRemix = false }: GuidedReviewProps) {
   // Remix (admin, for content): a new random board and piece set on every move.
   const [remixOn, setRemixOn] = useState(false);
   const remixLooks = useRef(new Map<number, BoardLook>());
@@ -483,7 +485,7 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
         <button onClick={onBack} aria-label="Back" className="grid h-10 w-10 place-items-center rounded-xl text-white active:scale-95"><ArrowLeft size={22} /></button>
         <div className="flex-1 text-center">
           <p className="text-[18px] font-black text-white">Game Review</p>
-          {coachPending && <p className="-mt-0.5 animate-pulse text-[11.5px] font-semibold" style={{ color: GREEN }}>Coach notes on the way…</p>}
+          {coachPending && <p className="-mt-0.5 animate-pulse text-[11.5px] font-semibold" style={{ color: GREEN }}>{coachProgress && coachProgress.done > 0 ? `Coach notes: ${coachProgress.done} of ${coachProgress.total} moves` : 'Coach notes on the way…'}</p>}
         </div>
         {canRemix && (
           <button onClick={() => { remixLooks.current.clear(); setRemixOn((v) => !v); }} aria-label="Remix board and pieces" title="Remix: a random board and pieces on every move"
@@ -506,11 +508,11 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
           <div onClick={canExpand ? () => setExpanded((v) => !v) : undefined}
             className={`absolute inset-x-3 top-1 overflow-hidden rounded-[14px] px-3.5 py-2.5 ${expanded ? 'min-h-[84px] shadow-2xl' : 'h-[84px]'} ${canExpand ? 'cursor-pointer' : ''}`}
             style={{ background: '#162022', border: '1px solid rgba(255,255,255,.07)', borderLeft: `4px solid ${accent}` }}>
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div key={animKey} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.16 }}>
-                {top}
-              </motion.div>
-            </AnimatePresence>
+            {/* The new note fades in straight away (no waiting for the old one to leave, which
+                left a note stuck on screen when skipping quickly through the moves). */}
+            <motion.div key={animKey} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.12 }}>
+              {top}
+            </motion.div>
           </div>
         </div>
         {/* Board with eval bar */}
@@ -554,12 +556,10 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
         {/* More from the coach about this move */}
         {detail && (
           <div className="px-3 pt-2">
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div key={animKey} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.16 }}
-                className="rounded-[14px] px-3.5 py-3" style={{ background: '#162022', border: '1px solid rgba(255,255,255,.07)' }}>
-                {detail}
-              </motion.div>
-            </AnimatePresence>
+            <motion.div key={animKey} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.12 }}
+              className="rounded-[14px] px-3.5 py-3" style={{ background: '#162022', border: '1px solid rgba(255,255,255,.07)' }}>
+              {detail}
+            </motion.div>
           </div>
         )}
 

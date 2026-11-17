@@ -933,6 +933,9 @@ export async function reviewFullGame(input: {
   /** With the AI coach on: called as soon as Stockfish is done (the AI takes much longer),
    *  with the engine-only review, so it can be shown while the coach's notes are written. */
   onEngineReady?: (r: { moves: MoveReview[]; whiteAccuracy: number; blackAccuracy: number }) => void;
+  /** With the AI coach on: called each time part of the coach's notes is ready (once the
+   *  engine is done), with the review so far and which moves the coach has covered. */
+  onCoachProgress?: (r: { moves: MoveReview[]; covered: number[] }) => void;
 }): Promise<GameReviewResult> {
   const { moves, opening, eco, result, whiteUsername, blackUsername, startFen, onProgress, userId } = input;
   const aiCoach = input.aiCoach === true;
@@ -960,7 +963,8 @@ export async function reviewFullGame(input: {
     }
     moveDetails.push(`${i}: ${m.moveNumber}${m.color === "white" ? "." : "..."} ${m.san} [fen:${fenBefore}] [legal:${legalCount}]`);
   }
-  const CHUNK_SIZE = 25;
+  // Small chunks, all sent at once: each comes back quickly and is shown as soon as it does.
+  const CHUNK_SIZE = 12;
   const needsChunking = moves.length > CHUNK_SIZE;
 
   function buildChunkPrompt(chunkMoveDetails: string[], chunkStart: number, chunkEnd: number, includeSummary: boolean): string {
@@ -1028,6 +1032,20 @@ JSON format:
   try {
     logger.info({ positions: fens.length, moves: moves.length, chunked: needsChunking }, "Starting parallel GPT + Stockfish analysis");
 
+    // The coach's notes so far, merged with the engine as each part arrives.
+    const partial = new Map<number, Partial<MoveReview>>();
+    let readyEvals: PositionEval[] | null = null;
+    const emitPartial = () => {
+      if (!readyEvals || !input.onCoachProgress || !partial.size) return;
+      const raw = [...partial.entries()].map(([i, m]) => ({
+        moveIndex: i, san: m.san ?? moves[i]?.san ?? "", color: (m.color ?? moves[i]?.color ?? "white") as "white" | "black",
+        classification: (["brilliant", "great", "best", "excellent", "good", "book", "inaccuracy", "mistake", "blunder", "missed_win"].includes(m.classification ?? "") ? m.classification : "good") as MoveReview["classification"],
+        explanation: m.explanation ?? "", betterMove: m.betterMove ?? null,
+        pros: Array.isArray(m.pros) ? m.pros : [], cons: Array.isArray(m.cons) ? m.cons : [],
+      }));
+      try { input.onCoachProgress({ moves: mergeReviewWithEngine(raw, moves, fens, readyEvals, uciMoves, ecoBookFens, input.opening ?? null), covered: [...partial.keys()] }); }
+      catch (err) { logger.warn({ err }, "Partial coach merge failed"); }
+    };
     const chunks: Array<{ start: number; end: number; details: string[] }> = [];
     for (let i = 0; i < moveDetails.length; i += CHUNK_SIZE) {
       const end = Math.min(i + CHUNK_SIZE - 1, moveDetails.length - 1);
@@ -1044,12 +1062,21 @@ JSON format:
         max_completion_tokens: chunkTokens,
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
+      }).then((resp) => {
+        // Pass this part on as soon as it's in (shown before the rest is written).
+        try {
+          const got = parseGptResponse(resp.choices[0]?.message?.content ?? "{}").moves ?? [];
+          for (const m of got) if (typeof m.moveIndex === "number") partial.set(m.moveIndex, m);
+          emitPartial();
+        } catch { /* the full merge below still uses it */ }
+        return resp;
       });
     });
 
     const [gptSettled, evals] = await Promise.all([
       Promise.allSettled(gptPromises),
       evaluateAllPositions(fens, undefined, onProgress).then((evals) => {
+        readyEvals = evals;
         if (aiCoach && input.onEngineReady) {
           try {
             const em = mergeReviewWithEngine([], moves, fens, evals, uciMoves, ecoBookFens, input.opening ?? null);
@@ -1060,6 +1087,7 @@ JSON format:
             input.onEngineReady({ moves: em, whiteAccuracy: acc("white"), blackAccuracy: acc("black") });
           } catch (err) { logger.warn({ err }, "Engine-first review failed (the full review still follows)"); }
         }
+        if (aiCoach) emitPartial(); // parts of the coach's notes that came in before the engine finished
         return evals;
       }).catch((err) => {
         // Engine evaluation failing here must not throw away GPT data that

@@ -703,6 +703,7 @@ export function GameReplay() {
   const [loadingSavedReview, setLoadingSavedReview] = useState(true);
   // Pro: the engine review is shown while the AI coach is still writing its notes.
   const [coachPending, setCoachPending] = useState(false);
+  const [coachProgress, setCoachProgress] = useState<{ done: number; total: number } | null>(null);
   const [reviewProgress, setReviewProgress] = useState<{ done: number; total: number } | null>(null);
   // Computed once, authoritatively, by the backend (reviewFullGame) using
   // the single shared accuracy formula. Older cached reviews created before
@@ -815,23 +816,29 @@ export function GameReplay() {
   }, []);
 
   const interimShownRef = useRef(false);
+  const interimCoachedRef = useRef(0);
   const pollReviewStatus = useCallback((jobId: string) => {
     stopPolling();
     interimShownRef.current = false;
+    interimCoachedRef.current = 0;
     reviewPollRef.current = setInterval(async () => {
       try {
         const res = await apiFetch(`/api/games/review-status/${jobId}`);
         if (!res.ok) return;
         const data = await res.json() as { status: string; reviewData?: { moves: ReviewMove[]; gameSummary?: GameSummary; whiteAccuracy?: number | null; blackAccuracy?: number | null }; error?: string; progress?: number | null; total?: number | null;
-          interim?: { moves: ReviewMove[]; whiteAccuracy?: number | null; blackAccuracy?: number | null } | null };
+          interim?: { moves: ReviewMove[]; whiteAccuracy?: number | null; blackAccuracy?: number | null; coached?: number; total?: number } | null };
 
-        // Stockfish is done: show its review now, the coach's version replaces it when ready.
-        if (data.status === 'pending' && data.interim?.moves?.length && !interimShownRef.current) {
+        // Stockfish is done: show its review now; the coach's notes go in as each part is
+        // written, and the finished review replaces it at the end.
+        const coached = data.interim?.coached ?? 0;
+        if (data.status === 'pending' && data.interim?.moves?.length && (!interimShownRef.current || coached > interimCoachedRef.current)) {
+          if (!interimShownRef.current && data.interim.whiteAccuracy != null && data.interim.blackAccuracy != null) setGameAccuracy({ white: data.interim.whiteAccuracy, black: data.interim.blackAccuracy });
           interimShownRef.current = true;
+          interimCoachedRef.current = coached;
           setReviewMoves(data.interim.moves);
           setReviewAi(false);
-          if (data.interim.whiteAccuracy != null && data.interim.blackAccuracy != null) setGameAccuracy({ white: data.interim.whiteAccuracy, black: data.interim.blackAccuracy });
           setCoachPending(true);
+          setCoachProgress({ done: coached, total: data.interim.total ?? data.interim.moves.length });
           setReviewProgress(null);
         }
         if (data.status === 'done' && data.reviewData) {
@@ -860,7 +867,7 @@ export function GameReplay() {
           setReviewProgress({ done: data.progress as number, total: data.total as number });
         }
       } catch { /* retry on next poll */ }
-    }, 3000);
+    }, 2000);
   }, [stopPolling]);
 
   useEffect(() => () => stopPolling(), [stopPolling]);
@@ -1121,6 +1128,7 @@ export function GameReplay() {
     return (<>{shareFab}
       <GuidedReview
         coachPending={coachPending}
+        coachProgress={coachProgress}
         status={reviewMoves.length > 0 && (!reviewing || coachPending) ? 'ready' : reviewError ? 'error' : loadingSavedReview && !reviewing ? 'loading' : 'preparing'}
         progress={reviewProgress}
         errorText={reviewError}
