@@ -35,3 +35,21 @@ export async function saveLichessGame(id: string, side?: 'white' | 'black', viaC
   if (typeof saved !== 'number') throw new Error(d.notYours ? 'That game isn’t yours (link this Lichess username to your account first).' : 'Couldn’t add the game to your account.');
   return saved;
 }
+
+// Any game finished on ChessScout's own board (other players, and bots, whose games are
+// kept out of "All games"), so "review my last game" can open it.
+const PLAYED = 'cs_last_played_game';
+export type LastPlayedGame = { savedId: number; at: number };
+export function rememberPlayedGame(savedId: number): void {
+  try {
+    const cur = lastPlayedGame();
+    if (cur?.savedId === savedId) return;
+    localStorage.setItem(PLAYED, JSON.stringify({ savedId, at: Date.now() }));
+  } catch { /* storage off */ }
+}
+export function lastPlayedGame(maxAgeMs = 6 * 3600_000): LastPlayedGame | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(PLAYED) ?? 'null') as LastPlayedGame | null;
+    return v && typeof v.savedId === 'number' && Date.now() - v.at < maxAgeMs ? v : null;
+  } catch { return null; }
+}

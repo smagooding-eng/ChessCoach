@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { rememberPlayedGame } from '@/lib/lastLichessGame';
 import { ShareButton, SHARE_BASE } from '@/components/ShareButton';
 import { RatePlayCard } from '@/components/RatePlayCard';
 import { ChessBoard } from '@/components/ChessBoard';
@@ -102,6 +103,8 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
   const reviewId = game?.dbGameIds && color
     ? (color === 'w' ? game.dbGameIds.white : game.dbGameIds.black)
     : undefined;
+  // so "review my last game" (e.g. in the streaming studio) opens this one, bot games included
+  useEffect(() => { if (reviewId) rememberPlayedGame(reviewId); }, [reviewId]);
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 100);

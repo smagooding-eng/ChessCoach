@@ -25,7 +25,7 @@ import { drawComposite, drawBoardPanel, drawReviewNotes, splitBoardPanel, headSi
 import { CloudRecorder, type RecStatus } from '@/lib/streamer/recorder';
 import { LiveHost } from '@/lib/streamer/live';
 import { apiFetch } from '@/lib/api';
-import { lastLichessGame, saveLichessGame } from '@/lib/lastLichessGame';
+import { lastLichessGame, lastPlayedGame, saveLichessGame } from '@/lib/lastLichessGame';
 import { useUser } from '@/hooks/use-user';
 import { useLichessGame } from '@/components/watch/LiveVideo';
 import { useSettings, PIECE_SHAPES } from '@/context/SettingsContext';
@@ -479,15 +479,19 @@ export default function StreamerStudio() {
   const reviewLatest = async () => {
     setReviewBusy(true);
     try {
-      // The game just finished in the board panel wins, unless a newer game is already saved.
-      const last = lastLichessGame();
+      // The game just finished in the board panel (Lichess, or ChessScout's own, bots
+      // included, which "All games" leaves out) wins, unless a newer game is already saved.
+      const last = lastLichessGame(), played = lastPlayedGame();
       const r = await apiFetch('/api/games?limit=1', { credentials: 'include' });
       const d = r.ok ? await r.json() : null;
       const top = d?.games?.[0] as { id: number; playedAt?: string } | undefined;
       const topAt = top?.playedAt ? new Date(top.playedAt).getTime() : 0;
-      if (last && !(top && top.id !== last.savedId && topAt > last.at)) {
-        openReview(last.savedId ?? await saveLichessGame(last.id, last.side, true));
-      } else if (top) openReview(top.id);
+      const newest = [
+        last ? { at: last.at, open: async () => openReview(last.savedId ?? await saveLichessGame(last.id, last.side, true)) } : null,
+        played ? { at: played.at, open: async () => openReview(played.savedId) } : null,
+        top ? { at: topAt, open: async () => openReview(top.id) } : null,
+      ].filter((x): x is { at: number; open: () => Promise<void> } => !!x).sort((a, b) => b.at - a.at)[0];
+      if (newest) await newest.open();
       else flash('No games in your account yet. Play one, then review it here.');
     } catch (e) { flash(e instanceof Error ? e.message : 'Couldn’t load your games. Try again.'); }
     finally { setReviewBusy(false); }
