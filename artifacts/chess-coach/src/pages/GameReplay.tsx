@@ -705,6 +705,8 @@ export function GameReplay() {
   // Pro: the engine review is shown while the AI coach is still writing its notes.
   const [coachPending, setCoachPending] = useState(false);
   const [coachProgress, setCoachProgress] = useState<{ done: number; total: number } | null>(null);
+  // The engine's evaluations so far while it reviews (moves the eval bar as the board steps through).
+  const [liveEvals, setLiveEvals] = useState<number[] | null>(null);
   const [reviewProgress, setReviewProgress] = useState<{ done: number; total: number } | null>(null);
   // Computed once, authoritatively, by the backend (reviewFullGame) using
   // the single shared accuracy formula. Older cached reviews created before
@@ -828,7 +830,8 @@ export function GameReplay() {
         const res = await apiFetch(`/api/games/review-status/${jobId}`);
         if (!res.ok) return;
         const data = await res.json() as { status: string; reviewData?: { moves: ReviewMove[]; gameSummary?: GameSummary; whiteAccuracy?: number | null; blackAccuracy?: number | null }; error?: string; progress?: number | null; total?: number | null;
-          interim?: { moves: ReviewMove[]; whiteAccuracy?: number | null; blackAccuracy?: number | null; coached?: number; total?: number } | null };
+          interim?: { moves: ReviewMove[]; whiteAccuracy?: number | null; blackAccuracy?: number | null; coached?: number; total?: number } | null; evals?: number[] | null };
+        if (Array.isArray(data.evals) && data.evals.length) setLiveEvals(data.evals);
 
         // Stockfish is done: show its review now; the coach's notes go in as each part is
         // written, and the finished review replaces it at the end.
@@ -1149,6 +1152,7 @@ export function GameReplay() {
       <GuidedReview
         coachPending={coachPending}
         coachProgress={coachProgress}
+        liveEvals={reviewMoves.length ? null : liveEvals}
         status={reviewMoves.length > 0 && (!reviewing || coachPending) ? 'ready' : reviewError ? 'error' : loadingSavedReview && !reviewing ? 'loading' : 'preparing'}
         progress={reviewProgress}
         errorText={reviewError}

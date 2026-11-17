@@ -920,7 +920,7 @@ export async function reviewFullGame(input: {
   whiteUsername: string;
   blackUsername: string;
   startFen?: string;
-  onProgress?: (done: number, total: number) => void;
+  onProgress?: (done: number, total: number, evalsSoFar?: number[]) => void;
   userId?: string;
   /** Run the OpenAI coach (move explanations + game summary). Only for Pro,
    *  admin and complimentary-Pro accounts -- everyone else gets the

@@ -127,6 +127,8 @@ export interface GuidedReviewProps {
   coachPending?: boolean;
   /** How far the coach's notes have got (moves covered so far, of all). */
   coachProgress?: { done: number; total: number } | null;
+  /** While the engine is still reviewing: its evaluation of each position so far (index = moves played). */
+  liveEvals?: number[] | null;
   /** 'preparing' while the engine reviews the game; the moves can still be browsed. */
   status?: 'ready' | 'loading' | 'preparing' | 'error';
   progress?: { done: number; total: number } | null;
@@ -142,7 +144,7 @@ export interface GuidedReviewProps {
 
 type Mode = { kind: 'main' } | { kind: 'best'; step: number } | { kind: 'reply'; step: number } | { kind: 'retry'; state: 'trying' | 'right' | 'wrong' };
 
-export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flipped, onFlip, whiteName, blackName, accuracy, result, onExit, onReport, onBack, endExtra, coachPending = false, coachProgress = null, status = 'ready', progress, errorText, onRetryReview, canFullAnalysis = true, onUpgrade, canRemix = false }: GuidedReviewProps) {
+export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flipped, onFlip, whiteName, blackName, accuracy, result, onExit, onReport, onBack, endExtra, coachPending = false, coachProgress = null, liveEvals = null, status = 'ready', progress, errorText, onRetryReview, canFullAnalysis = true, onUpgrade, canRemix = false }: GuidedReviewProps) {
   // Remix (admin, for content): a new random board and piece set on every move.
   const [remixOn, setRemixOn] = useState(false);
   const remixLooks = useRef(new Map<number, BoardLook>());
@@ -274,7 +276,7 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
   } else if (mode.kind === 'retry') {
     boardFen = fenBefore; lastMove = ply > 1 ? lastMoveOf(ply - 1) : null; quality = null; arrows = [];
   }
-  const cpNow = mode.kind === 'main' ? (ply === 0 ? 20 : rev?.evalAfterCp ?? null) : rev?.evalAfterCp ?? null;
+  const cpNow = mode.kind === 'main' ? (ply === 0 ? 20 : rev?.evalAfterCp ?? (typeof liveEvals?.[ply] === 'number' ? liveEvals[ply] : null)) : rev?.evalAfterCp ?? null;
 
   // Best: play the line through, one move at a time (tap a move to jump to it).
   const [autoPlay, setAutoPlay] = useState(true);

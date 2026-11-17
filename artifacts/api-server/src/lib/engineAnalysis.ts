@@ -490,7 +490,7 @@ export function stockfishBotMove(fen: string, elo: number): Promise<string | nul
 export async function evaluateAllPositions(
   fens: string[],
   depth: number = ANALYSIS_DEPTH,
-  onProgress?: (done: number, total: number) => void,
+  onProgress?: (done: number, total: number, evalsSoFar?: number[]) => void,
 ): Promise<PositionEval[]> {
   return withEngineQueue(() => evaluateAllPositionsUnqueued(fens, depth, onProgress));
 }
@@ -498,7 +498,7 @@ export async function evaluateAllPositions(
 async function evaluateAllPositionsUnqueued(
   fens: string[],
   depth: number = ANALYSIS_DEPTH,
-  onProgress?: (done: number, total: number) => void,
+  onProgress?: (done: number, total: number, evalsSoFar?: number[]) => void,
 ): Promise<PositionEval[]> {
   let engine = await getEngine();
   const results: PositionEval[] = [];
@@ -526,7 +526,7 @@ async function evaluateAllPositionsUnqueued(
         const bestMoveSan = uciSeq[0] ? uciToSan(fens[i], uciSeq[0]) : null;
         results.push({ cpWhite, bestMoveUci: uciSeq[0] ?? "", secondBestUci: ce.pvs[1]?.moves.split(" ")[0] ?? "", bestMoveSan, bestLineSan: uciSequenceToSan(fens[i], uciSeq, 6), depth: ce.depth });
         cloudMisses = 0;
-        if (onProgress && i % 5 === 0) onProgress(i + 1, fens.length);
+        if (onProgress && i % 5 === 0) onProgress(i + 1, fens.length, results.map((r) => r.cpWhite));
         continue;
       }
       cloudMisses++;
@@ -538,9 +538,9 @@ async function evaluateAllPositionsUnqueued(
       logger.warn({ err, fen: fens[i], idx: i }, "Engine eval failed for position");
       results.push({ cpWhite: 0, bestMoveUci: "", secondBestUci: "", bestMoveSan: null, bestLineSan: [], depth: 0 });
     }
-    if (onProgress && i % 5 === 0) onProgress(i + 1, fens.length);
+    if (onProgress && i % 5 === 0) onProgress(i + 1, fens.length, results.map((r) => r.cpWhite));
   }
-  if (onProgress) onProgress(fens.length, fens.length);
+  if (onProgress) onProgress(fens.length, fens.length, results.map((r) => r.cpWhite));
 
   return results;
 }

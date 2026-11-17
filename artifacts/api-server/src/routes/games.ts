@@ -838,6 +838,7 @@ router.get("/games/review-status/:jobId", async (req, res): Promise<void> => {
     total: progress?.total ?? null,
     // the engine review, while the AI coach is still writing
     interim: job.status === "pending" ? progress?.interim ?? null : null,
+    evals: job.status === "pending" && !progress?.interim ? progress?.evals ?? null : null,
   });
 });
 
@@ -1838,8 +1839,9 @@ async function runReviewJob(gameId: number, jobId: string, log: Logger): Promise
       whiteUsername: game.whiteUsername,
       blackUsername: game.blackUsername,
       startFen: startFen !== "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" ? startFen : undefined,
-      onProgress: (done, total) => {
-        db.execute(sql`UPDATE background_jobs SET result = COALESCE(result, '{}'::jsonb) || ${JSON.stringify({ progress: done, total })}::jsonb
+      onProgress: (done, total, evals) => {
+        // the evaluations so far go along, so the review page's bar moves while it waits
+        db.execute(sql`UPDATE background_jobs SET result = COALESCE(result, '{}'::jsonb) || ${JSON.stringify({ progress: done, total, ...(evals ? { evals } : {}) })}::jsonb
           WHERE id = ${jobId}`).catch(() => {});
       },
       // Stockfish is done long before the AI coach: the engine review is shown meanwhile.
