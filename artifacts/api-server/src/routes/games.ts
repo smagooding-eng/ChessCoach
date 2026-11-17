@@ -34,7 +34,17 @@ type ImportJobOptions = {
   log: Logger;
 };
 
-async function runImportJob(opts: ImportJobOptions): Promise<{ imported: number; updated: number; total: number; error?: string }> {
+// Imports for the same member and site run one after another: two at once (the app's sync
+// on opening and a background one) both saw a new game as missing and saved it twice.
+const importChains = new Map<string, Promise<unknown>>();
+function runImportJob(opts: ImportJobOptions): Promise<{ imported: number; updated: number; total: number; error?: string }> {
+  const key = `${opts.userId}:${opts.platform}`;
+  const run = (importChains.get(key) ?? Promise.resolve()).catch(() => {}).then(() => runImportJobNow(opts));
+  importChains.set(key, run);
+  void run.finally(() => { if (importChains.get(key) === run) importChains.delete(key); }).catch(() => {});
+  return run;
+}
+async function runImportJobNow(opts: ImportJobOptions): Promise<{ imported: number; updated: number; total: number; error?: string }> {
   const { userId, platformUsername, platform, months, forceUpdate, log } = opts;
   const storedUsername = platformUsername.toLowerCase();
   let imported = 0;
@@ -1508,9 +1518,40 @@ router.post("/games/review-after-upgrade", requireAuth, async (req, res): Promis
 
 let reviewServicesStarted = false;
 /** Boot: resume interrupted "Review all" jobs; watch for upgrades that asked for a Coach review. */
+/** Duplicate copies of the same Chess.com / Lichess game for a member are removed (keeping
+ *  the reviewed copy, else the oldest; "played on ChessScout" carries over), then the
+ *  database is made to refuse a second copy. The schema always declared this, but the
+ *  live database never had the rule. */
+async function dedupeExternalGames(): Promise<void> {
+  for (const col of ["lichess_game_id", "chesscom_game_id"] as const) {
+    const c = sql.raw(col);
+    const rank = sql`ROW_NUMBER() OVER (PARTITION BY user_id, ${c} ORDER BY (review_data IS NOT NULL) DESC, COALESCE(via_chessscout, false) DESC, id ASC)`;
+    try {
+      await db.execute(sql`UPDATE games g SET via_chessscout = true FROM (
+          SELECT id, ${rank} AS rn, BOOL_OR(COALESCE(via_chessscout, false)) OVER (PARTITION BY user_id, ${c}) AS any_cs
+          FROM games WHERE ${c} IS NOT NULL) r
+        WHERE g.id = r.id AND r.rn = 1 AND r.any_cs AND NOT COALESCE(g.via_chessscout, false)`);
+      const del = await db.execute(sql`DELETE FROM games WHERE id IN (
+          SELECT id FROM (SELECT id, ${rank} AS rn FROM games WHERE ${c} IS NOT NULL) x WHERE rn > 1)`);
+      const n = (del as unknown as { rowCount?: number }).rowCount ?? 0;
+      if (n) appLogger.info({ col, removed: n }, "[games] removed duplicate copies of games");
+      const idx = sql.raw(col === "lichess_game_id" ? "games_user_lichess_unique" : "games_user_chesscom_unique");
+      await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS ${idx} ON games (user_id, ${c}) WHERE ${c} IS NOT NULL`);
+    } catch (err) { appLogger.warn({ err, col }, "[games] duplicate clean-up failed"); }
+  }
+  // Copies that lost their Lichess id but are the same game (same link, same players)
+  try {
+    await db.execute(sql`DELETE FROM games n USING games k
+      WHERE n.user_id = k.user_id AND n.id <> k.id AND n.platform = 'lichess' AND n.lichess_game_id IS NULL
+        AND k.lichess_game_id IS NOT NULL AND n.pgn LIKE '%lichess.org/' || k.lichess_game_id || '%'
+        AND lower(n.white_username) = lower(k.white_username) AND lower(n.black_username) = lower(k.black_username)`);
+  } catch (err) { appLogger.warn({ err }, "[games] id-less duplicate clean-up failed"); }
+}
+
 export async function startReviewServices(): Promise<void> {
   if (reviewServicesStarted) return;
   reviewServicesStarted = true;
+  void dedupeExternalGames();
   void startCatchupReviews().catch((err) => appLogger.warn({ err }, "catch-up reviews failed to start"));
   void startSamedayReviews().catch((err) => appLogger.warn({ err }, "same-day reviews failed to start"));
   await db.execute(sql`CREATE TABLE IF NOT EXISTS review_after_upgrade (
