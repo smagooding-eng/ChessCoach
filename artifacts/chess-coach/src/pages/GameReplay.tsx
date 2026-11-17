@@ -1124,7 +1124,7 @@ export function GameReplay() {
         onExit={() => { setGtab('analysis'); setGuided(false); }}
         onReport={openReport}
         onBack={() => { if (window.history.length > 1) window.history.back(); else navigate('/games'); }}
-        endExtra={authUser && game.userId === authUser.id && reviewMoves.length > 0 ? <StayInTouchCard /> : null}
+        endExtra={authUser && reviewMoves.length > 0 && [authUser.chesscomUsername, authUser.lichessUsername].filter(Boolean).map((n) => String(n).toLowerCase()).some((n) => n === (game.whiteUsername ?? '').toLowerCase() || n === (game.blackUsername ?? '').toLowerCase()) ? <StayInTouchCard /> : null}
       /></>
     );
   }
