@@ -4,6 +4,9 @@ import {
   ADMIN_EMAILS,
   clearSession,
   getSessionId,
+  touchSession,
+  setSessionCookie,
+  SESSION_COOKIE,
   getSession,
 } from "../lib/auth";
 declare global {
@@ -38,8 +41,18 @@ export async function authMiddleware(
     return;
   }
   req.user = session.user;
+  // Using the app keeps you signed in: the session (and its cookie) is renewed, checked
+  // at most every few hours per session.
+  const last = touchedAt.get(sid) ?? 0;
+  if (Date.now() - last > 6 * 3600_000) {
+    touchedAt.set(sid, Date.now());
+    if (touchedAt.size > 50_000) touchedAt.clear();
+    const renewed = await touchSession(sid).catch(() => false);
+    if (renewed && req.cookies?.[SESSION_COOKIE] === sid) setSessionCookie(res, sid);
+  }
   next();
 }
+const touchedAt = new Map<string, number>();
 export function requireAuth(
   req: Request,
   res: Response,

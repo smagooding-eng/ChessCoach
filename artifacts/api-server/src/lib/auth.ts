@@ -1,10 +1,12 @@
 import crypto from "crypto";
 import { type Request, type Response } from "express";
 import { db, sessionsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq, lt } from "drizzle-orm";
 
 export const SESSION_COOKIE = "sid";
-export const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
+// 90 days, renewed whenever the member uses the app (see touchSession), so members who
+// come back now and then stay signed in. It used to be a fixed 7 days from sign-in.
+export const SESSION_TTL = 90 * 24 * 60 * 60 * 1000;
 
 export const ADMIN_EMAILS = ["smagooding@gmail.com", "goodingsls@live.com"];
 
@@ -49,6 +51,16 @@ export async function getSession(sid: string): Promise<SessionData | null> {
   }
 
   return row.sess as unknown as SessionData;
+}
+
+/** Push a session's expiry out again (at most once a day per session). Returns true when it
+ *  renewed, so the caller can refresh the cookie too. */
+export async function touchSession(sid: string): Promise<boolean> {
+  const r = await db.update(sessionsTable)
+    .set({ expire: new Date(Date.now() + SESSION_TTL) })
+    .where(and(eq(sessionsTable.sid, sid), lt(sessionsTable.expire, new Date(Date.now() + SESSION_TTL - 24 * 60 * 60 * 1000))))
+    .returning({ sid: sessionsTable.sid });
+  return r.length > 0;
 }
 
 export async function updateSession(
