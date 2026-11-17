@@ -41,10 +41,10 @@ const TIME_CONTROLS: Record<TimeControlId, TimeControlSpec> = {
 const BOT_OFFER_MS = 20 * 1000;
 // Until there are enough real players around, a search with no one to play
 // starts a bot game on its own after this long.
-// Every search has a game within 10 s: a bot after 8 s, or after 10 s when the app is also
-// looking on Lichess (which gets the time in between).
-const AUTO_BOT_MS = parseInt(process.env.LIVE_AUTO_BOT_MS || "") || 8 * 1000;
-const LICHESS_FIRST_BOT_MS = 10 * 1000;
+// 7 s looking for a ChessScout opponent, then (Lichess connected) 7 s on Lichess, then a
+// bot: the bot comes at 7 s, or at 14 s when the app is also looking on Lichess.
+const AUTO_BOT_MS = parseInt(process.env.LIVE_AUTO_BOT_MS || "") || 7 * 1000;
+const LICHESS_FIRST_BOT_MS = 14 * 1000;
 const DISCONNECT_GRACE_MS = 30 * 1000;    // opponent disconnect → 30s to reconnect
 const WIDEN_INTERVAL_MS = 2_000;          // periodic match scanner
 const HUMAN_COUNTRIES = [

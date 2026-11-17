@@ -346,7 +346,7 @@ export function useLivePlay() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** noAutoBot: the app is also looking on Lichess, so the server waits a little longer (10 s) before its bot. */
+  /** noAutoBot: the app is also looking on Lichess, so the server waits longer (14 s) before its bot. */
   const enterQueue = useCallback((timeControl: string, mode: LiveMode, opts?: { noAutoBot?: boolean }) => {
     setError(null);
     setGame(null);
