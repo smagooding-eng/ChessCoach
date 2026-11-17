@@ -33,6 +33,7 @@ export class SpriteAvatar {
   private changedAt = 0;
   private hold = 0;            // a new expression stays a moment, so it doesn't flicker
   private turn: 'front' | 'q' | 'p' = 'front';
+  private turnAng = 0;
   private bounce = 0;
   private cand: SpriteName = 'front'; private candSince = 0; // a change has to last a moment
   private sm: { x: number; y: number; s: number; roll: number } | null = null; // smoothed placement
@@ -58,20 +59,23 @@ export class SpriteAvatar {
   private pick(f: SpriteFace): SpriteName {
     // head turn, with a little hysteresis between front / three-quarter / profile
     const y = Math.abs(f.yaw);
-    if (this.turn === 'front' && y > 0.34) this.turn = 'q';
+    if (this.turn === 'front' && y > 0.4) this.turn = 'q';
     else if (this.turn === 'q' && y < 0.22) this.turn = 'front';
-    else if (this.turn === 'q' && y > 0.75) this.turn = 'p';
+    else if (this.turn === 'q' && y > 0.82) this.turn = 'p';
     else if (this.turn === 'p' && y < 0.6) this.turn = 'q';
     const side = f.yaw > 0 ? 'right' : 'left';
     if (this.turn !== 'front') return `${this.turn}_${side}` as SpriteName;
     // facing the camera: the expression
     // Expressions need a clear face: talking shows the talking faces instead (see draw).
-    const wink = Math.abs(f.blinkL - f.blinkR) > 0.55 && Math.max(f.blinkL, f.blinkR) > 0.7;
+    // (each needs a clear, held expression, so he doesn't flicker between moods)
+    const wink = Math.abs(f.blinkL - f.blinkR) > 0.6 && Math.max(f.blinkL, f.blinkR) > 0.75;
     if (wink) return 'wink';
-    if (f.smile > 0.62) return f.mouth > 0.45 ? 'laugh' : 'smile';
-    if (f.mouth > 0.75 && f.voice < 0.15) return 'surprised'; // mouth wide open and not talking
-    if (f.browDown > 0.62) return 'focused';
-    if (f.browDown > 0.45) return 'serious';
+    const smiling = this.cur === 'smile' || this.cur === 'laugh' ? f.smile > 0.5 : f.smile > 0.7;
+    if (smiling) return f.mouth > 0.5 ? 'laugh' : 'smile';
+    if (f.mouth > 0.8 && f.voice < 0.12) return 'surprised'; // mouth wide open and not talking
+    const frown = this.cur === 'focused' || this.cur === 'serious' ? f.browDown - 0.1 : f.browDown;
+    if (frown > 0.7) return 'focused';
+    if (frown > 0.55) return 'serious';
     return 'front';
   }
 
@@ -100,8 +104,8 @@ export class SpriteAvatar {
     // which picture: a new one has to be wanted for a moment before it shows
     const want = this.pick(f);
     if (want !== this.cand) { this.cand = want; this.candSince = t; }
-    const settle = want.startsWith('q_') || want.startsWith('p_') || want === 'front' ? 160 : 220;
-    if (want !== this.cur && t - this.candSince >= settle && t >= this.hold) { this.prev = this.cur; this.cur = want; this.changedAt = t; this.hold = t + 450; }
+    const settle = want.startsWith('q_') || want.startsWith('p_') ? 220 : want === 'front' ? 260 : 380;
+    if (want !== this.cur && t - this.candSince >= settle && t >= this.hold) { this.prev = this.cur; this.cur = want; this.changedAt = t; this.hold = t + 900; }
     // calmer placement: follow the head slowly, tilt only half as much
     if (!this.sm) this.sm = { x: cx, y: cy, s: S, roll };
     const m = this.sm;
@@ -113,7 +117,7 @@ export class SpriteAvatar {
     if (talking && speaking && t - this.visAt >= 85) { const v = this.viseme(f); if (v !== this.vis) { this.visPrev = this.vis; this.vis = v; this.visAt = t; } }
     if (!talking) { this.vis = null; this.visPrev = null; }
     this.bounce += (Math.min(1, f.voice * 1.2) - this.bounce) * 0.2;
-    const k = Math.min(1, (t - this.changedAt) / 160); // cross-fade
+    const k0 = Math.min(1, (t - this.changedAt) / 200), k = k0 * k0 * (3 - 2 * k0); // smooth cross-fade
     const W2 = m.s, H = W2 * 1.25;   // pictures are 512 x 640
     const dy = -this.bounce * W2 * 0.012;
     c.save();
@@ -128,17 +132,21 @@ export class SpriteAvatar {
     if (this.vis && turned) {
       // head turned: the talking face drawn at the nearest angle
       const deg = Math.abs(f.yaw) * 90, opts = this.cur.startsWith('p_') ? [60, 90] : [15, 30, 45, 60];
-      const ang = opts.reduce((b, x) => (Math.abs(x - deg) < Math.abs(b - deg) ? x : b), opts[0]);
+      const near = opts.reduce((b, x) => (Math.abs(x - deg) < Math.abs(b - deg) ? x : b), opts[0]);
+      // keep the angle until the head has clearly moved on, so it doesn't flicker between two
+      if (!opts.includes(this.turnAng) || Math.abs(deg - this.turnAng) > 11) this.turnAng = near;
+      const ang = this.turnAng;
       const key = (v: Viseme | null) => v && `${v.slice(2)}_${f.yaw < 0 ? 'm' : 'p'}${ang}`;
       const now = this.turnImgs.get(key(this.vis)!), before = this.visPrev ? this.turnImgs.get(key(this.visPrev)!) : undefined;
       if (now) {
         const kv = Math.min(1, (t - this.visAt) / 70);
-        if (before) { c.globalAlpha = 1; c.drawImage(before, ox, oy, W2, H); } else draw(this.cur, 1);
+        draw(this.cur, 1);
+        if (before) { c.globalAlpha = 1; c.drawImage(before, ox, oy, W2, H); }
         c.globalAlpha = kv; c.drawImage(now, ox, oy, W2, H);
       } else draw(this.cur, 1); // still loading
     } else if (this.vis) {
       const kv = Math.min(1, (t - this.visAt) / 70); // quick blend between mouth shapes
-      draw(this.visPrev ?? this.cur, 1); draw(this.vis, kv);
+      draw(this.cur, 1); draw(this.visPrev, 1); draw(this.vis, kv);
     } else {
       if (k < 1) draw(this.prev, 1);
       draw(this.cur, k);
