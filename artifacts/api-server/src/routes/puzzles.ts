@@ -3,7 +3,7 @@ import { db, puzzlesTable, puzzleAttemptsTable, gamesTable } from "@workspace/db
 import { eq, count, desc, sql, and, gte, inArray } from "drizzle-orm";
 import { requireAuth, requirePremium } from "../middlewares/authMiddleware";
 import { Chess } from "chess.js";
-import { withSetupMove, markSetupFixed } from "../lib/puzzleSetup";
+import { withSetupMove, markSetupFixed, fromLichessApi } from "../lib/puzzleSetup";
 
 const router: IRouter = Router();
 
@@ -898,19 +898,10 @@ async function fetchAndStoreLichessPuzzle(excludeIds: number[] = []) {
       }
       const data: any = await res.json();
 
-      if (!data.puzzle?.fen || !data.puzzle?.solution?.length) continue;
-
-      const fen = data.puzzle.fen;
-      const solutionUci = data.puzzle.solution.join(" ");
-
-      const validationChess = new Chess(fen);
-      const firstMove = data.puzzle.solution[0];
-      const testResult = validationChess.move({
-        from: firstMove.slice(0, 2),
-        to: firstMove.slice(2, 4),
-        promotion: firstMove.length > 4 ? firstMove[4] : undefined,
-      });
-      if (!testResult) continue;
+      // Stored like every other puzzle: from just before the opponent's setup move.
+      const shaped = fromLichessApi(data);
+      if (!shaped) continue;
+      const fen = shaped.solverFen;
 
       const [existing] = await db
         .select()
@@ -931,8 +922,8 @@ async function fetchAndStoreLichessPuzzle(excludeIds: number[] = []) {
 
       const [inserted] = await db.insert(puzzlesTable).values({
         lichessId: data.puzzle.id,
-        fen,
-        moves: solutionUci,
+        fen: shaped.fen,
+        moves: shaped.moves,
         rating: data.puzzle.rating,
         themes: data.puzzle.themes.join(","),
         source: "lichess",

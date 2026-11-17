@@ -2,6 +2,7 @@ import { db, puzzlesTable } from "@workspace/db";
 import { askFreeAi, freeAiAvailable } from "./freeAi";
 import { count, eq, sql } from "drizzle-orm";
 import { Chess } from "chess.js";
+import { fromLichessApi } from "./puzzleSetup";
 import { trackAiUsage, AI_FEATURES } from "./aiUsageTracker";
 
 interface VerifiedPuzzle {
@@ -255,17 +256,10 @@ export async function seedPuzzlesIfNeeded(minCount = 15) {
       });
       if (!res.ok) break;
       const data: any = await res.json();
-      if (!data.puzzle?.fen || !data.puzzle?.solution?.length) continue;
-
-      const fen = data.puzzle.fen;
-      const chess = new Chess(fen);
-      const firstMove = data.puzzle.solution[0];
-      const testResult = chess.move({
-        from: firstMove.slice(0, 2),
-        to: firstMove.slice(2, 4),
-        promotion: firstMove.length > 4 ? firstMove[4] : undefined,
-      });
-      if (!testResult) continue;
+      // Stored like every other puzzle: from just before the opponent's setup move.
+      const shaped = fromLichessApi(data);
+      if (!shaped) continue;
+      const fen = shaped.solverFen;
 
       const [ex] = await db
         .select({ id: puzzlesTable.id })
@@ -284,8 +278,8 @@ export async function seedPuzzlesIfNeeded(minCount = 15) {
 
       const [row] = await db.insert(puzzlesTable).values({
         lichessId: data.puzzle.id,
-        fen,
-        moves: data.puzzle.solution.join(" "),
+        fen: shaped.fen,
+        moves: shaped.moves,
         rating: data.puzzle.rating,
         themes: data.puzzle.themes.join(","),
         source: "lichess",

@@ -65,3 +65,33 @@ export async function fixGamePuzzleSetups(): Promise<void> {
   }
   if (fixed || removed) logger.info({ fixed, removed }, "[puzzles] game puzzles given their setup move");
 }
+
+/** A puzzle from Lichess's puzzle API in the stored shape: the game (its PGN ends where the
+ *  puzzle starts) gives the opponent's setup move; `solverFen` is the position to solve. */
+export function fromLichessApi(data: { game?: { pgn?: string }; puzzle?: { solution?: string[] } }): { fen: string; moves: string; solverFen: string } | null {
+  const pgn = data.game?.pgn, solution = data.puzzle?.solution;
+  if (!pgn || !solution?.length) return null;
+  const c = new Chess();
+  try { c.loadPgn(pgn, { strict: false }); } catch { return null; }
+  const h = c.history({ verbose: true });
+  const last = h[h.length - 1];
+  if (!last) return null;
+  const s0 = solution[0];
+  try { if (!new Chess(c.fen()).move({ from: s0.slice(0, 2), to: s0.slice(2, 4), promotion: s0[4] })) return null; } catch { return null; }
+  return { fen: last.before, moves: [`${last.from}${last.to}${last.promotion ?? ""}`, ...solution].join(" "), solverFen: c.fen() };
+}
+
+/** Lichess puzzles fetched one at a time used to be stored from the solver's move with no
+ *  setup move, so they were served with the opponent to move. Lichess solutions end on the
+ *  solver's move, so a stored Lichess puzzle always has an even number of moves; those with
+ *  an odd number (not the hand-made tac_ ones) are those, and are taken out (Lichess has
+ *  plenty more). Runs at startup; finds nothing once they're gone. */
+export async function removeSetuplessLichessPuzzles(): Promise<void> {
+  try {
+    const bad = `SELECT id FROM puzzles WHERE source = 'lichess' AND (lichess_id IS NULL OR lichess_id NOT LIKE 'tac\\_%')
+      AND array_length(string_to_array(trim(moves), ' '), 1) % 2 = 1`;
+    await db.execute(sql.raw(`DELETE FROM puzzle_attempts WHERE puzzle_id IN (${bad})`)).catch(() => {});
+    const r = rowsOf<{ id: number }>(await db.execute(sql.raw(`DELETE FROM puzzles WHERE id IN (${bad}) RETURNING id`)));
+    if (r.length) logger.info({ removed: r.length }, "[puzzles] removed Lichess puzzles stored without their setup move");
+  } catch (e) { logger.warn({ err: e }, "[puzzles] setup-less puzzle cleanup failed"); }
+}

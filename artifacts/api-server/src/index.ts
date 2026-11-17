@@ -571,6 +571,6 @@ import("./lib/puzzleSeed").then(({ seedPuzzlesIfNeeded }) => {
 }).catch(() => {});
 // Puzzles from members' games stored without their setup move came up from the wrong side.
 setTimeout(() => {
-  import("./lib/puzzleSetup").then(({ fixGamePuzzleSetups }) => fixGamePuzzleSetups())
+  import("./lib/puzzleSetup").then(({ fixGamePuzzleSetups, removeSetuplessLichessPuzzles }) => removeSetuplessLichessPuzzles().then(() => fixGamePuzzleSetups()))
     .catch((err) => logger.warn({ err }, "Fixing game puzzles failed"));
 }, 90_000).unref();
