@@ -41,7 +41,10 @@ const TIME_CONTROLS: Record<TimeControlId, TimeControlSpec> = {
 const BOT_OFFER_MS = 20 * 1000;
 // Until there are enough real players around, a search with no one to play
 // starts a bot game on its own after this long.
-const AUTO_BOT_MS = parseInt(process.env.LIVE_AUTO_BOT_MS || "") || 12 * 1000;
+// Every search has a game within 10 s: a bot after 8 s, or after 10 s when the app is also
+// looking on Lichess (which gets the time in between).
+const AUTO_BOT_MS = parseInt(process.env.LIVE_AUTO_BOT_MS || "") || 8 * 1000;
+const LICHESS_FIRST_BOT_MS = 10 * 1000;
 const DISCONNECT_GRACE_MS = 30 * 1000;    // opponent disconnect → 30s to reconnect
 const WIDEN_INTERVAL_MS = 2_000;          // periodic match scanner
 const HUMAN_COUNTRIES = [
@@ -750,15 +753,15 @@ async function joinQueue(ws: WebSocket, userId: string, username: string, tcIdIn
   const joinedAt0 = Date.now();
   queue.push({ userId, username, rating: myRating, ws, tc, mode, joinedAt: joinedAt0 });
   send(ws, { type: 'queued', tcId: flex ? 'any' : tcId, mode, botOfferMs: BOT_OFFER_MS, autoBotMs: AUTO_BOT_MS });
-  // Nobody to play after a short wait: start a game against a bot opponent
-  // (unless the app is handing them to a real Lichess game instead).
+  // Nobody to play after a short wait: start a game against a bot opponent (a little later
+  // when the app is also looking for a real game on Lichess).
   const joinedAt = joinedAt0;
-  if (!noAutoBot) setTimeout(() => {
+  setTimeout(() => {
     if (userActiveGame.has(userId)) return;
     const still = (queues.get(key) ?? []).find((w) => w.userId === userId && w.joinedAt === joinedAt);
     if (!still || still.ws.readyState !== WebSocket.OPEN) return;
     void spawnBotMatch(still.ws, userId, username, flex ? 'any' : tcId).catch(() => {});
-  }, AUTO_BOT_MS);
+  }, noAutoBot ? LICHESS_FIRST_BOT_MS : AUTO_BOT_MS);
   // Try immediate match (same clock first, then anyone flexible)
   tryMatchInQueue(key);
   if (queue.some(w => w.userId === userId)) tryMatchFlex(mode);
