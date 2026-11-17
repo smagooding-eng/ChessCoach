@@ -123,6 +123,8 @@ export interface GuidedReviewProps {
   onBack: () => void;
   /** Shown under the end-of-game summary (e.g. the stay-in-touch offer). */
   endExtra?: React.ReactNode;
+  /** The engine review is showing; the AI coach's notes are still being written. */
+  coachPending?: boolean;
   /** 'preparing' while the engine reviews the game; the moves can still be browsed. */
   status?: 'ready' | 'loading' | 'preparing' | 'error';
   progress?: { done: number; total: number } | null;
@@ -138,7 +140,7 @@ export interface GuidedReviewProps {
 
 type Mode = { kind: 'main' } | { kind: 'best'; step: number } | { kind: 'reply'; step: number } | { kind: 'retry'; state: 'trying' | 'right' | 'wrong' };
 
-export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flipped, onFlip, whiteName, blackName, accuracy, result, onExit, onReport, onBack, endExtra, status = 'ready', progress, errorText, onRetryReview, canFullAnalysis = true, onUpgrade, canRemix = false }: GuidedReviewProps) {
+export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flipped, onFlip, whiteName, blackName, accuracy, result, onExit, onReport, onBack, endExtra, coachPending = false, status = 'ready', progress, errorText, onRetryReview, canFullAnalysis = true, onUpgrade, canRemix = false }: GuidedReviewProps) {
   // Remix (admin, for content): a new random board and piece set on every move.
   const [remixOn, setRemixOn] = useState(false);
   const remixLooks = useRef(new Map<number, BoardLook>());
@@ -479,7 +481,10 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
       {/* Header */}
       <div className="flex shrink-0 items-center gap-2 px-3 pb-1 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <button onClick={onBack} aria-label="Back" className="grid h-10 w-10 place-items-center rounded-xl text-white active:scale-95"><ArrowLeft size={22} /></button>
-        <p className="flex-1 text-center text-[18px] font-black text-white">Game Review</p>
+        <div className="flex-1 text-center">
+          <p className="text-[18px] font-black text-white">Game Review</p>
+          {coachPending && <p className="-mt-0.5 animate-pulse text-[11.5px] font-semibold" style={{ color: GREEN }}>Coach notes on the way…</p>}
+        </div>
         {canRemix && (
           <button onClick={() => { remixLooks.current.clear(); setRemixOn((v) => !v); }} aria-label="Remix board and pieces" title="Remix: a random board and pieces on every move"
             className="grid h-10 w-10 place-items-center rounded-xl active:scale-95" style={{ color: remixOn ? GREEN : '#C9CFCD', background: remixOn ? 'rgba(129,182,76,.15)' : 'transparent' }}>

@@ -930,6 +930,9 @@ export async function reviewFullGame(input: {
   aiCoach?: boolean;
   /** Whose game this is: the summary (key mistakes, strengths, work on) is about this side only. */
   coachSide?: "white" | "black";
+  /** With the AI coach on: called as soon as Stockfish is done (the AI takes much longer),
+   *  with the engine-only review, so it can be shown while the coach's notes are written. */
+  onEngineReady?: (r: { moves: MoveReview[]; whiteAccuracy: number; blackAccuracy: number }) => void;
 }): Promise<GameReviewResult> {
   const { moves, opening, eco, result, whiteUsername, blackUsername, startFen, onProgress, userId } = input;
   const aiCoach = input.aiCoach === true;
@@ -1046,7 +1049,19 @@ JSON format:
 
     const [gptSettled, evals] = await Promise.all([
       Promise.allSettled(gptPromises),
-      evaluateAllPositions(fens, undefined, onProgress).catch((err) => {
+      evaluateAllPositions(fens, undefined, onProgress).then((evals) => {
+        if (aiCoach && input.onEngineReady) {
+          try {
+            const em = mergeReviewWithEngine([], moves, fens, evals, uciMoves, ecoBookFens, input.opening ?? null);
+            const acc = (color: "white" | "black") => {
+              const cm = em.filter((m) => m.color === color);
+              return cm.length ? Math.round(accuracyFromAvgLoss(cm.reduce((s, m) => s + estimatedLossForMove(m), 0) / cm.length) * 10) / 10 : 0;
+            };
+            input.onEngineReady({ moves: em, whiteAccuracy: acc("white"), blackAccuracy: acc("black") });
+          } catch (err) { logger.warn({ err }, "Engine-first review failed (the full review still follows)"); }
+        }
+        return evals;
+      }).catch((err) => {
         // Engine evaluation failing here must not throw away GPT data that
         // was already successfully fetched (real OpenAI cost, hard to
         // recover) — fall back to neutral, zero-centipawn evals so the

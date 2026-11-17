@@ -826,6 +826,8 @@ router.get("/games/review-status/:jobId", async (req, res): Promise<void> => {
     error: job.error ?? null,
     progress: progress?.progress ?? null,
     total: progress?.total ?? null,
+    // the engine review, while the AI coach is still writing
+    interim: job.status === "pending" ? progress?.interim ?? null : null,
   });
 });
 
@@ -1789,9 +1791,14 @@ async function runReviewJob(gameId: number, jobId: string, log: Logger): Promise
       blackUsername: game.blackUsername,
       startFen: startFen !== "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" ? startFen : undefined,
       onProgress: (done, total) => {
-        db.update(backgroundJobsTable).set({
-          result: { progress: done, total } as unknown as Record<string, unknown>,
-        }).where(eq(backgroundJobsTable.id, jobId)).catch(() => {});
+        db.execute(sql`UPDATE background_jobs SET result = COALESCE(result, '{}'::jsonb) || ${JSON.stringify({ progress: done, total })}::jsonb
+          WHERE id = ${jobId}`).catch(() => {});
+      },
+      // Stockfish is done long before the AI coach: the engine review is shown meanwhile.
+      onEngineReady: (r) => {
+        const interim = { moves: refreshBasicReview(markBookMoves(r.moves), false, game.opening ?? null), whiteAccuracy: r.whiteAccuracy, blackAccuracy: r.blackAccuracy };
+        db.execute(sql`UPDATE background_jobs SET result = COALESCE(result, '{}'::jsonb) || ${JSON.stringify({ interim })}::jsonb
+          WHERE id = ${jobId}`).catch(() => {});
       },
       userId: game.userId ?? undefined,
       aiCoach: await aiCoachForOwner(game.userId),

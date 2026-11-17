@@ -701,6 +701,8 @@ export function GameReplay() {
   // false = Stockfish-only review (free plan); the AI coach is Pro.
   const [reviewAi, setReviewAi]         = useState<boolean | null>(null);
   const [loadingSavedReview, setLoadingSavedReview] = useState(true);
+  // Pro: the engine review is shown while the AI coach is still writing its notes.
+  const [coachPending, setCoachPending] = useState(false);
   const [reviewProgress, setReviewProgress] = useState<{ done: number; total: number } | null>(null);
   // Computed once, authoritatively, by the backend (reviewFullGame) using
   // the single shared accuracy formula. Older cached reviews created before
@@ -812,14 +814,26 @@ export function GameReplay() {
     }
   }, []);
 
+  const interimShownRef = useRef(false);
   const pollReviewStatus = useCallback((jobId: string) => {
     stopPolling();
+    interimShownRef.current = false;
     reviewPollRef.current = setInterval(async () => {
       try {
         const res = await apiFetch(`/api/games/review-status/${jobId}`);
         if (!res.ok) return;
-        const data = await res.json() as { status: string; reviewData?: { moves: ReviewMove[]; gameSummary?: GameSummary; whiteAccuracy?: number | null; blackAccuracy?: number | null }; error?: string; progress?: number | null; total?: number | null };
+        const data = await res.json() as { status: string; reviewData?: { moves: ReviewMove[]; gameSummary?: GameSummary; whiteAccuracy?: number | null; blackAccuracy?: number | null }; error?: string; progress?: number | null; total?: number | null;
+          interim?: { moves: ReviewMove[]; whiteAccuracy?: number | null; blackAccuracy?: number | null } | null };
 
+        // Stockfish is done: show its review now, the coach's version replaces it when ready.
+        if (data.status === 'pending' && data.interim?.moves?.length && !interimShownRef.current) {
+          interimShownRef.current = true;
+          setReviewMoves(data.interim.moves);
+          setReviewAi(false);
+          if (data.interim.whiteAccuracy != null && data.interim.blackAccuracy != null) setGameAccuracy({ white: data.interim.whiteAccuracy, black: data.interim.blackAccuracy });
+          setCoachPending(true);
+          setReviewProgress(null);
+        }
         if (data.status === 'done' && data.reviewData) {
           const moves = data.reviewData.moves ?? [];
           if (moves.length > 0) setReviewMoves(moves);
@@ -831,15 +845,18 @@ export function GameReplay() {
           }
           setReviewing(false);
           setReviewProgress(null);
+          setCoachPending(false);
           reviewJobIdRef.current = null;
           stopPolling();
         } else if (data.status === 'error') {
-          setReviewError(data.error ?? 'Review failed. Please try again.');
+          // The engine review is already up: keep it rather than show an error.
+          if (!interimShownRef.current) setReviewError(data.error ?? 'Review failed. Please try again.');
+          setCoachPending(false);
           setReviewing(false);
           setReviewProgress(null);
           reviewJobIdRef.current = null;
           stopPolling();
-        } else if (data.progress != null && data.total != null) {
+        } else if (data.progress != null && data.total != null && !interimShownRef.current) {
           setReviewProgress({ done: data.progress as number, total: data.total as number });
         }
       } catch { /* retry on next poll */ }
@@ -1103,7 +1120,8 @@ export function GameReplay() {
   if (showGuided) {
     return (<>{shareFab}
       <GuidedReview
-        status={reviewMoves.length > 0 && !reviewing ? 'ready' : reviewError ? 'error' : loadingSavedReview && !reviewing ? 'loading' : 'preparing'}
+        coachPending={coachPending}
+        status={reviewMoves.length > 0 && (!reviewing || coachPending) ? 'ready' : reviewError ? 'error' : loadingSavedReview && !reviewing ? 'loading' : 'preparing'}
         progress={reviewProgress}
         errorText={reviewError}
         onRetryReview={() => { setReviewError(null); void handleReview(true); }}
