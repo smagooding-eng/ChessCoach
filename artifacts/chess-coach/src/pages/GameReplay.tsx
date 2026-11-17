@@ -643,6 +643,7 @@ export function GameReplay() {
   const { player: blackPlayer } = useChessPlayer(game?.blackUsername);
 
   const [currentMove, setCurrentMove] = useState(0);
+  const maxMovesRef = useRef(0);
   // Redesign only: Analysis / Key Moments / Report. Classic shows everything
   // in one stack exactly as before (the wrappers below are display:contents).
   const { enabled: redesign } = useDashboardRedesignFlag();
@@ -749,6 +750,7 @@ export function GameReplay() {
 
   const moves    = game?.moves || [];
   const maxMoves = moves.length;
+  maxMovesRef.current = maxMoves;
 
   // Auto-flip for the player's colour: the game's own owner name first, then any of
   // their linked Chess.com / Lichess names (the app's current username can be a
@@ -871,6 +873,24 @@ export function GameReplay() {
   }, [stopPolling]);
 
   useEffect(() => () => stopPolling(), [stopPolling]);
+
+  // While a review runs, the board steps through the moves as Stockfish checks them (so
+  // nobody stares at the starting position), then goes back to the start when it's ready.
+  // Taking the moves yourself stops it following.
+  const followReview = useRef(false);
+  const progressTarget = reviewProgress ? Math.min(maxMovesRef.current, Math.max(0, reviewProgress.done - 1)) : 0;
+  const followingNow = reviewing && !coachPending && reviewMoves.length === 0;
+  useEffect(() => { if (followingNow) followReview.current = true; }, [followingNow]);
+  useEffect(() => {
+    if (!followingNow || !followReview.current) return;
+    const t = setInterval(() => {
+      setCurrentMove((c) => (followReview.current && c < progressTarget ? c + 1 : c));
+    }, 300);
+    return () => clearInterval(t);
+  }, [followingNow, progressTarget]);
+  useEffect(() => {
+    if (!followingNow && followReview.current) { followReview.current = false; setCurrentMove(0); }
+  }, [followingNow]);
 
   // keepVisible: re-run in the background and swap the new review in when it's
   // done, instead of clearing the board (used to add the AI coach for Pro).
@@ -1140,7 +1160,7 @@ export function GameReplay() {
         startFen={gameStartFen}
         reviewMoves={reviewMoves}
         ply={currentMove}
-        setPly={(n) => { setIsPlaying(false); setPracticeMode(false); setCurrentMove(n); }}
+        setPly={(n) => { followReview.current = false; setIsPlaying(false); setPracticeMode(false); setCurrentMove(n); }}
         flipped={flipped}
         onFlip={() => setFlipped((f) => !f)}
         whiteName={game.whiteUsername}
