@@ -148,6 +148,16 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
     setPremove(null);
   }, [game?.fen, game?.turn, game?.status, color, premove, move, setPremove]);
 
+  // The ending (checkmate banner, result card, notices) only once the final move has been
+  // drawn and has landed on the board: shortly after the finished position arrives.
+  const [endShown, setEndShown] = useState(false);
+  const endKey = game?.status === 'finished' ? `${game.id}:${game.fen}` : null;
+  useEffect(() => {
+    if (!endKey) { setEndShown(false); return; }
+    setEndShown(false);
+    const t = setTimeout(() => setEndShown(true), 900);
+    return () => clearTimeout(t);
+  }, [endKey]);
   if (!game || !color) {
     return <div className="p-8 text-center" style={{ color: TEXT_MUTED }}>Loading…</div>;
   }
@@ -177,7 +187,7 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
   const opponentOfferedDraw = game.drawOfferFrom && game.drawOfferFrom !== color;
   const youOfferedDraw = game.drawOfferFrom && game.drawOfferFrom === color;
 
-  const finished = game.status === 'finished';
+  const finished = game.status === 'finished' && endShown;
   const youWonGame = (game.result === 'white' && youAreWhite) || (game.result === 'black' && !youAreWhite);
   const outcome: 'win' | 'loss' | 'draw' = game.result === 'draw' ? 'draw' : youWonGame ? 'win' : 'loss';
   const myRatingDelta = game.mode === 'ranked' ? (youAreWhite ? game.ratingDelta?.white : game.ratingDelta?.black) : null;
@@ -204,7 +214,7 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
   );
 
   const resultBanner = (() => {
-    if (game.status !== 'finished') return null;
+    if (!finished) return null;
     const youWon = (game.result === 'white' && youAreWhite) || (game.result === 'black' && !youAreWhite);
     const draw = game.result === 'draw';
     const title = draw ? 'Draw' : youWon ? 'You Won!' : 'You Lost';
@@ -372,7 +382,7 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
             yourColor={youAreWhite ? 'white' : 'black'}
             subtitle={describeEnding(game.termination, outcome)}
             ratingDelta={myRatingDelta}
-            delayMs={game.termination === 'checkmate' ? 500 : 250}
+            delayMs={0}
             actions={<>
               {rematchAskedByOpp && <p className="text-[13px] font-bold" style={{ color: '#EDEDED' }}>{opponentIsBot ? 'The bot' : 'Your opponent'} wants a rematch!</p>}
               {notice && <p className="text-[12px] font-bold" style={{ color: '#ec6b6b' }}>{notice}</p>}
