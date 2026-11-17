@@ -121,6 +121,8 @@ export interface GuidedReviewProps {
   /** Pro: the last step's "Continue to Pro report" (the full analysis, on its Report tab). */
   onReport?: () => void;
   onBack: () => void;
+  /** Shown under the end-of-game summary (e.g. the stay-in-touch offer). */
+  endExtra?: React.ReactNode;
   /** 'preparing' while the engine reviews the game; the moves can still be browsed. */
   status?: 'ready' | 'loading' | 'preparing' | 'error';
   progress?: { done: number; total: number } | null;
@@ -136,7 +138,7 @@ export interface GuidedReviewProps {
 
 type Mode = { kind: 'main' } | { kind: 'best'; step: number } | { kind: 'reply'; step: number } | { kind: 'retry'; state: 'trying' | 'right' | 'wrong' };
 
-export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flipped, onFlip, whiteName, blackName, accuracy, result, onExit, onReport, onBack, status = 'ready', progress, errorText, onRetryReview, canFullAnalysis = true, onUpgrade, canRemix = false }: GuidedReviewProps) {
+export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flipped, onFlip, whiteName, blackName, accuracy, result, onExit, onReport, onBack, endExtra, status = 'ready', progress, errorText, onRetryReview, canFullAnalysis = true, onUpgrade, canRemix = false }: GuidedReviewProps) {
   // Remix (admin, for content): a new random board and piece set on every move.
   const [remixOn, setRemixOn] = useState(false);
   const remixLooks = useRef(new Map<number, BoardLook>());
@@ -466,7 +468,9 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
   const resultLine = (() => {
     if (result === '1-0') return `${whiteName} won`;
     if (result === '0-1') return `${blackName} won`;
-    if (result === '1/2-1/2') return 'Draw';
+    if (result === '1/2-1/2' || result === 'draw') return 'Draw';
+    if (result === 'win') return 'You won';
+    if (result === 'loss') return 'You lost';
     return null;
   })();
 
@@ -595,6 +599,7 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
             </div>
           </div>
         )}
+        {atEnd && endExtra}
 
         {/* Opening summary: who played how (start of the review) */}
         {ply === 0 && mode.kind === 'main' && reviewMoves.length > 0 && (

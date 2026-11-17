@@ -1126,7 +1126,7 @@ router.get("/games/:id/replay", async (req, res): Promise<void> => {
       blackUsername: game.blackUsername,
       whiteRating: game.whiteRating,
       blackRating: game.blackRating,
-      result: outcomeLine(game),
+      result: game.result,
       opening: game.opening,
       eco: game.eco,
       analysisNotes: game.analysisNotes,

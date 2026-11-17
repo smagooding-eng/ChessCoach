@@ -1,4 +1,5 @@
 import { RedesignHeader } from '@/components/RedesignHeader';
+import { StayInTouchCard } from '@/components/review/StayInTouchCard';
 import { ShareButton, SHARE_BASE } from '@/components/ShareButton';
 import { landingSquare, type ShareSpec } from '@/lib/shareImage';
 import { TablebaseBadge } from '@/components/TablebaseBadge';
@@ -1123,6 +1124,7 @@ export function GameReplay() {
         onExit={() => { setGtab('analysis'); setGuided(false); }}
         onReport={openReport}
         onBack={() => { if (window.history.length > 1) window.history.back(); else navigate('/games'); }}
+        endExtra={authUser && game.userId === authUser.id && reviewMoves.length > 0 ? <StayInTouchCard /> : null}
       /></>
     );
   }
