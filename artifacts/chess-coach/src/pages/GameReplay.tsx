@@ -757,16 +757,31 @@ export function GameReplay() {
   // Auto-flip for the player's colour: the game's own owner name first, then any of
   // their linked Chess.com / Lichess names (the app's current username can be a
   // different account from the one this game was imported under).
+  // Which side is yours: the server's answer (your own accounts, then the name the game was
+  // saved under), else your linked names in order, and the name last looked up only when
+  // nothing else matches. (Checking a mixed list, White first, made whoever you'd looked
+  // up "You" when they had White.)
+  const mySide = useMemo((): 'w' | 'b' | null => {
+    if (!game) return null;
+    const g = game as { yourSide?: 'white' | 'black' | null; username?: string | null };
+    if (g.yourSide === 'white') return 'w';
+    if (g.yourSide === 'black') return 'b';
+    const white = (game.whiteUsername ?? '').toLowerCase(), black = (game.blackUsername ?? '').toLowerCase();
+    for (const n of [g.username, authUser?.scoutUsername, authUser?.chesscomUsername, authUser?.lichessUsername, username]) {
+      const x = (n ?? '').toLowerCase();
+      if (!x) continue;
+      if (x === white) return 'w';
+      if (x === black) return 'b';
+    }
+    return null;
+  }, [game, authUser?.scoutUsername, authUser?.chesscomUsername, authUser?.lichessUsername, username]);
   const flippedFor = useRef<number | null>(null);
   useEffect(() => {
     if (!game || flippedFor.current === game.id) return;
-    const names = [(game as { username?: string }).username, username, authUser?.chesscomUsername, authUser?.lichessUsername]
-      .filter(Boolean).map((n) => String(n).toLowerCase());
-    if (!names.length) return;
-    const black = (game.blackUsername ?? '').toLowerCase(), white = (game.whiteUsername ?? '').toLowerCase();
-    if (names.includes(black) && !names.includes(white)) { setFlipped(true); flippedFor.current = game.id; }
-    else if (names.includes(white)) { setFlipped(false); flippedFor.current = game.id; }
-  }, [game, username, authUser?.chesscomUsername, authUser?.lichessUsername]);
+    const side = mySide;
+    if (!side) return;
+    setFlipped(side === 'b'); flippedFor.current = game.id;
+  }, [game, mySide]);
 
   // Auto-play timer
   useEffect(() => {
@@ -1109,8 +1124,7 @@ export function GameReplay() {
   // Share the review as a picture (accuracy, best moves, your best moment on the board).
   const shareSpec = (): ShareSpec | null => {
     if (!game || reviewMoves.length === 0) return null;
-    const mineNames = [(game as { username?: string }).username, username, authUser?.chesscomUsername, authUser?.lichessUsername].filter(Boolean).map((n) => String(n).toLowerCase());
-    const me: 'w' | 'b' = mineNames.includes((game.blackUsername ?? '').toLowerCase()) ? 'b' : 'w';
+    const me: 'w' | 'b' = mySide ?? 'w';
     const mine = reviewMoves.filter((m) => m.color === (me === 'w' ? 'white' : 'black'));
     const count = (...c: string[]) => mine.filter((m) => c.includes(m.classification)).length;
     const acc = gameAccuracy ? Math.round(me === 'w' ? gameAccuracy.white : gameAccuracy.black) : null;
@@ -1183,8 +1197,7 @@ export function GameReplay() {
   // previous layout.
   const classic = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('classic') === '1';
   if (canFullAnalysis && !classic) {
-    const names = [username, authUser?.chesscomUsername, authUser?.lichessUsername].filter(Boolean).map((n) => String(n).toLowerCase());
-    const meColor: 'w' | 'b' | null = names.includes((game.whiteUsername ?? '').toLowerCase()) ? 'w' : names.includes((game.blackUsername ?? '').toLowerCase()) ? 'b' : null;
+    const meColor: 'w' | 'b' | null = mySide;
     return (<>{shareFab}
       <ProAnalysis
         game={game}
@@ -1258,10 +1271,7 @@ export function GameReplay() {
           )}
 
           {redesign && (() => {
-            const names = [username, authUser?.chesscomUsername, authUser?.lichessUsername].filter(Boolean).map((n) => String(n).toLowerCase());
-            const meWhite = names.includes((game.whiteUsername ?? '').toLowerCase());
-            const meBlack = !meWhite && names.includes((game.blackUsername ?? '').toLowerCase());
-            const youWhite = !meBlack;
+            const youWhite = mySide !== 'b';
             const me = youWhite ? { name: game.whiteUsername, rating: game.whiteRating, avatar: whitePlayer?.avatar } : { name: game.blackUsername, rating: game.blackRating, avatar: blackPlayer?.avatar };
             const opp = youWhite ? { name: game.blackUsername, rating: game.blackRating, avatar: blackPlayer?.avatar } : { name: game.whiteUsername, rating: game.whiteRating, avatar: whitePlayer?.avatar };
             const badge = game.result === 'win' ? { t: 'Win', bg: 'rgba(46,125,50,.45)', fg: '#95C45A' } : game.result === 'loss' ? { t: 'Loss', bg: 'rgba(150,35,45,.55)', fg: '#FF6B73' } : { t: 'Draw', bg: 'rgba(255,255,255,.12)', fg: '#C9D2CF' };

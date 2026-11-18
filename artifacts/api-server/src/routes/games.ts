@@ -1129,8 +1129,8 @@ router.get("/games/:id/replay", async (req, res): Promise<void> => {
   const startFen = extractStartFen(game.pgn);
   const DEFAULT_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-  res.json(
-    GetGameReplayResponse.parse({
+  res.json({
+    ...GetGameReplayResponse.parse({
       id: game.id,
       pgn: game.pgn,
       startFen: startFen !== DEFAULT_FEN ? startFen : null,
@@ -1143,8 +1143,12 @@ router.get("/games/:id/replay", async (req, res): Promise<void> => {
       opening: game.opening,
       eco: game.eco,
       analysisNotes: game.analysisNotes,
-    })
-  );
+    }),
+    // Which side is the owner's: their own accounts first, then the name it was saved under
+    // (the same rule the coach uses). The page goes by this before anything else.
+    yourSide: (await coachSideFor(game)) ?? null,
+    username: game.username,
+  });
 });
 
 router.post("/games/:id/analyze-moves", async (req, res): Promise<void> => {
