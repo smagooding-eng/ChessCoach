@@ -8,7 +8,9 @@ import { useUser } from '@/hooks/use-user';
 import { apiFetch, apiFetchLocal } from '@/lib/api';
 import { STUDIO_FRAME } from '@/lib/studioFrame';
 
-const SEEN = (uid: string) => `cs_trial_promo_v1:${uid}`;
+// v2: the first version kept the offer hidden for 3 seconds behind its animation, so
+// nearly everyone closed it unseen; members who didn't start get the fixed one once.
+const SEEN = (uid: string) => `cs_trial_promo_v2:${uid}`;
 // Places it would get in the way (sign-up, checkout, the free review page, the studio)
 const SKIP = /^\/(setup|login|signup|subscription|pricing|review|admin|kids|embed)(\/|$)/;
 
@@ -104,26 +106,26 @@ export function TrialPromo() {
         </div>
 
         <div className="px-6 pb-6 pt-1 text-center">
-          <p className="tp-in text-[11.5px] font-extrabold uppercase tracking-[.2em]" style={{ color: '#E8B447', animationDelay: '2.5s' }}>New · Free trial</p>
-          <h2 className="tp-in mt-1.5 text-[28px] font-extrabold leading-[1.1] tracking-tight" style={{ color: '#F5F7F6', animationDelay: '2.6s' }}>
+          <p className="tp-in text-[11.5px] font-extrabold uppercase tracking-[.2em]" style={{ color: '#E8B447', animationDelay: '.1s' }}>New · Free trial</p>
+          <h2 className="tp-in mt-1.5 text-[28px] font-extrabold leading-[1.1] tracking-tight" style={{ color: '#F5F7F6', animationDelay: '.16s' }}>
             {days} days of Pro,<br />on us
           </h2>
           <ul className="mt-4 grid gap-2 text-left">
             {FEATURES.map((f, i) => (
-              <li key={f} className="tp-in flex items-center gap-2.5 rounded-[12px] px-3 py-2.5 text-[14px] font-semibold" style={{ background: '#121B1D', border: '1px solid rgba(255,255,255,.06)', color: '#E6EBE9', animationDelay: `${2.8 + i * 0.12}s` }}>
+              <li key={f} className="tp-in flex items-center gap-2.5 rounded-[12px] px-3 py-2.5 text-[14px] font-semibold" style={{ background: '#121B1D', border: '1px solid rgba(255,255,255,.06)', color: '#E6EBE9', animationDelay: `${0.24 + i * 0.07}s` }}>
                 <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-black" style={{ background: '#81B64C', color: '#0B1213' }}>✓</span>
                 {f}
               </li>
             ))}
           </ul>
-          <button onClick={start} disabled={busy} className="tp-in tp-cta mt-5 inline-flex w-full items-center justify-center gap-2 rounded-[14px] py-3.5 text-[16px] font-extrabold disabled:opacity-70" style={{ animationDelay: '3.35s' }}>
+          <button onClick={start} disabled={busy} className="tp-in tp-cta mt-5 inline-flex w-full items-center justify-center gap-2 rounded-[14px] py-3.5 text-[16px] font-extrabold disabled:opacity-70" style={{ animationDelay: '.5s' }}>
             {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Crown size={18} /> Start my {days} free days</>}
           </button>
           {err && <p className="mt-2 text-[12.5px]" style={{ color: '#FF9DA2' }}>{err}</p>}
-          <p className="tp-in mt-3 text-[12px] leading-snug" style={{ color: '#87918E', animationDelay: '3.45s' }}>
+          <p className="tp-in mt-3 text-[12px] leading-snug" style={{ color: '#87918E', animationDelay: '.56s' }}>
             Card required to start. You won’t be charged for {days} days, {after}. Cancel any time before then in one tap.
           </p>
-          <button onClick={close} className="tp-in mt-2 text-[13.5px] font-bold" style={{ color: '#AEB6B3', animationDelay: '3.5s' }}>Maybe later</button>
+          <button onClick={close} className="tp-in mt-2 text-[13.5px] font-bold" style={{ color: '#AEB6B3', animationDelay: '.6s' }}>Maybe later</button>
         </div>
       </div>
     </div>
@@ -151,7 +153,7 @@ const CSS = `
 .tp-badge { position: absolute; top: 18px; left: 50%; display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 900; letter-spacing: .1em; color: #0B1213; background: linear-gradient(180deg,#F2C55E,#D69E2E); transform: translateX(-50%) scale(.4); opacity: 0; animation: tpBadge .5s cubic-bezier(.2,.9,.3,1.5) 2.35s both; }
 .tp-in { opacity: 0; animation: tpUp .45s ease both; }
 .tp-cta { color: #fff; background: linear-gradient(180deg,#81B64C,#5F8F36); box-shadow: 0 12px 28px -10px rgba(129,182,76,.65); }
-.tp-cta:not(:disabled) { animation: tpUp .45s ease both, tpPulse 2.4s ease-in-out 4.2s infinite; }
+.tp-cta:not(:disabled) { animation: tpUp .45s ease both, tpPulse 2.4s ease-in-out 1.6s infinite; }
 @keyframes tpFade { from { opacity: 0 } to { opacity: 1 } }
 @keyframes tpRise { from { opacity: 0; transform: translateY(26px) scale(.96) } to { opacity: 1; transform: none } }
 @keyframes tpSq { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }

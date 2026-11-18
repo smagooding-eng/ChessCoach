@@ -3211,7 +3211,7 @@ function LandingFunnelPanel() {
 }
 
 type TrialStats = {
-  promo: { shown: number; start: number; dismiss: number };
+  promo: { shown: number; start: number; dismiss: number; closeMedianSecs?: number | null; closedUnder4s?: number };
   checkout: { total: number; promo: number; subscription: number; pricing: number; email: number };
   trials: { started: number; inTrial: number; cancelling: number; paid: number; paidCancelling: number; paymentFailed: number; ended: number };
   recent: { email: string | null; status: string; startedAt: string; trialEnd: string | null; outcome: string }[];
@@ -3271,6 +3271,11 @@ function TrialStatsPanel() {
                 <Stat label="Tapped Start" value={data.promo.start} sub={pct(data.promo.start, data.promo.shown)} />
                 <Stat label="Closed it" value={data.promo.dismiss} sub={pct(data.promo.dismiss, data.promo.shown)} />
               </div>
+              {data.promo.closeMedianSecs != null && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Half of those who closed it did so within {data.promo.closeMedianSecs}s of it appearing; {data.promo.closedUnder4s} closed it within 4s.
+                </p>
+              )}
             </div>
             <div>
               <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Opened trial checkout</p>

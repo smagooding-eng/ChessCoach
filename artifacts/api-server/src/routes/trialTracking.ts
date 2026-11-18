@@ -58,6 +58,19 @@ router.get('/admin/trial-stats', requireAdmin, async (req: Request, res: Respons
       WHERE e.created_at >= ${since.toISOString()} AND e.created_at < ${until.toISOString()}
         AND lower(u.email) NOT IN (${sql.join(excluded.map((x) => sql`${x}`), sql`, `)})
       GROUP BY e.event, e.source`));
+    // How long members looked at the promo before closing it (from their latest "shown").
+    // The offer itself showed ~3.4s in before 18 Nov 2026, and ~0.6s in since.
+    const [close] = rowsOf<{ median: number | null; quick: number }>(await db.execute(sql`
+      WITH d AS (
+        SELECT EXTRACT(EPOCH FROM e.created_at - (
+          SELECT max(s.created_at) FROM trial_events s
+          WHERE s.user_id = e.user_id AND s.event = 'shown' AND s.created_at <= e.created_at)) AS secs
+        FROM trial_events e JOIN users u ON u.id = e.user_id
+        WHERE e.event = 'dismiss' AND e.created_at >= ${since.toISOString()} AND e.created_at < ${until.toISOString()}
+          AND lower(u.email) NOT IN (${sql.join(excluded.map((x) => sql`${x}`), sql`, `)}))
+      SELECT percentile_cont(0.5) WITHIN GROUP (ORDER BY secs)::float AS median,
+             COUNT(*) FILTER (WHERE secs < 4)::int AS quick
+      FROM d WHERE secs IS NOT NULL`));
     const count = (event: string, source?: string) => ev.filter((r) => r.event === event && (!source || r.source === source)).reduce((n, r) => n + r.people, 0);
 
     // Who each Stripe customer is (and which are Shann's own)
@@ -95,7 +108,8 @@ router.get('/admin/trial-stats', requireAdmin, async (req: Request, res: Respons
     const started = trials.filter((t) => t.outcome !== 'not_started').length;
     res.json({
       startDate: start, endDate: end,
-      promo: { shown: count('shown'), start: count('start'), dismiss: count('dismiss') },
+      promo: { shown: count('shown'), start: count('start'), dismiss: count('dismiss'),
+        closeMedianSecs: close?.median != null ? Math.round(close.median * 10) / 10 : null, closedUnder4s: close?.quick ?? 0 },
       checkout: { total: count('checkout'), promo: count('checkout', 'promo'), subscription: count('checkout', 'subscription'), pricing: count('checkout', 'pricing'), email: count('checkout', 'email') },
       trials: { started, inTrial: by('in_trial'), cancelling: by('cancelling'), paid: by('paid') + by('paid_cancelling'), paidCancelling: by('paid_cancelling'), paymentFailed: by('payment_failed'), ended: by('ended') },
       recent: trials.sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, 25),
