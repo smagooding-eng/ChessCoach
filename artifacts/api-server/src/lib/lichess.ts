@@ -51,35 +51,45 @@ export interface LichessGame {
   pgn?: string;
 }
 
+/** Games since `months` ago, newest first. Lichess sends at most 500 per request, so a
+ *  longer history is fetched page by page (each page ends where the last one stopped),
+ *  up to `maxGames`. Pages go one at a time, as Lichess asks. */
 export async function fetchLichessGames(
   username: string,
-  months: number = 3
+  months: number = 3,
+  maxGames: number = 20_000,
 ): Promise<LichessGame[]> {
   const since = Date.now() - months * 30 * 24 * 60 * 60 * 1000;
-  const url = `https://lichess.org/api/games/user/${encodeURIComponent(username)}?since=${since}&max=500&pgnInJson=true&opening=true&clocks=true&evals=false`;
-
-  const res = await fetch(url, {
-    headers: {
-      Accept: "application/x-ndjson",
-    },
-  });
-
-  if (!res.ok) {
-    throw new Error(`Lichess API error: ${res.status} for user ${username}`);
-  }
-
-  const text = await res.text();
-  const lines = text.trim().split("\n").filter(Boolean);
+  const PAGE = 500;
   const games: LichessGame[] = [];
-
-  for (const line of lines) {
-    try {
-      games.push(JSON.parse(line));
-    } catch {
-      logger.warn({ line: line.substring(0, 100) }, "Failed to parse Lichess game JSON");
+  let until: number | null = null;
+  for (;;) {
+    const url = `https://lichess.org/api/games/user/${encodeURIComponent(username)}?since=${since}${until != null ? `&until=${until}` : ""}&max=${PAGE}&pgnInJson=true&opening=true&clocks=true&evals=false`;
+    let res = await fetch(url, { headers: { Accept: "application/x-ndjson" } });
+    if (res.status === 429) {
+      // Lichess asks for a minute's pause after a 429
+      await new Promise((r) => setTimeout(r, 61_000));
+      res = await fetch(url, { headers: { Accept: "application/x-ndjson" } });
     }
+    if (!res.ok) {
+      if (games.length > 0) break; // keep what we have from earlier pages
+      throw new Error(`Lichess API error: ${res.status} for user ${username}`);
+    }
+    const lines = (await res.text()).trim().split("\n").filter(Boolean);
+    const page: LichessGame[] = [];
+    for (const line of lines) {
+      try {
+        page.push(JSON.parse(line));
+      } catch {
+        logger.warn({ line: line.substring(0, 100) }, "Failed to parse Lichess game JSON");
+      }
+    }
+    games.push(...page);
+    if (page.length < PAGE || games.length >= maxGames) break;
+    const oldest = Math.min(...page.map((g) => g.createdAt).filter((t) => typeof t === "number"));
+    if (!Number.isFinite(oldest) || oldest <= since) break;
+    until = oldest - 1;
   }
-
   return games;
 }
 

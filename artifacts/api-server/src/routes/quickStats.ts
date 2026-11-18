@@ -4,6 +4,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAdmin } from "../middlewares/authMiddleware";
+import { historyBackfillStatus } from "./games";
 
 const router: IRouter = Router();
 const rowsOf = <T,>(r: unknown): T[] => (Array.isArray(r) ? r : ((r as { rows?: T[] })?.rows ?? [])) as T[];
@@ -42,6 +43,11 @@ router.get("/admin/quick-stats", requireAdmin, async (req: Request, res: Respons
     // Nothing recorded yet (table made on the first start)
     res.json({ startDate: start, endDate: end, caught: 0, members: 0, notified: 0, pushed: 0, emailed: 0, opened: 0, minutes: { caught: null, reviewed: null, notified: null, chesscom: null, lichess: null } });
   }
+});
+
+router.get("/admin/history-status", requireAdmin, async (_req: Request, res: Response): Promise<void> => {
+  try { res.json(await historyBackfillStatus()); }
+  catch { res.json({ running: false, paused: null, accounts: 0, done: 0, errors: 0, gamesAdded: 0, noLinkedAccount: 0, sizeMb: null, limitMb: null }); }
 });
 
 export default router;

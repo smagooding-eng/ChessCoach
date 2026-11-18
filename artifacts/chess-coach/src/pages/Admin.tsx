@@ -3244,6 +3244,10 @@ function QuickReviewsPanel() {
     apiFetch(`/api/admin/quick-stats?startDate=${range.startDate}&endDate=${range.endDate}`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : null)).then(setData).catch(() => setData(null));
   }, [range]);
+  const [history, setHistory] = useState<{ accounts: number; done: number; errors: number; gamesAdded: number; noLinkedAccount: number; sizeMb: number | null; limitMb: number | null; paused: string | null } | null>(null);
+  useEffect(() => {
+    apiFetch('/api/admin/history-status', { credentials: 'include' }).then((r) => (r.ok ? r.json() : null)).then(setHistory).catch(() => {});
+  }, [range]);
   const mins = (v: number | null) => (v == null ? '—' : v < 1 ? '<1 min' : `${v} min`);
   const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : '—');
   const Stat = ({ label, value, sub }: { label: string; value: number | string; sub?: string }) => (
@@ -3274,6 +3278,18 @@ function QuickReviewsPanel() {
               <Stat label="Chess.com publish" value={mins(data.minutes.chesscom)} sub="end → caught" />
               <Stat label="Lichess publish" value={mins(data.minutes.lichess)} sub="end → caught" />
             </div>
+            {history && (
+              <div className="rounded-lg border border-border/30 bg-background/40 px-3 py-2.5 text-xs">
+                <p className="font-bold text-foreground">Full game history import</p>
+                <p className="mt-1 text-muted-foreground">
+                  {history.done} of {history.accounts} linked accounts done · {history.gamesAdded.toLocaleString()} older games added
+                  {history.errors ? ` · ${history.errors} failed (retried daily)` : ''}
+                  {history.noLinkedAccount ? ` · ${history.noLinkedAccount} members have no Chess.com or Lichess name linked` : ''}
+                </p>
+                {history.sizeMb != null && <p className="mt-1 text-muted-foreground">Database {history.sizeMb.toLocaleString()} MB · import pauses at {history.limitMb?.toLocaleString()} MB</p>}
+                {history.paused && <p className="mt-1 font-bold text-amber-400">Paused: {history.paused}</p>}
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">Members are told once they've stopped playing for 8 minutes, at most every 3 hours, about their latest game. "Opened" counts taps from the message.</p>
           </>
         )}

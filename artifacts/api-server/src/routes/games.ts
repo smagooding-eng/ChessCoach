@@ -96,14 +96,18 @@ async function runImportJobNow(opts: ImportJobOptions): Promise<{ imported: numb
       }
     }
   } else {
-    let games;
+    // Month by month, saving each before fetching the next: a full history can be tens
+    // of thousands of games, and a failed month doesn't lose the others.
+    let archives: string[];
     try {
-      games = await fetchChessComGames(platformUsername, months);
+      archives = (await fetchChessComArchiveList(platformUsername)).slice(-Math.max(1, months));
     } catch (err) {
       log.error({ err }, "Failed to fetch games from chess.com");
       return { imported, updated, total: 0, error: "Failed to fetch games from chess.com. Check the username and try again." };
     }
 
+    for (const archiveUrl of archives) {
+    const games = await fetchChessComGamesForArchive(archiveUrl);
     for (const game of games) {
       if (imported >= remainingImportSlots) break;
       try {
@@ -128,6 +132,7 @@ async function runImportJobNow(opts: ImportJobOptions): Promise<{ imported: numb
       } catch (err) {
         log.warn({ err }, "Failed to insert game");
       }
+    }
     }
   }
 
@@ -1611,6 +1616,9 @@ export async function startReviewServices(): Promise<void> {
 const CATCHUP_GAMES = Math.max(1, parseInt(process.env.CATCHUP_REVIEW_GAMES || "") || 5);
 const CATCHUP_GAP_MS = 20_000;
 let catchupRunning = false;
+// The latest month, plus the one before on the 1st and 2nd: a game finished just before
+// midnight on the last day can reach Chess.com's archive after the new month starts.
+const recentMonths = (): number => (new Date().getUTCDate() <= 2 ? 2 : 1);
 const rowsOfAny = <T,>(r: unknown): T[] => (Array.isArray(r) ? r : ((r as { rows?: T[] })?.rows ?? [])) as T[];
 const LAST_SEEN = sql`GREATEST(u.created_at, COALESCE(u.last_login_at, 'epoch'::timestamptz), COALESCE(u.last_active_at, 'epoch'::timestamptz),
   COALESCE((SELECT MAX(pv.created_at) FROM page_views pv WHERE pv.user_id = u.id), 'epoch'::timestamptz))`;
@@ -1630,7 +1638,7 @@ async function catchupOne(u: { id: string; chesscom_username: string | null; lic
   // Their latest games from Chess.com / Lichess (already-imported ones are skipped).
   for (const [platform, name] of [["chesscom", u.chesscom_username], ["lichess", u.lichess_username]] as const) {
     if (!name) continue;
-    try { await runImportJob({ userId: u.id, platformUsername: name, platform, months: 1, forceUpdate: false, log: appLogger }); }
+    try { await runImportJob({ userId: u.id, platformUsername: name, platform, months: recentMonths(), forceUpdate: false, log: appLogger }); }
     catch (err) { appLogger.warn({ err, userId: u.id, platform }, "[catchup] import failed"); }
   }
   const todo = await db.select().from(gamesTable)
@@ -1709,7 +1717,7 @@ let samedayRunning = false;
 async function samedayOne(u: { id: string; chesscom_username: string | null; lichess_username: string | null }): Promise<void> {
   for (const [platform, name] of [["chesscom", u.chesscom_username], ["lichess", u.lichess_username]] as const) {
     if (!name) continue;
-    try { await runImportJob({ userId: u.id, platformUsername: name, platform, months: 1, forceUpdate: false, log: appLogger }); }
+    try { await runImportJob({ userId: u.id, platformUsername: name, platform, months: recentMonths(), forceUpdate: false, log: appLogger }); }
     catch (err) { appLogger.warn({ err, userId: u.id, platform }, "[sameday] import failed"); }
   }
   // Their games from the last day and a half on Chess.com / Lichess, newest first
@@ -1806,18 +1814,108 @@ export async function startSamedayReviews(): Promise<void> {
   setTimeout(() => { void samedayTick(); }, 8 * 60_000).unref();
   setInterval(() => { void samedayTick(); }, 30 * 60_000).unref();
   await startQuickReviews();
+  await startHistoryBackfill();
+}
+
+// ── Full history, for every member who's ever signed up ───────────────────────────────
+// Sign-up imports 3 months and the background checks keep the latest month current;
+// this brings in everything older, once per linked account (all of Chess.com's monthly
+// archives, Lichess page by page). One account at a time with a pause between, so
+// Chess.com and Lichess see one steady stream of requests. history_backfill keeps who's
+// done (and redoes an account if its username changes). HISTORY_BACKFILL=0 turns it off.
+// Full histories add a lot of data, and a database that reaches its plan's storage limit
+// stops taking writes (the whole site). So the job pauses once the database reaches
+// HISTORY_BACKFILL_MAX_MB, or, if that isn't set, 300 MB more than it was when the job
+// first ran. Raise the limit to match the Neon plan and it carries on.
+let backfillRunning = false;
+let backfillPaused: string | null = null;
+async function dbSizeMb(): Promise<number> {
+  const [r] = rowsOfAny<{ mb: number }>(await db.execute(sql`SELECT (pg_database_size(current_database()) / 1048576)::int AS mb`));
+  return Number(r?.mb ?? 0);
+}
+async function backfillLimitMb(): Promise<number> {
+  const env = Number(process.env.HISTORY_BACKFILL_MAX_MB);
+  if (Number.isFinite(env) && env > 0) return env;
+  const [r] = rowsOfAny<{ v: string }>(await db.execute(sql`SELECT v FROM history_backfill_meta WHERE k = 'baseline_mb'`));
+  return Number(r?.v ?? 0) + 300;
+}
+async function backfillTick(): Promise<void> {
+  if (backfillRunning) return;
+  backfillRunning = true;
+  const until = Date.now() + 9 * 60_000;
+  try {
+    while (Date.now() < until) {
+      const [size, limit] = [await dbSizeMb(), await backfillLimitMb()];
+      if (size >= limit) {
+        if (!backfillPaused) appLogger.warn({ size, limit }, "[history] paused: database size limit");
+        backfillPaused = `Database is ${size} MB; the history import stops at ${limit} MB (HISTORY_BACKFILL_MAX_MB).`;
+        break;
+      }
+      backfillPaused = null;
+      const [next] = rowsOfAny<{ id: string; platform: "chesscom" | "lichess"; name: string }>(await db.execute(sql`
+        SELECT a.id, a.platform, a.name FROM (
+          SELECT id, 'chesscom' AS platform, chesscom_username AS name, created_at FROM users WHERE chesscom_username IS NOT NULL
+          UNION ALL
+          SELECT id, 'lichess', lichess_username, created_at FROM users WHERE lichess_username IS NOT NULL
+        ) a
+        LEFT JOIN history_backfill h ON h.user_id = a.id AND h.platform = a.platform
+        WHERE h.user_id IS NULL OR lower(h.username) <> lower(a.name)
+          OR (h.status = 'error' AND h.finished_at < now() - interval '1 day')
+          OR (h.status = 'working' AND h.started_at < now() - interval '2 hours')
+        ORDER BY (h.user_id IS NOT NULL), a.created_at DESC LIMIT 1`));
+      if (!next) break;
+      await db.execute(sql`INSERT INTO history_backfill (user_id, platform, username, status, started_at)
+        VALUES (${next.id}, ${next.platform}, ${next.name}, 'working', now())
+        ON CONFLICT (user_id, platform) DO UPDATE SET username = EXCLUDED.username, status = 'working', started_at = now(), error = NULL`);
+      try {
+        const r = await runImportJob({ userId: next.id, platformUsername: next.name, platform: next.platform, months: 600, forceUpdate: false, log: appLogger });
+        await db.execute(sql`UPDATE history_backfill SET status = ${r.error ? "error" : "done"}, imported = ${r.imported}, error = ${r.error ?? null}, finished_at = now()
+          WHERE user_id = ${next.id} AND platform = ${next.platform}`);
+        appLogger.info({ userId: next.id, platform: next.platform, imported: r.imported }, "[history] account done");
+      } catch (err) {
+        await db.execute(sql`UPDATE history_backfill SET status = 'error', error = ${String((err as Error)?.message ?? err).slice(0, 300)}, finished_at = now()
+          WHERE user_id = ${next.id} AND platform = ${next.platform}`).catch(() => {});
+      }
+      await new Promise((r) => setTimeout(r, 5_000));
+    }
+  } finally { backfillRunning = false; }
+}
+
+export async function historyBackfillStatus() {
+  const [r] = rowsOfAny<Record<string, number>>(await db.execute(sql`SELECT
+      (SELECT count(*)::int FROM users WHERE chesscom_username IS NOT NULL) + (SELECT count(*)::int FROM users WHERE lichess_username IS NOT NULL) AS accounts,
+      (SELECT count(*)::int FROM users WHERE chesscom_username IS NULL AND lichess_username IS NULL) AS "noLinkedAccount",
+      count(*) FILTER (WHERE status = 'done')::int AS done,
+      count(*) FILTER (WHERE status = 'error')::int AS errors,
+      COALESCE(sum(imported) FILTER (WHERE status = 'done'), 0)::int AS "gamesAdded"
+    FROM history_backfill`));
+  const [sizeMb, limitMb] = await Promise.all([dbSizeMb().catch(() => null), backfillLimitMb().catch(() => null)]);
+  return { running: backfillRunning, paused: backfillPaused, sizeMb, limitMb, ...r };
+}
+
+async function startHistoryBackfill(): Promise<void> {
+  if (process.env.HISTORY_BACKFILL === "0") return;
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS history_backfill (
+    user_id VARCHAR NOT NULL, platform VARCHAR(12) NOT NULL, username VARCHAR(64) NOT NULL,
+    status VARCHAR(12) NOT NULL, imported INTEGER, error TEXT,
+    started_at TIMESTAMPTZ, finished_at TIMESTAMPTZ, PRIMARY KEY (user_id, platform))`);
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS history_backfill_meta (k VARCHAR(32) PRIMARY KEY, v TEXT)`);
+  await db.execute(sql`INSERT INTO history_backfill_meta (k, v) VALUES ('baseline_mb', ${String(await dbSizeMb())}) ON CONFLICT (k) DO NOTHING`);
+  setTimeout(() => { void backfillTick(); }, 4 * 60_000).unref();
+  setInterval(() => { void backfillTick(); }, 10 * 60_000).unref();
 }
 
 // ── Quick reviews: minutes after a Chess.com / Lichess game, not hours ─────────────────
-// Each linked member is checked on their own schedule: every 3 min while they're in a
-// playing session (a game in the last 2 h), every 15 min if they've been around lately,
-// hourly otherwise. A check is one cheap request: Chess.com answers "304 Not Modified"
+// Every member who's ever signed up with a linked account (test accounts too) is checked
+// on their own schedule: every 3 min while they're in a playing session (a game in the
+// last 2 h), every 15 min if they've been around lately, hourly if seen or played this
+// month, every 6 h otherwise. A check is one cheap request: Chess.com answers "304 Not Modified"
 // to the current month's archive when nothing has changed (ETag), Lichess is asked for
 // games since the last one we have. Requests go one at a time, as both sites ask.
 // When a new game shows up it's imported and reviewed straight away (engine only), and
 // once they've stopped playing for 8 minutes they get one message about their latest
 // game: at most one every 3 hours. quick_detect records how long each step took.
-const QUICK_HOT_MS = 3 * 60_000, QUICK_WARM_MS = 15 * 60_000, QUICK_COLD_MS = 60 * 60_000;
+const QUICK_HOT_MS = 3 * 60_000, QUICK_WARM_MS = 15 * 60_000, QUICK_COLD_MS = 60 * 60_000, QUICK_AWAY_MS = 6 * 3600_000;
 const QUICK_QUIET_MS = 8 * 60_000, QUICK_GAP_MS = 3 * 3600_000;
 const QUICK_UA = "ChessScout.net/1.0 (+https://chessscout.net)";
 let quickRunning = false;
@@ -1856,7 +1954,7 @@ async function lichessHasNew(userId: string, name: string): Promise<boolean> {
   return (await res.text()).trim().length > 0;
 }
 
-type QuickMember = { id: string; chesscom_username: string | null; lichess_username: string | null; cc_etag: string | null; cc_month: string | null; recent_seen: boolean };
+type QuickMember = { id: string; chesscom_username: string | null; lichess_username: string | null; cc_etag: string | null; cc_month: string | null; recent_seen: boolean; month_seen: boolean };
 
 async function quickOne(u: QuickMember): Promise<void> {
   const started = new Date();
@@ -1865,12 +1963,12 @@ async function quickOne(u: QuickMember): Promise<void> {
     try {
       const c = await chesscomHasNew(u.id, u.chesscom_username, u.cc_etag, u.cc_month);
       etag = c.etag; month = c.month;
-      if (c.changed) { found = true; await runImportJob({ userId: u.id, platformUsername: u.chesscom_username, platform: "chesscom", months: 1, forceUpdate: false, log: appLogger }); }
+      if (c.changed) { found = true; await runImportJob({ userId: u.id, platformUsername: u.chesscom_username, platform: "chesscom", months: recentMonths(), forceUpdate: false, log: appLogger }); }
     } catch (err) { appLogger.warn({ err, userId: u.id }, "[quick] chess.com check failed"); }
   }
   if (u.lichess_username) {
     try {
-      if (await lichessHasNew(u.id, u.lichess_username)) { found = true; await runImportJob({ userId: u.id, platformUsername: u.lichess_username, platform: "lichess", months: 1, forceUpdate: false, log: appLogger }); }
+      if (await lichessHasNew(u.id, u.lichess_username)) { found = true; await runImportJob({ userId: u.id, platformUsername: u.lichess_username, platform: "lichess", months: recentMonths(), forceUpdate: false, log: appLogger }); }
     } catch (err) { appLogger.warn({ err, userId: u.id }, "[quick] lichess check failed"); }
   }
   if (found) {
@@ -1897,7 +1995,10 @@ async function quickOne(u: QuickMember): Promise<void> {
   // When to look again
   const newest = Math.max(await newestPlayed(u.id, "chesscom"), await newestPlayed(u.id, "lichess"));
   const inSession = Date.now() - newest < 2 * 3600_000;
-  const wait = inSession ? QUICK_HOT_MS : u.recent_seen || Date.now() - newest < 7 * 864e5 ? QUICK_WARM_MS : QUICK_COLD_MS;
+  const wait = inSession ? QUICK_HOT_MS
+    : u.recent_seen || Date.now() - newest < 7 * 864e5 ? QUICK_WARM_MS
+    : u.month_seen || Date.now() - newest < 30 * 864e5 ? QUICK_COLD_MS
+    : QUICK_AWAY_MS;
   await db.execute(sql`INSERT INTO sameday_reviews (user_id, next_quick_at, cc_etag, cc_month)
     VALUES (${u.id}, ${new Date(Date.now() + wait).toISOString()}, ${etag}, ${month})
     ON CONFLICT (user_id) DO UPDATE SET next_quick_at = EXCLUDED.next_quick_at, cc_etag = EXCLUDED.cc_etag, cc_month = EXCLUDED.cc_month`);
@@ -1909,11 +2010,10 @@ async function quickTick(): Promise<void> {
   try {
     const due = rowsOfAny<QuickMember>(await db.execute(sql`
       SELECT u.id, u.chesscom_username, u.lichess_username, s.cc_etag, s.cc_month,
-        (${LAST_SEEN} > now() - interval '14 days') AS recent_seen
+        (${LAST_SEEN} > now() - interval '14 days') AS recent_seen,
+        (${LAST_SEEN} > now() - interval '30 days') AS month_seen
       FROM users u LEFT JOIN sameday_reviews s ON s.user_id = u.id
       WHERE (u.chesscom_username IS NOT NULL OR u.lichess_username IS NOT NULL)
-        AND ${LAST_SEEN} > now() - interval '30 days'
-        AND u.id NOT IN (SELECT id FROM analytics_excluded_users)
         AND (s.next_quick_at IS NULL OR s.next_quick_at <= now())
       ORDER BY s.next_quick_at ASC NULLS FIRST LIMIT 40`));
     for (const u of due) {
