@@ -743,6 +743,23 @@ export function GameReplay() {
       .finally(() => setLoadingSavedReview(false));
   }, [game?.id]);
 
+  // A saved AI review with moves the coach left without notes: fill those in (once).
+  const coachGapsFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (!game || reviewAi !== true || reviewing || loadingSavedReview || reviewMoves.length === 0) return;
+    if (coachGapsFor.current === game.id) return;
+    const gaps = reviewMoves.some((m) => !(m as { pros?: string[] }).pros?.length && !(m as { cons?: string[] }).cons?.length);
+    if (!gaps) return;
+    coachGapsFor.current = game.id;
+    const forGame = game.id;
+    apiFetch(`/api/games/${forGame}/coach-gaps`, { method: 'POST', credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { filled?: number; reviewData?: { moves?: ReviewMove[] } } | null) => {
+        if (d?.filled && d.reviewData?.moves?.length && coachGapsFor.current === forGame) setReviewMoves(d.reviewData.moves);
+      })
+      .catch(() => {});
+  }, [game, reviewAi, reviewing, loadingSavedReview, reviewMoves]);
+
   // Practice mode — Lichess best move
   const [bestMoveSan, setBestMoveSan]   = useState<string | null>(null);
   const [fetchingBest, setFetchingBest] = useState(false);

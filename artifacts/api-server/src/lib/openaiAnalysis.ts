@@ -1175,6 +1175,13 @@ JSON format:
 
     const reviewMoves = mergeReviewWithEngine(rawMoves, moves, fens, evals, uciMoves, ecoBookFens, input.opening ?? null);
 
+    // Moves the coach left without notes (a part that failed, or moves it skipped):
+    // ask again for just those, so every move has its notes when the review is done.
+    if (aiCoach && allParsedMoves.length > 0 && coachGaps(reviewMoves).length > 0) {
+      await fillCoachGaps({ moves: reviewMoves, fens, evals, whiteUsername, blackUsername, opening, result, userId })
+        .catch((err) => logger.warn({ err }, "Coach gap pass failed"));
+    }
+
     const gameSummary: GameReviewSummary | null = gameSummaryRaw ? {
       overview: gameSummaryRaw.overview ?? "",
       keyMistakes: Array.isArray(gameSummaryRaw.keyMistakes)
@@ -1216,6 +1223,128 @@ JSON format:
     logger.error({ err }, "Failed to review full game with OpenAI");
     throw err;
   }
+}
+
+/** Moves the AI coach left without notes (no pros and no cons): a coach request that
+ *  failed, or an answer that skipped some moves. */
+export function coachGaps(moves: MoveReview[]): number[] {
+  return moves.flatMap((m, i) => ((m.pros?.length ?? 0) === 0 && (m.cons?.length ?? 0) === 0 ? [i] : []));
+}
+
+/** A second pass for coachGaps(): asks the coach about just those moves, checks every
+ *  note against the engine (as the main review does) and writes pros/cons into `moves`
+ *  in place. Positions and evaluations come from the review itself when not given, so
+ *  it also mends saved reviews. Returns how many moves it filled. */
+export async function fillCoachGaps(opts: {
+  moves: MoveReview[];
+  fens?: string[];
+  evals?: PositionEval[];
+  whiteUsername: string;
+  blackUsername: string;
+  opening: string | null;
+  result: string;
+  userId?: string;
+}): Promise<number> {
+  const { moves } = opts;
+  const gaps = coachGaps(moves);
+  if (gaps.length === 0) return 0;
+  const Chess = require("chess.js").Chess;
+
+  // Position before and after each move, and the engine's view of both
+  const before = (i: number): string | undefined => opts.fens?.[i] ?? moves[i]?.fen;
+  const after = (i: number): string | undefined => {
+    if (opts.fens?.[i + 1]) return opts.fens[i + 1];
+    const b = before(i);
+    if (!b) return undefined;
+    try { const c = new Chess(b); c.move(moves[i].san); return c.fen(); } catch { return moves[i + 1]?.fen; }
+  };
+  const evalAt = (pos: number): PositionEval => {
+    if (opts.evals?.[pos]) return opts.evals[pos];
+    const prev = pos > 0 ? moves[pos - 1] : undefined;
+    const here = moves[pos];
+    return {
+      cpWhite: prev?.evalAfterCp ?? 0, bestMoveUci: "", secondBestUci: "",
+      bestMoveSan: here?.bestLineSan?.[0] ?? (here?.betterMove ? here.betterMove.split(/\s/)[0] : null),
+      bestLineSan: here?.bestLineSan ?? [], depth: 0,
+    };
+  };
+
+  const lines: Array<{ i: number; line: string }> = [];
+  for (const i of gaps) {
+    const m = moves[i], fen = before(i);
+    if (!fen) continue;
+    let legal = 0;
+    try { legal = new Chess(fen).moves().length; } catch { continue; }
+    lines.push({ i, line: `${i}: ${Math.floor(i / 2) + 1}${m.color === "white" ? "." : "..."} ${m.san} [fen:${fen}] [legal:${legal}] [engine: ${m.classification}]` });
+  }
+  if (lines.length === 0) return 0;
+
+  const GROUP = 12;
+  const groups: Array<typeof lines> = [];
+  for (let k = 0; k < lines.length; k += GROUP) groups.push(lines.slice(k, k + GROUP));
+  const model = "gpt-5.6-luna";
+  const settled = await Promise.allSettled(groups.map((g) => openai.chat.completions.create({
+    model,
+    max_completion_tokens: Math.min(8192, 600 + g.length * 260),
+    response_format: { type: "json_object" },
+    messages: [{ role: "user", content: `You are a chess coach. Give a short note on each move below.
+
+Game: ${opts.whiteUsername} vs ${opts.blackUsername} | ${opts.opening ?? "Unknown"} | ${opts.result}
+
+Moves (with the engine's verdict on each):
+${g.map((x) => x.line).join("\n")}
+
+For each move: explanation (1 sentence), pros (1-2 items, max 8 words each), cons (1-2 items, max 8 words each).
+Base everything on the position given; don't claim captures, checks or threats that aren't there.
+You MUST cover ALL ${g.length} moves listed above.
+
+JSON format:
+{"moves":[{"moveIndex":${g[0].i},"explanation":"...","pros":["..."],"cons":["..."]}]}` }],
+  })));
+
+  let filled = 0, promptTokens = 0, completionTokens = 0;
+  settled.forEach((r, gi) => {
+    if (r.status !== "fulfilled") { logger.warn({ err: String(r.reason) }, "Coach gap pass failed for a group"); return; }
+    promptTokens += r.value.usage?.prompt_tokens ?? 0;
+    completionTokens += r.value.usage?.completion_tokens ?? 0;
+    let got: Array<{ moveIndex?: number; explanation?: string; pros?: unknown; cons?: unknown }> = [];
+    try { got = (JSON.parse(r.value.choices[0]?.message?.content ?? "{}").moves ?? []); } catch { return; }
+    const asked = new Set(groups[gi].map((x) => x.i));
+    for (const a of got) {
+      const i = a.moveIndex;
+      if (typeof i !== "number" || !asked.has(i)) continue;
+      const m = moves[i];
+      if ((m.pros?.length ?? 0) || (m.cons?.length ?? 0)) continue;
+      const fenB = before(i), fenA = after(i);
+      if (!fenB || !fenA) continue;
+      let legal = 0;
+      try { legal = new Chess(fenB).moves().length; } catch { continue; }
+      const facts = computeEngineFacts({
+        fenBefore: fenB, fenAfter: fenA, evalBefore: evalAt(i),
+        evalAfter: { ...evalAt(i + 1), cpWhite: m.evalAfterCp ?? evalAt(i + 1).cpWhite },
+        sanPlayed: m.san, classification: m.classification, playerColor: m.color,
+        inBook: m.classification === "book", legalMoveCount: legal,
+      });
+      const pros = (Array.isArray(a.pros) ? a.pros : []).filter((p): p is string => typeof p === "string" && !!p.trim());
+      const cons = (Array.isArray(a.cons) ? a.cons : []).filter((c): c is string => typeof c === "string" && !!c.trim());
+      const cleanPros = pros.filter((p) => reconcileExplanation(p, facts).ok);
+      const cleanCons = cons.filter((c) => reconcileExplanation(c, facts).ok);
+      // Same rule as the main review: anything that doesn't match the engine → the
+      // fact-based notes instead.
+      const use = cleanPros.length !== pros.length || cleanCons.length !== cons.length || (!pros.length && !cons.length)
+        ? buildFallbackProsCons(facts) : { pros: cleanPros, cons: cleanCons };
+      if (!use.pros.length && !use.cons.length) continue;
+      m.pros = use.pros;
+      m.cons = use.cons;
+      if (!m.explanation && typeof a.explanation === "string" && reconcileExplanation(a.explanation, facts).ok) m.explanation = a.explanation;
+      filled++;
+    }
+  });
+  if (promptTokens || completionTokens) {
+    void trackAiUsage({ userId: opts.userId, feature: AI_FEATURES.FULL_GAME_REVIEW, model, usage: { prompt_tokens: promptTokens, completion_tokens: completionTokens } });
+  }
+  logger.info({ gaps: gaps.length, filled }, "Coach gap pass");
+  return filled;
 }
 
 interface LessonChallengeOutput {

@@ -17,7 +17,7 @@ import {
 } from "@workspace/api-zod";
 import { fetchChessComGames, extractGameMetadata, parsePgnMoves, extractOpeningFromPgn, extractStartFen, fetchChessComArchiveList, fetchChessComGamesForArchive } from "../lib/chesscom";
 import { fetchLichessGames, extractLichessGameMetadata } from "../lib/lichess";
-import { analyzeMoves, analyzeSingleMove, reviewFullGame, analyzeGamePgn } from "../lib/openaiAnalysis";
+import { analyzeMoves, analyzeSingleMove, reviewFullGame, analyzeGamePgn, fillCoachGaps, type MoveReview } from "../lib/openaiAnalysis";
 import { randomUUID } from "crypto";
 import type { Logger } from "pino";
 import { trackAiUsage, AI_FEATURES } from "../lib/aiUsageTracker";
@@ -1939,6 +1939,38 @@ async function startQuickReviews(): Promise<void> {
   setInterval(() => { void quickTick(); }, 60_000).unref();
 }
 
+
+// Mend a saved AI review where some moves have no coach notes: ask the coach about
+// just those moves and save them. Only for the game's owner with the AI coach.
+const coachGapRuns = new Set<number>();
+router.post("/games/:id/coach-gaps", requireAuth, async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  const [game] = Number.isFinite(id) ? await db.select().from(gamesTable).where(eq(gamesTable.id, id)) : [];
+  if (!game || game.userId !== req.user!.id) { res.status(404).json({ error: "Not found" }); return; }
+  const rd = game.reviewData as Record<string, unknown> | null;
+  const moves = rd && Array.isArray(rd.moves) ? (rd.moves as MoveReview[]) : null;
+  // One try per review: moves the coach still can't cover aren't asked about on every visit
+  if (!rd || !moves || !aiFlag(rd) || rd.coachGapsTried || !(await aiCoachForOwner(game.userId))) { res.json({ filled: 0 }); return; }
+  if (coachGapRuns.has(id)) { res.json({ filled: 0, busy: true }); return; }
+  coachGapRuns.add(id);
+  try {
+    const filled = await fillCoachGaps({
+      moves, whiteUsername: game.whiteUsername, blackUsername: game.blackUsername,
+      opening: game.opening ?? null, result: game.result ?? "", userId: game.userId ?? undefined,
+    });
+    await db.update(gamesTable).set({ reviewData: { ...rd, moves, coachGapsTried: true } as unknown as Record<string, unknown> }).where(eq(gamesTable.id, id));
+    res.json({
+      filled,
+      reviewData: filled > 0 ? {
+        moves: refreshBasicReview(markBookMoves(moves), true, game.opening ?? null),
+        gameSummary: rd.gameSummary ?? null, whiteAccuracy: rd.whiteAccuracy ?? null, blackAccuracy: rd.blackAccuracy ?? null, aiCoach: true,
+      } : undefined,
+    });
+  } catch (err) {
+    req.log.warn({ err, gameId: id }, "coach gap fill failed");
+    res.json({ filled: 0 });
+  } finally { coachGapRuns.delete(id); }
+});
 
 // The member opened a game from its quick-review message
 router.post("/games/:id/quick-opened", requireAuth, async (req, res): Promise<void> => {
