@@ -16,14 +16,16 @@ export interface OpeningStat {
 }
 
 export function useMyOpenings() {
-  const { username, isLoaded } = useUser();
+  const { username, isLoaded, isAuthenticated } = useUser();
   return useQuery<{ openings: OpeningStat[]; totalGames: number }>({
     queryKey: ['/api/games/openings', username],
+    staleTime: 5 * 60_000,
     queryFn: async () => {
       const res = await apiFetch(`/api/games/openings?username=${encodeURIComponent(username ?? '')}`);
       if (!res.ok) throw new Error('Failed to load openings');
       return res.json();
     },
-    enabled: isLoaded && !!username,
+    // The list is your account's games: a signed-in member needs no lookup name.
+    enabled: isLoaded && (isAuthenticated || !!username),
   });
 }

@@ -223,7 +223,7 @@ export function AnalysisRedesign() {
   const { data: coursesData } = useMyCourses();
   const { data: summary } = useMyAnalysisSummary();
   const { data: weaknessesData } = useMyWeaknesses();
-  const { data: openingsData } = useMyOpenings();
+  const { data: openingsData, isLoading: openingsLoading, isError: openingsError, refetch: refetchOpenings } = useMyOpenings();
   const { data: multiElo } = useMultiEloProgress(username ?? undefined);
   const [tab, setTabState] = useState<TabId>(initialTab);
   const setTab = (t: TabId) => {
@@ -592,6 +592,14 @@ export function AnalysisRedesign() {
                       </Link>
                     );
                   })}
+                </div>
+              ) : openingsLoading ? (
+                <div className="space-y-2.5 py-1" aria-label="Loading your openings">
+                  {[0, 1, 2].map((k) => <div key={k} className="h-[74px] animate-pulse rounded-[14px]" style={{ background: 'rgba(255,255,255,.04)', border: `1px solid ${RD.border}` }} />)}
+                </div>
+              ) : openingsError ? (
+                <div className="py-8 text-center text-[13px]" style={{ color: RD.muted }}>
+                  Couldn’t load your openings. <button onClick={() => void refetchOpenings()} className="font-bold underline" style={{ color: RD.green }}>Try again</button>
                 </div>
               ) : (
                 <p className="py-8 text-center text-[13px]" style={{ color: RD.muted }}>Play an opening at least 3 times to see its win rate here.</p>

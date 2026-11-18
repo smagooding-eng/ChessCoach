@@ -646,6 +646,7 @@ router.get("/games/openings", requireAuth, async (req, res): Promise<void> => {
     })
     .from(gamesTable)
     .where(eq(gamesTable.userId, req.user!.id));
+  const mine = await ownerNames(req.user!.id);
 
   const totalGames = games.length;
 
@@ -669,7 +670,7 @@ router.get("/games/openings", requireAuth, async (req, res): Promise<void> => {
     const stat = map.get(key)!;
     if (!stat.eco && g.eco) stat.eco = g.eco;
 
-    const isWhite = g.whiteUsername.toLowerCase() === g.username;
+    const isWhite = sideFromNames(g, mine) !== "black";
     const colorStat = isWhite ? stat.white : stat.black;
 
     stat.total.games++;

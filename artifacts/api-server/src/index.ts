@@ -213,6 +213,9 @@ async function runSchemaMigrations() {
       started_at TIMESTAMPTZ NOT NULL,
       finished_at TIMESTAMPTZ NOT NULL
     )`);
+    // Every "your games" read (games list, openings, stats) filters by user: without this
+    // each one scanned the whole games table.
+    try { await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_games_user_played ON games(user_id, played_at DESC)`); } catch { /* keep starting */ }
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_live_games_white_user ON live_games(white_user_id, finished_at DESC)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_live_games_black_user ON live_games(black_user_id, finished_at DESC)`);
 
