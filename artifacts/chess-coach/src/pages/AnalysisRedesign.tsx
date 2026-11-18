@@ -13,6 +13,8 @@ import { RedesignHeader } from '@/components/RedesignHeader';
 import type { WeaknessRecord } from '@workspace/api-client-react';
 import { useSwipeTabs } from '@/lib/swipeNav';
 import { NEUTRAL_CHIP } from '@/lib/redesignTheme';
+import { useQuery } from '@tanstack/react-query';
+import { apiFetch } from '@/lib/api';
 
 // "My Analytics" (enhanced UI), laid out from the supplied concept. Every
 // number on this page is real data:
@@ -35,6 +37,7 @@ const TABS = [
   { id: 'weaknesses', label: 'Weaknesses' },
   { id: 'courses', label: 'Courses' },
   { id: 'openings', label: 'Openings' },
+  { id: 'endgames', label: 'Endgames' },
   { id: 'trends', label: 'Trends' },
 ] as const;
 type TabId = (typeof TABS)[number]['id'];
@@ -369,11 +372,11 @@ export function AnalysisRedesign() {
       <div className="mx-auto grid grid-cols-1 w-full max-w-[760px] gap-3 lg:max-w-[1200px]">
         <RedesignHeader title="My Analytics" icon={<span className="text-[26px] leading-none">♟</span>} />
 
-        <div data-swipe-tabs className="grid grid-cols-5 gap-0.5 rounded-[16px] p-1 lg:max-w-[720px]" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+        <div data-swipe-tabs className="flex gap-0.5 overflow-x-auto rounded-[16px] p-1 [scrollbar-width:none] lg:max-w-[820px] [&::-webkit-scrollbar]:hidden" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
           {TABS.map((t) => {
             const active = tab === t.id;
             return (
-              <button key={t.id} onClick={() => setTab(t.id)} className="min-w-0 truncate rounded-[12px] px-0.5 py-2.5 text-[11.5px] font-bold transition-colors min-[400px]:text-[12.5px] md:px-3 md:text-[13px]"
+              <button key={t.id} ref={active ? (el) => el?.scrollIntoView({ block: 'nearest', inline: 'nearest' }) : undefined} onClick={() => setTab(t.id)} className="shrink-0 grow whitespace-nowrap rounded-[12px] px-3 py-2.5 text-[12.5px] font-bold transition-colors md:text-[13px]"
                 style={active ? { background: 'rgba(255,255,255,.08)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                 {t.label}
               </button>
@@ -668,6 +671,8 @@ export function AnalysisRedesign() {
           </>
         )}
 
+        {tab === 'endgames' && <EndgamesTab />}
+
         {tab === 'trends' && (
           <div className="grid gap-3 lg:grid-cols-2 lg:items-start lg:gap-4">
             {monthlyAll.length > 0 && (
@@ -717,6 +722,157 @@ export function AnalysisRedesign() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+type EndgameStats = {
+  totalGames: number; endgameGames: number; reachedPct: number;
+  overall: { games: number; wins: number; draws: number; losses: number; winRate: number; score: number };
+  allScore: number;
+  byKind: Array<{ kind: string; label: string; games: number; wins: number; draws: number; losses: number; winRate: number; score: number;
+    recent: Array<{ id: number; opponent: string; result: string; playedAt: string }> }>;
+  conversion: {
+    ahead: { games: number; won: number; pct: number };
+    equal: { games: number; wins: number; draws: number; losses: number; score: number };
+    behind: { games: number; saved: number; pct: number };
+  };
+  pending: number;
+};
+
+const KIND_ICON: Record<string, string> = { pawn: 'wP', minor: 'wN', rook: 'wR', rook_minor: 'wR', queen: 'wQ' };
+
+function ResultBar({ wins, draws, losses }: { wins: number; draws: number; losses: number }) {
+  const n = wins + draws + losses || 1;
+  return (
+    <span className="flex h-2 flex-1 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.08)' }}>
+      <span style={{ width: `${(wins / n) * 100}%`, background: RD.green }} />
+      <span style={{ width: `${(draws / n) * 100}%`, background: 'rgba(255,255,255,.35)' }} />
+      <span style={{ width: `${(losses / n) * 100}%`, background: RD.red }} />
+    </span>
+  );
+}
+
+function EndgamesTab() {
+  const { isAuthenticated } = useUser();
+  const [open, setOpen] = useState<string | null>(null);
+  const { data, isLoading, isError, refetch } = useQuery<EndgameStats>({
+    queryKey: ['/api/endgame-stats'],
+    queryFn: async () => {
+      const res = await apiFetch('/api/endgame-stats', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed');
+      return res.json();
+    },
+    enabled: isAuthenticated,
+    staleTime: 5 * 60_000,
+    // A first visit works through your games in steps: keep going until all are in.
+    refetchInterval: (q) => ((q.state.data as EndgameStats | undefined)?.pending ? 1500 : false),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="grid gap-3 lg:grid-cols-2">
+        {[0, 1].map((k) => <div key={k} className="h-[220px] animate-pulse rounded-[20px]" style={{ background: 'rgba(255,255,255,.04)', border: `1px solid ${RD.border}` }} />)}
+      </div>
+    );
+  }
+  if (isError || !data) {
+    return <Card><div className="py-8 text-center text-[13px]" style={{ color: RD.muted }}>Couldn’t load your endgame stats. <button onClick={() => void refetch()} className="font-bold underline" style={{ color: RD.green }}>Try again</button></div></Card>;
+  }
+  if (data.endgameGames === 0) {
+    return (
+      <Card>
+        <p className="py-8 text-center text-[13px]" style={{ color: RD.muted }}>
+          {data.pending > 0 ? 'Going through your games…' : 'None of your games have reached an endgame yet. Once one does, your endgame stats show up here.'}
+        </p>
+      </Card>
+    );
+  }
+
+  const c = data.conversion;
+  const diff = data.overall.score - data.allScore;
+  return (
+    <div className="grid gap-3 lg:grid-cols-2 lg:items-start lg:gap-4">
+      <Card>
+        <h2 className="mb-3 text-[16px] font-extrabold">Your Endgames</h2>
+        <div className="flex gap-2">
+          <StatTile icon={<Swords size={18} />} value={String(data.endgameGames)} label={`${data.reachedPct}% of your games`} />
+          <StatTile icon={<Trophy size={18} />} value={`${data.overall.winRate}%`} label="Endgame win rate" />
+          <StatTile icon={diff >= 0 ? <ArrowUp size={18} /> : <ArrowDown size={18} />} color={diff >= 0 ? RD.green : RD.red}
+            value={`${data.overall.score}%`} label={`Score (${diff >= 0 ? '+' : ''}${diff} vs all games)`} />
+        </div>
+        {data.pending > 0 && <p className="mt-2 text-[11.5px]" style={{ color: RD.muted }}>Still adding {data.pending} older games…</p>}
+      </Card>
+
+      <Card>
+        <h2 className="mb-3 text-[16px] font-extrabold">Turning Endgames Into Results</h2>
+        <div className="space-y-2.5">
+          {[
+            { label: 'Winning endgames won', sub: 'Up 2+ pawns of material', pct: c.ahead.pct, games: c.ahead.games, good: true },
+            { label: 'Losing endgames saved', sub: 'Down 2+ pawns, drawn or won', pct: c.behind.pct, games: c.behind.games, good: true },
+            { label: 'Equal endgames scored', sub: 'Level material (win = 1, draw = ½)', pct: c.equal.score, games: c.equal.games, good: true },
+          ].map((row) => (
+            <div key={row.label} className="rounded-[14px] px-3 py-2.5" style={{ background: 'rgba(255,255,255,.025)', border: `1px solid ${RD.border}` }}>
+              <div className="flex items-baseline justify-between gap-2">
+                <b className="text-[13.5px] font-bold">{row.label}</b>
+                <b className="text-[15px] font-extrabold" style={{ color: row.games ? RD.text : RD.muted }}>{row.games ? `${row.pct}%` : '—'}</b>
+              </div>
+              <div className="mt-1 flex items-center gap-2.5">
+                <span className="h-2 flex-1 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.08)' }}>
+                  <span className="block h-full rounded-full" style={{ width: `${row.games ? Math.max(row.pct, 3) : 0}%`, background: row.pct >= 50 ? RD.green : RD.red }} />
+                </span>
+                <span className="w-[86px] shrink-0 text-right text-[11px]" style={{ color: RD.muted }}>{row.games} game{row.games === 1 ? '' : 's'}</span>
+              </div>
+              <span className="mt-0.5 block text-[11px]" style={{ color: RD.muted }}>{row.sub}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <Card className="lg:col-span-2">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="text-[16px] font-extrabold">By Endgame Type</h2>
+          <Link href="/endgames" className="flex items-center gap-1 text-[13.5px] font-bold" style={{ color: RD.green }}>Practice <ChevronRight size={15} /></Link>
+        </div>
+        <div className="space-y-2">
+          {data.byKind.map((k) => {
+            const isOpen = open === k.kind;
+            return (
+              <div key={k.kind} className="rounded-[14px]" style={{ background: 'rgba(255,255,255,.025)', border: `1px solid ${RD.border}` }}>
+                <button onClick={() => setOpen(isOpen ? null : k.kind)} className="flex w-full items-center gap-3 px-2.5 py-2.5 text-left">
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px]" style={{ background: 'rgba(255,255,255,.06)' }}>
+                    <img src={sprite(KIND_ICON[k.kind] ?? 'wK')} alt="" className="h-7 w-7" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-baseline justify-between gap-2">
+                      <b className="truncate text-[14px] font-bold">{k.label}</b>
+                      <b className="text-[13.5px]">{k.winRate}%</b>
+                    </span>
+                    <span className="mt-1.5 flex items-center gap-2.5"><ResultBar wins={k.wins} draws={k.draws} losses={k.losses} /></span>
+                    <span className="mt-1 block text-[11px]" style={{ color: RD.muted }}>{k.games} games · {k.wins}W {k.draws}D {k.losses}L</span>
+                  </span>
+                  <ChevronDown size={16} className="shrink-0 transition-transform" style={{ color: RD.muted, transform: isOpen ? 'rotate(180deg)' : undefined }} />
+                </button>
+                {isOpen && (
+                  <div className="space-y-1 px-2.5 pb-2.5">
+                    {k.recent.map((g) => (
+                      <Link key={g.id} href={`/games/${g.id}`} className="flex items-center justify-between gap-2 rounded-[10px] px-2.5 py-2 text-[12.5px]" style={{ background: 'rgba(255,255,255,.03)' }}>
+                        <span className="min-w-0 truncate">vs {g.opponent}</span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          <b style={{ color: g.result === 'win' ? RD.green : g.result === 'loss' ? RD.red : RD.muted }}>{g.result === 'win' ? 'Won' : g.result === 'loss' ? 'Lost' : 'Draw'}</b>
+                          <span style={{ color: RD.muted }}>{new Date(g.playedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                          <ChevronRight size={14} style={{ color: RD.muted }} />
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <p className="mt-3 text-[11px]" style={{ color: RD.muted }}>An endgame starts once each side is down to a rook and a minor piece, or less, besides pawns.</p>
+      </Card>
     </div>
   );
 }

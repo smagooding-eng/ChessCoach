@@ -22,6 +22,7 @@ import { randomUUID } from "crypto";
 import type { Logger } from "pino";
 import { trackAiUsage, AI_FEATURES } from "../lib/aiUsageTracker";
 import { Chess } from "chess.js";
+import { ownerNames, sideFromNames } from "../lib/ownerSide";
 
 const router: IRouter = Router();
 
@@ -1306,23 +1307,6 @@ async function saveReview(gameId: number, reviewResult: unknown): Promise<"saved
 
 /** The side the coach's summary is written for: the owner's own account names first
  *  (an imported game can be stored under another name), then the name it was imported under. */
-// Who the user is: their own ChessScout, Chess.com and Lichess names, from the account.
-async function ownerNames(userId: string | null | undefined): Promise<string[]> {
-  if (!userId) return [];
-  try {
-    const [u] = await db.select({ a: usersTable.scoutUsername, b: usersTable.chesscomUsername, c: usersTable.lichessUsername }).from(usersTable).where(eq(usersTable.id, userId));
-    return u ? [u.a, u.b, u.c].filter((n): n is string => !!n).map((n) => n.toLowerCase()) : [];
-  } catch { return []; }
-}
-
-// Which side the user played: their own names first, then the account the game was saved under.
-function sideFromNames(game: { username?: string | null; whiteUsername: string; blackUsername: string }, names: string[]): "white" | "black" | undefined {
-  const all = game.username ? [...names, game.username.toLowerCase()] : names;
-  const w = game.whiteUsername.toLowerCase(), b = game.blackUsername.toLowerCase();
-  for (const n of all) { if (n === w) return "white"; if (n === b) return "black"; }
-  return undefined;
-}
-
 async function coachSideFor(game: typeof gamesTable.$inferSelect): Promise<"white" | "black" | undefined> {
   return sideFromNames(game, await ownerNames(game.userId));
 }
