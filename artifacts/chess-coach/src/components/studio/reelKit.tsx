@@ -4,7 +4,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Copy, Check, Shuffle } from 'lucide-react';
-import { randomLook, lookLabel, type BoardLook } from '@/context/SettingsContext';
+import { randomLook, lookLabel, BOARD_TEXTURES, type BoardLook } from '@/context/SettingsContext';
+import { pieceImageUrls } from '@/components/RecoloredPieces';
 
 /** The 9:16 frame. Full screen (clean view / render) fits inside the screen whatever its shape. */
 export function reelFrameSize(full: boolean): React.CSSProperties {
@@ -43,16 +44,73 @@ export function CaptionBox({ text, label = 'Caption' }: { text: string; label?: 
 export type ReelLook = { mode: 'mine' | 'fixed' | 'scene' | 'move'; look?: BoardLook | null };
 export const REEL_LOOK_DEFAULT: ReelLook = { mode: 'mine' };
 
-/** The look for the current scene or move (stable while that key stays the same). */
+// A look is only shown once its pictures (photo board, textures, piece sprites) have
+// loaded: switching to one that hadn't showed an empty board or no pieces for a moment.
+const loadedUrls = new Set<string>();
+const keepDecoded: HTMLImageElement[] = [];
+function lookUrls(l: BoardLook): string[] {
+  const tex = BOARD_TEXTURES[l.boardTexture];
+  const urls: string[] = [];
+  if (tex?.boardImage) urls.push(tex.boardImage);
+  for (const css of [tex?.backgroundImage, tex?.backgroundImageDark]) {
+    for (const m of (css ?? '').matchAll(/url\(['"]?([^'")]+)['"]?\)/g)) urls.push(m[1]);
+  }
+  return [...urls, ...pieceImageUrls(l.pieceShape)];
+}
+function loadUrl(url: string): Promise<void> {
+  if (loadedUrls.has(url)) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => { void (img.decode?.() ?? Promise.resolve()).catch(() => {}).finally(() => { loadedUrls.add(url); keepDecoded.push(img); resolve(); }); };
+    img.onerror = () => reject(new Error(url));
+    img.src = url;
+  });
+}
+const prepareLook = (l: BoardLook) => Promise.all(lookUrls(l).map(loadUrl)).then(() => undefined);
+
+/** The look for the current scene or move (stable while that key stays the same). New
+ *  looks are got ready in the background; until the next one is ready the board keeps
+ *  the one before, so it never shows half-loaded. */
 export function useReelLook(rl: ReelLook | undefined, sceneKey: string | number, moveKey: string | number): BoardLook | null {
   const cache = useRef(new Map<string, BoardLook>());
+  const ready = useRef<BoardLook[]>([]);
+  const pending = useRef(0);
+  const last = useRef<BoardLook | null>(null);
+  const alive = useRef(true);
+  const [, bump] = useState(0);
   const r = rl ?? REEL_LOOK_DEFAULT;
+  const cycling = r.mode === 'scene' || r.mode === 'move';
+
+  const topUp = () => {
+    while (ready.current.length + pending.current < 4) {
+      const l = randomLook();
+      pending.current++;
+      prepareLook(l)
+        .then(() => { if (alive.current) { ready.current.push(l); bump((n) => n + 1); } })
+        .catch(() => { /* a picture that won't load: skip that look */ })
+        .finally(() => { pending.current--; if (alive.current) setTimeout(topUp, 0); });
+    }
+  };
+  useEffect(() => {
+    alive.current = true;
+    if (cycling) topUp();
+    return () => { alive.current = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cycling]);
+  const fixedLook = r.mode === 'fixed' ? r.look ?? null : null;
+  useEffect(() => { if (fixedLook) void prepareLook(fixedLook).catch(() => {}); }, [fixedLook]);
+
   if (r.mode === 'mine') return null;
-  if (r.mode === 'fixed') return r.look ?? null;
+  if (r.mode === 'fixed') return fixedLook;
   const k = `${r.mode}:${r.mode === 'scene' ? sceneKey : `${sceneKey}/${moveKey}`}`;
   let l = cache.current.get(k);
-  if (!l) { l = randomLook(); cache.current.set(k, l); }
-  return l;
+  if (!l && ready.current.length) {
+    l = ready.current.shift()!;
+    cache.current.set(k, l);
+    setTimeout(topUp, 0);
+  }
+  if (l) last.current = l;
+  return last.current;
 }
 
 export function LookPicker({ value, onChange }: { value: ReelLook | undefined; onChange: (v: ReelLook) => void }) {

@@ -88,6 +88,20 @@ function remapElement(node: React.ReactNode, outline: string, detail: string, ow
   return React.cloneElement(node, { style: newStyle } as any, newChildren);
 }
 
+// Shapes drawn from picture files (/pieces/<shape>/<key>.svg, or .webp for raster sets)
+// rather than the recolorable built-in set.
+const STATIC_SVG_SHAPES: string[] = ['cburnett', 'celtic', 'chessnut', 'fantasy', 'spatial', 'rhosgfx', 'kiwen-suwi', 'firi', 'totoy', 'papercut'];
+const PIECE_KEYS = ['wP', 'wR', 'wN', 'wB', 'wQ', 'wK', 'bP', 'bR', 'bN', 'bB', 'bQ', 'bK'];
+
+/** The picture files a piece shape is drawn from (none for the built-in recolorable set). */
+export function pieceImageUrls(pieceShape: string): string[] {
+  const info = PIECE_SHAPES[pieceShape as keyof typeof PIECE_SHAPES];
+  if (!STATIC_SVG_SHAPES.includes(pieceShape) && !info?.raster) return [];
+  const ext = info?.raster ? 'webp' : 'svg';
+  const ver = info?.raster ? `?v=${info.version ?? 1}` : '';
+  return PIECE_KEYS.map((k) => `/pieces/${pieceShape}/${k}.${ext}${ver}`);
+}
+
 export interface RecoloredPieceProps {
   fill: string;
   outline: string;
@@ -167,7 +181,6 @@ export function buildTintedPieceSet(opts: {
   // Each one's license is checked and recorded in PIECE_SHAPES below;
   // this list exists only to decide which shapes take this static-asset
   // path versus the recolorable 'default' path further down.
-  const STATIC_SVG_SHAPES: string[] = ['cburnett', 'celtic', 'chessnut', 'fantasy', 'spatial', 'rhosgfx', 'kiwen-suwi', 'firi', 'totoy', 'papercut'];
   if (STATIC_SVG_SHAPES.includes(pieceShape) || PIECE_SHAPES[pieceShape as keyof typeof PIECE_SHAPES]?.raster) {
     // Raster sets are WebP sprites; every other static shape is SVG. The version tag means a
     // replaced set of sprites (same file names) is never served from a stale cache.
