@@ -488,11 +488,12 @@ router.get("/games", requireAuth, async (req, res): Promise<void> => {
     dbQuery = dbQuery.where(and(...conditions));
   }
 
-  const [games, [{ value: total }]] = await Promise.all([dbQuery, countQuery]);
+  const [games, [{ value: total }], mine] = await Promise.all([dbQuery, countQuery, ownerNames(req.user!.id)]);
 
   res.json({
     games: games.map(({ hasReview, ...g }) => ({
       ...g,
+      yourSide: sideFromNames(g, mine) ?? null,
       reviewed: !!hasReview,
       playedAt: g.playedAt.toISOString(),
       createdAt: g.createdAt.toISOString(),
@@ -609,8 +610,11 @@ router.get("/games/openings/detail", requireAuth, async (req, res): Promise<void
   }
 
   // Return top 10 sample games + main line
+  const mine = await ownerNames(req.user!.id);
   const sampleGames = matched.slice(0, 10).map(g => ({
     id: g.id,
+    username: g.username,
+    yourSide: sideFromNames(g, mine) ?? null,
     result: g.result,
     whiteUsername: g.whiteUsername,
     blackUsername: g.blackUsername,
@@ -1098,14 +1102,15 @@ router.get("/games/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(
-    GetGameResponse.parse({
+  res.json({
+    ...GetGameResponse.parse({
       ...game,
       reviewed: !!(game.reviewData && typeof game.reviewData === 'object'),
       playedAt: game.playedAt.toISOString(),
       createdAt: game.createdAt.toISOString(),
-    })
-  );
+    }),
+    yourSide: (await coachSideFor(game)) ?? null,
+  });
 });
 
 router.get("/games/:id/replay", async (req, res): Promise<void> => {
@@ -1300,18 +1305,25 @@ async function saveReview(gameId: number, reviewResult: unknown): Promise<"saved
 
 /** The side the coach's summary is written for: the owner's own account names first
  *  (an imported game can be stored under another name), then the name it was imported under. */
-async function coachSideFor(game: typeof gamesTable.$inferSelect): Promise<"white" | "black" | undefined> {
-  const names: string[] = [];
-  if (game.userId) {
-    try {
-      const [u] = await db.select({ a: usersTable.scoutUsername, b: usersTable.chesscomUsername, c: usersTable.lichessUsername }).from(usersTable).where(eq(usersTable.id, game.userId));
-      if (u) names.push(...[u.a, u.b, u.c].filter((n): n is string => !!n).map((n) => n.toLowerCase()));
-    } catch { /* fall back to the stored name */ }
-  }
-  if (game.username) names.push(game.username.toLowerCase());
+// Who the user is: their own ChessScout, Chess.com and Lichess names, from the account.
+async function ownerNames(userId: string | null | undefined): Promise<string[]> {
+  if (!userId) return [];
+  try {
+    const [u] = await db.select({ a: usersTable.scoutUsername, b: usersTable.chesscomUsername, c: usersTable.lichessUsername }).from(usersTable).where(eq(usersTable.id, userId));
+    return u ? [u.a, u.b, u.c].filter((n): n is string => !!n).map((n) => n.toLowerCase()) : [];
+  } catch { return []; }
+}
+
+// Which side the user played: their own names first, then the account the game was saved under.
+function sideFromNames(game: { username?: string | null; whiteUsername: string; blackUsername: string }, names: string[]): "white" | "black" | undefined {
+  const all = game.username ? [...names, game.username.toLowerCase()] : names;
   const w = game.whiteUsername.toLowerCase(), b = game.blackUsername.toLowerCase();
-  for (const n of names) { if (n === w) return "white"; if (n === b) return "black"; }
+  for (const n of all) { if (n === w) return "white"; if (n === b) return "black"; }
   return undefined;
+}
+
+async function coachSideFor(game: typeof gamesTable.$inferSelect): Promise<"white" | "black" | undefined> {
+  return sideFromNames(game, await ownerNames(game.userId));
 }
 
 async function aiCoachForOwner(ownerId: string | null | undefined): Promise<boolean> {

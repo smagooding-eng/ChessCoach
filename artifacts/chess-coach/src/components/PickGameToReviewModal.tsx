@@ -1,3 +1,4 @@
+import { mySide, useMyNames } from '@/lib/gameSide';
 import { useLocation } from 'wouter';
 import { X, ChevronRight, Trophy, Skull, Minus } from 'lucide-react';
 import { useMyGames } from '@/hooks/use-games';
@@ -25,6 +26,7 @@ function formatDate(iso: string) {
 }
 
 export function PickGameToReviewModal({ onClose }: { onClose: () => void }) {
+  const myNames = useMyNames();
   const { data, isLoading } = useMyGames(5);
   const [, navigate] = useLocation();
   const games = (data?.games ?? []).slice(0, 5);
@@ -66,8 +68,7 @@ export function PickGameToReviewModal({ onClose }: { onClose: () => void }) {
           {games.map((g) => {
             const badge = RESULT_BADGE[g.result] ?? RESULT_BADGE.draw;
             const Icon = badge.icon;
-            const opponent = g.username && g.whiteUsername.toLowerCase() === g.username
-              ? g.blackUsername : g.whiteUsername;
+            const opponent = mySide(g, myNames) === 'black' ? g.whiteUsername : g.blackUsername;
             return (
               <button
                 key={g.id}

@@ -116,9 +116,12 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           },
         );
       }
-      if (data.user?.chesscomUsername && !localStorage.getItem('chessCoachUsername')) {
-        localStorage.setItem('chessCoachUsername', data.user.chesscomUsername);
-        setUsername(data.user.chesscomUsername);
+      // Signed in, you are your account: a name kept on this device from an earlier
+      // sign-in or lookup never stands in for it.
+      const own = data.user ? (data.user.chesscomUsername || data.user.lichessUsername || data.user.scoutUsername || null) : null;
+      if (own) {
+        localStorage.setItem('chessCoachUsername', own);
+        setUsername(own);
       }
     } catch {
       setAuthUser(null);
@@ -202,6 +205,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const login = (name: string) => {
     localStorage.setItem('chessCoachUsername', name);
     setUsername(name);
+    // Every caller is saving your own Chess.com name to your account: show it now.
+    setAuthUser((u) => (u ? { ...u, chesscomUsername: name } : u));
   };
 
   const logout = () => {
@@ -230,7 +235,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <UserContext.Provider value={{
-      username,
+      username: (authUser ? (authUser.chesscomUsername || authUser.lichessUsername || authUser.scoutUsername) : null) || username,
       isLoaded,
       login,
       logout,

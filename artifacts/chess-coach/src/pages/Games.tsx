@@ -1,3 +1,4 @@
+import { mySide, useMyNames } from '@/lib/gameSide';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useReviewAll } from '@/components/ReviewAllDialog';
 import { PageHero } from '@/components/DesignSystem';
@@ -46,6 +47,7 @@ export function Games() {
     opponent: h2hMode && debouncedH2hOpponent ? debouncedH2hOpponent : undefined,
   });
   const { username } = useUser();
+  const myNames = useMyNames();
   const { data: summary } = useMyAnalysisSummary();
   const queryClient = useQueryClient();
 
@@ -152,37 +154,10 @@ export function Games() {
     );
   }
 
-  const getMyHandle = (game: typeof games[0]) =>
-    (game.username || username || '').toLowerCase();
-
-  const getPlayerColor = (game: typeof games[0]) => {
-    const u = getMyHandle(game);
-    if (!u) return null;
-    if (game.whiteUsername.toLowerCase() === u) return 'white';
-    if (game.blackUsername.toLowerCase() === u) return 'black';
-    return null;
-  };
-
-  const getOpponent = (game: typeof games[0]) => {
-    const u = getMyHandle(game);
-    if (game.whiteUsername.toLowerCase() === u) return game.blackUsername;
-    if (game.blackUsername.toLowerCase() === u) return game.whiteUsername;
-    return game.blackUsername;
-  };
-
-  const getUserRating = (game: typeof games[0]) => {
-    const u = getMyHandle(game);
-    if (game.whiteUsername.toLowerCase() === u) return game.whiteRating;
-    if (game.blackUsername.toLowerCase() === u) return game.blackRating;
-    return game.whiteRating;
-  };
-
-  const getOpponentRating = (game: typeof games[0]) => {
-    const u = getMyHandle(game);
-    if (game.whiteUsername.toLowerCase() === u) return game.blackRating;
-    if (game.blackUsername.toLowerCase() === u) return game.whiteRating;
-    return game.blackRating;
-  };
+  const getPlayerColor = (game: typeof games[0]) => mySide(game, myNames);
+  const getOpponent = (game: typeof games[0]) => (getPlayerColor(game) === 'black' ? game.whiteUsername : game.blackUsername);
+  const getUserRating = (game: typeof games[0]) => (getPlayerColor(game) === 'black' ? game.blackRating : game.whiteRating);
+  const getOpponentRating = (game: typeof games[0]) => (getPlayerColor(game) === 'black' ? game.whiteRating : game.blackRating);
 
   return (
     <div className="space-y-5 px-4 pt-4 md:px-0 md:pt-0 pb-10">

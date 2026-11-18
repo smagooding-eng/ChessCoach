@@ -1,3 +1,4 @@
+import { playedWhite, useMyNames } from '@/lib/gameSide';
 import React, { useEffect, useState } from 'react';
 import { PieceTile } from '@/components/DesignSystem';
 import { useParams, Link } from 'wouter';
@@ -125,6 +126,7 @@ function timeAgo(iso: string | null): string {
 export function WeaknessDetail() {
   const { id } = useParams();
   const { username } = useUser();
+  const myNames = useMyNames();
   const [data, setData] = useState<WeaknessDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -164,8 +166,7 @@ export function WeaknessDetail() {
   const sev = SEV_CFG[weakness.severity] ?? SEV_CFG.Medium;
   const pct = Math.round(weakness.frequency * 100);
   const isWhite = (g: RelatedGame) => {
-    const u = ((g as any).username || username || '').toLowerCase();
-    return g.whiteUsername.toLowerCase() === u;
+    return playedWhite(g as Parameters<typeof playedWhite>[0], myNames);
   };
   const CategoryIcon = CATEGORY_ICONS[weakness.category] ?? AlertTriangle;
   const SevIcon = sev.icon;

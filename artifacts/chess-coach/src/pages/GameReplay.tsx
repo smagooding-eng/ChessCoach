@@ -1,4 +1,5 @@
 import { RedesignHeader } from '@/components/RedesignHeader';
+import { useMyNames, mySide as sideOf } from '@/lib/gameSide';
 import { StayInTouchCard } from '@/components/review/StayInTouchCard';
 import { ShareButton, SHARE_BASE } from '@/components/ShareButton';
 import { landingSquare, type ShareSpec } from '@/lib/shareImage';
@@ -761,20 +762,12 @@ export function GameReplay() {
   // saved under), else your linked names in order, and the name last looked up only when
   // nothing else matches. (Checking a mixed list, White first, made whoever you'd looked
   // up "You" when they had White.)
+  const myNames = useMyNames();
   const mySide = useMemo((): 'w' | 'b' | null => {
     if (!game) return null;
-    const g = game as { yourSide?: 'white' | 'black' | null; username?: string | null };
-    if (g.yourSide === 'white') return 'w';
-    if (g.yourSide === 'black') return 'b';
-    const white = (game.whiteUsername ?? '').toLowerCase(), black = (game.blackUsername ?? '').toLowerCase();
-    for (const n of [g.username, authUser?.scoutUsername, authUser?.chesscomUsername, authUser?.lichessUsername, username]) {
-      const x = (n ?? '').toLowerCase();
-      if (!x) continue;
-      if (x === white) return 'w';
-      if (x === black) return 'b';
-    }
-    return null;
-  }, [game, authUser?.scoutUsername, authUser?.chesscomUsername, authUser?.lichessUsername, username]);
+    const s = sideOf(game as Parameters<typeof sideOf>[0], myNames);
+    return s === 'white' ? 'w' : s === 'black' ? 'b' : null;
+  }, [game, myNames]);
   const flippedFor = useRef<number | null>(null);
   useEffect(() => {
     if (!game || flippedFor.current === game.id) return;
@@ -1621,7 +1614,7 @@ export function GameReplay() {
                 {currentFen && (
                   <button
                     onClick={() => {
-                      const isBlack = game?.blackUsername.toLowerCase() === username?.toLowerCase();
+                      const isBlack = mySide === 'b';
                       const opponentRating = game
                         ? (isBlack ? game.whiteRating : game.blackRating) || 1200
                         : 1200;
@@ -1681,10 +1674,7 @@ export function GameReplay() {
                 ? `Analyzing ${game.opening}… move ${currentSan}`
                 : `${phase} · analyzing move ${Math.ceil(reviewProgress.done / 2)} of ${Math.ceil(reviewProgress.total / 2)}${currentSan ? ` (${currentSan})` : ''}`;
 
-            const myHandle = ((game as any).username || username || '').toLowerCase();
-            const playerRating = myHandle
-              ? (game.whiteUsername.toLowerCase() === myHandle ? game.whiteRating : game.blackRating)
-              : game.whiteRating;
+            const playerRating = mySide === 'b' ? game.blackRating : game.whiteRating;
 
             return (
               <div className="space-y-3">

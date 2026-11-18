@@ -1,3 +1,4 @@
+import { playedWhite, useMyNames } from '@/lib/gameSide';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { MoveNavigationBar } from '@/components/MoveNavigationBar';
 import { RD } from '@/lib/redesignTheme';
@@ -63,6 +64,7 @@ function WinBar({ wins, losses, draws }: { wins: number; losses: number; draws: 
 export function OpeningDetail() {
   const { eco } = useParams<{ eco: string }>();
   const { username, authUser } = useUser();
+  const myNames = useMyNames();
   const { data: openingsData } = useMyOpenings();
 
   // URL params: eco is URL-encoded opening name OR eco code
@@ -539,8 +541,7 @@ export function OpeningDetail() {
 
               <div className="glass-card rounded-xl divide-y divide-border/50 overflow-hidden">
                 {data.sampleGames.map((game, i) => {
-                  const myHandle = (game.username || username || '').toLowerCase();
-                  const isWhite = game.whiteUsername.toLowerCase() === myHandle;
+                  const isWhite = playedWhite(game, myNames);
                   return (
                     <motion.div
                       key={game.id}

@@ -15,7 +15,7 @@ import { encodeCard } from '@/pages/ShareCard';
 import { ReferralCard } from '@/pages/Profile';
 import { useMyGames } from '@/hooks/use-games';
 import { GameThumb } from '@/components/GameThumb';
-import { playedWhite } from '@/lib/gameSide';
+import { playedWhite, useMyNames } from '@/lib/gameSide';
 import { ProUpsell } from '@/components/ProUpsell';
 import { useSiteImg } from '@/hooks/use-app-config';
 import { usePhotoLook } from '@/context/SettingsContext';
@@ -109,10 +109,8 @@ export function DashboardRedesign() {
     autoImportLinkedAccounts({ chesscom, lichess });
   }, [username, authUser?.chesscomUsername, authUser?.lichessUsername]);
 
-  const displayName = username ?? authUser?.chesscomUsername ?? authUser?.lichessUsername ?? 'Player';
-  const mine = [username, authUser?.chesscomUsername, authUser?.lichessUsername]
-    .filter((n): n is string => !!n)
-    .map((n) => n.toLowerCase());
+  const displayName = authUser?.scoutUsername ?? authUser?.chesscomUsername ?? authUser?.lichessUsername ?? username ?? 'Player';
+  const mine = useMyNames();
 
   // Same "best available rating" logic as the Layout header so the two
   // numbers can never disagree.

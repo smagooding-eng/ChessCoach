@@ -8,7 +8,7 @@ import { useMyAnalysisSummary } from '@/hooks/use-analysis';
 import { useMyGames, type GameSource } from '@/hooks/use-games';
 import { useUser } from '@/hooks/use-user';
 import { GameThumb } from '@/components/GameThumb';
-import { playedWhite } from '@/lib/gameSide';
+import { playedWhite, useMyNames } from '@/lib/gameSide';
 import { RD } from '@/lib/redesignTheme';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import { useReviewAll } from '@/components/ReviewAllDialog';
@@ -121,10 +121,7 @@ export function GamesRedesign() {
   const reviewAll = useReviewAll((jobId) => { setBulkError(null); setBulkProgress(null); setBulkJobId(jobId); });
   const startBulkReview = reviewAll.start;
 
-  const mine = useMemo(
-    () => [username, authUser?.chesscomUsername, authUser?.lichessUsername, (authUser as { scoutUsername?: string | null } | null)?.scoutUsername].filter((n): n is string => !!n).map((n) => n.toLowerCase()),
-    [username, authUser],
-  );
+  const mine = useMyNames();
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
