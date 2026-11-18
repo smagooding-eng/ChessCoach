@@ -14,6 +14,8 @@ import emailTrackingRouter from "./emailTracking";
 import stripeRouter from "./stripe";
 import trialTrackingRouter from "./trialTracking";
 import endgameStatsRouter from "./endgameStats";
+import quickStatsRouter from "./quickStats";
+import chesscomGameRouter from "./chesscomGame";
 import adminRouter from "./admin";
 import emailRouter from "./email";
 import storageRouter from "./storage";
@@ -60,10 +62,12 @@ const router: IRouter = Router();
 
 router.use(authRouter);
 router.use(healthRouter);
+router.use(chesscomGameRouter); // before gamesRouter: /games/from-chesscom
 router.use(gamesRouter);
 router.use(stripeRouter);
 router.use(trialTrackingRouter);
 router.use(endgameStatsRouter);
+router.use(quickStatsRouter);
 router.use(adminRouter);
 router.use(emailRouter);
 router.use(emailPrefsRouter);

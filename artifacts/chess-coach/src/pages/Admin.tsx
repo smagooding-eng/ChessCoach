@@ -845,6 +845,7 @@ export function Admin() {
           <LandingFunnelPanel />
 
           <TrialStatsPanel />
+          <QuickReviewsPanel />
         </>
       )}
 
@@ -3228,6 +3229,59 @@ const TRIAL_OUTCOME: Record<string, { label: string; color: string }> = {
 };
 
 // The 3-day Pro trial: the promo, trial checkout, and what Stripe says happened after.
+type QuickStats = {
+  caught: number; members: number; notified: number; pushed: number; emailed: number; opened: number;
+  minutes: { caught: number | null; reviewed: number | null; notified: number | null; chesscom: number | null; lichess: number | null };
+};
+
+// Quick reviews: Chess.com / Lichess games caught minutes after they ended, reviewed,
+// and the member told once they'd stopped playing.
+function QuickReviewsPanel() {
+  const [data, setData] = useState<QuickStats | null>(null);
+  const [range, setRange] = useState<DateRange>({ startDate: '', endDate: '' });
+  useEffect(() => {
+    if (!range.startDate || !range.endDate) return;
+    apiFetch(`/api/admin/quick-stats?startDate=${range.startDate}&endDate=${range.endDate}`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null)).then(setData).catch(() => setData(null));
+  }, [range]);
+  const mins = (v: number | null) => (v == null ? '—' : v < 1 ? '<1 min' : `${v} min`);
+  const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : '—');
+  const Stat = ({ label, value, sub }: { label: string; value: number | string; sub?: string }) => (
+    <div className="rounded-lg border border-border/30 bg-background/40 px-3 py-2.5">
+      <p className="text-[11px] text-muted-foreground">{label}</p>
+      <p className="text-xl font-black leading-tight">{value}</p>
+      {sub && <p className="text-[11px] text-muted-foreground">{sub}</p>}
+    </div>
+  );
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-xl border border-border/40 bg-card overflow-hidden">
+      <div className="px-5 py-3 border-b border-border/30 flex items-center justify-between">
+        <h3 className="text-sm font-bold text-amber-400 flex items-center gap-2"><TrendingUp className="w-4 h-4" /> Quick reviews</h3>
+        <DateRangeFilter onChange={setRange} defaultPreset="7d" />
+      </div>
+      <div className="p-4 space-y-3">
+        {!data ? <p className="text-xs text-muted-foreground text-center py-4">Loading…</p> : (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <Stat label="Games caught" value={data.caught} sub={`${data.members} members`} />
+              <Stat label="Told them" value={data.notified} sub={`${data.pushed} push · ${data.emailed} email`} />
+              <Stat label="Opened" value={data.opened} sub={pct(data.opened, data.notified)} />
+              <Stat label="Game end → message" value={mins(data.minutes.notified)} sub="median" />
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <Stat label="End → caught" value={mins(data.minutes.caught)} sub="median" />
+              <Stat label="End → reviewed" value={mins(data.minutes.reviewed)} sub="median" />
+              <Stat label="Chess.com publish" value={mins(data.minutes.chesscom)} sub="end → caught" />
+              <Stat label="Lichess publish" value={mins(data.minutes.lichess)} sub="end → caught" />
+            </div>
+            <p className="text-xs text-muted-foreground">Members are told once they've stopped playing for 8 minutes, at most every 3 hours, about their latest game. "Opened" counts taps from the message.</p>
+          </>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
 function TrialStatsPanel() {
   const [data, setData] = useState<TrialStats | null>(null);
   const [loading, setLoading] = useState(true);

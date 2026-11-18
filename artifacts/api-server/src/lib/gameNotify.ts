@@ -25,7 +25,8 @@ export function gameMessage(g: NotifyGame, side: "white" | "black" | null): Game
   const mine = moves.filter((m) => m.color === side), theirs = moves.filter((m) => m.color !== side);
   const acc = !Array.isArray(rd) ? (side === "white" ? rd?.whiteAccuracy : rd?.blackAccuracy) : undefined;
   const accText = typeof acc === "number" && acc > 0 ? ` You played at ${Math.round(acc)}% accuracy.` : "";
-  const url = `/games/${g.id}`;
+  // ?from=quick: the review page notes that the member came back from this message
+  const url = `/games/${g.id}?from=quick`;
 
   let title: string, body: string, lead: string;
   if (g.result === "win") {

@@ -1,0 +1,15 @@
+#chessscout-review { position: fixed; right: 18px; bottom: 18px; z-index: 2147483000; display: flex; align-items: center; gap: 6px;
+  padding: 6px 6px 6px 8px; border-radius: 16px; background: #0D1516; border: 1px solid rgba(129,182,76,.55);
+  box-shadow: 0 14px 36px -10px rgba(0,0,0,.75); font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  animation: csxIn .35s cubic-bezier(.2,.9,.3,1.2) both; }
+#chessscout-review .csx-go { display: flex; align-items: center; gap: 10px; padding: 6px 12px 6px 4px; border-radius: 12px;
+  color: #F5F7F6; text-decoration: none; }
+#chessscout-review .csx-go:hover { background: rgba(129,182,76,.12); }
+#chessscout-review img { width: 34px; height: 34px; border-radius: 9px; }
+#chessscout-review span { display: flex; flex-direction: column; line-height: 1.2; }
+#chessscout-review b { font-size: 14px; font-weight: 800; color: #F5F7F6; }
+#chessscout-review small { font-size: 11.5px; color: #9FB0A5; margin-top: 2px; }
+#chessscout-review .csx-x { width: 26px; height: 26px; border: 0; border-radius: 50%; background: rgba(255,255,255,.06);
+  color: #87918E; font-size: 17px; line-height: 1; cursor: pointer; }
+#chessscout-review .csx-x:hover { color: #F5F7F6; }
+@keyframes csxIn { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }

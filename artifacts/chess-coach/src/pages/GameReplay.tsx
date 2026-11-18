@@ -763,6 +763,11 @@ export function GameReplay() {
   // nothing else matches. (Checking a mixed list, White first, made whoever you'd looked
   // up "You" when they had White.)
   const myNames = useMyNames();
+  // Came back from a quick-review message: note it once (Admin › Quick reviews › Opened)
+  useEffect(() => {
+    if (!id || new URLSearchParams(window.location.search).get('from') !== 'quick') return;
+    void apiFetch(`/api/games/${id}/quick-opened`, { method: 'POST', credentials: 'include' }).catch(() => {});
+  }, [id]);
   const mySide = useMemo((): 'w' | 'b' | null => {
     if (!game) return null;
     const s = sideOf(game as Parameters<typeof sideOf>[0], myNames);

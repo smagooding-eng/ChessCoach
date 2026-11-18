@@ -1727,7 +1727,8 @@ async function samedayOne(u: { id: string; chesscom_username: string | null; lic
   await samedayNotify(u.id).catch((err) => appLogger.warn({ err, userId: u.id }, "[sameday] notify failed"));
 }
 
-async function samedayNotify(userId: string): Promise<void> {
+async function samedayNotify(userId: string, opts: { minGapMs?: number; quietMs?: number } = {}): Promise<boolean> {
+  const minGapMs = opts.minGapMs ?? 20 * 3600_000;
   const [st] = rowsOfAny<{ notified_at: string | null; game_id: number | null; emailed_at: string | null; catchup_emailed: string | null; seen: string; has_push: boolean;
     email: string | null; first_name: string | null; email_opt_out: boolean }>(await db.execute(sql`
     SELECT s.last_notified_at AS notified_at, s.last_game_id AS game_id, s.last_emailed_at AS emailed_at,
@@ -1735,19 +1736,21 @@ async function samedayNotify(userId: string): Promise<void> {
       ${LAST_SEEN} AS seen, EXISTS (SELECT 1 FROM push_subscriptions ps WHERE ps.user_id = u.id) AS has_push,
       u.email, u.first_name, u.email_opt_out
     FROM users u LEFT JOIN sameday_reviews s ON s.user_id = u.id WHERE u.id = ${userId}`));
-  if (!st) return;
-  if (st.notified_at && Date.now() - new Date(st.notified_at).getTime() < 20 * 3600_000) return; // once a day at most
+  if (!st) return false;
+  if (st.notified_at && Date.now() - new Date(st.notified_at).getTime() < minGapMs) return false; // spacing
   // Their newest freshly reviewed game, if they haven't been on ChessScout since playing it
   const [g] = await db.select().from(gamesTable)
     .where(and(eq(gamesTable.userId, userId), sql`${gamesTable.platform} IN ('chesscom', 'lichess')`,
       sql`${gamesTable.playedAt} > now() - interval '36 hours'`, sql`${gamesTable.reviewData} IS NOT NULL`))
     .orderBy(desc(gamesTable.playedAt)).limit(1);
-  if (!g || g.id === st.game_id) return;
-  if (g.playedAt && new Date(st.seen).getTime() > new Date(g.playedAt).getTime()) return;
+  if (!g || g.id === st.game_id) return false;
+  if (g.playedAt && new Date(st.seen).getTime() > new Date(g.playedAt).getTime()) return false;
+  // Still playing? Wait until they've stopped, then tell them about their latest game.
+  if (opts.quietMs && g.playedAt && Date.now() - new Date(g.playedAt).getTime() < opts.quietMs) return false;
   const side = await coachSideFor(g);
   const { gameMessage } = await import("../lib/gameNotify");
   const msg = gameMessage({ id: g.id, result: g.result, username: g.username, white_username: g.whiteUsername, black_username: g.blackUsername, review_data: g.reviewData }, side ?? null);
-  if (!msg) return;
+  if (!msg) return false;
   let pushed = false, emailed = false;
   if (st.has_push) {
     const { sendPushToUser, isPushConfigured } = await import("../lib/pushNotifications");
@@ -1763,11 +1766,13 @@ async function samedayNotify(userId: string): Promise<void> {
     await sendEmail({ to: st.email, subject: msg.subject, html, headers: unsubscribeHeaders(userId) });
     emailed = true;
   }
-  if (!pushed && !emailed) return;
+  if (!pushed && !emailed) return false;
   await db.execute(sql`INSERT INTO sameday_reviews (user_id, last_notified_at, last_game_id ${emailed ? sql`, last_emailed_at` : sql``})
     VALUES (${userId}, now(), ${g.id} ${emailed ? sql`, now()` : sql``})
     ON CONFLICT (user_id) DO UPDATE SET last_notified_at = now(), last_game_id = ${g.id} ${emailed ? sql`, last_emailed_at = now()` : sql``}`);
   appLogger.info({ userId, gameId: g.id, pushed, emailed }, "[sameday] told them about their game");
+  await db.execute(sql`UPDATE quick_detect SET notified_at = now(), via = ${pushed ? "push" : "email"} WHERE game_id = ${g.id}`).catch(() => {});
+  return true;
 }
 
 async function samedayTick(): Promise<void> {
@@ -1800,7 +1805,149 @@ export async function startSamedayReviews(): Promise<void> {
     last_game_id INTEGER, last_emailed_at TIMESTAMPTZ)`);
   setTimeout(() => { void samedayTick(); }, 8 * 60_000).unref();
   setInterval(() => { void samedayTick(); }, 30 * 60_000).unref();
+  await startQuickReviews();
 }
+
+// ── Quick reviews: minutes after a Chess.com / Lichess game, not hours ─────────────────
+// Each linked member is checked on their own schedule: every 3 min while they're in a
+// playing session (a game in the last 2 h), every 15 min if they've been around lately,
+// hourly otherwise. A check is one cheap request: Chess.com answers "304 Not Modified"
+// to the current month's archive when nothing has changed (ETag), Lichess is asked for
+// games since the last one we have. Requests go one at a time, as both sites ask.
+// When a new game shows up it's imported and reviewed straight away (engine only), and
+// once they've stopped playing for 8 minutes they get one message about their latest
+// game: at most one every 3 hours. quick_detect records how long each step took.
+const QUICK_HOT_MS = 3 * 60_000, QUICK_WARM_MS = 15 * 60_000, QUICK_COLD_MS = 60 * 60_000;
+const QUICK_QUIET_MS = 8 * 60_000, QUICK_GAP_MS = 3 * 3600_000;
+const QUICK_UA = "ChessScout.net/1.0 (+https://chessscout.net)";
+let quickRunning = false;
+let quickPauseUntil = 0;
+
+async function newestPlayed(userId: string, platform: "chesscom" | "lichess"): Promise<number> {
+  const [r] = rowsOfAny<{ t: string | null }>(await db.execute(sql`
+    SELECT max(played_at) AS t FROM games WHERE user_id = ${userId} AND platform = ${platform}`));
+  return r?.t ? new Date(r.t).getTime() : 0;
+}
+
+/** Has a Chess.com game finished since the newest one we have? (one request, usually a 304) */
+async function chesscomHasNew(userId: string, name: string, etag: string | null, month: string | null):
+  Promise<{ changed: boolean; etag: string | null; month: string }> {
+  const now = new Date();
+  const m = `${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  const headers: Record<string, string> = { "User-Agent": QUICK_UA };
+  if (etag && month === m) headers["If-None-Match"] = etag;
+  const res = await fetch(`https://api.chess.com/pub/player/${encodeURIComponent(name.toLowerCase())}/games/${m}`, { headers, signal: AbortSignal.timeout(15_000) });
+  if (res.status === 304) return { changed: false, etag, month: m };
+  if (res.status === 429) { quickPauseUntil = Date.now() + 5 * 60_000; return { changed: false, etag, month: month ?? m }; }
+  if (!res.ok) return { changed: false, etag: null, month: m };
+  const body = (await res.json().catch(() => null)) as { games?: Array<{ end_time?: number }> } | null;
+  const newest = Math.max(0, ...(body?.games ?? []).map((g) => (g.end_time ?? 0) * 1000));
+  const have = await newestPlayed(userId, "chesscom");
+  return { changed: newest > have + 1000, etag: res.headers.get("etag"), month: m };
+}
+
+async function lichessHasNew(userId: string, name: string): Promise<boolean> {
+  const since = (await newestPlayed(userId, "lichess")) + 1000;
+  const res = await fetch(`https://lichess.org/api/games/user/${encodeURIComponent(name)}?since=${since}&max=1&moves=false`, {
+    headers: { Accept: "application/x-ndjson", "User-Agent": QUICK_UA }, signal: AbortSignal.timeout(15_000),
+  });
+  if (res.status === 429) { quickPauseUntil = Date.now() + 2 * 60_000; return false; }
+  if (!res.ok) return false;
+  return (await res.text()).trim().length > 0;
+}
+
+type QuickMember = { id: string; chesscom_username: string | null; lichess_username: string | null; cc_etag: string | null; cc_month: string | null; recent_seen: boolean };
+
+async function quickOne(u: QuickMember): Promise<void> {
+  const started = new Date();
+  let etag = u.cc_etag, month = u.cc_month, found = false;
+  if (u.chesscom_username) {
+    try {
+      const c = await chesscomHasNew(u.id, u.chesscom_username, u.cc_etag, u.cc_month);
+      etag = c.etag; month = c.month;
+      if (c.changed) { found = true; await runImportJob({ userId: u.id, platformUsername: u.chesscom_username, platform: "chesscom", months: 1, forceUpdate: false, log: appLogger }); }
+    } catch (err) { appLogger.warn({ err, userId: u.id }, "[quick] chess.com check failed"); }
+  }
+  if (u.lichess_username) {
+    try {
+      if (await lichessHasNew(u.id, u.lichess_username)) { found = true; await runImportJob({ userId: u.id, platformUsername: u.lichess_username, platform: "lichess", months: 1, forceUpdate: false, log: appLogger }); }
+    } catch (err) { appLogger.warn({ err, userId: u.id }, "[quick] lichess check failed"); }
+  }
+  if (found) {
+    // What just came in, newest first: note when we caught it, then review it
+    const fresh = await db.select().from(gamesTable)
+      .where(and(eq(gamesTable.userId, u.id), sql`${gamesTable.platform} IN ('chesscom', 'lichess')`,
+        sql`${gamesTable.createdAt} >= ${started.toISOString()}`, sql`${gamesTable.playedAt} > now() - interval '6 hours'`))
+      .orderBy(desc(gamesTable.playedAt)).limit(SAMEDAY_GAMES);
+    for (const g of fresh) {
+      await db.execute(sql`INSERT INTO quick_detect (game_id, user_id, platform, ended_at, detected_at)
+        VALUES (${g.id}, ${u.id}, ${g.platform}, ${g.playedAt.toISOString()}, now()) ON CONFLICT (game_id) DO NOTHING`).catch(() => {});
+    }
+    for (const g of fresh) {
+      if (g.reviewData) continue;
+      if (await hasActiveManualReview(u.id)) break;
+      try {
+        await reviewOneGame(g, undefined, u.id, false);
+        await db.execute(sql`UPDATE quick_detect SET reviewed_at = now() WHERE game_id = ${g.id}`).catch(() => {});
+      } catch (err) { appLogger.warn({ err, gameId: g.id }, "[quick] review failed"); }
+    }
+  }
+  await samedayNotify(u.id, { minGapMs: QUICK_GAP_MS, quietMs: QUICK_QUIET_MS }).catch((err) => appLogger.warn({ err, userId: u.id }, "[quick] notify failed"));
+
+  // When to look again
+  const newest = Math.max(await newestPlayed(u.id, "chesscom"), await newestPlayed(u.id, "lichess"));
+  const inSession = Date.now() - newest < 2 * 3600_000;
+  const wait = inSession ? QUICK_HOT_MS : u.recent_seen || Date.now() - newest < 7 * 864e5 ? QUICK_WARM_MS : QUICK_COLD_MS;
+  await db.execute(sql`INSERT INTO sameday_reviews (user_id, next_quick_at, cc_etag, cc_month)
+    VALUES (${u.id}, ${new Date(Date.now() + wait).toISOString()}, ${etag}, ${month})
+    ON CONFLICT (user_id) DO UPDATE SET next_quick_at = EXCLUDED.next_quick_at, cc_etag = EXCLUDED.cc_etag, cc_month = EXCLUDED.cc_month`);
+}
+
+async function quickTick(): Promise<void> {
+  if (quickRunning || Date.now() < quickPauseUntil) return;
+  quickRunning = true;
+  try {
+    const due = rowsOfAny<QuickMember>(await db.execute(sql`
+      SELECT u.id, u.chesscom_username, u.lichess_username, s.cc_etag, s.cc_month,
+        (${LAST_SEEN} > now() - interval '14 days') AS recent_seen
+      FROM users u LEFT JOIN sameday_reviews s ON s.user_id = u.id
+      WHERE (u.chesscom_username IS NOT NULL OR u.lichess_username IS NOT NULL)
+        AND ${LAST_SEEN} > now() - interval '30 days'
+        AND u.id NOT IN (SELECT id FROM analytics_excluded_users)
+        AND (s.next_quick_at IS NULL OR s.next_quick_at <= now())
+      ORDER BY s.next_quick_at ASC NULLS FIRST LIMIT 40`));
+    for (const u of due) {
+      if (Date.now() < quickPauseUntil) break;
+      try { await quickOne(u); }
+      catch (err) { appLogger.warn({ err, userId: u.id }, "[quick] member failed"); }
+      await new Promise((r) => setTimeout(r, 400));
+    }
+  } finally { quickRunning = false; }
+}
+
+async function startQuickReviews(): Promise<void> {
+  if (process.env.QUICK_REVIEWS === "0") return;
+  await db.execute(sql`ALTER TABLE sameday_reviews ADD COLUMN IF NOT EXISTS next_quick_at TIMESTAMPTZ`);
+  await db.execute(sql`ALTER TABLE sameday_reviews ADD COLUMN IF NOT EXISTS cc_etag TEXT`);
+  await db.execute(sql`ALTER TABLE sameday_reviews ADD COLUMN IF NOT EXISTS cc_month VARCHAR(8)`);
+  await db.execute(sql`CREATE TABLE IF NOT EXISTS quick_detect (
+    game_id INTEGER PRIMARY KEY, user_id VARCHAR NOT NULL, platform VARCHAR(12),
+    ended_at TIMESTAMPTZ, detected_at TIMESTAMPTZ, reviewed_at TIMESTAMPTZ, notified_at TIMESTAMPTZ, via VARCHAR(8),
+    opened_at TIMESTAMPTZ)`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS quick_detect_ended ON quick_detect (ended_at)`);
+  setTimeout(() => { void quickTick(); }, 3 * 60_000).unref();
+  setInterval(() => { void quickTick(); }, 60_000).unref();
+}
+
+
+// The member opened a game from its quick-review message
+router.post("/games/:id/quick-opened", requireAuth, async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  if (Number.isFinite(id)) {
+    await db.execute(sql`UPDATE quick_detect SET opened_at = COALESCE(opened_at, now()) WHERE game_id = ${id} AND user_id = ${req.user!.id}`).catch(() => {});
+  }
+  res.json({ ok: true });
+});
 
 router.get("/games/review-all-status/:jobId", requireAuth, async (req, res): Promise<void> => {
   const [job] = await db.select().from(backgroundJobsTable).where(

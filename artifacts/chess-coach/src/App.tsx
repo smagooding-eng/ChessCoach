@@ -1,3 +1,4 @@
+import { AfterSignInRedirect } from '@/lib/afterSignIn';
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { gameState } from '@/lib/gameBusy';
 import { isRunningStandalone } from '@/hooks/use-pwa-install';
@@ -156,6 +157,7 @@ const TermsPage = lazyRetry(() => import("@/pages/Terms"));
 const CreditsPage = lazyRetry(() => import("@/pages/Credits"));
 const VsAimchessPage = lazyRetry(() => import("@/pages/VsAimchess"));
 const PricingPage = lazyRetry(() => import("@/pages/Pricing"));
+const ChesscomGamePage = lazyRetry(() => import("@/pages/ChesscomGame"));
 const FreeReviewPage = lazyRetry(() => import("@/pages/FreeReview"));
 const VsImproveMyChessPage = lazyRetry(() => import("@/pages/VsImproveMyChess"));
 const VsFreeAnalysisPage = lazyRetry(() => import("@/pages/VsFreeAnalysis"));
@@ -621,6 +623,7 @@ function Router() {
       <Route path="/vs/aimchess" component={VsAimchessPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/review" component={FreeReviewPage} />
+      <Route path="/cc/:gameId" component={ChesscomGamePage} />
       <Route path="/vs/improve-my-chess" component={VsImproveMyChessPage} />
       <Route path="/vs/free-chess-analysis" component={VsFreeAnalysisPage} />
       <Route path="/welcome" component={PWelcome} />
@@ -756,6 +759,7 @@ function App() {
                     <BackgroundJobsWatcher />
                     <AutoPushPrompt />
                     <TrialPromo />
+                    <AfterSignInRedirect />
                     <RealtimeBridge />
                   </NotInKidMode>
                   <AudioAutoplayUnlock />

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { peekAfterSignIn } from '@/lib/afterSignIn';
 import { startGoogleSignIn, startLichessSignIn } from '@/lib/googleSignIn';
 import { trackFunnelEvent } from '@/lib/funnelTracking';
 import { useUser } from '@/hooks/use-user';
@@ -59,7 +60,7 @@ export function Setup() {
   }
 
   if (isAuthenticated) {
-    setLocation('/');
+    setLocation(peekAfterSignIn() ?? '/');
     return null;
   }
 
@@ -128,7 +129,7 @@ export function Setup() {
       }
 
       await refreshAuth();
-      setLocation('/');
+      setLocation(peekAfterSignIn() ?? '/');
     } catch {
       setError('Connection error. Please try again.');
     } finally {
