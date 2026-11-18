@@ -1,5 +1,5 @@
 import { AfterSignInRedirect } from '@/lib/afterSignIn';
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation, useSearch } from "wouter";
 import { gameState } from '@/lib/gameBusy';
 import { isRunningStandalone } from '@/hooks/use-pwa-install';
 import { isInPlayApp } from '@/lib/playApp';
@@ -237,7 +237,10 @@ const ChallengePage = lazyRetry(() => import("@/pages/Challenge").then(m => ({ d
 const PlayNowPage = lazyRetry(() => import("@/pages/PlayNow").then(m => ({ default: m.PlayNow })));
 const LichessPlayPage = lazyRetry(() => import("@/pages/LichessPlay").then(m => ({ default: m.LichessPlay })));
 const LichessCallbackPage = lazyRetry(() => import("@/pages/LichessPlay").then(m => ({ default: m.LichessCallback })));
-const PLichessPlay = () => <ProtectedRoute component={LichessPlayPage} />;
+// Keyed by ?game=: going from one Lichess game to another (e.g. "next game waiting on
+// your move") starts the page fresh for that game. The page never changes ?game itself.
+const LichessPlayForGame = () => { const g = new URLSearchParams(useSearch()).get('game') ?? ''; return <LichessPlayPage key={g} />; };
+const PLichessPlay = () => <ProtectedRoute component={LichessPlayForGame} />;
 const WatchLivePage = lazyRetry(() => import("@/pages/WatchLive").then(m => ({ default: m.WatchLive })));
 const PWatchLive = () => <ProtectedRoute component={WatchLivePage} />;
 

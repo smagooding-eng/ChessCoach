@@ -14,6 +14,7 @@ import { useUser } from '@/hooks/use-user';
 import { PT, cardStyle, greenBtn, ghostBtn, formatLeft } from '@/lib/playTheme';
 import { NotifyPrompt } from '@/components/play/NotifyPrompt';
 import { dailyTcLabel, dailyTimeLeft, type DailyGameRow } from './DailyGames';
+import { useGoToNextMove } from '@/lib/nextMyMove';
 
 const HOW: Record<string, string> = {
   checkmate: 'by checkmate', resignation: 'by resignation', timeout: 'on time', stalemate: 'by stalemate',
@@ -117,7 +118,8 @@ export function DailyGame() {
     try { const c = new Chess(game.fen); for (const s of draft) c.move(s); return c.fen(); } catch { return game.fen; }
   }, [game?.fen, draft]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const post = async (path: string, body?: object) => {
+  const next = useGoToNextMove(me);
+  const post = async (path: string, body?: object): Promise<{ game?: DailyGameRow } | null> => {
     setSending(true); setError('');
     try {
       const r = await apiFetch(`/api/correspondence/games/${id}/${path}`, {
@@ -125,9 +127,10 @@ export function DailyGame() {
         body: body ? JSON.stringify(body) : undefined,
       });
       const d = await r.json();
-      if (!r.ok) { setError(d.error || 'Something went wrong'); await load(); return; }
+      if (!r.ok) { setError(d.error || 'Something went wrong'); await load(); return null; }
       apply(d);
-    } catch { setError('Connection problem — try again'); }
+      return d;
+    } catch { setError('Connection problem — try again'); return null; }
     finally { setSending(false); }
   };
 
@@ -234,6 +237,7 @@ export function DailyGame() {
 
   return (
     <div className="mx-auto max-w-[620px] lg:max-w-[1080px] space-y-3 p-4 md:p-0 pb-24">
+      {next.banner}
       <div className="flex items-center justify-between gap-3">
         <Link href="/daily" className="inline-flex items-center gap-1.5 text-sm" style={{ color: PT.muted }}><ArrowLeft size={16} /> Daily games</Link>
         <span className="text-[12px] font-bold" style={{ color: PT.muted }}>{dailyTcLabel(game.timeControl)} per move · {game.mode === 'ranked' ? 'Ranked' : 'Casual'}</span>
@@ -259,7 +263,10 @@ export function DailyGame() {
             const c = new Chess(); if (game.pgn) c.loadPgn(game.pgn);
             if (c.move(san)) setGame({ ...game, fen: c.fen(), pgn: c.pgn(), turnUserId: white ? game.blackUserId : game.whiteUserId });
           } catch { /* server will reject */ }
-          void post('move', { san });
+          void post('move', { san }).then((d) => {
+            // Moved and it's their turn now: on to the next game waiting on you
+            if (d?.game && d.game.status === 'active' && d.game.turnUserId !== me) void next.goNext({ daily: id });
+          });
         }}
         lastMove={browser.viewing ? browser.lastMove : planning ? null : lastMove}
         moveQuality={null}

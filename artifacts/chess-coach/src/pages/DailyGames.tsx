@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { THEIR_MOVE_OPACITY } from '@/components/play/ActiveGamesCard';
 import { announceChallengeSent } from '@/lib/challengeSent';
 import { Link, useLocation } from 'wouter';
 import { CalendarDays, Loader2, Users, X, ChevronRight, Sparkles, Award, Trophy } from 'lucide-react';
@@ -218,7 +219,7 @@ export function DailyGames({ embedded = false, listOnly = false }: { embedded?: 
     const res = g.status === 'finished' ? (g.termination === 'aborted' ? 'Aborted' : g.result === 'draw' ? 'Draw' : won ? 'Won' : 'Lost') : null;
     const moves = g.pgn ? (g.pgn.match(/\d+\./g)?.length ?? 0) : 0;
     return (
-      <Link href={`/daily/${g.id}`} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}` }}>
+      <Link href={`/daily/${g.id}`} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}`, opacity: g.status === 'active' && !yourTurn ? THEIR_MOVE_OPACITY : 1 }}>
         <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: white ? '#f0ede8' : '#1b1b1b', border: '1px solid rgba(255,255,255,.35)' }} title={white ? 'You are White' : 'You are Black'} />
         <span className="min-w-0 flex-1">
           <b className="block truncate text-[14.5px] font-extrabold" style={{ color: PT.text }}>vs {opp}</b>
@@ -344,7 +345,7 @@ export function DailyGames({ embedded = false, listOnly = false }: { embedded?: 
             <section className="overflow-hidden" style={cardStyle}>
               <h2 className="px-4 py-3 text-[13px] font-black uppercase tracking-[0.14em]" style={{ color: PT.muted }}>♞ On Lichess · {liGames.length}</h2>
               {[...liGames].sort((a, b) => Number(!isDaily(b)) - Number(!isDaily(a)) || Number(!!b.isMyTurn) - Number(!!a.isMyTurn)).map((g) => (
-                <LiLink key={g.gameId} href={/^(ultraBullet|bullet|blitz)$/.test(g.speed ?? '') ? `https://lichess.org/${g.gameId}` : `/lichess?game=${g.gameId}&from=list`} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}` }}>
+                <LiLink key={g.gameId} href={/^(ultraBullet|bullet|blitz)$/.test(g.speed ?? '') ? `https://lichess.org/${g.gameId}` : `/lichess?game=${g.gameId}&from=list`} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}`, opacity: g.isMyTurn ? 1 : THEIR_MOVE_OPACITY }}>
                   <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: g.color === 'white' ? '#f0ede8' : '#1b1b1b', border: '1px solid rgba(255,255,255,.35)' }} />
                   <span className="min-w-0 flex-1">
                     <b className="block truncate text-[14.5px] font-extrabold" style={{ color: PT.text }}>vs {g.opponent?.username ?? 'Opponent'}</b>

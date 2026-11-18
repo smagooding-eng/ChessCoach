@@ -2,6 +2,7 @@
 // people here when nobody's on ChessScout (/lichess?seek=10+0&rated=0), or they
 // can open it themselves. Finished games are saved into their ChessScout games
 // for review. See lib/lichessBoard.ts for how it talks to Lichess.
+import { useGoToNextMove } from '@/lib/nextMyMove';
 import { useGameBusy } from '@/lib/gameBusy';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
@@ -281,6 +282,7 @@ export function LichessPlay() {
   const turn = pos?.chess.turn();
   const timeOf = (c: 'w' | 'b') => { if (!st) return 0; const base = c === 'w' ? st.wtime : st.btime; return running && turn === c ? base - (now - stAt) : base; };
 
+  const nextMove = useGoToNextMove(authUser?.id);
   const onMove = async (san: string) => {
     if (!myTurn || !pos || !gameId) return;
     const c = new Chess(pos.chess.fen());
@@ -288,7 +290,9 @@ export function LichessPlay() {
     const uci = `${mv.from}${mv.to}${mv.promotion ?? ''}`;
     setPending({ fen: c.fen(), last: { from: mv.from, to: mv.to } });
     const r = await playMove(gameId, uci);
-    if (!r.ok) { setPending(null); setError(r.error || "Lichess didn't accept that move."); }
+    if (!r.ok) { setPending(null); setError(r.error || "Lichess didn't accept that move."); return; }
+    // A daily game, moved: on to the next daily game waiting on you (if the move didn't end it)
+    if (full?.speed === 'correspondence' && !c.isGameOver()) void nextMove.goNext({ lichess: gameId });
   };
 
   // A premove plays as soon as it's our turn (if it's still legal).
@@ -473,6 +477,7 @@ export function LichessPlay() {
     const resultText = st.winner ? `${won ? 'You won' : 'You lost'} ${LICHESS_STATUS_TEXT[st.status] ?? ''}` : LICHESS_STATUS_TEXT[st.status] ?? 'Draw';
     return (
       <div className="mx-auto max-w-[620px] space-y-2.5 p-3 pb-24">
+        {nextMove.banner}
         <div className="flex items-center justify-between text-[12px] font-bold" style={{ color: PT.muted }}>
           <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#81B64C]" />Lichess · {full.clock ? `${full.clock.initial / 60000}+${full.clock.increment / 1000}` : full.daysPerTurn ? `Daily · ${full.daysPerTurn} day${full.daysPerTurn > 1 ? 's' : ''} a move` : full.speed} · {full.rated ? 'Rated' : 'Casual'}</span>
           <a href={`https://lichess.org/${full.id}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline">On lichess.org <ExternalLink size={12} /></a>

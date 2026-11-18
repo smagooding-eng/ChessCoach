@@ -48,6 +48,9 @@ const TC: Record<string, string> = { corr_1d: '1 day', corr_3d: '3 days', corr_7
 
 // "Your games" on the home page: any live game in progress plus active daily
 // games (your move first). Refreshes in real time; hidden when there are none.
+// Games waiting on the opponent are faded, so the ones on your move stand out.
+export const THEIR_MOVE_OPACITY = 0.5;
+
 export function ActiveGamesCard() {
   const { authUser } = useUser();
   const me = authUser?.id;
@@ -145,7 +148,7 @@ export function ActiveGamesCard() {
           })()}
           {liSorted.map((g) => (
             <LiLink key={g.gameId} href={liHref(g)} className="w-[164px] shrink-0 snap-start rounded-2xl p-2"
-              style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${g.isMyTurn ? 'rgba(129,182,76,0.55)' : PT.border}` }}>
+              style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${g.isMyTurn ? 'rgba(129,182,76,0.55)' : PT.border}`, opacity: g.isMyTurn ? 1 : THEIR_MOVE_OPACITY }}>
               {g.fen ? <ThemedMiniBoard fen={g.fen} size={148} flipped={g.color === 'black'} /> : <span className="block h-[148px] w-[148px] rounded-md" style={{ background: 'rgba(255,255,255,0.05)' }} />}
               <b className="mt-2 flex items-center gap-1.5 truncate text-[13px] font-extrabold" style={{ color: PT.text }}>
                 {!isDaily(g) && <span className="h-2 w-2 shrink-0 animate-pulse rounded-full" style={{ background: PT.red }} />}
@@ -165,7 +168,7 @@ export function ActiveGamesCard() {
             const mv = gameMoves(sansFromPgn(g.pgn));
             return (
               <Link key={g.id} href={`/daily/${g.id}`} className="w-[164px] shrink-0 snap-start rounded-2xl p-2"
-                style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${yours ? 'rgba(129,182,76,0.55)' : PT.border}` }}>
+                style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${yours ? 'rgba(129,182,76,0.55)' : PT.border}`, opacity: yours ? 1 : THEIR_MOVE_OPACITY }}>
                 {g.fen ? <ThemedMiniBoard fen={g.fen} size={148} flipped={!white} lastMove={mv.last} /> : <span className="block h-[148px] w-[148px] rounded-md" style={{ background: 'rgba(255,255,255,0.05)' }} />}
                 <b className="mt-2 block truncate text-[13px] font-extrabold" style={{ color: PT.text }}>{nameOf(white ? g.blackUsername : g.whiteUsername)}</b>
                 <span className="flex items-baseline justify-between gap-1 text-[11.5px]">
@@ -197,7 +200,7 @@ export function ActiveGamesCard() {
         );
       })()}
       {view === 'list' && liSorted.map((g) => (
-        <LiLink key={g.gameId} href={liHref(g)} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}` }}>
+        <LiLink key={g.gameId} href={liHref(g)} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}`, opacity: g.isMyTurn ? 1 : THEIR_MOVE_OPACITY }}>
           {g.fen ? <ThemedMiniBoard fen={g.fen} size={56} flipped={g.color === 'black'} /> : <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: PT.green }} />}
           <span className="min-w-0 flex-1">
             <b className="flex items-center gap-1.5 truncate text-[14px] font-extrabold" style={{ color: PT.text }}>
@@ -220,7 +223,7 @@ export function ActiveGamesCard() {
         const left = bank - (Date.now() + offset - new Date(g.lastMoveAt).getTime());
         const mv = gameMoves(sansFromPgn(g.pgn));
         return (
-          <Link key={g.id} href={`/daily/${g.id}`} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}` }}>
+          <Link key={g.id} href={`/daily/${g.id}`} className="flex items-center gap-3 px-4 py-3" style={{ borderTop: `1px solid ${PT.border}`, opacity: yours ? 1 : THEIR_MOVE_OPACITY }}>
             {g.fen && <ThemedMiniBoard fen={g.fen} size={56} flipped={!white} lastMove={mv.last} />}
             <span className="min-w-0 flex-1">
               <b className="block truncate text-[14px] font-extrabold" style={{ color: PT.text }}>vs {nameOf(white ? g.blackUsername : g.whiteUsername)}</b>
