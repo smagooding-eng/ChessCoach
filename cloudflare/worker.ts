@@ -176,6 +176,14 @@ async function stripeProducts(env: Env): Promise<Response> {
 
 const FNS: Record<'og' | 'page' | 'sitemap', Handler> = { og, page, sitemap };
 
+const CANONICAL: Record<string, string> = {
+  '/privacy': 'https://chessscout.net/privacy.html',
+  '/terms': 'https://chessscout.net/terms',
+};
+declare const HTMLRewriter: {
+  new (): { on(selector: string, handlers: { element(el: { setAttribute(k: string, v: string): void }): void }): { transform(r: Response): Response } };
+};
+
 // The page/og handlers fetch https://chessscout.net/index.html to fill in. Here that
 // file comes straight from the static assets (no trip out and back in).
 let assets: Env['ASSETS'] | null = null;
@@ -231,6 +239,18 @@ export default {
       const q = { ...Object.fromEntries(url.searchParams), ...rw.q };
       const fakeUrl = `/api/${rw.fn}?${new URLSearchParams(q)}`;
       return cached(request, ctx, () => runVercel(FNS[rw.fn], request, q, fakeUrl));
+    }
+
+    // App pages listed in the sitemap: the app shell names the home page as canonical,
+    // which makes Google treat them as copies of it. Name the right address instead
+    // (the privacy policy's is the plain privacy.html page, same text).
+    const canonical = CANONICAL[path];
+    if (canonical && request.method === 'GET') {
+      const res = await env.ASSETS.fetch(request);
+      if (!(res.headers.get('Content-Type') ?? '').includes('text/html')) return res;
+      return new HTMLRewriter()
+        .on('link[rel="canonical"]', { element(el) { el.setAttribute('href', canonical); } })
+        .transform(res);
     }
 
     // Everything else: the app itself (index.html for app routes; see wrangler.jsonc).

@@ -31,7 +31,7 @@ const CORE: [string, string, string][] = [
   ['/vs/aimchess', 'monthly', '0.6'],
   ['/vs/improve-my-chess', 'monthly', '0.6'],
   ['/vs/free-chess-analysis', 'monthly', '0.6'],
-  ['/privacy', 'yearly', '0.3'],
+  ['/privacy.html', 'yearly', '0.3'], // the privacy policy's one address (/privacy points here)
   ['/terms', 'yearly', '0.3'],
 ];
 
