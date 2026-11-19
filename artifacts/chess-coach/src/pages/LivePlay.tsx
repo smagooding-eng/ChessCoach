@@ -180,6 +180,14 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
     }
   }, [live]);
 
+  // (all hooks stay above the early returns below: a game starting must not change how many run)
+  const waitedMs = live.queuedAt ? now - live.queuedAt : 0;
+  const showBotOffer = live.status === 'queued' && waitedMs >= live.botOfferMs;
+  useEffect(() => { if (showBotOffer) trackPlay('bot_offer_shown'); }, [showBotOffer]);
+  const showConnect = live.status === 'queued' && !lichess && !!lichessClock;
+  useEffect(() => { if (showConnect) trackPlay('connect_shown'); }, [showConnect]);
+  useEffect(() => { if (live.status === 'queued' && waitedMs >= LICHESS_HANDOFF_MS) trackPlay('nobody_here'); }, [live.status, waitedMs >= LICHESS_HANDOFF_MS]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Keep the game on screen through a reconnect (status can briefly read
   // connecting/disconnected/idle while the socket comes back).
   if (live.game && !live.minimized && (live.status === 'in_game' || live.status === 'finished' || live.game.status === 'active')) {
@@ -231,12 +239,6 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
     setHosted(null);
   };
 
-  const waitedMs = live.queuedAt ? now - live.queuedAt : 0;
-  const showBotOffer = live.status === 'queued' && waitedMs >= live.botOfferMs;
-  useEffect(() => { if (showBotOffer) trackPlay('bot_offer_shown'); }, [showBotOffer]);
-  const showConnect = live.status === 'queued' && !lichess && !!lichessClock;
-  useEffect(() => { if (showConnect) trackPlay('connect_shown'); }, [showConnect]);
-  useEffect(() => { if (live.status === 'queued' && waitedMs >= LICHESS_HANDOFF_MS) trackPlay('nobody_here'); }, [live.status, waitedMs >= LICHESS_HANDOFF_MS]); // eslint-disable-line react-hooks/exhaustive-deps
   const queuedLabel = live.queuedTc === 'any' ? 'Any clock' : TC_OPTIONS.find(t => t.id === live.queuedTc)?.label;
 
   return (
