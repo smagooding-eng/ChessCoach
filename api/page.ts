@@ -42,10 +42,10 @@ async function fetchWithTimeout(url: string, ms: number): Promise<FetchRes | nul
 class UpstreamDown extends Error {}
 // Null for a page that doesn't exist (404); throws when the API can't answer, so
 // we never cache an empty page or redirect a real page away because Render was
-// restarting. Kept well inside Vercel's 10-second function limit (going past it
-// is what Google saw as "Server error (5xx)").
+// restarting. 8 s: Cloudflare has no 10-second limit like Vercel had, and a busy API
+// often answers in 5 to 8 s; past that the Worker serves the page's last good copy.
 async function getJson<T>(path: string): Promise<T | null> {
-  const r = await fetchWithTimeout(`${API}${path}`, 5000);
+  const r = await fetchWithTimeout(`${API}${path}`, 8000);
   if (r && r.status === 404) return null;
   if (!r || !r.ok) throw new UpstreamDown(path);
   const j = (await r.json().catch(() => null)) as T | null;

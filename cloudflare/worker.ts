@@ -107,19 +107,42 @@ function runVercel(fn: Handler, request: Request, query: Record<string, string>,
 
 // Vercel cached these at its edge (s-maxage); do the same with Cloudflare's cache so
 // SEO pages and previews don't ask the API server on every visit.
+// Each good page is also kept as a "last good copy" for 30 days. When the API can't answer
+// (Render restarting after a deploy, or busy), the page would be a 503: that copy is served
+// instead, so Google and visitors still get the page. (Vercel's CDN did this on its own;
+// Cloudflare's cache drops a page once it expires, which is when Search Console started
+// counting "Server error (5xx)".)
+const LAST_GOOD_S = 30 * 86400;
 async function cached(request: Request, ctx: Ctx, make: () => Promise<Response>): Promise<Response> {
   if (request.method !== 'GET') return make();
   const cache = (caches as unknown as { default: Cache }).default;
-  const key = new Request(request.url, { method: 'GET', headers: { 'x-ua-kind': BOT.test(request.headers.get('user-agent') ?? '') ? 'bot' : 'human' } });
+  const kind = BOT.test(request.headers.get('user-agent') ?? '') ? 'bot' : 'human';
+  const key = new Request(request.url, { method: 'GET', headers: { 'x-ua-kind': kind } });
+  const lastGoodUrl = new URL(request.url); lastGoodUrl.searchParams.set('__cs_last_good', '1');
+  const lastGoodKey = new Request(lastGoodUrl.toString(), { method: 'GET', headers: { 'x-ua-kind': kind } });
   const hit = await cache.match(key);
   if (hit) return hit;
-  const res = await make();
+  let res: Response;
+  try { res = await make(); } catch { res = new Response('Service temporarily unavailable', { status: 503, headers: { 'Retry-After': '120' } }); }
+  if (res.status >= 500) {
+    const good = await cache.match(lastGoodKey);
+    if (good) {
+      const copy = new Response(good.body, good);
+      copy.headers.set('Cache-Control', 'public, max-age=60');
+      copy.headers.set('X-CS-Served', 'last-good-copy');
+      return copy;
+    }
+    return res;
+  }
   const cc = res.headers.get('Cache-Control') ?? '';
   const s = cc.match(/s-maxage=(\d+)/);
   if (res.status === 200 && s && !/no-store|private/.test(cc)) {
     const copy = new Response(res.clone().body, res);
     copy.headers.set('Cache-Control', `public, max-age=${s[1]}`);
     ctx.waitUntil(cache.put(key, copy));
+    const keep = new Response(res.clone().body, res);
+    keep.headers.set('Cache-Control', `public, max-age=${LAST_GOOD_S}`);
+    ctx.waitUntil(cache.put(lastGoodKey, keep));
   }
   return res;
 }
