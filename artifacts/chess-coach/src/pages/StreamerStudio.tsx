@@ -12,8 +12,12 @@ import { RD } from '@/lib/redesignTheme';
 import { BG_PHOTOS } from '@/context/SettingsContext';
 
 // A picture you upload as the background is kept on this device (not in the settings).
-const BG_UPLOAD_KEY = 'cs_studio_bg_upload';
-const bgSrc = (v: string): string => { if (v !== 'upload') return v; try { return localStorage.getItem(BG_UPLOAD_KEY) ?? ''; } catch { return ''; } };
+// Each account's Studio set-up (name, headline, layout, picture...) is its own: switching
+// accounts on the same phone never carries one account's over to another.
+let owner = '';
+const BG_UPLOAD_KEY_LEGACY = 'cs_studio_bg_upload';
+const bgUploadKey = () => `${BG_UPLOAD_KEY_LEGACY}:${owner}`;
+const bgSrc = (v: string): string => { if (v !== 'upload') return v; try { return localStorage.getItem(bgUploadKey()) ?? ''; } catch { return ''; } };
 const THEME_BGS = BG_PHOTOS.filter((b) => !!b.src);
 import { VoiceChanger, VOICE_PRESETS, VOICE_GROUPS, DEFAULT_CUSTOM, type VoicePreset, type CustomVoice } from '@/lib/streamer/voiceChanger';
 import { FaceTracker, type FacePose } from '@/lib/streamer/faceTracker';
@@ -115,15 +119,27 @@ const DEFAULTS: Settings = {
   headline: 'The road to 1500 ELO', goal: 1500, ratingFrom: 'auto', manualRating: 0,
   broadcast: true, recordLive: true, title: '',
 };
-const KEY = 'cs_streamer_v2';
+const KEY_LEGACY = 'cs_streamer_v2';
+const settingsKey = () => `${KEY_LEGACY}:${owner}`;
 const VIRTUAL_W = 430; // the app is laid out like a phone inside the board panel
 const VIRTUAL_H = 1000;
 const BG = '#050A0B', CARD = '#0D1516', CARD_LIGHT = '#121B1D'; // solid, never see-through
 const IS_PHONE = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
+/** Settings saved before they were per account were the admin's: only an admin account picks them up. */
+function adoptLegacy(admin: boolean): void {
+  try {
+    if (!admin || localStorage.getItem(settingsKey())) return;
+    const old = localStorage.getItem(KEY_LEGACY);
+    if (old) localStorage.setItem(settingsKey(), old);
+    const bg = localStorage.getItem(BG_UPLOAD_KEY_LEGACY);
+    if (bg && !localStorage.getItem(bgUploadKey())) localStorage.setItem(bgUploadKey(), bg);
+  } catch { /* storage off */ }
+}
+
 function loadSettings(): Settings {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(settingsKey());
     if (raw) {
       const saved = JSON.parse(raw) as Partial<Settings>;
       const merged = { ...DEFAULTS, ...saved };
@@ -183,7 +199,9 @@ export default function StreamerStudioGate() {
       </div>
     );
   }
-  return <StreamerStudio admin={!!authUser?.isAdmin} />;
+  owner = authUser?.id ?? '';
+  adoptLegacy(!!authUser?.isAdmin);
+  return <StreamerStudio key={owner} admin={!!authUser?.isAdmin} />;
 }
 
 function StreamerStudio({ admin }: { admin: boolean }) {
@@ -196,7 +214,7 @@ function StreamerStudio({ admin }: { admin: boolean }) {
   const sRef = useRef(s); sRef.current = s;
   const set = useCallback((patch: Partial<Settings>) => setS((p) => ({ ...p, ...patch })), []);
   const pinch = useRef<{ d: number; s: number } | null>(null);
-  useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* ignore */ } }, [s]);
+  useEffect(() => { try { localStorage.setItem(settingsKey(), JSON.stringify(s)); } catch { /* ignore */ } }, [s]);
 
   const [tab, setTab] = useState<Tab>('layout');
   const [edit, setEdit] = useState(false);
@@ -278,7 +296,7 @@ function StreamerStudio({ admin }: { admin: boolean }) {
       const cv = document.createElement('canvas'); cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k);
       cv.getContext('2d')!.drawImage(bmp, 0, 0, cv.width, cv.height);
       const url = cv.toDataURL('image/jpeg', 0.86);
-      localStorage.setItem(BG_UPLOAD_KEY, url);
+      localStorage.setItem(bgUploadKey(), url);
       set({ bg: 'image', bgImage: 'upload' });
     } catch { flash('That picture couldn’t be used. Try a smaller one.'); }
   }, [set, flash]);
