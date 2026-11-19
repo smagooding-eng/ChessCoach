@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { saveFile } from '@/lib/saveFile';
 import { Download, Loader2, Share2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
@@ -34,6 +34,17 @@ export function TrafficExportPanel() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  // On a phone the share sheet is the way to put the file somewhere you can find it
+  // (Files, Drive, a chat). Android opens it only within a few seconds of the tap, so
+  // the file is built ahead of time, as soon as a range is picked.
+  const phone = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const prebuilt = useRef<string | null>(null);
+  useEffect(() => {
+    if (!phone || prebuilt.current === preset) return;
+    prebuilt.current = preset;
+    void build();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preset, phone]);
 
   const build = async (): Promise<File | null> => {
     setBusy(true); setMsg(''); setFile(null);
@@ -80,7 +91,10 @@ export function TrafficExportPanel() {
         await navigator.share({ files: [f], title: f.name });
         setMsg('Shared.');
       } else { await download(); }
-    } catch { /* share sheet closed */ }
+    } catch (e) {
+      if ((e as Error)?.name === 'AbortError') return; // closed the share sheet
+      setMsg('Tap Share / Save again: your phone needs a fresh tap to open the share sheet.');
+    }
   };
 
   return (
@@ -101,17 +115,24 @@ export function TrafficExportPanel() {
         ))}
       </div>
       <div className="flex flex-wrap gap-2">
+        {phone && canShare && (
+          <button type="button" onClick={share} disabled={busy}
+            className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold disabled:opacity-60" style={{ background: GREEN, color: '#fff' }}>
+            {busy ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />} {busy ? 'Building…' : 'Share / Save'}
+          </button>
+        )}
         <button type="button" onClick={download} disabled={busy}
-          className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold disabled:opacity-60" style={{ background: GREEN, color: '#fff' }}>
-          {busy ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} {busy ? 'Building…' : 'Download file'}
+          className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold disabled:opacity-60" style={phone && canShare ? { background: 'rgba(255,255,255,.08)', color: '#fff' } : { background: GREEN, color: '#fff' }}>
+          {busy && !(phone && canShare) ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} {busy && !(phone && canShare) ? 'Building…' : 'Download file'}
         </button>
-        {canShare && (
+        {!phone && canShare && (
           <button type="button" onClick={share} disabled={busy}
             className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold disabled:opacity-60" style={{ background: 'rgba(255,255,255,.08)', color: '#fff' }}>
             <Share2 size={14} /> Share file
           </button>
         )}
       </div>
+      {phone && canShare && <p className="mt-2 text-[11px]" style={{ color: MUTED }}>On your phone: <b>Share / Save</b> → <b>Files</b> (or Drive) to keep it, or straight into a chat.</p>}
       {msg && <p className="mt-2 text-[11px] font-semibold text-white">{msg}</p>}
     </div>
   );
