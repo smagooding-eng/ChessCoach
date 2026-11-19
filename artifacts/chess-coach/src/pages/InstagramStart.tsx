@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'wouter';
 import { Loader2, Sparkles, Check, ChevronRight, X, Mail } from 'lucide-react';
 import { RD } from '@/lib/redesignTheme';
-import { apiFetch } from '@/lib/api';
+import { apiFetchLocal } from '@/lib/api';
 import { useUser } from '@/hooks/use-user';
 import { trackFunnelEvent } from '@/lib/funnelTracking';
 import { rememberReturnTo, GoogleSignupButton, LichessMark, startLichessSignup } from '@/components/QuickSignup';
@@ -47,7 +47,8 @@ export default function InstagramStart() {
   const load = async (p: Platform, u: string) => {
     setLoading(true); setErr(null); setGames(null);
     try {
-      const r = await apiFetch(`/api/free-review/preview?platform=${p}&username=${encodeURIComponent(u)}`);
+      // Answered by chessscout.net itself (the Worker), straight from Chess.com / Lichess
+      const r = await apiFetchLocal(`/api/preview-games?platform=${p}&username=${encodeURIComponent(u)}`);
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error ?? 'Couldn’t load your games.');
       setShown({ platform: p, username: u }); setGames(d.games ?? []);

@@ -14,6 +14,7 @@ import geo from '../api/geo';
 import og from '../api/og';
 import page from '../api/page';
 import sitemap from '../api/sitemap';
+import { previewGames } from './api/previewGames';
 // The Android app's link to this site (served by the Worker itself, so it can't go
 // missing even if the folder starting with a dot isn't uploaded with the files).
 import assetlinks from '../artifacts/chess-coach/public/.well-known/assetlinks.json';
@@ -209,6 +210,8 @@ export default {
       return new Response(JSON.stringify(assetlinks), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=3600' } });
     }
 
+    // The Instagram page's game lookup, answered here (see api/previewGames.ts)
+    if (path === '/api/preview-games') return previewGames(url);
     // The functions Vercel ran under /api
     if (path === '/api/geo') return runVercel(geo, request, {}, url.pathname + url.search);
     if (path === '/api/stripe/products') {
