@@ -1,0 +1,84 @@
+/* Admin on the app's theme: solid dark cards (never see-through or tinted), one border
+   colour, one inner-card colour. Scoped to .cs-admin so nothing else changes. Panels were
+   added over time with different styles; these rules bring them all onto the same look. */
+
+.cs-admin {
+  --cs-bg: #050A0B;
+  --cs-card: #0D1516;
+  --cs-inner: #121B1D;
+  --cs-line: rgba(255, 255, 255, 0.08);
+  --cs-text: #F5F7F6;
+  --cs-muted: #87918E;
+  --cs-green: #81B64C;
+  color: var(--cs-text);
+}
+
+/* Section nav: solid strip so it stays readable over the page photo while scrolling */
+.cs-admin-nav { background: var(--cs-bg); border-bottom: 1px solid var(--cs-line); }
+@media (min-width: 768px) { .cs-admin-nav { border-radius: 14px; padding-left: 8px; padding-right: 8px; } }
+
+/* Panels */
+.cs-admin .bg-card,
+.cs-admin [class~="bg-card/60"],
+.cs-admin [class~="bg-card/80"],
+.cs-admin [class~="bg-card/50"] {
+  background: var(--cs-card) !important;
+  backdrop-filter: none !important;
+}
+.cs-admin [class~="border-border/40"],
+.cs-admin [class~="border-border/30"],
+.cs-admin [class~="border-border/50"],
+.cs-admin [class~="border-border/20"],
+.cs-admin .border-border { border-color: var(--cs-line) !important; }
+.cs-admin [class~="divide-border/30"] > * + * { border-color: var(--cs-line) !important; }
+
+/* Panel title strips were tinted (orange/amber/green/blue/purple at 5-8%): plain solid now */
+.cs-admin [class~="bg-orange-500/5"],
+.cs-admin [class~="bg-amber-500/5"],
+.cs-admin [class~="bg-emerald-500/5"],
+.cs-admin [class~="bg-blue-500/5"],
+.cs-admin [class~="bg-purple-500/5"],
+.cs-admin [class~="bg-red-500/5"],
+.cs-admin [class~="bg-green-500/5"] { background: var(--cs-card) !important; }
+
+/* Inner boxes (stats, list rows, inputs) */
+.cs-admin [class~="bg-background/40"],
+.cs-admin [class~="bg-background/50"],
+.cs-admin [class~="bg-background/30"],
+.cs-admin [class~="bg-secondary/30"],
+.cs-admin [class~="bg-secondary/40"],
+.cs-admin [class~="bg-secondary/50"],
+.cs-admin [class~="bg-secondary/60"],
+.cs-admin .bg-secondary,
+.cs-admin .bg-background { background: var(--cs-inner) !important; }
+
+.cs-admin .text-muted-foreground { color: var(--cs-muted) !important; }
+.cs-admin .text-foreground { color: var(--cs-text) !important; }
+
+.cs-admin input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+.cs-admin select,
+.cs-admin textarea {
+  background-color: var(--cs-inner);
+  border-color: var(--cs-line);
+  color: var(--cs-text);
+}
+
+/* Shared buttons/rows used by the admin shell */
+.cs-admin-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 12px; border-radius: 12px;
+  font-size: 13px; font-weight: 800;
+  background: #121B1D; color: #F5F7F6;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: background-color .15s;
+}
+.cs-admin-btn:hover { background: #18232A; }
+.cs-admin-btn:disabled { opacity: .55; }
+
+.cs-admin-row {
+  display: flex; width: 100%; align-items: center; gap: 12px;
+  padding: 14px 16px; border-radius: 16px;
+  background: #0D1516; border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: background-color .15s;
+}
+.cs-admin-row:hover { background: #111B1C; }

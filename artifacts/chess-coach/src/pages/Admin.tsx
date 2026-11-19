@@ -1,7 +1,7 @@
 import { BacklinkGapPanel } from '@/components/admin/BacklinkGapPanel';
 import { FreeAiPanel } from '@/components/admin/FreeAiPanel';
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { PageHero } from '@/components/DesignSystem';
+import './admin.css';
 import { useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
 import { apiFetch } from '@/lib/api';
@@ -66,6 +66,24 @@ const PATH_LABELS: Record<string, string> = {
   '/admin': 'Admin Dashboard',
 };
 
+type AdminTab = 'overview' | 'funnel' | 'engagement' | 'users' | 'marketing' | 'ai' | 'tournaments' | 'settings' | 'tools';
+const ADMIN_TABS: { key: AdminTab; label: string; icon: React.ComponentType<{ className?: string }>; blurb: string }[] = [
+  { key: 'overview', label: 'Overview', icon: Activity, blurb: 'The headline numbers, and who’s on right now.' },
+  { key: 'funnel', label: 'Sign-ups & Pro', icon: TrendingUp, blurb: 'Visitors → sign-ups → Pro: where people come from and where they drop off.' },
+  { key: 'engagement', label: 'Play & reviews', icon: Gamepad2, blurb: 'Games played, quick reviews, and what members actually do.' },
+  { key: 'users', label: 'Members', icon: Users, blurb: 'Find a member, grant Pro, see subscribers.' },
+  { key: 'marketing', label: 'Marketing', icon: Megaphone, blurb: 'Referrals, affiliates, outreach, SEO and social.' },
+  { key: 'ai', label: 'AI cost', icon: Brain, blurb: 'What the AI is used for and what it costs.' },
+  { key: 'tournaments', label: 'Tournaments', icon: Trophy, blurb: 'Create and run tournaments.' },
+  { key: 'settings', label: 'Site settings', icon: Settings, blurb: 'Look, notifications and the shop.' },
+  { key: 'tools', label: 'Tools', icon: Wrench, blurb: 'Caches, fixes, and features still in development.' },
+];
+
+/** A small section label inside a tab. */
+function AdminHeading({ title }: { title: string }) {
+  return <h2 className="pt-2 text-[11px] font-black uppercase tracking-[0.16em]" style={{ color: TEXT_MUTED }}>{title}</h2>;
+}
+
 function labelForPath(path: string): string {
   if (PATH_LABELS[path]) return PATH_LABELS[path];
   if (path.startsWith('/games/')) return 'Game Replay';
@@ -76,9 +94,9 @@ function labelForPath(path: string): string {
 }
 
 const CHESSCOM_GREEN = '#81b64c';
-const BG_CARD = '#302e2b';
-const TEXT_LIGHT = '#e8e6e3';
-const TEXT_MUTED = '#9e9b98';
+const BG_CARD = '#0D1516'; // the app's solid dark card
+const TEXT_LIGHT = '#F5F7F6';
+const TEXT_MUTED = '#87918E';
 
 function fmt(n: number | undefined): string {
   if (n == null) return '—';
@@ -354,7 +372,7 @@ function StatCard({
       <div className="flex items-center gap-2">
         <div
           className="w-8 h-8 rounded-xl flex items-center justify-center"
-          style={{ background: `${color}1a` }}
+          style={{ background: '#121B1D', border: '1px solid rgba(255,255,255,0.06)' }}
         >
           <Icon className="w-4 h-4" style={{ color }} />
         </div>
@@ -437,7 +455,20 @@ export function Admin() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'traffic' | 'ai' | 'users' | 'growth' | 'tournaments' | 'tools'>('overview');
+  const [activeTab, setActiveTabState] = useState<AdminTab>(() => {
+    try {
+      const q = new URLSearchParams(window.location.search).get('tab');
+      const saved = q || localStorage.getItem('cs_admin_tab');
+      const old: Record<string, AdminTab> = { traffic: 'funnel', growth: 'marketing' };
+      const t = (saved && (old[saved] ?? saved)) as AdminTab | null;
+      return t && ADMIN_TABS.some((x) => x.key === t) ? t : 'overview';
+    } catch { return 'overview'; }
+  });
+  const setActiveTab = (t: AdminTab) => {
+    setActiveTabState(t);
+    try { localStorage.setItem('cs_admin_tab', t); window.history.replaceState(window.history.state, '', `${window.location.pathname}?tab=${t}`); } catch { /* ignore */ }
+    window.scrollTo({ top: 0 });
+  };
   const [showUsers, setShowUsers] = useState(false);
   const [showBots, setShowBots] = useState(false);
   const [showSubscribers, setShowSubscribers] = useState(false);
@@ -526,80 +557,31 @@ export function Admin() {
   }
 
   return (
-    <div className="px-3 md:px-0 pt-4 md:pt-0 space-y-4">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div className="flex-1 min-w-[260px]">
-          <PageHero piece="♚" title="Admin Dashboard" subtitle="Combined user and activity stats across the entire app." />
+    <div className="cs-admin px-3 md:px-0 pt-4 md:pt-0 space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[26px] font-black leading-tight" style={{ color: TEXT_LIGHT }}>Admin</h1>
+          <p className="text-[12.5px]" style={{ color: TEXT_MUTED }}>{ADMIN_TABS.find((t) => t.key === activeTab)?.blurb}</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={handleClearCache}
-            disabled={clearing}
-            className="text-[11px] font-black px-2.5 py-2 rounded-xl transition-colors flex items-center gap-1 bg-red-500/25 border border-red-500/40 text-red-300 hover:bg-red-500/35 disabled:opacity-50"
-          >
-            {clearing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-            {clearing ? 'Clearing…' : 'Clear Cache'}
-          </button>
-          {clearResult && <span className="text-[11px] font-medium text-emerald-400">{clearResult}</span>}
-          <button
-            onClick={handleClearCourses}
-            disabled={clearingCourses}
-            className="text-[11px] font-black px-2.5 py-2 rounded-xl transition-colors flex items-center gap-1 bg-amber-500/25 border border-amber-500/40 text-amber-300 hover:bg-amber-500/35 disabled:opacity-50"
-          >
-            {clearingCourses ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-            {clearingCourses ? 'Clearing…' : 'Clear Courses Only'}
-          </button>
-          {clearCoursesResult && <span className="text-[11px] font-medium text-emerald-400">{clearCoursesResult}</span>}
-          <button
-            onClick={openComposer}
-            className="text-[11px] font-bold px-2.5 py-2 rounded-xl transition-colors flex items-center gap-1 bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:bg-amber-500/30"
-          >
-            <Mail className="w-3.5 h-3.5" /> Compose
-          </button>
-          <button
-            onClick={load}
-            disabled={loading}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl font-bold text-sm transition-all disabled:opacity-50"
-            style={{
-              background: `${CHESSCOM_GREEN}1a`,
-              color: CHESSCOM_GREEN,
-              border: `1px solid ${CHESSCOM_GREEN}33`,
-            }}
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+        <div className="flex shrink-0 items-center gap-2">
+          <button onClick={openComposer} className="cs-admin-btn"><Mail className="w-4 h-4" /> <span className="hidden sm:inline">Email</span></button>
+          <button onClick={load} disabled={loading} className="cs-admin-btn" aria-label="Refresh">
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> <span className="hidden sm:inline">Refresh</span>
           </button>
         </div>
       </div>
 
-      {/* One tab bar instead of one continuous scroll through 15 separate
-          panels -- each stat/panel now lives in exactly one place, grouped
-          by the question it answers, instead of wherever it happened to
-          get added over time. auto-refreshes every 30s via the interval
-          on the load() effect above (this used to be a second, separate
-          poll inside the now-removed AdminTicker component). */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 -mx-3 px-3 md:mx-0 md:px-0">
-        {([
-          ['overview', 'Overview'],
-          ['traffic', 'Traffic & Funnel'],
-          ['ai', 'AI Usage & Cost'],
-          ['users', 'Users'],
-          ['growth', 'Growth & Marketing'],
-          ['tournaments', 'Tournaments'],
-          ['tools', 'Admin Tools'],
-        ] as const).map(([key, label]) => (
-          <button
-            key={key}
-            onClick={() => setActiveTab(key)}
-            className="shrink-0 px-3.5 py-2 rounded-full text-xs font-bold transition-all"
-            style={activeTab === key
-              ? { background: CHESSCOM_GREEN, color: '#000' }
-              : { background: 'rgba(255,255,255,0.05)', color: TEXT_MUTED }}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      {/* Sections: every panel lives in exactly one, grouped by the question it answers. */}
+      <nav className="cs-admin-nav sticky top-0 z-20 -mx-3 px-3 py-2 md:mx-0 md:px-0">
+        <div className="flex gap-1.5 overflow-x-auto">
+          {ADMIN_TABS.map(({ key, label, icon: Icon }) => (
+            <button key={key} onClick={() => setActiveTab(key)} className="flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-[13px] font-bold transition-colors"
+              style={activeTab === key ? { background: CHESSCOM_GREEN, color: '#06110A' } : { background: '#121B1D', color: TEXT_MUTED, border: '1px solid rgba(255,255,255,.08)' }}>
+              <Icon className="w-4 h-4" /> {label}
+            </button>
+          ))}
+        </div>
+      </nav>
 
       {error && (
         <div
@@ -767,11 +749,13 @@ export function Admin() {
           </div>
         </div>
       )}
+      <OnlineNowPanel labelForPath={labelForPath} />
       </>
       )}
 
-      {activeTab === 'traffic' && (
+      {activeTab === 'funnel' && (
         <>
+          <AdminHeading title="Visitors" />
           <TrafficExportPanel />
 
           {(stats as unknown as { excluded?: { accounts: number; browsers: number; suspectedBotBrowsers: number; emails: string[] } } | null)?.excluded && (() => {
@@ -832,20 +816,32 @@ export function Admin() {
             </div>
           )}
 
-          <GamesPlayedPanel />
+          <AdminHeading title="Sign-ups" />
+          <LandingFunnelPanel />
 
+          <AdminHeading title="Pro" />
+          <TrialStatsPanel />
+        </>
+      )}
+
+      {activeTab === 'engagement' && (
+        <>
+          <GamesPlayedPanel />
+          <QuickReviewsPanel />
+          <UserActivityPanel />
+        </>
+      )}
+
+      {activeTab === 'settings' && (
+        <>
+          <AdminHeading title="Look" />
           <DashboardRedesignTogglePanel />
           <PhotoImagesTogglePanel />
           <DefaultLookPanel />
-
+          <AdminHeading title="Notifications" />
           <PushNotificationPanel />
-
+          <AdminHeading title="Shop" />
           <ShopManagementPanel />
-
-          <LandingFunnelPanel />
-
-          <TrialStatsPanel />
-          <QuickReviewsPanel />
         </>
       )}
 
@@ -853,43 +849,47 @@ export function Admin() {
 
       {activeTab === 'users' && (
         <>
-          {/* This is the same UserListPanel the Overview tab's Users stat
-              card opens (via the same showUsers state) -- grant Pro,
-              grant affiliate, view usage, delete, filter, and sort all
-              live here. Surfaced directly on this tab too, not just via
-              a click-through on Overview, since "Users" is where an
-              admin would naturally look for this first. */}
-          <div className="rounded-2xl border border-border/40 bg-card/60 overflow-hidden">
-            <button
-              onClick={() => setShowUsers(true)}
-              className="w-full px-5 py-4 flex items-center justify-between hover:bg-secondary/20 transition-colors"
-            >
-              <span className="text-sm font-bold flex items-center gap-2"><Users className="w-4 h-4 text-blue-400" /> Manage Users</span>
-              <span className="text-xs text-muted-foreground">Grant Pro / affiliate, view usage, delete, filter &amp; sort →</span>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button onClick={() => setShowUsers(true)} className="cs-admin-row">
+              <Users className="w-5 h-5 shrink-0" style={{ color: CHESSCOM_GREEN }} />
+              <span className="min-w-0 flex-1 text-left"><b className="block text-[14.5px]" style={{ color: TEXT_LIGHT }}>All members{stats ? ` · ${fmt(stats.users.total)}` : ''}</b>
+                <span className="block text-[12px]" style={{ color: TEXT_MUTED }}>Grant Pro or affiliate, see usage, filter, sort, delete</span></span>
+              <ChevronRight className="w-4 h-4 shrink-0" style={{ color: TEXT_MUTED }} />
             </button>
-            {showUsers && <UserListPanel onClose={() => setShowUsers(false)} onEmailUsers={handleEmailUsers} />}
+            <button onClick={() => setShowSubscribers(true)} className="cs-admin-row">
+              <CreditCard className="w-5 h-5 shrink-0" style={{ color: '#E8B447' }} />
+              <span className="min-w-0 flex-1 text-left"><b className="block text-[14.5px]" style={{ color: TEXT_LIGHT }}>Subscribers{stats ? ` · ${fmt(stats.subscriptions.total)}` : ''}</b>
+                <span className="block text-[12px]" style={{ color: TEXT_MUTED }}>Who pays, which plan, past due</span></span>
+              <ChevronRight className="w-4 h-4 shrink-0" style={{ color: TEXT_MUTED }} />
+            </button>
           </div>
-          <OnlineNowPanel labelForPath={labelForPath} />
-          <UserActivityPanel />
+          <AnimatePresence>
+            {showUsers && <UserListPanel onClose={() => setShowUsers(false)} onEmailUsers={handleEmailUsers} />}
+            {showSubscribers && <SubscribersPanel onClose={() => setShowSubscribers(false)} />}
+          </AnimatePresence>
         </>
       )}
 
-      {activeTab === 'growth' && (
+      {activeTab === 'marketing' && (
         <>
-          <Link href="/admin/studio" className="mb-4 flex items-center gap-3 rounded-2xl p-4" style={{ background: 'linear-gradient(135deg, rgba(129,182,76,.18), rgba(129,182,76,.05))', border: '1px solid rgba(129,182,76,.35)' }}>
+          <Link href="/admin/studio" className="cs-admin-row">
             <span className="text-2xl" aria-hidden>🎬</span>
-            <span className="flex-1"><span className="block text-[15px] font-black text-white">Content Studio</span><span className="block text-[12.5px] text-white/70">Find brilliant moves, traps, forks and mates in every reviewed game and turn them into vertical clips.</span></span>
-            <span className="text-[13px] font-bold text-[#B8E08C]">Open →</span>
+            <span className="min-w-0 flex-1"><b className="block text-[14.5px]" style={{ color: TEXT_LIGHT }}>Content Studio</b><span className="block text-[12px]" style={{ color: TEXT_MUTED }}>Brilliant moves, traps, forks and mates from reviewed games, turned into vertical clips</span></span>
+            <ChevronRight className="w-4 h-4 shrink-0" style={{ color: TEXT_MUTED }} />
           </Link>
+          <AdminHeading title="Referrals & affiliates" />
           <ReferralCodesPanel />
           <ReferralSignupsPanel />
           <AffiliatesPanel />
+          <AdminHeading title="Sharing & email" />
           <ShareKitPanel />
           <EmailTrackingPanel />
+          <AdminHeading title="Outreach" />
           <ClubOutreachPanel />
           <DirectoryKitPanel />
           <BacklinkGapPanel />
           <OutreachStudio />
+          <AdminHeading title="Search & social" />
           <SeoArticlesPanel />
           <FacebookAutoPostPanel />
         </>
@@ -899,6 +899,20 @@ export function Admin() {
 
       {activeTab === 'tools' && (
         <>
+          <div className="rounded-xl p-4" style={{ background: BG_CARD, border: '1px solid rgba(255,255,255,0.08)' }}>
+            <h2 className="text-base font-black" style={{ color: TEXT_LIGHT }}>Caches</h2>
+            <p className="mb-3 text-[11.5px]" style={{ color: TEXT_MUTED }}>Clearing reviews makes every member's games go through a full (paid) re-analysis. Courses only touches courses.</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button onClick={handleClearCache} disabled={clearing} className="cs-admin-btn" style={{ color: '#FF7A80' }}>
+                {clearing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} {clearing ? 'Clearing…' : 'Clear review cache'}
+              </button>
+              <button onClick={handleClearCourses} disabled={clearingCourses} className="cs-admin-btn" style={{ color: '#E8B447' }}>
+                {clearingCourses ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />} {clearingCourses ? 'Clearing…' : 'Clear courses only'}
+              </button>
+              {clearResult && <span className="text-[12px] font-bold" style={{ color: CHESSCOM_GREEN }}>{clearResult}</span>}
+              {clearCoursesResult && <span className="text-[12px] font-bold" style={{ color: CHESSCOM_GREEN }}>{clearCoursesResult}</span>}
+            </div>
+          </div>
           <div
             className="rounded-xl p-4"
             style={{ background: BG_CARD, border: `1px solid rgba(255,255,255,0.05)` }}
@@ -912,7 +926,7 @@ export function Admin() {
             <div className="flex flex-wrap gap-2">
               <Link href="/live">
                 <a className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-bold text-sm"
-                  style={{ background: `${CHESSCOM_GREEN}1a`, color: CHESSCOM_GREEN, border: `1px solid ${CHESSCOM_GREEN}33` }}>
+                  style={{ background: '#121B1D', color: CHESSCOM_GREEN, border: '1px solid rgba(255,255,255,0.08)' }}>
                   <Play className="w-4 h-4" /> Play Live
                 </a>
               </Link>
@@ -3212,6 +3226,7 @@ function LandingFunnelPanel() {
 }
 
 type TrialStats = {
+  path?: { saw: number; tapped: number; closedOnly: number; neither: number; tappedThenCheckout: number; checkoutPeople: number; checkoutFailed: number } | null;
   promo: { shown: number; start: number; dismiss: number; closeMedianSecs?: number | null; closedUnder4s?: number };
   checkout: { total: number; promo: number; subscription: number; pricing: number; email: number };
   trials: { started: number; inTrial: number; cancelling: number; paid: number; paidCancelling: number; paymentFailed: number; ended: number };
@@ -3334,24 +3349,40 @@ function TrialStatsPanel() {
           <p className="text-xs text-muted-foreground text-center py-4">Failed to load trial stats.{err ? ` (${err})` : ''}</p>
         ) : (
           <>
+            {data.path && (() => {
+              const p = data.path;
+              const seg = (n: number, color: string) => (p.saw ? <div style={{ width: `${(n / p.saw) * 100}%`, background: color }} /> : null);
+              return (
+                <div>
+                  <p className="mb-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">The offer, per member</p>
+                  <p className="mb-2 text-[11.5px] text-muted-foreground">Each member counted once, however many days they saw it. The three parts add up to everyone who saw it.</p>
+                  <div className="mb-2 flex h-2.5 overflow-hidden rounded-full" style={{ background: '#121B1D' }}>
+                    {seg(p.tapped, '#81B64C')}{seg(p.closedOnly, '#87918E')}{seg(p.neither, '#3A4446')}
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <Stat label="Saw it" value={p.saw} sub="members" />
+                    <Stat label="Tapped Start" value={p.tapped} sub={pct(p.tapped, p.saw)} />
+                    <Stat label="Closed without tapping" value={p.closedOnly} sub={pct(p.closedOnly, p.saw)} />
+                    <Stat label="Left it open" value={p.neither} sub={pct(p.neither, p.saw)} />
+                  </div>
+                  <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <Stat label="Tapped → checkout opened" value={p.tappedThenCheckout} sub={`${pct(p.tappedThenCheckout, p.tapped)} of those who tapped`} />
+                    <Stat label="Checkout didn't open" value={p.checkoutFailed} sub="error or price not loaded" />
+                    <Stat label="Trials started (Stripe)" value={data.trials.started} sub={`${pct(data.trials.started, p.checkoutPeople)} of ${p.checkoutPeople} who opened checkout`} />
+                  </div>
+                  {data.promo.closeMedianSecs != null && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Half of the closes came within {data.promo.closeMedianSecs}s of the offer appearing; {data.promo.closedUnder4s} within 4s.
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
             <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Promo (members)</p>
-              <div className="grid grid-cols-3 gap-2">
-                <Stat label="Saw it" value={data.promo.shown} />
-                <Stat label="Tapped Start" value={data.promo.start} sub={pct(data.promo.start, data.promo.shown)} />
-                <Stat label="Closed it" value={data.promo.dismiss} sub={pct(data.promo.dismiss, data.promo.shown)} />
-              </div>
-              {data.promo.closeMedianSecs != null && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Half of those who closed it did so within {data.promo.closeMedianSecs}s of it appearing; {data.promo.closedUnder4s} closed it within 4s.
-                </p>
-              )}
-            </div>
-            <div>
-              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Opened trial checkout</p>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                <Stat label="Total" value={data.checkout.total} />
-                <Stat label="From promo" value={data.checkout.promo} />
+              <p className="mb-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">Where trial checkouts were opened</p>
+              <p className="mb-2 text-[11.5px] text-muted-foreground">Members; one member can open it from more than one place.</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <Stat label="Pro offer" value={data.checkout.promo} />
                 <Stat label="Subscription page" value={data.checkout.subscription} />
                 <Stat label="Pricing page" value={data.checkout.pricing} />
                 <Stat label="Email offer" value={data.checkout.email} />
@@ -3361,7 +3392,7 @@ function TrialStatsPanel() {
               <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Trials (from Stripe)</p>
               {data.stripeError && <p className="mb-2 text-xs text-red-400">Stripe: {data.stripeError}</p>}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-                <Stat label="Started" value={data.trials.started} sub={pct(data.trials.started, data.checkout.total) + ' of checkouts'} />
+                <Stat label="Started" value={data.trials.started} />
                 <Stat label="In trial now" value={data.trials.inTrial} />
                 <Stat label="Cancelling (in trial)" value={data.trials.cancelling} />
                 <Stat label="Paid" value={data.trials.paid} sub={finished ? `${pct(data.trials.paid, finished)} of finished trials` : undefined} />

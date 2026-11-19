@@ -26,7 +26,7 @@ const FEATURES = [
 ];
 
 type Price = { id: string; unit_amount: number; recurring?: { interval?: string } };
-const track = (event: 'shown' | 'start' | 'dismiss') => {
+const track = (event: 'shown' | 'start' | 'dismiss' | 'checkout_failed') => {
   apiFetch('/api/trial/track', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event }) }).catch(() => {});
 };
 
@@ -73,17 +73,26 @@ export function TrialPromo() {
   const close = () => { track('dismiss'); setOpen(false); };
   const start = async () => {
     track('start');
-    if (!price) { window.location.href = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/subscription?offer=trial&from=promo`; return; }
     setBusy(true); setErr('');
     try {
+      // The price hadn't loaded yet: get it now (this used to send them to the subscription
+      // page instead, where most never tapped again).
+      let p = price;
+      if (!p) {
+        const d = await apiFetchLocal('/api/stripe/products').then((x) => (x.ok ? x.json() : null)).catch(() => null);
+        p = (d?.data?.[0]?.prices as Price[] | undefined)?.find((x) => x.recurring?.interval === 'month') ?? null;
+        if (p) setPrice(p);
+      }
+      if (!p) { track('checkout_failed'); window.location.href = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/subscription?offer=trial&from=promo`; return; }
       const r = await apiFetch('/api/stripe/checkout-trial', {
         method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ priceId: price.id, source: 'promo' }),
+        body: JSON.stringify({ priceId: p.id, source: 'promo' }),
       });
       const d = await r.json().catch(() => ({}));
       if (d.url) { window.location.href = d.url; return; }
+      track('checkout_failed');
       setErr(d.error || 'Couldn’t start the free trial. Please try again.');
-    } catch { setErr('Connection error. Please try again.'); }
+    } catch { track('checkout_failed'); setErr('Connection error. Please try again.'); }
     setBusy(false);
   };
   const after = price ? `then $${(price.unit_amount / 100).toFixed(price.unit_amount % 100 ? 2 : 0)}/month` : 'then Pro’s monthly price';

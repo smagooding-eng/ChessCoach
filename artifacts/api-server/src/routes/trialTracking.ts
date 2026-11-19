@@ -33,7 +33,7 @@ export async function logTrialEvent(userId: string, event: string, source?: stri
 }
 
 // From the promo itself
-const PROMO_EVENTS = new Set(['shown', 'start', 'dismiss']);
+const PROMO_EVENTS = new Set(['shown', 'start', 'dismiss', 'checkout_failed']);
 router.post('/trial/track', async (req: Request, res: Response) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const event = String(req.body?.event ?? '');
@@ -72,6 +72,26 @@ router.get('/admin/trial-stats', requireAdmin, async (req: Request, res: Respons
              COUNT(*) FILTER (WHERE secs < 4)::int AS quick
       FROM d WHERE secs IS NOT NULL`));
     const count = (event: string, source?: string) => ev.filter((r) => r.event === event && (!source || r.source === source)).reduce((n, r) => n + r.people, 0);
+    // The promo as one path per person, so the parts add up: everyone who saw it either tapped
+    // Start, closed it without tapping, or did neither (left the page with it open). A member
+    // who saw it on several days is counted once.
+    const [path] = rowsOf<{ saw: number; tapped: number; closed_only: number; checkout_after: number; checkout_any: number; failed: number }>(await db.execute(sql`
+      WITH e AS (
+        SELECT e.user_id, e.event, e.source FROM trial_events e JOIN users u ON u.id = e.user_id
+        WHERE e.created_at >= ${since.toISOString()} AND e.created_at < ${until.toISOString()}
+          AND lower(u.email) NOT IN (${sql.join(excluded.map((x) => sql`${x}`), sql`, `)})),
+      p AS (
+        SELECT user_id,
+          bool_or(event = 'shown') AS saw, bool_or(event = 'start') AS tapped, bool_or(event = 'dismiss') AS closed,
+          bool_or(event = 'checkout') AS checkout, bool_or(event = 'checkout_failed') AS failed
+        FROM e GROUP BY user_id)
+      SELECT count(*) FILTER (WHERE saw)::int AS saw,
+             count(*) FILTER (WHERE saw AND tapped)::int AS tapped,
+             count(*) FILTER (WHERE saw AND closed AND NOT tapped)::int AS closed_only,
+             count(*) FILTER (WHERE saw AND tapped AND checkout)::int AS checkout_after,
+             count(*) FILTER (WHERE checkout)::int AS checkout_any,
+             count(*) FILTER (WHERE failed)::int AS failed
+      FROM p`));
 
     // Who each Stripe customer is (and which are Shann's own)
     const cust = rowsOf<{ cid: string; email: string | null }>(await db.execute(sql`
@@ -108,6 +128,8 @@ router.get('/admin/trial-stats', requireAdmin, async (req: Request, res: Respons
     const started = trials.filter((t) => t.outcome !== 'not_started').length;
     res.json({
       startDate: start, endDate: end,
+      path: path ? { saw: path.saw, tapped: path.tapped, closedOnly: path.closed_only, neither: Math.max(0, path.saw - path.tapped - path.closed_only),
+        tappedThenCheckout: path.checkout_after, checkoutPeople: path.checkout_any, checkoutFailed: path.failed } : null,
       promo: { shown: count('shown'), start: count('start'), dismiss: count('dismiss'),
         closeMedianSecs: close?.median != null ? Math.round(close.median * 10) / 10 : null, closedUnder4s: close?.quick ?? 0 },
       checkout: { total: count('checkout'), promo: count('checkout', 'promo'), subscription: count('checkout', 'subscription'), pricing: count('checkout', 'pricing'), email: count('checkout', 'email') },
