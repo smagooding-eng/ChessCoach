@@ -26,7 +26,15 @@ async function requireStudio(req: Request, res: Response, next: NextFunction) {
     const { hasFullAccess } = await import("../lib/accessControl");
     if ((await hasFullAccess(String(req.user.id))).full) { next(); return; }
   } catch { /* fall through */ }
+  // Invited by the admin to stream together: the studio opens for that co-stream.
+  if (adminGuest(String(req.user.id))) { next(); return; }
   res.status(403).json({ error: "Streamer Studio is part of ChessScout Pro." });
+}
+/** Has an invite from (or a co-stream with) an admin: Studio is open to them for it. */
+function adminGuest(uid: string): boolean {
+  coSweep();
+  for (const c of costreams.values()) if (c.byAdmin && (c.to === uid || c.from === uid)) return true;
+  return false;
 }
 // Watching a live stream: anyone signed in.
 function requireMember(req: Request, res: Response, next: NextFunction) {
@@ -280,6 +288,8 @@ interface CoStream {
   id: string; gameId: string; status: "invited" | "active";
   from: string; to: string; fromName: string; toName: string;
   mail: Map<string, unknown[]>; seen: Map<string, number>; at: number;
+  /** Started by the admin (any member, no game needed). */
+  byAdmin?: boolean;
 }
 const costreams = new Map<string, CoStream>();
 const CO_GONE_MS = 45_000;
@@ -317,6 +327,42 @@ router.post("/costream/invite", requireStudio, async (req: Request, res: Respons
   costreams.set(id, { id, gameId: g.state.id, status: "invited", from: uid, to: opp.userId, fromName: name, toName: opp.username,
     mail: new Map(), seen: new Map([[uid, Date.now()]]), at: Date.now() });
   res.json({ id, partner: opp.username });
+});
+
+// Admin: invite any member to stream together, by their ChessScout, Chess.com or Lichess
+// name (or email). No game needed, and they don't need Pro: the studio opens for it.
+router.post("/costream/invite-user", requireStudio, async (req: Request, res: Response) => {
+  if (!isAdmin(req)) { res.status(403).json({ error: "Admins only" }); return; }
+  coSweep();
+  const uid = String(req.user!.id);
+  const who = String(req.body?.username ?? "").trim().replace(/^@/, "").toLowerCase();
+  if (!who || who.length > 80) { res.status(400).json({ error: "Enter their username." }); return; }
+  const rows = await db.execute(sql`SELECT id, COALESCE(NULLIF(scout_username, ''), NULLIF(chesscom_username, ''), NULLIF(lichess_username, ''), first_name, 'Player') AS name
+    FROM users WHERE lower(scout_username) = ${who} OR lower(chesscom_username) = ${who} OR lower(lichess_username) = ${who} OR lower(email) = ${who}
+    ORDER BY last_login_at DESC NULLS LAST LIMIT 1`).catch(() => ({ rows: [] }));
+  const [them] = ((rows as { rows?: { id: string; name: string }[] }).rows ?? []);
+  if (!them) { res.status(404).json({ error: `No ChessScout member called ${who}.` }); return; }
+  if (String(them.id) === uid) { res.status(400).json({ error: "That's you." }); return; }
+  for (const [id, c] of costreams) if (c.from === uid || c.to === uid || c.from === String(them.id) || c.to === String(them.id)) costreams.delete(id);
+  const id = randomUUID();
+  const name = String(req.body?.name || "ChessScout").slice(0, 40);
+  costreams.set(id, { id, gameId: "", status: "invited", from: uid, to: String(them.id), fromName: name, toName: String(them.name).slice(0, 40),
+    mail: new Map(), seen: new Map([[uid, Date.now()]]), at: Date.now(), byAdmin: true });
+  try {
+    const { notifyUser } = await import("../lib/notify");
+    await notifyUser(String(them.id), { title: "Stream together?", body: `${name} invited you to live stream together on ChessScout. Open Streamer Studio to answer.`, url: "/studio", kind: "costream" });
+  } catch { /* the studio shows it anyway */ }
+  res.json({ id, partner: them.name });
+});
+
+// The studio page asks whether it's open to this member (Pro, admin, or invited by the admin).
+router.get("/studio/access", requireMember, async (req: Request, res: Response) => {
+  if (isAdmin(req)) { res.json({ open: true }); return; }
+  try {
+    const { hasFullAccess } = await import("../lib/accessControl");
+    if ((await hasFullAccess(String(req.user!.id))).full) { res.json({ open: true }); return; }
+  } catch { /* fall through */ }
+  res.json({ open: adminGuest(String(req.user!.id)) });
 });
 
 // Your co-stream (or an invite to you), and any messages from your partner. Polled ~1/s.

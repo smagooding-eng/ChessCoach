@@ -20,6 +20,7 @@ const bgUploadKey = () => `${BG_UPLOAD_KEY_LEGACY}:${owner}`;
 const bgSrc = (v: string): string => { if (v !== 'upload') return v; try { return localStorage.getItem(bgUploadKey()) ?? ''; } catch { return ''; } };
 const THEME_BGS = BG_PHOTOS.filter((b) => !!b.src);
 import { VoiceChanger, VOICE_PRESETS, VOICE_GROUPS, DEFAULT_CUSTOM, type VoicePreset, type CustomVoice } from '@/lib/streamer/voiceChanger';
+import { PersonSegmenter } from '@/lib/streamer/personSegmenter';
 import { FaceTracker, type FacePose } from '@/lib/streamer/faceTracker';
 import {
   MojiHead, loadThree, lookFromCamera, DEFAULT_MOJI, MOJI_SKINS, MOJI_HAIR_COLORS, MOJI_EYE_COLORS, MOJI_FRAMES, MOJI_HAIRS, MOJI_BEARDS, MOJI_MUSTACHES, MOJI_GLASSES,
@@ -181,8 +182,15 @@ function Note({ children }: { children: ReactNode }) {
 /** Pro members and admins; everyone else gets a short note with the way to Pro (no popup). */
 export default function StreamerStudioGate() {
   const { isPremium, authUser, isAuthLoading } = useUser();
-  if (isAuthLoading) return null;
-  if (!isPremium && !authUser?.isAdmin) {
+  // Not Pro, but invited by the admin to stream together: the studio opens for that.
+  const [guest, setGuest] = useState<boolean | null>(null);
+  const needsCheck = !isAuthLoading && !!authUser && !isPremium && !authUser.isAdmin;
+  useEffect(() => {
+    if (!needsCheck) return;
+    void apiFetch('/api/studio/access').then((r) => (r.ok ? r.json() : null)).then((d) => setGuest(!!d?.open)).catch(() => setGuest(false));
+  }, [needsCheck]);
+  if (isAuthLoading || (needsCheck && guest === null)) return null;
+  if (!isPremium && !authUser?.isAdmin && !guest) {
     return (
       <div className="min-h-screen grid place-items-center p-6" style={{ background: BG, color: RD.text }}>
         <div className="w-full max-w-md rounded-2xl p-6 text-center" style={{ background: CARD, border: `1px solid ${RD.border}` }}>
@@ -269,6 +277,7 @@ function StreamerStudio({ admin }: { admin: boolean }) {
   const peekRef = useRef(peek); peekRef.current = peek;
   const screenStream = useRef<MediaStream | null>(null);
   const tracker = useRef(new FaceTracker());
+  const segmenter = useRef(new PersonSegmenter());
   const voice = useRef(new VoiceChanger());
   const recRef = useRef<{ rec: MediaRecorder; streams: MediaStream[]; ctx: AudioContext | null } | null>(null);
   const cloudRec = useRef<CloudRecorder | null>(null);
@@ -411,6 +420,15 @@ function StreamerStudio({ admin }: { admin: boolean }) {
     void tracker.current.load().then((ok) => setTrackStatus(ok ? 'ready' : 'failed'));
   }, [s.camOn, s.disguise]);
 
+  // ---- background behind you (not just behind a character): only loaded when it's needed ----
+  const [segStatus, setSegStatus] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle');
+  useEffect(() => {
+    if (!s.camOn || s.bg === 'room' || !(s.disguise === 'none' || s.disguise === 'pixelate' || s.disguise === 'blur')) return;
+    if (segmenter.current.status === 'ready' || segmenter.current.status === 'loading') return;
+    setSegStatus('loading');
+    void segmenter.current.load().then((ok) => setSegStatus(ok ? 'ready' : 'failed'));
+  }, [s.camOn, s.bg, s.disguise]);
+
   // ---- voice ----
   const startVoice = useCallback(async () => {
     try {
@@ -466,6 +484,7 @@ function StreamerStudio({ admin }: { admin: boolean }) {
   useEffect(() => () => mixer.current.close(), []);
   // An opponent to invite: the live game you're in now (checked every few seconds)
   const [liveOpp, setLiveOpp] = useState<{ name: string; bot: boolean } | null>(null);
+  const [inviteName, setInviteName] = useState('');
   useEffect(() => {
     let alive = true;
     const check = () => apiFetch('/api/live/active-game?keepBot=1', { credentials: 'include' })
@@ -792,6 +811,8 @@ function StreamerStudio({ admin }: { admin: boolean }) {
     const bgPic: { src: string; img: HTMLImageElement | null } = { src: '', img: null };
     const tiny = document.createElement('canvas');
     const tctx = tiny.getContext('2d');
+    const person = document.createElement('canvas');
+    const pctx = person.getContext('2d');
     const loop = () => {
       raf = requestAnimationFrame(loop);
       const cv = camCanvas.current, vid = camVideo.current, st = sRef.current;
@@ -818,6 +839,23 @@ function StreamerStudio({ admin }: { admin: boolean }) {
           c.imageSmoothingEnabled = true; c.drawImage(tiny, 0, 0, W, H);
         } else c.drawImage(vid, ox, oy, vw * sc, vh * sc);
         c.restore();
+      };
+      // You, cut out of your room (a background goes behind you): see lib/streamer/personSegmenter.
+      const cutOut = st.bg !== 'room' && (st.disguise === 'none' || st.disguise === 'pixelate' || st.disguise === 'blur')
+        && hasVideo && !!vid && segmenter.current.status === 'ready' && segmenter.current.update(vid) && !!pctx;
+      const drawCamera = () => {
+        if (!cutOut || !vid || !pctx) { drawVideo(); return; }
+        if (st.bg === 'blur') drawVideo(40); else brand();
+        if (person.width !== W || person.height !== H) { person.width = W; person.height = H; }
+        pctx.save();
+        pctx.clearRect(0, 0, W, H);
+        if (mirror) pctx.setTransform(-1, 0, 0, 1, W, 0);
+        pctx.drawImage(vid, ox, oy, vw * sc, vh * sc);
+        pctx.globalCompositeOperation = 'destination-in';
+        pctx.imageSmoothingEnabled = true;
+        pctx.drawImage(segmenter.current.mask, ox, oy, vw * sc, vh * sc);
+        pctx.restore();
+        c.drawImage(person, 0, 0);
       };
       const brand = () => {
         if (st.bg === 'color') { c.fillStyle = st.bgColor; c.fillRect(0, 0, W, H); return; }
@@ -860,7 +898,7 @@ function StreamerStudio({ admin }: { admin: boolean }) {
       const tracked = t - lastSeen < 450;
 
       if (st.disguise === 'none') {
-        if (hasVideo) drawVideo(); else brand();
+        if (hasVideo) drawCamera(); else brand();
       } else if (st.disguise === 'character') {
         // Your character on the studio background (or your room / blurred room, with your face hidden).
         if (hasVideo && tracked && st.bg === 'room') {
@@ -880,7 +918,7 @@ function StreamerStudio({ admin }: { admin: boolean }) {
         drawVideo(Math.max(10, r / 3));
         c.restore();
       } else {
-        drawVideo();
+        drawCamera();
         // hide the face region: ellipse in the (mirrored) video space
         const r = pose.size * 0.62;
         c.save(); c.beginPath(); c.ellipse(pose.x, pose.y, r, r * 1.3, pose.roll, 0, Math.PI * 2); c.clip();
@@ -1456,7 +1494,9 @@ function StreamerStudio({ admin }: { admin: boolean }) {
             )}
 
             <Label>Background</Label>
-            <p className="-mt-1 mb-2 text-[11.5px]" style={{ color: RD.muted }}>Behind your character, and whenever the camera is off.</p>
+            <p className="-mt-1 mb-2 text-[11.5px]" style={{ color: RD.muted }}>Behind you (your room is cut out), behind your character, and whenever the camera is off.</p>
+            {s.camOn && s.bg !== 'room' && segStatus === 'loading' && <Note>Getting the background ready…</Note>}
+            {s.camOn && s.bg !== 'room' && segStatus === 'failed' && <Note>The background couldn’t load on this device, so your room still shows. Check your connection and pick the background again.</Note>}
             <div className="flex flex-wrap gap-2">
               <Chip on={s.bg === 'brand'} onClick={() => set({ bg: 'brand' })}>♞ ChessScout</Chip>
               <Chip on={s.bg === 'room'} onClick={() => set({ bg: 'room' })}>🏠 My room</Chip>
@@ -1570,7 +1610,20 @@ function StreamerStudio({ admin }: { admin: boolean }) {
               <Note>You're co-streaming with <b>{co.state.partner}</b>: both of you appear on both streams, with both voices. {co.state.partnerLive ? `${co.state.partner} is live too; viewers can switch between your two views on chessscout.net/streams.` : ''}</Note>
             ) : co.state ? (
               <Note>{co.state.invitedByMe ? `Invite sent to ${co.state.partner}.` : `${co.state.partner} invited you: answer at the top of the studio.`}</Note>
-            ) : liveOpp && !liveOpp.bot ? (<>
+            ) : admin ? (<>
+              {liveOpp && !liveOpp.bot && (
+                <button disabled={coBusy} onClick={() => void coDo(async () => { const who = await co.invite(s.name); flash(`Invite sent to ${who}. They accept in their Streamer Studio.`); })}
+                  className="mb-2 w-full py-2.5 rounded-xl font-extrabold text-sm disabled:opacity-60" style={{ background: RD.green, color: '#06110A' }}>
+                  Invite {liveOpp.name} to stream this match together
+                </button>
+              )}
+              <form onSubmit={(e) => { e.preventDefault(); const u = inviteName.trim(); if (!u) return; void coDo(async () => { const who = await co.inviteUser(u, s.name); setInviteName(''); flash(`Invite sent to ${who}. They get a notification and answer in Streamer Studio.`); }); }} className="flex gap-2">
+                <input value={inviteName} onChange={(e) => setInviteName(e.target.value)} placeholder="Their username or email" autoCapitalize="none" autoCorrect="off" spellCheck={false}
+                  className="min-w-0 flex-1 px-3 py-2.5 rounded-lg text-sm" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }} />
+                <button type="submit" disabled={coBusy || !inviteName.trim()} className="shrink-0 px-4 py-2.5 rounded-xl font-extrabold text-sm disabled:opacity-60" style={{ background: RD.green, color: '#06110A' }}>Invite</button>
+              </form>
+              <Note>Admin: invite any member to live stream with you, by their ChessScout, Chess.com or Lichess name. No game needed, and they don't need Pro: they get a notification, and Streamer Studio opens for them to accept. Use headphones so they don't hear themselves.</Note>
+            </>) : liveOpp && !liveOpp.bot ? (<>
               <button disabled={coBusy} onClick={() => void coDo(async () => { const who = await co.invite(s.name); flash(`Invite sent to ${who}. They accept in their Streamer Studio.`); })}
                 className="w-full py-2.5 rounded-xl font-extrabold text-sm disabled:opacity-60" style={{ background: RD.green, color: '#06110A' }}>
                 Invite {liveOpp.name} to stream this match together

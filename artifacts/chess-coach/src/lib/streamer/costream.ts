@@ -64,6 +64,13 @@ export class CoStreamLink {
     return r.partner;
   }
 
+  /** Admin: invite any member by name (no game needed). */
+  async inviteUser(username: string, name: string): Promise<string> {
+    const r = await call<{ id: string; partner: string }>('/api/costream/invite-user', { username, name });
+    await this.poll();
+    return r.partner;
+  }
+
   async accept(name: string) {
     if (!this.state) return;
     await call(`/api/costream/${this.state.id}/accept`, { name });
