@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { BackLink } from '@/lib/navBack';
 import { useParams, Link } from 'wouter';
 import { PageHero, CHESSCOM_GREEN, TEXT_LIGHT, TEXT_MUTED } from '@/components/DesignSystem';
 import { apiFetch } from '@/lib/api';
@@ -116,7 +117,7 @@ export function ArticlePage() {
     return (
       <div className="max-w-lg mx-auto px-4 py-16 text-center">
         <p className="text-sm" style={{ color: TEXT_MUTED }}>Couldn't find that article.</p>
-        <Link href="/learn" className="inline-block mt-4 text-sm font-semibold" style={{ color: CHESSCOM_GREEN }}>← Back to all articles</Link>
+        <BackLink fallback="/learn" className="inline-block mt-4 text-sm font-semibold" style={{ color: CHESSCOM_GREEN }}>← Back to all articles</BackLink>
       </div>
     );
   }

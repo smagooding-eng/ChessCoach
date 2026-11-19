@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { BackLink } from '@/lib/navBack';
 import { Link } from 'wouter';
 import { ArrowLeft, Loader2, Archive as ArchiveIcon, Clock } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
@@ -48,9 +49,9 @@ export default function SolvedPuzzlesPage() {
 
   return (
     <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
-      <Link href="/puzzles" className="inline-flex items-center gap-1.5 text-sm" style={{ color: TEXT_MUTED }}>
+      <BackLink fallback="/puzzles" className="inline-flex items-center gap-1.5 text-sm" style={{ color: TEXT_MUTED }}>
         <ArrowLeft className="w-4 h-4" /> Back to Puzzles
-      </Link>
+      </BackLink>
 
       <div>
         <h1 className="text-2xl font-black" style={{ color: TEXT_LIGHT }}>Solved Puzzles</h1>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { BackLink } from '@/lib/navBack';
 import { CountryFlag } from '@/components/CountryFlag';
 import { Link } from 'wouter';
 import { AlertTriangle, ArrowLeft, ArrowRight, ChevronDown, ChevronRight, History, Loader2, Search } from 'lucide-react';
@@ -74,7 +75,7 @@ export function ScoutRedesign(props: {
         {/* Title + search */}
         <section className="rounded-[22px] p-4" style={card}>
           <div className="flex items-center gap-3">
-            <Link href="/" aria-label="Back" className="grid h-9 w-9 place-items-center rounded-full" style={{ color: RD.green }}><ArrowLeft size={22} /></Link>
+            <BackLink fallback="/" aria-label="Back" className="grid h-9 w-9 place-items-center rounded-full" style={{ color: RD.green }}><ArrowLeft size={22} /></BackLink>
             <h1 className="text-[28px] font-extrabold tracking-tight">Opponent Scout</h1>
           </div>
           <p className="mt-2 text-[15px] leading-snug" style={{ color: 'rgba(245,247,246,.82)' }}>Enter a Chess.com username to get an instant scouting report.</p>

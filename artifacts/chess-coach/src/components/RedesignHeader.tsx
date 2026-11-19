@@ -1,4 +1,5 @@
 import React from 'react';
+import { BackLink } from '@/lib/navBack';
 import { Link } from 'wouter';
 import { ArrowLeft } from 'lucide-react';
 import { RD } from '@/lib/redesignTheme';
@@ -21,9 +22,9 @@ export function RedesignHeader({
     <div className={`flex items-center justify-between gap-3 px-1 ${dense ? 'pb-1.5 pt-[max(0.25rem,env(safe-area-inset-top))]' : 'pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]'}`}>
       <div className="flex min-w-0 items-center gap-3.5">
         {backHref ? (
-          <Link href={backHref} aria-label="Back" className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ color: RD.green }}>
+          <BackLink fallback={backHref} aria-label="Back" className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ color: RD.green }}>
             <ArrowLeft size={22} />
-          </Link>
+          </BackLink>
         ) : icon ? (
           <span className="grid h-9 w-9 shrink-0 place-items-center" style={{ color: RD.green }}>{icon}</span>
         ) : null}

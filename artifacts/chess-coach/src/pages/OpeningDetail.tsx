@@ -1,4 +1,5 @@
 import { playedWhite, useMyNames } from '@/lib/gameSide';
+import { BackLink } from '@/lib/navBack';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { MoveNavigationBar } from '@/components/MoveNavigationBar';
 import { RD } from '@/lib/redesignTheme';
@@ -224,7 +225,7 @@ export function OpeningDetail() {
     <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
       <BookOpen className="w-10 h-10 text-muted-foreground opacity-40" />
       <p className="text-lg font-bold">Opening not found</p>
-      <Link href="/openings" className="text-primary text-sm hover:underline">← Back to Openings</Link>
+      <BackLink fallback="/openings" className="text-primary text-sm hover:underline">← Back to Openings</BackLink>
     </div>
   );
 
@@ -239,9 +240,9 @@ export function OpeningDetail() {
   return (
     <div className="space-y-6 pb-20">
       {/* Back */}
-      <Link href="/openings" className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm">
+      <BackLink fallback="/openings" className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm">
         <ArrowLeft className="w-4 h-4" /> Back to Openings
-      </Link>
+      </BackLink>
 
       {/* Header */}
       <div className="glass-card rounded-xl p-5 flex flex-wrap items-start justify-between gap-4">

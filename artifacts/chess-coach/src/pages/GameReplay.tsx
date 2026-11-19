@@ -1,4 +1,5 @@
 import { RedesignHeader } from '@/components/RedesignHeader';
+import { BackLink, canGoBack } from '@/lib/navBack';
 import { useMyNames, mySide as sideOf } from '@/lib/gameSide';
 import { StayInTouchCard } from '@/components/review/StayInTouchCard';
 import { ShareButton, SHARE_BASE } from '@/components/ShareButton';
@@ -1129,7 +1130,7 @@ export function GameReplay() {
   if (error || !game) return (
     <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
       <p className="text-destructive text-lg font-bold">Failed to load game.</p>
-      <Link href="/games" className="text-primary text-sm hover:underline">← Back to Games</Link>
+      <BackLink fallback="/games" className="text-primary text-sm hover:underline">← Back to Games</BackLink>
     </div>
   );
 
@@ -1202,7 +1203,7 @@ export function GameReplay() {
         result={game.result ?? null}
         onExit={() => { setGtab('analysis'); setGuided(false); }}
         onReport={openReport}
-        onBack={() => { if (window.history.length > 1) window.history.back(); else navigate('/games'); }}
+        onBack={() => { if (canGoBack()) window.history.back(); else navigate('/games'); }}
         endExtra={authUser && reviewMoves.length > 0 && [authUser.chesscomUsername, authUser.lichessUsername].filter(Boolean).map((n) => String(n).toLowerCase()).some((n) => n === (game.whiteUsername ?? '').toLowerCase() || n === (game.blackUsername ?? '').toLowerCase()) ? <StayInTouchCard /> : null}
       /></>
     );
@@ -1259,9 +1260,9 @@ export function GameReplay() {
       {/* The redesign has its back arrow in the header, and the opening lives in
           the Report tab, so the bottom of the screen goes to the board and coach. */}
       {!redesign && (
-      <Link href="/games" className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm shrink-0 order-3 xl:order-none">
+      <BackLink fallback="/games" className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm shrink-0 order-3 xl:order-none">
         <ArrowLeft className="w-4 h-4" /> Back to Games
-      </Link>
+      </BackLink>
       )}
 
       {game.opening && !redesign && (

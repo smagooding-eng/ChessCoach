@@ -1,4 +1,6 @@
 import { STUDIO_FRAME } from "./lib/studioFrame"; // first: may swap storage for the Studio's app footage
+import { installNavDepth } from "./lib/navBack";
+installNavDepth(); // before anything navigates: lets back buttons go back exactly one page
 import { createRoot } from "react-dom/client";
 import { analytics } from "@heycatch/sdk";
 import { setBaseUrl, setAuthTokenGetter } from "@workspace/api-client-react";

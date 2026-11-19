@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { canGoBack } from '@/lib/navBack';
 import { Link } from 'wouter';
 import { ArrowLeft, Camera, ExternalLink } from 'lucide-react';
 import { setPageMeta } from '@/lib/pageMeta';
@@ -70,7 +71,7 @@ export default function CreditsPage() {
     <div className="min-h-screen" style={{ background: c.bg, color: c.text }}>
       <nav className="sticky top-0 z-40 backdrop-blur-xl" style={{ background: `${c.bg}dd`, borderBottom: `1px solid ${c.border}` }}>
         <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-4 sm:px-8">
-          <button onClick={() => (window.history.length > 1 ? window.history.back() : (window.location.href = '/'))}
+          <button onClick={() => (canGoBack() ? window.history.back() : (window.location.href = '/'))}
             className="flex items-center gap-1.5 text-sm font-medium" style={{ color: c.muted }}>
             <ArrowLeft className="h-4 w-4" /> Back
           </button>

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { BackLink } from '@/lib/navBack';
 import { Link, useLocation } from 'wouter';
 import { ArrowLeft, Trophy, Zap, CalendarDays, Users, Clock, Swords, GitBranch, Loader2, Check, Sparkles, Award, ChevronDown, Crown } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
@@ -161,7 +162,7 @@ export function CreateTournament() {
   return (
     <div className="mx-auto max-w-[560px] space-y-4 p-4 pb-28 md:p-0">
       <div className="flex items-center gap-3">
-        <Link href="/tournaments" className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ color: PT.muted, background: 'rgba(255,255,255,.05)' }} aria-label="Back"><ArrowLeft size={18} /></Link>
+        <BackLink fallback="/tournaments" className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ color: PT.muted, background: 'rgba(255,255,255,.05)' }} aria-label="Back"><ArrowLeft size={18} /></BackLink>
         <div>
           <h1 className="text-2xl font-black" style={{ color: PT.text, letterSpacing: '-0.02em' }}>Create a tournament</h1>
           <p className="text-[13px]" style={{ color: PT.muted }}>Set it up, then share the link with your players.</p>

@@ -4,6 +4,7 @@
 // Record to a file here; stream through OBS / Discord using Go live (full screen).
 // Everything runs in the browser: no server changes.
 
+import { BackLink } from '@/lib/navBack';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as RPointerEvent, ReactNode } from 'react';
 import { Link } from 'wouter';
@@ -1225,7 +1226,7 @@ function StreamerStudio({ admin }: { admin: boolean }) {
       {hiddenVideo}
       <div className={clean ? 'flex-1 flex flex-col min-w-0' : 'flex flex-col lg:flex-1 min-w-0 p-3 gap-3'}>
         {!clean && <div className="flex flex-wrap items-center gap-2">
-          <Link href={admin ? '/admin' : '/'} className="text-sm font-semibold px-3 py-1.5 rounded-lg" style={{ background: CARD_LIGHT, color: RD.text }}>← {admin ? 'Admin' : 'Back'}</Link>
+          <BackLink fallback={admin ? '/admin' : '/'} className="text-sm font-semibold px-3 py-1.5 rounded-lg" style={{ background: CARD_LIGHT, color: RD.text }}>← {admin ? 'Admin' : 'Back'}</BackLink>
           <h1 className="font-extrabold text-lg">Streamer Studio</h1>
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: RD.gold, color: '#050A0B' }}>BETA</span>
           <div className="w-full sm:w-auto sm:ml-auto flex gap-2">

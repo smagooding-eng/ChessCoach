@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { BackLink } from '@/lib/navBack';
 import { Link } from 'wouter';
 import { ArrowLeft, Trash2, Swords, Loader2, Archive as ArchiveIcon, Puzzle } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
@@ -60,9 +61,9 @@ export default function ScanArchivePage() {
 
   return (
     <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
-      <Link href="/scan" className="inline-flex items-center gap-1.5 text-sm" style={{ color: TEXT_MUTED }}>
+      <BackLink fallback="/scan" className="inline-flex items-center gap-1.5 text-sm" style={{ color: TEXT_MUTED }}>
         <ArrowLeft className="w-4 h-4" /> Back to Scan
-      </Link>
+      </BackLink>
 
       <div>
         <h1 className="text-2xl font-black" style={{ color: TEXT_LIGHT }}>Saved Positions</h1>

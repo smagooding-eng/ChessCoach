@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { BackLink } from '@/lib/navBack';
 import { Link } from 'wouter';
 import { generateAnalyzerGame, type EngineSide } from '@/lib/analyzerGame';
 import { ArrowLeft, Loader2, RefreshCw, Search, Clapperboard, Shuffle } from 'lucide-react';
@@ -366,7 +367,7 @@ export function ContentStudio() {
   return (
     <div className="mx-auto max-w-6xl px-3 pb-24 pt-3 text-white md:px-0">
       <div className="mb-3 flex items-center gap-2">
-        <Link href="/admin" className="grid h-9 w-9 place-items-center rounded-lg hover:bg-white/10" aria-label="Back to admin"><ArrowLeft size={20} /></Link>
+        <BackLink fallback="/admin" className="grid h-9 w-9 place-items-center rounded-lg hover:bg-white/10" aria-label="Back to admin"><ArrowLeft size={20} /></BackLink>
         <Clapperboard size={22} className="text-[#81B64C]" />
         <h1 className="text-[22px] font-black">Content Studio</h1>
       </div>

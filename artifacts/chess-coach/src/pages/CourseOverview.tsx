@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { BackLink } from '@/lib/navBack';
 import { Link } from 'wouter';
 import { ArrowLeft, ArrowRight, CheckCircle2, Layers, Play } from 'lucide-react';
 import { RD } from '@/lib/redesignTheme';
@@ -32,9 +33,9 @@ export function CourseOverview({
     <div className="min-h-full pb-10" style={{ background: RD.bg, color: RD.text }}>
       <div className="mx-auto w-full max-w-[600px]">
         <div className="relative flex items-center justify-center px-3 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
-          <Link href="/courses" aria-label="Back to courses" className="absolute left-3 grid h-10 w-10 place-items-center rounded-full" style={{ color: RD.text }}>
+          <BackLink fallback="/courses" aria-label="Back to courses" className="absolute left-3 grid h-10 w-10 place-items-center rounded-full" style={{ color: RD.text }}>
             <ArrowLeft size={22} />
-          </Link>
+          </BackLink>
           <b className="text-[16px]">Course</b>
         </div>
 

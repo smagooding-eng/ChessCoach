@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { BackLink } from '@/lib/navBack';
 import { Link, useLocation, useParams } from 'wouter';
 import { ArrowLeft, Send, Swords, Loader2, UserPlus } from 'lucide-react';
 import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
@@ -127,7 +128,7 @@ export function Messages() {
     <div className="mx-auto flex max-w-[760px] flex-col p-4 md:p-0" style={{ height: 'calc(100dvh - 140px)', minHeight: 420 }}>
       {/* Header */}
       <div className="flex items-center gap-3 pb-3">
-        <Link href="/friends" className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ color: PT.muted, background: 'rgba(255,255,255,.05)' }} aria-label="Back to friends"><ArrowLeft size={18} /></Link>
+        <BackLink fallback="/friends" className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ color: PT.muted, background: 'rgba(255,255,255,.05)' }} aria-label="Back to friends"><ArrowLeft size={18} /></BackLink>
         {friend ? (
           <>
             <FriendAvatar src={friend.avatar} name={friend.name} status={friend.status} size={40} />

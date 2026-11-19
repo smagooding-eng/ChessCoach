@@ -1,6 +1,7 @@
 // Watching a tournament: anyone with the link (signed in or not) can follow
 // one game move by move, or every board in play at once (the TV view, made
 // for streaming: fullscreen it and capture the window in OBS).
+import { BackLink } from '@/lib/navBack';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'wouter';
 import { ArrowLeft, Loader2, Maximize2, Minimize2, Radio, Tv, RotateCcw } from 'lucide-react';
@@ -122,7 +123,7 @@ export function TournamentWatch() {
   return (
     <div className="mx-auto w-full max-w-[640px] space-y-3 px-3 py-4">
       <div className="flex items-center gap-3">
-        <Link href={`/tournaments/${id}`} className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ color: PT.muted, background: 'rgba(255,255,255,.05)' }} aria-label="Back to the tournament"><ArrowLeft size={18} /></Link>
+        <BackLink fallback={`/tournaments/${id}`} className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ color: PT.muted, background: 'rgba(255,255,255,.05)' }} aria-label="Back to the tournament"><ArrowLeft size={18} /></BackLink>
         <div className="min-w-0 flex-1">
           <p className="truncate text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: PT.muted }}>{t?.name}</p>
           <p className="flex items-center gap-1.5 text-[15px] font-extrabold" style={{ color: PT.text }}>
@@ -213,7 +214,7 @@ export function TournamentTV() {
   return (
     <div ref={boxRef} className="mx-auto w-full max-w-[1200px] space-y-3 px-3 py-4" style={{ background: full ? PT.bg : undefined, minHeight: full ? '100vh' : undefined }}>
       <div className="flex items-center gap-3">
-        {!full && <Link href={`/tournaments/${id}`} className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ color: PT.muted, background: 'rgba(255,255,255,.05)' }} aria-label="Back to the tournament"><ArrowLeft size={18} /></Link>}
+        {!full && <BackLink fallback={`/tournaments/${id}`} className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ color: PT.muted, background: 'rgba(255,255,255,.05)' }} aria-label="Back to the tournament"><ArrowLeft size={18} /></BackLink>}
         <div className="min-w-0 flex-1">
           <p className="truncate text-[18px] font-black" style={{ color: PT.text }}>{t?.name}</p>
           <p className="flex items-center gap-1.5 text-[12.5px] font-bold" style={{ color: live ? '#E5484D' : PT.muted }}>

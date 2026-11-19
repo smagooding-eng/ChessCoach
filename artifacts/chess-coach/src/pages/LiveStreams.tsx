@@ -1,6 +1,7 @@
 // Watch live streams on chessscout.net (anyone signed in). A co-stream (two players
 // streaming their match together) is one card: both players' views, side by side on wider
 // screens. Each view already carries both voices, so only one plays sound at a time.
+import { BackLink } from '@/lib/navBack';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { RD } from '@/lib/redesignTheme';
@@ -81,7 +82,7 @@ export default function LiveStreams() {
   return (
     <div className="min-h-screen p-3 flex flex-col gap-3 relative z-0" style={{ background: BG, color: RD.text }}>
       <div className="flex items-center gap-2">
-        <Link href={authUser?.isAdmin ? '/admin' : '/'} className="text-sm font-semibold px-3 py-1.5 rounded-lg" style={{ background: CARD_LIGHT, color: RD.text }}>← {authUser?.isAdmin ? 'Admin' : 'Back'}</Link>
+        <BackLink fallback={authUser?.isAdmin ? '/admin' : '/'} className="text-sm font-semibold px-3 py-1.5 rounded-lg" style={{ background: CARD_LIGHT, color: RD.text }}>← {authUser?.isAdmin ? 'Admin' : 'Back'}</BackLink>
         <h1 className="font-extrabold text-lg">Live streams</h1>
         {(isPremium || authUser?.isAdmin) && (
           <Link href="/studio" className="ml-auto text-sm font-bold px-3 py-1.5 rounded-lg" style={{ background: RD.red, color: '#fff' }}>◉ Go live</Link>

@@ -1,6 +1,7 @@
 // Chess for Kids -- the shared frame: sky background, top bar, speech
 // bubble, chunky buttons and the buddy picker.
 
+import { BackLink } from '@/lib/navBack';
 import { useEffect, type ReactNode, type CSSProperties } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'wouter';
@@ -60,10 +61,10 @@ export function TopBar({ back, onAvatar }: { back?: string; onAvatar?: () => voi
   return (
     <div className="flex items-center gap-2 py-2">
       {back && (
-        <Link href={back} aria-label="Back"
+        <BackLink fallback={back} aria-label="Back"
           className="w-11 h-11 rounded-2xl bg-white flex items-center justify-center active:translate-y-0.5" style={round}>
           <ArrowLeft className="w-6 h-6" style={{ color: INK }} />
-        </Link>
+        </BackLink>
       )}
       <div className="flex-1" />
       <div className="h-11 px-3 rounded-2xl bg-white flex items-center gap-1.5 font-extrabold text-lg" style={round} aria-label={`${totalStars(state)} stars`}>

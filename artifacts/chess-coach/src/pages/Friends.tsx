@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { BackLink } from '@/lib/navBack';
 import { Link, useLocation } from 'wouter';
 import { ArrowLeft, Search, UserPlus, Check, X, MessageCircle, Swords, Loader2, Users, Clock } from 'lucide-react';
 import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
@@ -76,7 +77,7 @@ export function Friends() {
   return (
     <div className="mx-auto max-w-[760px] space-y-4 p-4 pb-24 md:p-0">
       <div className="flex items-center gap-3">
-        <Link href="/live" className="grid h-9 w-9 place-items-center rounded-full" style={{ color: PT.muted, background: 'rgba(255,255,255,.05)' }} aria-label="Back to Live play"><ArrowLeft size={18} /></Link>
+        <BackLink fallback="/live" className="grid h-9 w-9 place-items-center rounded-full" style={{ color: PT.muted, background: 'rgba(255,255,255,.05)' }} aria-label="Back to Live play"><ArrowLeft size={18} /></BackLink>
         <div className="min-w-0">
           <h1 className="text-2xl font-black md:text-3xl" style={{ color: PT.text, letterSpacing: '-0.02em' }}>Friends</h1>
           <p className="text-sm" style={{ color: PT.muted }}>Message friends, see who's online, and challenge them to a game.</p>

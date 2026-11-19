@@ -1,4 +1,5 @@
 import { playedWhite, useMyNames } from '@/lib/gameSide';
+import { BackLink } from '@/lib/navBack';
 import React, { useEffect, useState } from 'react';
 import { PieceTile } from '@/components/DesignSystem';
 import { useParams, Link } from 'wouter';
@@ -151,9 +152,9 @@ export function WeaknessDetail() {
 
   if (error || !data) return (
     <div className="space-y-8 pb-16 max-w-4xl mx-auto">
-      <Link href="/analysis" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-sm">
+      <BackLink fallback="/analysis" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-sm">
         <ArrowLeft className="w-4 h-4" /> Back to Analysis
-      </Link>
+      </BackLink>
       <div className="flex flex-col items-center justify-center py-20 gap-4">
         <AlertTriangle className="w-10 h-10 text-amber-400" />
         <p className="text-muted-foreground">{error ?? 'Weakness not found.'}</p>
@@ -179,9 +180,9 @@ export function WeaknessDetail() {
   return (
     <div className="space-y-6 pb-20 max-w-4xl mx-auto px-4 pt-4 md:px-0 md:pt-0">
       {/* Back */}
-      <Link href="/analysis" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-sm font-medium">
+      <BackLink fallback="/analysis" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-sm font-medium">
         <ArrowLeft className="w-4 h-4" /> Back to Analysis
-      </Link>
+      </BackLink>
 
       {/* ── Hero card ── */}
       <motion.div

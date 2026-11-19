@@ -1,5 +1,6 @@
 // Beginner path -- one lesson: short explanation, then the exercises.
 
+import { BackLink } from '@/lib/navBack';
 import { useState, useRef, type ReactNode } from 'react';
 import { Link, useParams, useLocation } from 'wouter';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -40,9 +41,9 @@ function Shell({ children, back, title, tight }: { children: ReactNode; back: st
     <div className="min-h-screen" style={{ background: L.bg, color: L.text }}>
       <div className={`max-w-xl mx-auto px-4 ${tight ? 'pb-0' : 'pb-12'}`} style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}>
         <div className="flex items-center gap-3 py-2">
-          <Link href={back} aria-label="Back" className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: L.card }}>
+          <BackLink fallback={back} aria-label="Back" className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: L.card }}>
             <ArrowLeft className="w-5 h-5" />
-          </Link>
+          </BackLink>
           {title && <p className="text-sm font-bold truncate" style={{ color: L.muted }}>{title}</p>}
         </div>
         {children}

@@ -1,4 +1,5 @@
 import { RD, REDESIGN_ON } from '@/lib/redesignTheme';
+import { BackLink } from '@/lib/navBack';
 import { LessonQuizScreen, LessonCompleteScreen, LessonIntroScreen, findQuizMoves, type QuizMoves, type IntroBullet } from '@/components/LessonFlow';
 import { artFor, ART_BASE } from './CoursesRedesign';
 import { useDashboardRedesignFlag, useSiteImg } from '@/hooks/use-app-config';
@@ -991,9 +992,9 @@ export function CourseDetail() {
   );
   if (!course) return (
     <div className="space-y-8 pb-16 max-w-5xl mx-auto">
-      <Link href="/courses" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-sm">
+      <BackLink fallback="/courses" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-sm">
         <ArrowLeft className="w-4 h-4" /> Back to Courses
-      </Link>
+      </BackLink>
       <div className="flex flex-col items-center justify-center py-20 gap-4">
         <Target className="w-10 h-10 text-muted-foreground" />
         <p className="text-muted-foreground">This course could not be loaded.</p>
