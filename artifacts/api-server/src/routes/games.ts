@@ -23,6 +23,7 @@ import type { Logger } from "pino";
 import { trackAiUsage, AI_FEATURES } from "../lib/aiUsageTracker";
 import { Chess } from "chess.js";
 import { ownerNames, sideFromNames } from "../lib/ownerSide";
+import { findSameGame, adoptIds, removeSameGameCopies } from "../lib/sameGame";
 
 const router: IRouter = Router();
 
@@ -89,6 +90,9 @@ async function runImportJobNow(opts: ImportJobOptions): Promise<{ imported: numb
             continue;
           }
         }
+        // Saved by another route without its Lichess id (e.g. from ChessScout's board)?
+        const same = await findSameGame(userId, { pgn: game.pgn!, white: meta.whiteUsername, black: meta.blackUsername, playedAt: meta.playedAt }).catch(() => null);
+        if (same) { await adoptIds(same, { lichessGameId: meta.lichessGameId }); continue; }
         const [row] = await db.insert(gamesTable).values({ userId, username: storedUsername, ...meta, pgn: game.pgn! }).onConflictDoNothing().returning({ id: gamesTable.id });
         if (row) imported++;
       } catch (err) {
@@ -127,6 +131,8 @@ async function runImportJobNow(opts: ImportJobOptions): Promise<{ imported: numb
             continue;
           }
         }
+        const same = await findSameGame(userId, { pgn: game.pgn, white: meta.whiteUsername, black: meta.blackUsername, playedAt: meta.playedAt }).catch(() => null);
+        if (same) { await adoptIds(same, { chesscomGameId: meta.chesscomGameId }); continue; }
         const [row] = await db.insert(gamesTable).values({ userId, username: storedUsername, platform: "chesscom", ...meta, pgn: game.pgn }).onConflictDoNothing().returning({ id: gamesTable.id });
         if (row) imported++;
       } catch (err) {
@@ -983,6 +989,11 @@ router.post("/games/import-pgn", requireAuth, async (req, res): Promise<void> =>
         await db.update(gamesTable).set(chesscomGameId ? { chesscomGameId: null } : { lichessGameId: null }).where(eq(gamesTable.id, dupe[0].id)).catch(() => {});
         dupe = [];
       }
+      // Same players, same moves, already saved by another route (maybe without this id)
+      if (dupe.length === 0) {
+        const same = await findSameGame(userId, { pgn: g, white, black, playedAt: pgnPlayedAt(g) }).catch(() => null);
+        if (same) { await adoptIds(same, { lichessGameId, chesscomGameId }); dupe = [{ id: same.id, w: white, b: black }]; }
+      }
       if (dupe.length > 0) {
         // Already saved (e.g. by a sync): put it on their side if it was saved from the other
         // player's, and drop the review written for the wrong side so it's redone.
@@ -1558,7 +1569,9 @@ async function dedupeExternalGames(): Promise<void> {
 export async function startReviewServices(): Promise<void> {
   if (reviewServicesStarted) return;
   reviewServicesStarted = true;
-  void dedupeExternalGames();
+  // Copies sharing a Lichess / Chess.com id first, then copies of the same game with different
+  // ids or none (same players, same moves)
+  void dedupeExternalGames().then(() => removeSameGameCopies(appLogger));
   void startCatchupReviews().catch((err) => appLogger.warn({ err }, "catch-up reviews failed to start"));
   void startSamedayReviews().catch((err) => appLogger.warn({ err }, "same-day reviews failed to start"));
   await db.execute(sql`CREATE TABLE IF NOT EXISTS review_after_upgrade (

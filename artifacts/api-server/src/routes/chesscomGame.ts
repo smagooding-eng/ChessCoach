@@ -9,6 +9,7 @@ import { db, gamesTable, usersTable } from "@workspace/db";
 import { and, desc, eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/authMiddleware";
 import { extractGameMetadata, type ChessComGame } from "../lib/chesscom";
+import { findSameGame, adoptIds } from "../lib/sameGame";
 
 const router: IRouter = Router();
 const UA = "ChessScout.net/1.0 (+https://chessscout.net)";
@@ -59,6 +60,8 @@ router.post("/games/from-chesscom", requireAuth, async (req: Request, res: Respo
           .where(and(eq(gamesTable.userId, userId), eq(gamesTable.chesscomGameId, meta.chesscomGameId))).limit(1);
         if (have) { res.json({ id: have.id }); return; }
       }
+      const same = await findSameGame(userId, { pgn: g.pgn, white: meta.whiteUsername, black: meta.blackUsername, playedAt: meta.playedAt }).catch(() => null);
+      if (same) { await adoptIds(same, { chesscomGameId: meta.chesscomGameId }); res.json({ id: same.id }); return; }
       const [row] = await db.insert(gamesTable).values({ userId, username: name, platform: "chesscom", ...meta, pgn: g.pgn })
         .onConflictDoNothing().returning({ id: gamesTable.id });
       if (row) { res.json({ id: row.id }); return; }
