@@ -6,7 +6,7 @@ import { useLivePlay, type LiveMode } from '@/hooks/use-live-play';
 import { useLiveRatings } from '@/hooks/use-live-ratings';
 import { LiveGame } from '@/pages/LiveGame';
 import { Link, useLocation } from 'wouter';
-import { lichessAuth, connectLichess, syncLichessAuth, seek as lichessSeek, streamEvents, isDaily, abort as abortLichess, alsoSeekDailyOnLichess } from '@/lib/lichessBoard';
+import { lichessAuth, connectLichess, syncLichessAuth, seek as lichessSeek, streamEvents, isDaily, abort as abortLichess, alsoSeekDailyOnLichess, dailyPair, clearDailyPair, cancelDailySeek } from '@/lib/lichessBoard';
 import { Loader2, Swords, Zap, Clock, X, History, ChevronRight, Users, CalendarDays, Bot } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { PT, cardStyle, greenBtn, ghostBtn } from '@/lib/playTheme';
@@ -84,6 +84,15 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
   // Daily games, started from the same clocks.
   const [dailyBusy, setDailyBusy] = useState(false);
   const [dailyNote, setDailyNote] = useState<string | null>(null);
+  // The daily search just started from here, so a mistaken tap is one tap to undo.
+  const [dailyStarted, setDailyStarted] = useState<{ tc: string; mode: LiveMode } | null>(null);
+  const undoDaily = async () => {
+    const d = dailyStarted; if (!d) return;
+    setDailyStarted(null); setDailyNote(null);
+    const p = dailyPair(); if (p && p.tc === d.tc) { clearDailyPair(); if (p.seekId) void cancelDailySeek(p.seekId); }
+    await apiFetch('/api/correspondence/cancel-queue', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ timeControl: d.tc, mode: d.mode }) }).catch(() => {});
+    window.dispatchEvent(new Event('cs:daily-update'));
+  };
   const startDaily = async (tc: string) => {
     setDailyBusy(true); setDailyNote(null);
     try {
@@ -93,6 +102,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
       if (d.status === 'matched' && d.game) { navigate(`/daily/${d.game.id}`); return; }
       // Nobody waiting here: look on Lichess at the same time (whichever is quicker).
       await alsoSeekDailyOnLichess(tc, mode);
+      setDailyStarted({ tc, mode });
       setDailyNote(`Looking for an opponent (${DAILY_OPTIONS.find((o) => o.id === tc)?.label} a move). We'll notify you when the game starts.`);
       window.dispatchEvent(new Event('cs:daily-update'));
     } catch (e) { setDailyNote(`!${e instanceof Error ? e.message : 'Could not start a daily game'}`); }
@@ -392,7 +402,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
             <LivePulse />
             {/* Play anyone: one pool across every clock, so you're matched as fast as possible. */}
             <button
-              disabled={live.status === 'connecting' || live.status === 'disconnected'}
+              disabled={false}
               onClick={() => queueFor('any', mode)}
               className="flex w-full items-center gap-2.5 rounded-[12px] px-3.5 py-3 text-left transition-transform active:scale-[0.99] disabled:opacity-50"
               style={{ background: 'linear-gradient(180deg, #8FC25A, #81B64C)', boxShadow: '0 2px 0 #5F8F36', color: '#FFFFFF' }}>
@@ -408,7 +418,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
                 const r = ratingsData?.ratings[opt.id];
                 return (
                   <button key={opt.id}
-                    disabled={live.status === 'connecting' || live.status === 'disconnected'}
+                    disabled={false}
                     onClick={() => queueFor(opt.id, mode)}
                     className="rounded-[10px] px-1 py-2 text-center transition-transform active:scale-[0.97] disabled:opacity-50"
                     style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${PT.border}` }}>
@@ -419,6 +429,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
               })}
             </div>
             {/* Daily: one move a day (or 3, or 7); we notify you when it's your turn. */}
+            <p className="pt-1 text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: PT.muted }}>Daily games · days per move</p>
             <div className="grid grid-cols-3 gap-1.5">
               {DAILY_OPTIONS.map(opt => (
                 <button key={opt.id} disabled={dailyBusy} onClick={() => void startDaily(opt.id)}
@@ -429,7 +440,12 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
                 </button>
               ))}
             </div>
-            {dailyNote && <p className="text-[12px]" style={{ color: dailyNote.startsWith('!') ? PT.red : PT.green }}>{dailyNote.replace(/^!/, '')}</p>}
+            {dailyNote && (
+              <p className="text-[12px]" style={{ color: dailyNote.startsWith('!') ? PT.red : PT.green }}>
+                {dailyNote.replace(/^!/, '')}
+                {dailyStarted && !dailyNote.startsWith('!') && <> <button onClick={() => void undoDaily()} className="font-extrabold underline" style={{ color: PT.text }}>Cancel this search</button></>}
+              </p>
+            )}
           </section>
 
           {/* Not connected to Lichess: real opponents instead of a bot when nobody's free here. */}

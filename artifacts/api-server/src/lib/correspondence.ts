@@ -413,6 +413,8 @@ async function applyTimeoutsForUser(userId: string): Promise<void> {
 const LOW_TIME_FRACTION = 0.15; // remind when under 15% of the allowance is left (e.g. ~3.6h of a 1-day game)
 
 async function sweep(): Promise<void> {
+  // Daily searches don't wait forever: after 3 days with nobody, the search ends.
+  try { await db.execute(sql`DELETE FROM correspondence_queue WHERE joined_at < now() - interval '3 days'`); } catch (err) { logger.warn({ err }, "[daily] old searches not cleared"); }
   try { await pairWaiting(); } catch (err) { logger.warn({ err }, "[daily] queue pairing failed"); }
   const active = await db.select().from(correspondenceGamesTable).where(eq(correspondenceGamesTable.status, "active"));
   for (const game of active) {

@@ -93,6 +93,8 @@ export function useLivePlay() {
   /** You're in a bot game and a ChessScout player wants to play you. */
   const [switchOffer, setSwitchOffer] = useState<string | null>(null);
   const seekTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** A search tapped before the connection was up: sent the moment it opens. */
+  const pendingQueueRef = useRef<{ timeControl: string; mode: LiveMode; noAutoBot?: boolean } | null>(null);
   // Accepted a friend's challenge but they're not online yet.
   const [waitingFor, setWaitingFor] = useState<string | null>(null);
   const pendingAcceptRef = useRef<string | null>(null);
@@ -179,6 +181,11 @@ export function useLivePlay() {
       }
       // Joining someone: your own bot game (if any) gives way, so send it even then.
       const myOpp = g && colorRef.current ? (colorRef.current === 'w' ? g.black : g.white) : null;
+      if (pendingQueueRef.current && !(g && g.status === 'active')) {
+        const q = pendingQueueRef.current; pendingQueueRef.current = null;
+        ws.send(JSON.stringify({ type: 'queue', timeControl: q.timeControl, mode: q.mode, ...(q.noAutoBot ? { noAutoBot: true } : {}) }));
+        return;
+      }
       if (pendingSeekRef.current && (!(g && g.status === 'active') || myOpp?.isBot)) {
         ws.send(JSON.stringify({ type: 'join_seek', seekerId: pendingSeekRef.current }));
         return;
@@ -356,7 +363,7 @@ export function useLivePlay() {
       // "disconnected".
       const g = gameRef.current;
       const inGame = !!g && (statusRef.current === 'in_game' || statusRef.current === 'finished');
-      if (!inGame) setStatus('disconnected');
+      if (!inGame && !pendingQueueRef.current) setStatus('disconnected');
       if (!reconnectTimerRef.current) {
         reconnectTimerRef.current = setTimeout(() => {
           reconnectTimerRef.current = null;
@@ -386,10 +393,18 @@ export function useLivePlay() {
     setColor(null);
     setOpponentDisconnect(null);
     setPremove(null);
-    send({ type: 'queue', timeControl, mode, ...(opts?.noAutoBot ? { noAutoBot: true } : {}) });
-  }, [send]);
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) { ws.send(JSON.stringify({ type: 'queue', timeControl, mode, ...(opts?.noAutoBot ? { noAutoBot: true } : {}) })); return; }
+    // Still connecting: show the search straight away and send it as soon as we're connected
+    // (the buttons used to sit greyed out until then).
+    pendingQueueRef.current = { timeControl, mode, noAutoBot: opts?.noAutoBot };
+    setQueuedTc(timeControl); setQueuedMode(mode); setQueuedAt(Date.now()); setStatus('queued');
+  }, []);
 
-  const cancel = useCallback(() => { send({ type: 'cancel' }); }, [send]);
+  const cancel = useCallback(() => {
+    if (pendingQueueRef.current) { pendingQueueRef.current = null; setStatus(wsRef.current?.readyState === WebSocket.OPEN ? 'idle' : 'connecting'); setQueuedTc(null); setQueuedMode(null); return; }
+    send({ type: 'cancel' });
+  }, [send]);
   // Opt-in, clearly labeled bot game (always casual) when nobody's free.
   const playBot = useCallback((timeControl: string) => { setError(null); send({ type: 'play_bot', timeControl }); }, [send]);
   // Accept a friend's live challenge link. Sent now if connected, or as soon

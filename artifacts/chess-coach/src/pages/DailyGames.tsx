@@ -184,7 +184,7 @@ export function DailyGames({ embedded = false, listOnly = false }: { embedded?: 
   // A search running on both: the first to find an opponent wins, the other is taken back.
   useEffect(() => {
     const p = dailyPair(); if (!p) return;
-    if (Date.now() - p.at > 7 * 86400_000) { clearDailyPair(); return; }
+    if (Date.now() - p.at > 3 * 86400_000) { clearDailyPair(); if (p.seekId) void cancelDailySeek(p.seekId); return; }
     const newLichess = liGames.filter(isDaily).find((g) => !p.known.includes(g.gameId));
     const stillQueued = queue.some((q) => q.timeControl === p.tc);
     if (newLichess) {
