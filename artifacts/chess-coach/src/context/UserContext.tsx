@@ -3,7 +3,7 @@ import { setLichessOwner, forgetLichessOnDevice } from '@/lib/lichessBoard';
 import { appFlagFromSignin } from '@/lib/playApp';
 import { analytics } from '@heycatch/sdk';
 import { apiFetch, setAuthToken, getAuthToken } from '@/lib/api';
-import { trackFunnelEvent } from '@/lib/funnelTracking';
+import { trackFunnelEvent, settleSignInTrip } from '@/lib/funnelTracking';
 import { pendingHandoff, clearHandoff } from '@/lib/googleSignIn';
 
 interface AuthUser {
@@ -103,6 +103,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const data = await res.json() as { user: AuthUser | null };
       setAuthUser(data.user ?? null);
       if (data.user) clearHandoff();
+      if (data.user) settleSignInTrip(true);
+      // Back without a sign-in: give a sign-in that finished in another tab ~10 s to arrive
+      else window.setTimeout(() => settleSignInTrip(!!authUserRef.current), 10_000);
       if (data.user) {
         // HeyCatch identity -- id is the stable internal user id, never
         // an email/token. Email and name live in properties so the

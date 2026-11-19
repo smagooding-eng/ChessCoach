@@ -7,7 +7,7 @@
 // still signed out. If one tap can't show (or isn't switched on), it falls back
 // to the usual redirect.
 import { apiFetch, apiUrl } from '@/lib/api';
-import { appSigninParam } from '@/lib/funnelTracking';
+import { appSigninParam, noteLeavingToSignIn, trackFunnelEvent } from '@/lib/funnelTracking';
 
 interface OneTapNote { isSkippedMoment?: () => boolean; getSkippedReason?: () => string; isNotDisplayed?: () => boolean; isDismissedMoment?: () => boolean; getDismissedReason?: () => string }
 interface GoogleId {
@@ -32,6 +32,7 @@ const loadGsi = () => (script ??= new Promise<GoogleId | null>((resolve) => {
 }));
 
 function redirectSignIn(ref: string) {
+  noteLeavingToSignIn('google');
   window.location.href = apiUrl(`/api/auth/google?${[ref ? `ref=${encodeURIComponent(ref)}` : '', appSigninParam(), `h=${newHandoff()}`].filter(Boolean).join('&')}`);
 }
 
@@ -63,7 +64,7 @@ export async function startGoogleSignIn(refCode?: string): Promise<void> {
   gid.prompt((n) => {
     // The person closed the sheet themselves: leave them where they are.
     if (n.isDismissedMoment?.() && n.getDismissedReason?.() === 'credential_returned') return;
-    if (n.isSkippedMoment?.() && n.getSkippedReason?.() === 'user_cancel') { settled = true; return; }
+    if (n.isSkippedMoment?.() && n.getSkippedReason?.() === 'user_cancel') { settled = true; trackFunnelEvent('google_signin_cancelled'); return; }
     // Couldn't show here (not set up for this site, no Google account on the device...): redirect.
     if (n.isNotDisplayed?.() || n.isSkippedMoment?.()) fallback();
   });
@@ -88,5 +89,6 @@ export function clearHandoff(): void { try { localStorage.removeItem(HANDOFF_KEY
 export function startLichessSignIn(refCode?: string): void {
   let ref = refCode ?? '';
   if (!ref) { try { ref = localStorage.getItem('chessscout_ref') || ''; } catch { /* ignore */ } }
+  noteLeavingToSignIn('lichess');
   window.location.href = apiUrl(`/api/auth/lichess?${[ref ? `ref=${encodeURIComponent(ref)}` : '', appSigninParam(), `h=${newHandoff()}`].filter(Boolean).join('&')}`);
 }

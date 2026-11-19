@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { trackFunnelEvent, trackFunnelEventBeacon, type LandingSectionId } from '@/lib/funnelTracking';
+import { trackFunnelEvent, trackFunnelEventBeacon, type LandingSectionId, leavingToSignIn } from '@/lib/funnelTracking';
 
 const SECTION_IDS: LandingSectionId[] = ['hero', 'pillars', 'explore', 'how_it_works', 'differentiators', 'features', 'faq', 'pricing', 'final_cta'];
 const SCROLL_MILESTONES = [25, 50, 75, 100] as const;
@@ -86,6 +86,8 @@ export function useLandingFunnelTracking() {
       if (!currentSection.current) return;
       exitLogged.current = true;
       const elapsedMs = Date.now() - pageLoadTime.current;
+      // Off to Google / Lichess to sign in: not someone leaving the site
+      if (leavingToSignIn()) { trackFunnelEventBeacon('left_for_signin', elapsedMs); return; }
       trackFunnelEventBeacon(`exit_${currentSection.current}` as any, elapsedMs);
     };
     const onVisibilityChange = () => {

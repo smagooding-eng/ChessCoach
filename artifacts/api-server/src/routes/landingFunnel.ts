@@ -85,6 +85,9 @@ const VALID_EVENTS = new Set([
   "google_oauth_clicked", "google_signup_completed", "google_signup_error", "google_login_completed",
   "guest_game_started", "guest_game_finished",
   "lichess_oauth_clicked", "lichess_signup_completed", "lichess_login_completed",
+  // the trip out to Google / Lichess to sign in: left for it, cancelled Google's sheet, or
+  // came back without finishing (as opposed to leaving the site)
+  "left_for_signin", "google_signin_cancelled", "google_signin_abandoned", "lichess_signin_abandoned",
   "scroll_25", "scroll_50", "scroll_75", "scroll_100",
   "engaged_10s",
   ...CHECKOUT_EVENTS,
@@ -168,7 +171,16 @@ async function getFunnelStatsForPlatform(since: Date, until: Date, platform: Pla
   // Google OAuth are tracked as separate funnels above (for good reason,
   // they have different failure modes), but "how many actually signed
   // up" as a single headline number needs both added together.
-  const totalSignedUp = signupCompleted + googleSignupCompleted;
+  const lichessOauthClicked = countMap["lichess_oauth_clicked"] ?? 0;
+  const lichessSignupCompleted = countMap["lichess_signup_completed"] ?? 0;
+  const lichessLoginCompleted = countMap["lichess_login_completed"] ?? 0;
+  const totalSignedUp = signupCompleted + googleSignupCompleted + lichessSignupCompleted;
+  const signIn = {
+    leftForSignIn: countMap["left_for_signin"] ?? 0,
+    googleCancelled: countMap["google_signin_cancelled"] ?? 0,
+    googleCameBackWithout: countMap["google_signin_abandoned"] ?? 0,
+    lichessCameBackWithout: countMap["lichess_signin_abandoned"] ?? 0,
+  };
 
   const scrollDepth = {
     scroll25: countMap["scroll_25"] ?? 0,
@@ -246,6 +258,10 @@ async function getFunnelStatsForPlatform(since: Date, until: Date, platform: Pla
     googleSignupCompleted,
     googleSignupError,
     googleLoginCompleted,
+    lichessOauthClicked,
+    lichessSignupCompleted,
+    lichessLoginCompleted,
+    signIn,
     totalSignedUp,
     leftWithoutAction,
     scrollDepth,

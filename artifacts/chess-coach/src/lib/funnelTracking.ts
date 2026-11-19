@@ -33,12 +33,40 @@ export type LandingFunnelEvent =
   | 'google_oauth_clicked' | 'google_signup_completed' | 'google_signup_error' | 'google_login_completed'
   | 'guest_game_started' | 'guest_game_finished'
   | 'lichess_oauth_clicked' | 'lichess_signup_completed' | 'lichess_login_completed'
+  | 'left_for_signin' | 'google_signin_cancelled' | 'google_signin_abandoned' | 'lichess_signin_abandoned'
   | 'scroll_25' | 'scroll_50' | 'scroll_75' | 'scroll_100'
   | 'engaged_10s'
   | 'pro_checkout_stripe' | 'pro_checkout_card' | 'pro_checkout_google_pay' | 'pro_checkout_apple_pay'
   | 'pro_checkout_link' | 'pro_checkout_amazon_pay' | 'pro_checkout_paypal' | 'pro_checkout_other'
   | `viewed_${LandingSectionId}`
   | `exit_${LandingSectionId}`;
+
+// The trip out to Google / Lichess to sign in. Noted when it starts so that (1) leaving
+// the page for it isn't counted as someone leaving the site, and (2) coming back without
+// a sign-in is counted as "came back without finishing" rather than lost.
+const SIGNIN_OUT = 'cs_signin_out';
+export function noteLeavingToSignIn(provider: 'google' | 'lichess'): void {
+  try { localStorage.setItem(SIGNIN_OUT, JSON.stringify({ provider, at: Date.now() })); } catch { /* storage off */ }
+}
+function signInTrip(): { provider: 'google' | 'lichess'; at: number } | null {
+  try { const v = JSON.parse(localStorage.getItem(SIGNIN_OUT) || 'null'); return v && typeof v.at === 'number' ? v : null; } catch { return null; }
+}
+/** Leaving this page right now is the trip out to sign in (started in the last minute). */
+export function leavingToSignIn(): boolean {
+  const t = signInTrip();
+  return !!t && Date.now() - t.at < 60_000;
+}
+/** Back on the site after the trip: signed in → done; not signed in (and it's been more
+ *  than a few seconds, so this isn't the page that started it) → "came back without". */
+export function settleSignInTrip(signedIn: boolean): void {
+  const t = signInTrip();
+  if (!t) return;
+  const age = Date.now() - t.at;
+  if (signedIn || age > 60 * 60_000) { try { localStorage.removeItem(SIGNIN_OUT); } catch { /* ignore */ } return; }
+  if (age < 4000) return;
+  try { localStorage.removeItem(SIGNIN_OUT); } catch { /* ignore */ }
+  trackFunnelEvent(t.provider === 'lichess' ? 'lichess_signin_abandoned' : 'google_signin_abandoned');
+}
 
 export function trackFunnelEvent(eventType: LandingFunnelEvent, elapsedMs?: number) {
   if (eventType === 'signup_completed' || eventType === 'google_signup_completed' || eventType === 'lichess_signup_completed') axonTrack('sign_up');
