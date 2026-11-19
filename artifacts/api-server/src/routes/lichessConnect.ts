@@ -203,6 +203,20 @@ async function removeCopiedConnections(): Promise<void> {
     ) r WHERE r.user_id = t.user_id AND r.rank > 1`);
 }
 
+/** Signed up / in with Lichess (routes/auth.ts): that sign-in also connects Lichess for play,
+ *  so there's no second "Connect Lichess" step. Kept unless another account already holds it. */
+export async function saveBoardTokenFromSignIn(userId: string, token: string, username: string): Promise<boolean> {
+  try {
+    await ensureTable();
+    const taken = rowsOf<{ user_id: string }>(await db.execute(sql`SELECT user_id FROM lichess_board_tokens
+      WHERE lower(username) = lower(${username}) AND user_id <> ${userId} LIMIT 1`));
+    if (taken.length) return false;
+    await db.execute(sql`INSERT INTO lichess_board_tokens (user_id, token, username, updated_at) VALUES (${userId}, ${seal(token)}, ${username}, now())
+      ON CONFLICT (user_id) DO UPDATE SET token = EXCLUDED.token, username = EXCLUDED.username, updated_at = now()`);
+    return true;
+  } catch { return false; }
+}
+
 export function startLichessDailyWatch(): void {
   if (watching) return;
   watching = true;

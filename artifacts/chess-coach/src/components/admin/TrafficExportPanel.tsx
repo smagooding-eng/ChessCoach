@@ -53,11 +53,12 @@ export function TrafficExportPanel() {
       const end = new Date();
       const start = p.days ? new Date(Date.now() - (p.days - 1) * 86_400_000) : new Date('2024-01-01T00:00:00');
       const q = `startDate=${ymd(start)}&endDate=${ymd(end)}${TZ_Q}`;
-      const [traffic, stats, landingFunnel, gamesPlayed] = await Promise.all([
+      const [traffic, stats, landingFunnel, gamesPlayed, lichess] = await Promise.all([
         getJson(`/api/admin/traffic-export?${q}`),
         getJson('/api/admin/stats'),
         getJson(`/api/admin/landing-funnel?${q}`),
         getJson('/api/admin/game-stats'),
+        getJson(`/api/admin/lichess-report?${q}`),
       ]);
       if ((traffic as { error?: string })?.error) { setMsg(`Could not build the export: ${(traffic as { error: string }).error}`); return null; }
       const body = {
@@ -66,6 +67,7 @@ export function TrafficExportPanel() {
         siteWideStats: stats,
         landingFunnelByPlatform: landingFunnel,
         gamesPlayed,
+        lichess,
       };
       const f = new File([JSON.stringify(body, null, 2)], `chessscout-traffic-${ymd(start)}_to_${ymd(end)}.json`, { type: 'application/json' });
       setFile(f);

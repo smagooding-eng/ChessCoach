@@ -1,3 +1,4 @@
+import { trackPlay, newPlaySearch } from '@/lib/playFunnel';
 import { useGameBusy } from '@/lib/gameBusy';
 import React, { useEffect, useRef, useState } from 'react';
 import { announceChallengeSent } from '@/lib/challengeSent';
@@ -106,6 +107,13 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
   const [friendOpen, setFriendOpen] = useState(false);
 
   useEffect(() => { if (live.status === 'finished') void refetch(); }, [live.status, refetch]);
+  // The live-play path for the admin Lichess report
+  const prevStatus = useRef(live.status);
+  useEffect(() => {
+    const was = prevStatus.current; prevStatus.current = live.status;
+    if (live.status === 'queued' && was !== 'queued') { newPlaySearch(); trackPlay('queued'); }
+    if (live.status === 'in_game' && was === 'queued') trackPlay('matched_here');
+  }, [live.status]);
   useEffect(() => { if (live.status === 'in_game') setHosted(null); }, [live.status]);
   useEffect(() => {
     if (live.status !== 'queued') return;
@@ -126,6 +134,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
     if (live.status !== 'queued') { handedOff.current = false; stopLichessSearch(); return; }
     if (handedOff.current || !lichess || !lichessClock || waitedSoFar < LICHESS_HANDOFF_MS) return;
     handedOff.current = true;
+    trackPlay('lichess_search');
     const ac = new AbortController(); liSearch.current = ac; setLiSearching(true);
     const [m, inc] = lichessClock.split('+').map(Number);
     // A game starting on Lichess: open it (unless ChessScout found someone in the same instant).
@@ -133,6 +142,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
       if (e.type !== 'gameStart' || isDaily(e.game)) return;
       if (statusRef.current !== 'queued') { void abortLichess(e.game.gameId); return; }
       ac.abort(); live.cancel();
+      trackPlay('lichess_game');
       navigate(`/lichess?game=${e.game.gameId}&from=live`);
     }, ac.signal).catch(() => {});
     void lichessSeek({ minutes: m, increment: inc, rated: live.queuedMode === 'ranked' }, ac.signal)
@@ -223,6 +233,10 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
 
   const waitedMs = live.queuedAt ? now - live.queuedAt : 0;
   const showBotOffer = live.status === 'queued' && waitedMs >= live.botOfferMs;
+  useEffect(() => { if (showBotOffer) trackPlay('bot_offer_shown'); }, [showBotOffer]);
+  const showConnect = live.status === 'queued' && !lichess && !!lichessClock;
+  useEffect(() => { if (showConnect) trackPlay('connect_shown'); }, [showConnect]);
+  useEffect(() => { if (live.status === 'queued' && waitedMs >= LICHESS_HANDOFF_MS) trackPlay('nobody_here'); }, [live.status, waitedMs >= LICHESS_HANDOFF_MS]); // eslint-disable-line react-hooks/exhaustive-deps
   const queuedLabel = live.queuedTc === 'any' ? 'Any clock' : TC_OPTIONS.find(t => t.id === live.queuedTc)?.label;
 
   return (
@@ -277,7 +291,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
                 {liSearching || (lichess && lichessClock) ? 'Your game opens the moment someone is found.' : "We've let players with notifications on know you're looking."}
               </p>
             </div>
-            <button onClick={live.cancel} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm" style={ghostBtn}>
+            <button onClick={() => { trackPlay('cancelled'); live.cancel(); }} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm" style={ghostBtn}>
               <X className="w-4 h-4" /> Cancel
             </button>
           </div>
@@ -288,7 +302,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
                 <p className="text-[14.5px] font-extrabold" style={{ color: PT.text }}>Get a real opponent in seconds</p>
                 <p className="text-[12.5px]" style={{ color: PT.muted }}>Connect Lichess and, whenever nobody's free here, we'll match you with a Lichess player right on this board.</p>
               </div>
-              <button onClick={() => { live.cancel(); void connectLichess(`/lichess?seek=${encodeURIComponent(lichessClock)}&rated=${live.queuedMode === 'ranked' ? 1 : 0}&from=live`); }} className="shrink-0 rounded-xl px-3.5 py-2.5 text-[13px] font-extrabold" style={greenBtn}>Connect Lichess</button>
+              <button onClick={() => { trackPlay('connect_clicked'); live.cancel(); void connectLichess(`/lichess?seek=${encodeURIComponent(lichessClock)}&rated=${live.queuedMode === 'ranked' ? 1 : 0}&from=live`); }} className="shrink-0 rounded-xl px-3.5 py-2.5 text-[13px] font-extrabold" style={greenBtn}>Connect Lichess</button>
             </div>
           )}
           {showBotOffer && live.queuedTc && (
@@ -298,7 +312,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
                 <p className="text-[14.5px] font-extrabold" style={{ color: PT.text }}>No one's free in your range right now</p>
                 <p className="text-[12.5px]" style={{ color: PT.muted }}>Play a ChessScout bot at your level instead. It's labeled as a bot and the game is casual (no rating change). Or keep searching.</p>
               </div>
-              <button onClick={() => live.playBot(live.queuedTc!)} className="shrink-0 rounded-xl px-3.5 py-2.5 text-[13px] font-extrabold" style={greenBtn}>Play bot</button>
+              <button onClick={() => { trackPlay('bot_chosen'); live.playBot(live.queuedTc!); }} className="shrink-0 rounded-xl px-3.5 py-2.5 text-[13px] font-extrabold" style={greenBtn}>Play bot</button>
             </div>
           )}
         </div>
@@ -397,6 +411,21 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
             </div>
             {dailyNote && <p className="text-[12px]" style={{ color: dailyNote.startsWith('!') ? PT.red : PT.green }}>{dailyNote.replace(/^!/, '')}</p>}
           </section>
+
+          {/* Not connected to Lichess: real opponents instead of a bot when nobody's free here. */}
+          {!lichess && (
+            <section className="flex items-center gap-3 p-3.5" style={cardStyle}>
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-[22px] leading-none" style={{ background: '#262421', color: '#FFFFFF' }} aria-hidden="true">♞</span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[14px] font-extrabold" style={{ color: PT.text }}>Real opponents, any time</p>
+                <p className="text-[12px] leading-snug" style={{ color: PT.muted }}>
+                  Connect Lichess and, when nobody's free here, you're paired with a real Lichess player on this board (10 and 15 min) instead of a bot.{' '}
+                  No account? <a href="https://lichess.org/signup" target="_blank" rel="noopener noreferrer" className="font-bold underline" style={{ color: PT.text }}>Make one free</a>, then connect.
+                </p>
+              </div>
+              <button onClick={() => { trackPlay('connect_clicked'); void connectLichess('/live'); }} className="shrink-0 rounded-xl px-3 py-2.5 text-[12.5px] font-extrabold" style={greenBtn}>Connect</button>
+            </section>
+          )}
 
           {/* Play a friend: closed until you want it. */}
           <section className="overflow-hidden" style={cardStyle}>

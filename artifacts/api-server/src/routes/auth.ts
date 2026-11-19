@@ -1,3 +1,4 @@
+import { saveBoardTokenFromSignIn } from "./lichessConnect";
 import { Router, type IRouter, type Request, type Response } from "express";
 import bcrypt from "bcryptjs";
 import { db, usersTable, referralConversionsTable, emailDripLogTable } from "@workspace/db";
@@ -619,7 +620,8 @@ router.get("/auth/lichess", (req: Request, res: Response) => {
   lichessPending.set(state, { verifier, ref: String(req.query.ref ?? "").slice(0, 40), app: req.query.app === "1", at: Date.now(), h: validHandoffCode(req.query.h) ? String(req.query.h) : null });
   const params = new URLSearchParams({
     response_type: "code", client_id: "chessscout.net", redirect_uri: `${getOrigin(req)}/api/auth/lichess/callback`,
-    scope: "email:read", code_challenge_method: "S256", code_challenge: challenge, state,
+    // board:play too: signing in with Lichess also connects it for playing (no second step)
+    scope: "email:read board:play", code_challenge_method: "S256", code_challenge: challenge, state,
   });
   res.redirect(`https://lichess.org/oauth?${params}`);
 });
@@ -640,9 +642,7 @@ router.get("/auth/lichess/callback", async (req: Request, res: Response) => {
     const auth = { Authorization: `Bearer ${tok.access_token}` };
     const acc = await fetch("https://lichess.org/api/account", { headers: auth }).then((r) => (r.ok ? r.json() : null)).catch(() => null) as { id?: string; username?: string; title?: string; profile?: { firstName?: string; lastName?: string } } | null;
     const em = await fetch("https://lichess.org/api/account/email", { headers: auth }).then((r) => (r.ok ? r.json() : null)).catch(() => null) as { email?: string } | null;
-    // We only needed to read who they are: give the token back to Lichess.
-    void fetch("https://lichess.org/api/token", { method: "DELETE", headers: auth }).catch(() => {});
-    if (!acc?.id || !acc.username || acc.title === "BOT") { fail(); return; }
+    if (!acc?.id || !acc.username || acc.title === "BOT") { void fetch("https://lichess.org/api/token", { method: "DELETE", headers: auth }).catch(() => {}); fail(); return; }
     await ensureLichessColumn();
     const email = em?.email ? em.email.toLowerCase() : null;
     const rows = (r: any) => (Array.isArray(r) ? r : r?.rows ?? []);
@@ -674,6 +674,8 @@ router.get("/auth/lichess/callback", async (req: Request, res: Response) => {
           .then(() => { db.insert(emailDripLogTable).values({ userId: created.id, dripType: "welcome" }).catch(() => {}); }).catch(() => {});
       }
     }
+    // The same sign-in connects Lichess for play; if it can't be kept, give the token back.
+    if (!(await saveBoardTokenFromSignIn(user, tok.access_token, acc.username))) void fetch("https://lichess.org/api/token", { method: "DELETE", headers: auth }).catch(() => {});
     const [fresh] = await db.select().from(usersTable).where(eq(usersTable.id, user));
     const sid = await createSession({ user: toSessionUser(fresh) } as SessionData);
     setSessionCookie(res, sid);
