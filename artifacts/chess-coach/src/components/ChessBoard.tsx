@@ -271,7 +271,7 @@ export function ChessBoard({
   // board immediately for feedback) but not actually committed via
   // onMovePlayed until the player taps Confirm.
   const [pendingMove, setPendingMove] = useState<{ from: string; to: string; san: string; isCorrect: boolean; tempFen: string } | null>(null);
-  const [promotionPending, setPromotionPending] = useState<{ from: string; to: string } | null>(null);
+  const [promotionPending, setPromotionPending] = useState<{ from: string; to: string; color: 'w' | 'b' } | null>(null);
 
   // Computed once, referenced both by the recolored piece set below and
   // by the gradient <defs> in the render output further down. baseLight/
@@ -402,7 +402,7 @@ export function ChessBoard({
       if (isPromotion && promotionChoiceRef.current === 'ask') {
         const legal = probe.moves({ square: from as any, verbose: true }).some((m: any) => m.to === to);
         if (!legal) return false;
-        setPromotionPending({ from, to });
+        setPromotionPending({ from, to, color: piece.color });
         return true;
       }
       return finishMove(from, to, 'q');
@@ -676,23 +676,41 @@ export function ChessBoard({
           covering it. Styled as an aerial-view chess clock top: a wide
           rectangular block split by a center seam into two paddle halves,
           like the reference clocks. */}
-      {/* Promotion piece picker -- only shown when "Ask on Promotion" is
-          on and a pawn just reached the back rank. */}
-      {promotionPending && (
-        <div className="mt-3 flex items-center justify-center gap-2">
-          {(['q', 'r', 'b', 'n'] as const).map((p) => (
-            <button
-              key={p}
-              onClick={() => choosePromotion(p)}
-              className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl transition-transform active:scale-90"
-              style={{ background: '#302e2b', border: '1px solid rgba(129,182,76,0.4)' }}
-              title={{ q: 'Queen', r: 'Rook', b: 'Bishop', n: 'Knight' }[p]}
-            >
-              {{ q: '♛', r: '♜', b: '♝', n: '♞' }[p]}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Promotion picker -- only when "Ask on Promotion" is on and a pawn just reached the
+          last rank. Drawn on the board itself, on the promotion square: a column of your own
+          pieces (queen nearest the edge), the rest of the board dimmed; tap outside or ✕ to
+          take the move back. */}
+      {promotionPending && (() => {
+        const at = squareToPercent(promotionPending.to);
+        const fromTop = at.top === '0%';
+        const order = (['q', 'n', 'r', 'b'] as const);
+        const names = { q: 'Queen', r: 'Rook', b: 'Bishop', n: 'Knight' } as const;
+        const cell = (i: number) => (fromTop ? { top: `${(i * 100) / 4.5}%` } : { bottom: `${(i * 100) / 4.5}%` });
+        return (
+          <div className="absolute inset-x-0 top-0 z-30 aspect-square" role="dialog" aria-label="Promote your pawn">
+            <button type="button" aria-label="Cancel promotion" onClick={() => setPromotionPending(null)}
+              className="absolute inset-0 rounded-[10px]" style={{ background: 'rgba(0,0,0,.55)' }} />
+            <div className="absolute overflow-hidden rounded-[8px]" style={{ left: at.left, width: '12.5%', height: '56.25%', ...(fromTop ? { top: 0 } : { bottom: 0 }), boxShadow: '0 10px 30px rgba(0,0,0,.6)' }}>
+              <div className="relative h-full w-full">
+                {order.map((p, i) => {
+                  const code = `${promotionPending.color}${p.toUpperCase()}` as keyof typeof tintedPieces;
+                  const render = (tintedPieces as Record<string, (() => React.ReactNode) | undefined>)[code as string];
+                  return (
+                    <button key={p} type="button" onClick={() => choosePromotion(p)} aria-label={`Promote to ${names[p]}`} title={names[p]}
+                      className="absolute left-0 grid w-full place-items-center transition-transform active:scale-95"
+                      style={{ ...cell(i), height: `${100 / 4.5}%`, background: i === 0 ? '#F5F7F6' : '#E4E8E6', borderBottom: '1px solid rgba(0,0,0,.08)' }}>
+                      <span className="block h-[88%] w-[88%]">{render ? render() : <span className="text-3xl">{{ q: '♛', r: '♜', b: '♝', n: '♞' }[p]}</span>}</span>
+                    </button>
+                  );
+                })}
+                <button type="button" onClick={() => setPromotionPending(null)} aria-label="Cancel"
+                  className="absolute left-0 grid w-full place-items-center text-[13px] font-black"
+                  style={{ ...(fromTop ? { bottom: 0 } : { top: 0 }), height: `${50 / 4.5}%`, background: '#2A3133', color: '#C9D1CE' }}>✕</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {confirmTarget === undefined && !pendingMove && !promotionPending && reserveConfirmSpace && confirmMoves && !suppressConfirmMoves && (
         <div aria-hidden className={`mt-3 h-[68px] ${sidePanel ? 'lg:hidden' : ''}`} />

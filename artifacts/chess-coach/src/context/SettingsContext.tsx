@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useUser } from '@/context/UserContext';
 import { useDashboardRedesignFlag, useDefaultLook, type DefaultLook } from '@/hooks/use-app-config';
-import { playSound, SOUND_PACKS, type SoundPack, type SoundEvent } from '@/lib/sounds';
+import { playSound, SOUND_PACKS, DEFAULT_SOUND_PACK, type SoundPack, type SoundEvent } from '@/lib/sounds';
 import { REDESIGN_ON } from '@/lib/redesignTheme';
 export { SOUND_PACKS, type SoundPack };
 
@@ -434,7 +434,7 @@ const APP_DEFAULT_SETTINGS: Settings = {
   showLegalMoves: true,
   soundEnabled: true,
   hapticsEnabled: true,
-  soundPack: 'classic',
+  soundPack: DEFAULT_SOUND_PACK,
   promotionChoice: 'queen',
   boardSize: 'standard',
   uiStyle: 'standard',
@@ -512,7 +512,9 @@ const SettingsContext = createContext<SettingsContextValue | null>(null);
 // selection or a missing-image board: fall back to the default pieces.
 function sanitizeSettings(st: Settings): Settings {
   let out = PIECE_SHAPES[st.pieceShape as PieceShape] ? st : { ...st, pieceShape: 'default' as PieceShape };
-  if (!SOUND_PACKS[out.soundPack as SoundPack]) out = { ...out, soundPack: 'classic' };
+  if (!SOUND_PACKS[out.soundPack as SoundPack]) out = { ...out, soundPack: DEFAULT_SOUND_PACK };
+  // Once: the old default beep becomes the new wooden default (Classic stays in the list).
+  if (!(out as { soundV2?: number }).soundV2) out = { ...out, soundPack: out.soundPack === 'classic' ? DEFAULT_SOUND_PACK : out.soundPack, soundV2: 1 } as Settings;
   if (out.uiStyle !== 'photo' && out.uiStyle !== 'standard') out = { ...out, uiStyle: 'standard' };
   if (!BG_PHOTOS.some((p) => p.id === out.bgPhoto)) out = { ...out, bgPhoto: 'library' };
   if (!CARD_GLASS[out.cardGlass as CardGlass]) out = { ...out, cardGlass: 'medium' };
@@ -616,7 +618,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       ? { ...eff.pieceCustomColors, finish: {} as React.CSSProperties, baseLight: eff.pieceCustomColors.light, baseDark: eff.pieceCustomColors.dark }
       : { ...PIECE_STYLES[eff.pieceStyle] };
 
-  activeSoundPack = eff.soundPack ?? 'classic';
+  activeSoundPack = eff.soundPack ?? DEFAULT_SOUND_PACK;
   activeSoundEnabled = eff.soundEnabled !== false;
   activeHaptics = eff.hapticsEnabled !== false;
 
@@ -713,7 +715,7 @@ export function useSettings() {
 
 // The selected sound pack, mirrored here by SettingsProvider so the plain
 // playMoveSound() function (called from boards and the puzzle page) always uses it.
-let activeSoundPack: SoundPack = 'classic';
+let activeSoundPack: SoundPack = DEFAULT_SOUND_PACK;
 let activeSoundEnabled = true;
 let activeHaptics = true;
 export function playMoveSound(kind: SoundEvent = 'move') {

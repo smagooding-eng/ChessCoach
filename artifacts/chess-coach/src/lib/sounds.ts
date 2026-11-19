@@ -1,10 +1,10 @@
 // Gameplay sound packs, synthesized with Web Audio (no audio files to download or
-// cache). Each pack voices the same set of events; "classic" is the original
-// sine beep so existing users hear exactly what they had before.
+// cache). Each pack voices the same set of events. "scout" (wood) is everyone's default;
+// "classic" is the original sine beep, still there to pick.
 
 import { Chess, type Move } from 'chess.js';
 
-export type SoundPack = 'classic' | 'wood' | 'marble' | 'soft' | 'arcade'
+export type SoundPack = 'scout' | 'classic' | 'wood' | 'marble' | 'soft' | 'arcade'
   // natural: modelled pieces on real materials (see "Natural packs" below)
   | 'staunton' | 'club' | 'stone' | 'glass' | 'blitz';
 export type SoundEvent = 'move' | 'capture' | 'check' | 'castle' | 'promote' | 'gameEnd' | 'illegal';
@@ -15,6 +15,7 @@ export const SOUND_GROUPS: { id: SoundGroup; label: string; blurb: string }[] = 
   { id: 'electronic', label: 'Electronic', blurb: 'Simple tones and effects.' },
 ];
 export const SOUND_PACKS: Record<SoundPack, { label: string; blurb: string; group: SoundGroup }> = {
+  scout: { label: 'ChessScout', blurb: 'The default: a weighted wooden piece set down firmly on a wooden board, warm and crisp', group: 'natural' },
   staunton: { label: 'Tournament Wood', blurb: 'Weighted Staunton pieces, felt bases, wooden board', group: 'natural' },
   club: { label: 'Club Set', blurb: 'Plastic pieces on a roll-up board, club-night clack', group: 'natural' },
   stone: { label: 'Marble & Stone', blurb: 'Heavy stone pieces on a marble board', group: 'natural' },
@@ -100,7 +101,10 @@ interface Material {
   room: number;                             // reverb send 0..1
   roomSize: number;                         // seconds
 }
-const MATERIALS: Record<'staunton' | 'club' | 'stone' | 'glass', Material> = {
+const MATERIALS: Record<'scout' | 'staunton' | 'club' | 'stone' | 'glass', Material> = {
+  // The default: a solid, warm "tock" -- a low wooden body and a clear click on top, short
+  // enough for fast games, with just a touch of room.
+  scout: { modes: [[540, 0.065, 0.55], [1190, 0.045, 0.34], [2240, 0.03, 0.17], [3480, 0.018, 0.07]], thump: [125, 0.085, 0.7], hardness: 3400, contact: 0.01, contactGain: 0.4, room: 0.12, roomSize: 0.35 },
   staunton: { modes: [[610, 0.055, 0.5], [1240, 0.04, 0.3], [2050, 0.028, 0.16], [3150, 0.018, 0.07]], thump: [150, 0.07, 0.55], hardness: 2600, contact: 0.012, contactGain: 0.32, room: 0.16, roomSize: 0.45 },
   club: { modes: [[1450, 0.03, 0.42], [2650, 0.022, 0.28], [3900, 0.016, 0.16], [5400, 0.01, 0.07]], thump: [118, 0.05, 0.32], hardness: 5200, contact: 0.008, contactGain: 0.42, room: 0.1, roomSize: 0.35 },
   stone: { modes: [[1850, 0.09, 0.32], [3020, 0.07, 0.24], [4480, 0.055, 0.15], [6900, 0.035, 0.07]], thump: [210, 0.06, 0.4], hardness: 7000, contact: 0.006, contactGain: 0.4, room: 0.24, roomSize: 0.8 },
@@ -232,6 +236,7 @@ function naturalPack(m: Material, clockEveryMove = false): Record<SoundEvent, Vo
 }
 
 const PACKS: Record<SoundPack, Record<SoundEvent, Voice>> = {
+  scout: naturalPack(MATERIALS.scout),
   staunton: naturalPack(MATERIALS.staunton),
   club: naturalPack(MATERIALS.club),
   stone: naturalPack(MATERIALS.stone),
@@ -287,11 +292,12 @@ const PACKS: Record<SoundPack, Record<SoundEvent, Voice>> = {
 // Checks use the capture sound and captures the check sound (every pack).
 const VOICE_FOR: Partial<Record<SoundEvent, SoundEvent>> = { check: 'capture', capture: 'check' };
 
-export function playSound(event: SoundEvent, pack: SoundPack = 'classic') {
+export const DEFAULT_SOUND_PACK: SoundPack = 'scout';
+export function playSound(event: SoundEvent, pack: SoundPack = DEFAULT_SOUND_PACK) {
   const ac = audio();
   if (!ac) return;
   const voice = VOICE_FOR[event] ?? event;
-  try { (PACKS[pack] ?? PACKS.classic)[voice](ac, ac.currentTime + 0.005); } catch {}
+  try { (PACKS[pack] ?? PACKS[DEFAULT_SOUND_PACK])[voice](ac, ac.currentTime + 0.005); } catch {}
 }
 
 /** Which event a played move should sound like (most important wins). */
