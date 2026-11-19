@@ -116,7 +116,7 @@ const DEFAULTS: Settings = {
   disguise: 'character', moji: DEFAULT_MOJI, customVoice: DEFAULT_CUSTOM, bg: 'brand', bgColor: '#121B1D', avatarScale: 1.3, charScale: 1.8, bgImage: '',
   voice: 'off', pitch: 0, micId: '', output: 'none',
   name: 'Anonymous Knight', subtitle: 'Playing on chessscout.net',
-  headline: 'The road to 1500 ELO', goal: 1500, ratingFrom: 'auto', manualRating: 0,
+  headline: '', goal: 0, ratingFrom: 'auto', manualRating: 0,
   broadcast: true, recordLive: true, title: '',
 };
 const KEY_LEGACY = 'cs_streamer_v2';
@@ -209,7 +209,10 @@ function StreamerStudio({ admin }: { admin: boolean }) {
   // device by an admin don't carry them over either).
   const [s, setS] = useState<Settings>(() => {
     const x = loadSettings();
-    return admin ? x : { ...x, disguise: x.disguise === 'character' || x.disguise === 'moji' ? 'none' : x.disguise, voice: 'off' };
+    if (admin) return x;
+    // The old built-in headline ("The road to 1500 ELO") was the owner's own: nobody else starts with it.
+    if (x.headline === 'The road to 1500 ELO') { x.headline = ''; if (x.goal === 1500) x.goal = 0; }
+    return { ...x, disguise: x.disguise === 'character' || x.disguise === 'moji' ? 'none' : x.disguise, voice: 'off' };
   });
   const sRef = useRef(s); sRef.current = s;
   const set = useCallback((patch: Partial<Settings>) => setS((p) => ({ ...p, ...patch })), []);
@@ -1320,7 +1323,7 @@ function StreamerStudio({ admin }: { admin: boolean }) {
             <input value={s.subtitle} onChange={(e) => set({ subtitle: e.target.value.slice(0, 60) })} placeholder="Subtitle" className="w-full px-3 py-2 rounded-lg text-sm" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }} />
             <Note>Use a stream name, not your real one, to stay anonymous.</Note>
             <Label>Headline</Label>
-            <input value={s.headline} onChange={(e) => set({ headline: e.target.value.slice(0, 50) })} placeholder="The road to 1500 ELO" className="w-full px-3 py-2 rounded-lg text-sm mb-2" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }} />
+            <input value={s.headline} onChange={(e) => set({ headline: e.target.value.slice(0, 50) })} placeholder="Your headline, e.g. your goal for this stream" className="w-full px-3 py-2 rounded-lg text-sm mb-2" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }} />
             <div className="flex items-center gap-2 mb-2">
               <span className="text-[12.5px] font-semibold" style={{ color: RD.muted }}>Goal</span>
               <input type="number" inputMode="numeric" value={s.goal || ''} onChange={(e) => set({ goal: Math.max(0, Math.min(3500, Number(e.target.value) || 0)) })} className="w-24 px-3 py-2 rounded-lg text-sm" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }} />
