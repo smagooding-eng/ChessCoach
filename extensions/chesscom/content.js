@@ -29,6 +29,35 @@
     return false;
   }
 
+  // Chess.com's own game-over card (Black Won / Game Review / Rematch), if it's on screen.
+  function overCard() {
+    let best = null, area = 0;
+    for (const s of GAME_OVER) {
+      for (const el of document.querySelectorAll(s)) {
+        if (el.id === BTN || el.closest('#' + BTN)) continue;
+        const r = el.getBoundingClientRect();
+        if (!r.width || r.width < 200 || r.width > 700 || r.height < 120) continue;
+        const a = r.width * r.height;
+        if (a > area) { best = r; area = a; }
+      }
+    }
+    return best;
+  }
+
+  // Sit right under Chess.com's card (same width), or above it when there's no room below;
+  // with no card on screen (a finished game opened later), bottom-right as before.
+  function place() {
+    const box = document.getElementById(BTN);
+    if (!box) return;
+    const r = overCard();
+    if (!r) { box.classList.remove('csx-docked'); box.style.cssText = ''; return; }
+    box.classList.add('csx-docked');
+    const h = box.offsetHeight || 60, gap = 8;
+    const below = r.bottom + gap + h <= window.innerHeight - 4;
+    const top = below ? r.bottom + gap : Math.max(4, r.top - gap - h);
+    box.style.cssText = `left:${Math.round(r.left)}px;top:${Math.round(top)}px;width:${Math.round(r.width)}px;right:auto;bottom:auto;`;
+  }
+
   function gameId() {
     const m = location.pathname.match(/^\/(?:analysis\/)?game\/(?:live\/|daily\/)?(\d{4,15})(?:[/?#]|$)/);
     if (m) return m[1];
@@ -68,6 +97,7 @@
     box.querySelector('.csx-x').addEventListener('click', () => { dismissedKey = key; hide(); });
     document.body.appendChild(box);
     shownKey = key;
+    place();
   }
 
   function hide() {
@@ -90,4 +120,6 @@
   }
 
   setInterval(check, 1000);
+  setInterval(place, 200);
+  window.addEventListener('resize', place);
 })();
