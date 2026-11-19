@@ -58,15 +58,17 @@ export async function fetchLichessGames(
   username: string,
   months: number = 3,
   maxGames: number = 20_000,
+  /** Someone's waiting on the answer (a page they're looking at): don't sit out a 429 for a minute. */
+  interactive = false,
 ): Promise<LichessGame[]> {
   const since = Date.now() - months * 30 * 24 * 60 * 60 * 1000;
-  const PAGE = 500;
+  const PAGE = Math.min(500, maxGames);
   const games: LichessGame[] = [];
   let until: number | null = null;
   for (;;) {
     const url = `https://lichess.org/api/games/user/${encodeURIComponent(username)}?since=${since}${until != null ? `&until=${until}` : ""}&max=${PAGE}&pgnInJson=true&opening=true&clocks=true&evals=false`;
     let res = await fetch(url, { headers: { Accept: "application/x-ndjson" } });
-    if (res.status === 429) {
+    if (res.status === 429 && !interactive) {
       // Lichess asks for a minute's pause after a 429
       await new Promise((r) => setTimeout(r, 61_000));
       res = await fetch(url, { headers: { Accept: "application/x-ndjson" } });

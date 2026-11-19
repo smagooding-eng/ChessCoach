@@ -2399,8 +2399,9 @@ async function ensureFreeReviewTable(): Promise<void> {
 /** The player's 10 most recent finished games, newest first, with the metadata and PGN. */
 async function recentForFreeReview(platform: "chesscom" | "lichess", username: string) {
   if (platform === "lichess") {
-    const games = (await fetchLichessGames(username, 1)).filter((g) => !!g.pgn);
-    const list = (games.length ? games : (await fetchLichessGames(username, 6)).filter((g) => !!g.pgn)).slice(0, 10);
+    // Just the 10 most recent (it used to pull a whole month or six, which for an active
+    // player is thousands of games: the page timed out with "Failed to fetch").
+    const list = (await fetchLichessGames(username, 120, 10, true)).filter((g) => !!g.pgn).slice(0, 10);
     return list.map((g) => ({ meta: extractLichessGameMetadata(g, username), pgn: g.pgn!, ref: g.id }));
   }
   const archives = await fetchChessComArchiveList(username);

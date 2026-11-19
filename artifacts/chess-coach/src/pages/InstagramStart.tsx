@@ -56,7 +56,7 @@ export default function InstagramStart() {
       if (chosen && !isAuthenticated) pick(chosen);
       store(FREE_REVIEW_KEY, { platform: p, username: u });
       trackFunnelEvent('ig_games_shown');
-    } catch (e) { setErr(e instanceof Error ? e.message : 'Couldn’t load your games.'); } finally { setLoading(false); }
+    } catch (e) { setErr(e instanceof Error && !/fetch|network|load failed/i.test(e.message) ? e.message : 'Couldn’t reach ChessScout. Check your connection and try again.'); } finally { setLoading(false); }
   };
 
   // Opened from the "continue in Chrome" link: pick up where they were.

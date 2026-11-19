@@ -49,7 +49,7 @@ export default function FreeReview() {
     setGames(null); setErr(null);
     void apiFetch(`/api/free-review/recent?platform=${who.platform}&username=${encodeURIComponent(who.username)}`, { credentials: 'include' })
       .then(async (r) => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.error ?? 'Couldn’t load your games.'); setGames(d.games ?? []); })
-      .catch((e: unknown) => setErr(e instanceof Error ? e.message : 'Couldn’t load your games.'));
+      .catch((e: unknown) => setErr(e instanceof Error && !/fetch|network|load failed/i.test(e.message) ? e.message : 'Couldn’t reach ChessScout. Check your connection and try again.'));
   }, [who]);
 
   const start = (e: React.FormEvent) => {
