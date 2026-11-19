@@ -50,6 +50,9 @@ function rewriteFor(path: string, ua: string): Target {
   let m: RegExpMatchArray | null;
   if (path === '/push-rotate') return { proxy: '/api/push/rotate' };
   if ((m = path.match(/^\/t\/(.*)$/))) return { proxy: `/api/t/${m[1]}` };
+  // A file saved from the app on a phone (see api-server routes/downloads.ts): served on
+  // this site, so the Android app keeps it in-app and Chrome's downloads save it.
+  if ((m = path.match(/^\/dl\/([\w-]{20,64})$/))) return { proxy: `/api/downloads/${m[1]}` };
   const bot = BOT.test(ua);
   if (bot && (m = path.match(/^\/challenge\/([^/]+)$/))) return { fn: 'og', q: { kind: 'challenge', code: m[1] } };
   if (bot && (m = path.match(/^\/share\/([^/]+)$/))) return { fn: 'og', q: { kind: 'share', data: m[1] } };

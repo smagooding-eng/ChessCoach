@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { saveFile } from '@/lib/saveFile';
 import { Download, Loader2, Share2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
@@ -64,11 +65,10 @@ export function TrafficExportPanel() {
   const download = async () => {
     const f = file ?? await build();
     if (!f) return;
-    const url = URL.createObjectURL(f);
-    const a = document.createElement('a');
-    a.href = url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
-    setMsg(`Downloaded ${f.name}. Attach it in a chat for analysis.`);
+    const how = await saveFile(f);
+    setMsg(how === 'link'
+      ? `Saving ${f.name} to your phone's Downloads (check the download notification). Attach it in a chat for analysis.`
+      : `Downloaded ${f.name}. Attach it in a chat for analysis.`);
   };
 
   const canShare = typeof navigator !== 'undefined' && 'canShare' in navigator;

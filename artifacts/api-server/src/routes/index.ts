@@ -16,6 +16,7 @@ import trialTrackingRouter from "./trialTracking";
 import endgameStatsRouter from "./endgameStats";
 import quickStatsRouter from "./quickStats";
 import chesscomGameRouter from "./chesscomGame";
+import downloadsRouter from "./downloads";
 import adminRouter from "./admin";
 import emailRouter from "./email";
 import storageRouter from "./storage";
@@ -63,6 +64,7 @@ const router: IRouter = Router();
 router.use(authRouter);
 router.use(healthRouter);
 router.use(chesscomGameRouter); // before gamesRouter: /games/from-chesscom
+router.use(downloadsRouter);
 router.use(gamesRouter);
 router.use(stripeRouter);
 router.use(trialTrackingRouter);
