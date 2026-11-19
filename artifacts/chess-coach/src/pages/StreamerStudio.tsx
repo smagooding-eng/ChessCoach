@@ -1096,6 +1096,7 @@ function StreamerStudio({ admin }: { admin: boolean }) {
   }
   // Co-streaming: your camera panel shares its space with your partner's (not while laying out)
   const lay = coOnStage ? withPartnerPanel(s.layout, stage.w, stage.h) : s.layout;
+  const partnerRect: Rect | undefined = coOnStage ? (lay as { partner?: Rect }).partner : undefined;
   const panel = (id: PanelId, label: string, children: ReactNode) => {
     const r = lay[id];
     if (r.hidden && !edit) return null;
@@ -1175,11 +1176,11 @@ function StreamerStudio({ admin }: { admin: boolean }) {
           {coOnStage && <CoName name={s.name} round={!!lay.cam.round} />}
         </div>
       ))}
-      {coOnStage && 'partner' in lay && (
-        <div className="absolute overflow-hidden" style={{ ...px(lay.partner), zIndex: lay.partner.z, borderRadius: lay.partner.round ? '50%' : 0, background: '#050A0B', boxShadow: lay.partner.round ? `0 0 0 3px ${RD.green}, 0 8px 24px rgba(0,0,0,.6)` : undefined }}>
+      {partnerRect && (
+        <div className="absolute overflow-hidden" style={{ ...px(partnerRect), zIndex: partnerRect.z, borderRadius: partnerRect.round ? '50%' : 0, background: '#050A0B', boxShadow: partnerRect.round ? `0 0 0 3px ${RD.green}, 0 8px 24px rgba(0,0,0,.6)` : undefined }}>
           <video autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover"
             ref={(el) => { partnerVideo.current = el; if (el && el.srcObject !== coPartner) { el.srcObject = coPartner; void el.play().catch(() => {}); } }} />
-          <CoName name={co.state?.partner ?? ''} round={!!lay.partner.round} />
+          <CoName name={co.state?.partner ?? ''} round={!!partnerRect.round} />
         </div>
       )}
       {headRef.current && panel('head', 'Headline', (() => {
