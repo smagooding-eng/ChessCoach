@@ -76,6 +76,10 @@ async function trackSubscriptionEventBestEffort(payload: Buffer, signature: stri
   }
 }
 
+// Render's health check, answered before anything else (logging, sessions, body parsing):
+// it times out after 5 s, and a busy moment elsewhere shouldn't make it fail.
+app.get('/api/healthz', (_req, res) => { res.json({ status: 'ok' }); });
+
 app.post(
   '/api/stripe/webhook',
   express.raw({ type: 'application/json' }),

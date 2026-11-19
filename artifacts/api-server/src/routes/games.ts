@@ -62,14 +62,9 @@ async function runImportJobNow(opts: ImportJobOptions): Promise<{ imported: numb
   const remainingImportSlots = Infinity;
 
   if (platform === "lichess") {
-    let lichessGames;
-    try {
-      lichessGames = await fetchLichessGames(platformUsername, months);
-    } catch (err) {
-      log.error({ err }, "Failed to fetch games from Lichess");
-      return { imported, updated, total: 0, error: "Failed to fetch games from Lichess. Check the username and try again." };
-    }
-
+    // Page by page (500 games), each saved before the next is fetched: a whole history held
+    // in memory at once (up to 20,000 games with clocks) starved the server.
+    const savePage = async (lichessGames: Awaited<ReturnType<typeof fetchLichessGames>>) => {
     for (const game of lichessGames) {
       if (imported >= remainingImportSlots) break;
       try {
@@ -98,6 +93,13 @@ async function runImportJobNow(opts: ImportJobOptions): Promise<{ imported: numb
       } catch (err) {
         log.warn({ err }, "Failed to insert Lichess game");
       }
+    }
+    };
+    try {
+      await fetchLichessGames(platformUsername, months, 20_000, false, savePage);
+    } catch (err) {
+      log.error({ err }, "Failed to fetch games from Lichess");
+      return { imported, updated, total: 0, error: "Failed to fetch games from Lichess. Check the username and try again." };
     }
   } else {
     // Month by month, saving each before fetching the next: a full history can be tens
@@ -1571,7 +1573,9 @@ export async function startReviewServices(): Promise<void> {
   reviewServicesStarted = true;
   // Copies sharing a Lichess / Chess.com id first, then copies of the same game with different
   // ids or none (same players, same moves)
-  void dedupeExternalGames().then(() => removeSameGameCopies(appLogger));
+  // Not right at start-up: a new server must answer Render's health check first (these
+  // read through months of games).
+  setTimeout(() => { void dedupeExternalGames().then(() => removeSameGameCopies(appLogger)); }, 6 * 60_000).unref();
   void startCatchupReviews().catch((err) => appLogger.warn({ err }, "catch-up reviews failed to start"));
   void startSamedayReviews().catch((err) => appLogger.warn({ err }, "same-day reviews failed to start"));
   await db.execute(sql`CREATE TABLE IF NOT EXISTS review_after_upgrade (

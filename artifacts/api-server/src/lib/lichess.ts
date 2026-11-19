@@ -60,7 +60,10 @@ export async function fetchLichessGames(
   maxGames: number = 20_000,
   /** Someone's waiting on the answer (a page they're looking at): don't sit out a 429 for a minute. */
   interactive = false,
+  /** Handle each page as it arrives and don't keep it (big histories): the result is then empty. */
+  onPage?: (page: LichessGame[]) => Promise<void>,
 ): Promise<LichessGame[]> {
+  let fetched = 0;
   const since = Date.now() - months * 30 * 24 * 60 * 60 * 1000;
   const PAGE = Math.min(500, maxGames);
   const games: LichessGame[] = [];
@@ -86,8 +89,9 @@ export async function fetchLichessGames(
         logger.warn({ line: line.substring(0, 100) }, "Failed to parse Lichess game JSON");
       }
     }
-    games.push(...page);
-    if (page.length < PAGE || games.length >= maxGames) break;
+    fetched += page.length;
+    if (onPage) await onPage(page); else games.push(...page);
+    if (page.length < PAGE || fetched >= maxGames) break;
     const oldest = Math.min(...page.map((g) => g.createdAt).filter((t) => typeof t === "number"));
     if (!Number.isFinite(oldest) || oldest <= since) break;
     until = oldest - 1;

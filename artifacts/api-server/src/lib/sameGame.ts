@@ -59,15 +59,34 @@ export async function adoptIds(row: SameGameRow, ids: { lichessGameId?: string |
 export async function removeSameGameCopies(log: { info: (o: object, m: string) => void; warn: (o: object, m: string) => void }): Promise<void> {
   let removed = 0;
   try {
+    // One member at a time (all at once read every repeated pairing's PGN into memory and
+    // held the server up), with a breath between members.
+    const users = (await db.execute(sql`
+      SELECT DISTINCT user_id FROM (
+        SELECT user_id FROM games WHERE played_at > now() - interval '120 days'
+        GROUP BY user_id, lower(white_username), lower(black_username) HAVING count(*) > 1) x`)) as unknown as { rows?: Array<{ user_id: string }> } | Array<{ user_id: string }>;
+    for (const u of (Array.isArray(users) ? users : users.rows ?? [])) {
+      removed += await removeCopiesFor(u.user_id);
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    if (removed) log.info({ removed }, "[games] removed copies of the same game");
+  } catch (err) {
+    log.warn({ err }, "[games] same-game clean-up failed");
+  }
+}
+
+async function removeCopiesFor(userId: string): Promise<number> {
+  let removed = 0;
+  {
     const rows = (await db.execute(sql`
       SELECT id, user_id, lower(white_username) AS w, lower(black_username) AS b, pgn, played_at,
         review_data IS NOT NULL AS reviewed, COALESCE(via_chessscout, false) AS via, lichess_game_id, chesscom_game_id
       FROM games
-      WHERE played_at > now() - interval '120 days'
-        AND (user_id, lower(white_username), lower(black_username)) IN (
-          SELECT user_id, lower(white_username), lower(black_username) FROM games
-          WHERE played_at > now() - interval '120 days'
-          GROUP BY 1, 2, 3 HAVING count(*) > 1)
+      WHERE user_id = ${userId} AND played_at > now() - interval '120 days'
+        AND (lower(white_username), lower(black_username)) IN (
+          SELECT lower(white_username), lower(black_username) FROM games
+          WHERE user_id = ${userId} AND played_at > now() - interval '120 days'
+          GROUP BY 1, 2 HAVING count(*) > 1)
       ORDER BY user_id, played_at`)) as unknown as { rows?: Array<Record<string, unknown>> } | Array<Record<string, unknown>>;
     const list = (Array.isArray(rows) ? rows : rows.rows ?? []) as Array<{
       id: number; user_id: string; w: string; b: string; pgn: string; played_at: string;
@@ -96,8 +115,6 @@ export async function removeSameGameCopies(log: { info: (o: object, m: string) =
       await db.execute(sql`UPDATE games SET lichess_game_id = ${li}, chesscom_game_id = ${cc}, via_chessscout = ${via} WHERE id = ${keep.id}`).catch(() => {});
       removed += drop.length;
     }
-    if (removed) log.info({ removed }, "[games] removed copies of the same game");
-  } catch (err) {
-    log.warn({ err }, "[games] same-game clean-up failed");
   }
+  return removed;
 }
