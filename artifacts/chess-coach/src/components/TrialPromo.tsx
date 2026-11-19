@@ -1,7 +1,7 @@
 // The 3-day Pro trial, offered at most once a day to members who can still take it: a pawn walks
 // across three "days" and promotes to a queen, then the offer. Not a paywall: it shows
 // once a day, closes with "Maybe later", and stops for good once they start the trial.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { Crown, X, Loader2 } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
@@ -14,6 +14,7 @@ const SEEN = (uid: string) => `cs_trial_promo_v2:${uid}`;
 const EVERY_MS = 24 * 60 * 60_000;
 /** Shown in the last couple of minutes (the notifications nudge waits its turn). */
 export const PROMO_OPEN_KEY = 'cs_promo_open_at';
+const BOARDS = /^\/(live|lichess|daily|play|puzzles?|bots?|challenge|tournaments?|studio|cc)(\/|$)/;
 // Places it would get in the way (sign-up, checkout, the free review page, the studio)
 const SKIP = /^\/(setup|login|signup|subscription|pricing|review|admin|kids|embed)(\/|$)/;
 
@@ -38,9 +39,14 @@ export function TrialPromo() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
+  // Only right as they move to another page, never while they're busy on one, and never
+  // onto a board they play or solve on.
+  const prevPath = useRef(path);
   useEffect(() => {
+    const moved = prevPath.current !== path; prevPath.current = path;
+    if (!moved) return;
     if (!authUser || !isSubscriptionLoaded || isPremium || open) return;
-    if (STUDIO_FRAME || window.self !== window.top || SKIP.test(path)) return;
+    if (STUDIO_FRAME || window.self !== window.top || SKIP.test(path) || BOARDS.test(path)) return;
     let seen = false;
     try { const at = Number(localStorage.getItem(SEEN(authUser.id)) || 0); seen = !!at && Date.now() - at < EVERY_MS; } catch { /* storage off */ }
     if (seen) return;
@@ -49,7 +55,7 @@ export function TrialPromo() {
       try {
         const r = await apiFetch('/api/stripe/trial-offer', { credentials: 'include' });
         const d = r.ok ? await r.json() : null;
-        if (gone || !d?.eligible) return;
+        if (gone || !d?.eligible || document.visibilityState !== 'visible') return;
         setDays(Number(d.days) || 3);
         try { localStorage.setItem(SEEN(authUser.id), String(Date.now())); localStorage.setItem(PROMO_OPEN_KEY, String(Date.now())); } catch { /* storage off */ }
         setOpen(true);
@@ -58,9 +64,9 @@ export function TrialPromo() {
         const monthly = (p?.data?.[0]?.prices as Price[] | undefined)?.find((x) => x.recurring?.interval === 'month');
         if (!gone && monthly) setPrice(monthly);
       } catch { /* try again next visit */ }
-    }, 1400);
+    }, 700);
     return () => { gone = true; clearTimeout(t); };
-  }, [authUser, isPremium, isSubscriptionLoaded, path, open]);
+  }, [path]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!open) return null;
 

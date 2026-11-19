@@ -1,7 +1,8 @@
-// Members with notifications off get a short reminder every 2-3 days: our own card (never
+// Members with notifications off get a short reminder every 2-3 days, only right as they
+// move to another page (never while they're in the middle of something): our own card (never
 // the browser's permission box on its own), with Turn on / Not now. Blocked in settings:
 // the same card says where to switch them back on.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { Bell, X, Loader2 } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
@@ -9,9 +10,11 @@ import { usePushNotifications } from '@/hooks/use-push-notifications';
 import { STUDIO_FRAME } from '@/lib/studioFrame';
 import { PROMO_OPEN_KEY } from '@/components/TrialPromo';
 
+
 const KEY = (uid: string) => `cs_notify_nudge:${uid}`;
 const EVERY_MS = 60 * 60 * 60_000; // 2.5 days
-const SKIP = /^\/(setup|login|signup|subscription|pricing|review|instagram|admin|kids|embed|notifications|welcome)(\/|$)/;
+// Not on sign-up/checkout pages, and never onto a board you play or solve on.
+export const NUDGE_SKIP = /^\/(setup|login|signup|subscription|pricing|review|instagram|admin|kids|embed|notifications|welcome|live|lichess|daily|play|puzzles?|bots?|challenge|tournaments?|studio|cc)(\/|$)/;
 
 export function NotifyNudge() {
   const { authUser } = useUser();
@@ -20,20 +23,24 @@ export function NotifyNudge() {
   const [open, setOpen] = useState(false);
   const off = push.supported && !(push.permission === 'granted' && push.isSubscribed);
 
+  // Only on a page change (not on the page they opened, not while they stay on one).
+  const prevPath = useRef(path);
   useEffect(() => {
-    if (!authUser || !off || open || STUDIO_FRAME || window.self !== window.top || SKIP.test(path)) return;
+    const moved = prevPath.current !== path; prevPath.current = path;
+    if (!moved) return;
+    if (!authUser || !off || open || STUDIO_FRAME || window.self !== window.top || NUDGE_SKIP.test(path)) return;
     let last = 0;
     try { last = Number(localStorage.getItem(KEY(authUser.id)) || 0); } catch { /* storage off */ }
     if (last && Date.now() - last < EVERY_MS) return;
-    // After they've had a moment on the page, and not on top of the Pro offer.
+    // Just after the new page appears, and not on top of the Pro offer.
     const t = setTimeout(() => {
       try { if (Date.now() - Number(localStorage.getItem(PROMO_OPEN_KEY) || 0) < 3 * 60_000) return; } catch { /* ignore */ }
       if (document.visibilityState !== 'visible') return;
       try { localStorage.setItem(KEY(authUser.id), String(Date.now())); } catch { /* storage off */ }
       setOpen(true);
-    }, 20_000);
+    }, 700);
     return () => clearTimeout(t);
-  }, [authUser, off, open, path]);
+  }, [path]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (open && !off) setOpen(false); }, [open, off]);
   if (!open) return null;
