@@ -2436,6 +2436,31 @@ router.get("/free-review/recent", requireAuth, async (req, res): Promise<void> =
   }
 });
 
+// The Instagram page (chessscout.net/ig): a visitor sees their own recent games before
+// signing up. No account needed, so it's capped per visitor address.
+const previewHits = new Map<string, { n: number; at: number }>();
+router.get("/free-review/preview", async (req, res): Promise<void> => {
+  const ip = String(req.headers["cf-connecting-ip"] ?? req.headers["x-forwarded-for"] ?? req.ip ?? "").split(",")[0].trim();
+  const now = Date.now();
+  const h = previewHits.get(ip);
+  if (h && now - h.at < 10 * 60_000) { if (++h.n > 20) { res.status(429).json({ error: "Too many lookups. Try again in a few minutes." }); return; } }
+  else previewHits.set(ip, { n: 1, at: now });
+  if (previewHits.size > 5000) for (const [k, v] of previewHits) if (now - v.at > 10 * 60_000) previewHits.delete(k);
+  const platform = req.query.platform === "lichess" ? "lichess" : "chesscom";
+  const username = String(req.query.username ?? "").trim();
+  if (!/^[A-Za-z0-9_-]{2,40}$/.test(username)) { res.status(400).json({ error: "Enter your username." }); return; }
+  try {
+    const list = await recentForFreeReview(platform, username);
+    const games: FreeRecent[] = list.map(({ meta, ref }) => ({
+      ref, white: meta.whiteUsername, black: meta.blackUsername, whiteRating: meta.whiteRating, blackRating: meta.blackRating,
+      result: meta.result, opening: meta.opening, playedAt: new Date(meta.playedAt).toISOString(), timeControl: meta.timeControl,
+    }));
+    res.json({ games });
+  } catch {
+    res.status(404).json({ error: platform === "lichess" ? "We couldn't find that Lichess username." : "We couldn't find that Chess.com username." });
+  }
+});
+
 router.post("/free-review", requireAuth, async (req, res): Promise<void> => {
   const userId = req.user!.id;
   const platform = req.body?.platform === "lichess" ? "lichess" : "chesscom";

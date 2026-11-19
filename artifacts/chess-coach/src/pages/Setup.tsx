@@ -1,3 +1,5 @@
+import { inAppBrowser, isAndroid, openInBrowserUrl } from '@/lib/inAppBrowser';
+import { InAppGoogleNote } from '@/components/QuickSignup';
 import React, { useState, useEffect } from 'react';
 import { peekAfterSignIn } from '@/lib/afterSignIn';
 import { startGoogleSignIn, startLichessSignIn } from '@/lib/googleSignIn';
@@ -138,6 +140,8 @@ export function Setup() {
   };
 
   const handleGoogleLogin = () => {
+    // Inside Instagram / Facebook / TikTok Google won't sign anyone in: reopen in Chrome
+    if (inAppBrowser() && isAndroid()) { trackFunnelEvent('inapp_open_browser'); window.location.href = openInBrowserUrl(); return; }
     trackFunnelEvent('google_oauth_clicked');
     void startGoogleSignIn(referralCode || localStorage.getItem('chessscout_ref') || '');
   };
@@ -172,6 +176,7 @@ export function Setup() {
 
         {googleAvailable && (
           <>
+            {!isAndroid() && <InAppGoogleNote className="mb-3" />}
             <button
               onClick={handleGoogleLogin}
               className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl border-2 border-border bg-secondary/50 hover:bg-secondary transition-colors text-foreground font-medium mb-4"

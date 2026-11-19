@@ -34,8 +34,8 @@ const SEO_KEYS = 'play-chess-online|chess-for-kids|learn-chess|chess-puzzles|che
 // ── Redirects (vercel.json "redirects", all temporary) ──────────────────────
 function redirectFor(path: string): string | null {
   const bio: Record<string, string> = { '/ig': 'instagram', '/tt': 'tiktok', '/yt': 'youtube', '/fb': 'facebook' };
-  // Instagram's bio link goes to the free AI game review.
-  if (bio[path]) return `${path === '/ig' ? '/review' : '/'}?utm_source=${bio[path]}&utm_medium=bio&utm_campaign=bio_link`;
+  // Instagram's bio link: its own page (see your games first, sign-up that works inside Instagram).
+  if (bio[path]) return `${path === '/ig' ? '/instagram' : '/'}?utm_source=${bio[path]}&utm_medium=bio&utm_campaign=bio_link`;
   let m = path.match(/^\/blog\/([^/]+)$/);
   if (m) return `/learn/${m[1]}`;
   if (path === '/blog') return '/learn';

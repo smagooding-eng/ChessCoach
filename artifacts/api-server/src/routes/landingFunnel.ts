@@ -88,6 +88,8 @@ const VALID_EVENTS = new Set([
   // the trip out to Google / Lichess to sign in: left for it, cancelled Google's sheet, or
   // came back without finishing (as opposed to leaving the site)
   "left_for_signin", "google_signin_cancelled", "google_signin_abandoned", "lichess_signin_abandoned",
+  // the Instagram page (/ig): looked up their games; inside an app's built-in browser, tapped "open in browser"
+  "ig_games_shown", "inapp_open_browser",
   "scroll_25", "scroll_50", "scroll_75", "scroll_100",
   "engaged_10s",
   ...CHECKOUT_EVENTS,
@@ -180,6 +182,8 @@ async function getFunnelStatsForPlatform(since: Date, until: Date, platform: Pla
     googleCancelled: countMap["google_signin_cancelled"] ?? 0,
     googleCameBackWithout: countMap["google_signin_abandoned"] ?? 0,
     lichessCameBackWithout: countMap["lichess_signin_abandoned"] ?? 0,
+    igGamesShown: countMap["ig_games_shown"] ?? 0,
+    openedInBrowser: countMap["inapp_open_browser"] ?? 0,
   };
 
   const scrollDepth = {

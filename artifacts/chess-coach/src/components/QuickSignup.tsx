@@ -7,6 +7,7 @@ import { useEffect } from 'react';
 import { X, Mail } from 'lucide-react';
 import { trackFunnelEvent } from '@/lib/funnelTracking';
 import { startGoogleSignIn, startLichessSignIn } from '@/lib/googleSignIn';
+import { inAppBrowser, appName, isAndroid, openInBrowserUrl } from '@/lib/inAppBrowser';
 
 export const RETURN_TO_KEY = 'cs_return_to';
 
@@ -42,13 +43,46 @@ export function GoogleMark({ className = 'h-5 w-5' }: { className?: string }) {
   );
 }
 
-export function QuickSignup({ open, onClose, title, subtitle, returnTo }: {
+/** "Continue with Google", or -- inside Instagram / Facebook / TikTok, where Google refuses
+ *  to sign anyone in -- a link that reopens the page in the phone's browser (Android), or
+ *  how to get there (iPhone). */
+export function GoogleSignupButton({ className = '', label = 'Continue with Google', path }: { className?: string; label?: string; path?: string }) {
+  const iab = inAppBrowser();
+  const style = { background: '#FFFFFF', color: '#1F1F1F', boxShadow: '0 10px 26px -12px rgba(0,0,0,.6)' };
+  const cls = `flex w-full items-center justify-center gap-3 rounded-[14px] py-3.5 text-[15px] font-extrabold ${className}`;
+  if (!iab) return <button type="button" onClick={startGoogleSignup} className={cls} style={style}><GoogleMark /> {label}</button>;
+  if (isAndroid()) {
+    return (
+      <div className={className}>
+        <a href={openInBrowserUrl(path)} onClick={() => trackFunnelEvent('inapp_open_browser')} className={cls} style={style}><GoogleMark /> {label} in Chrome</a>
+        <p className="mt-1.5 text-center text-[11.5px]" style={{ color: '#87918E' }}>Google sign-in doesn't work inside {appName(iab)}, so this opens Chrome.</p>
+      </div>
+    );
+  }
+  return <InAppGoogleNote className={className} />;
+}
+
+/** iPhone inside Instagram / Facebook / TikTok: how to reach a browser where Google works. */
+export function InAppGoogleNote({ className = '' }: { className?: string }) {
+  const iab = inAppBrowser();
+  if (!iab) return null;
+  return (
+    <div className={`rounded-[14px] px-3.5 py-3 text-[12.5px] leading-snug ${className}`} style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.10)', color: '#F5F7F6' }}>
+      <span className="flex items-center gap-2 font-extrabold"><GoogleMark className="h-4 w-4" /> Google sign-in doesn't work inside {appName(iab)}</span>
+      <span className="mt-1 block" style={{ color: '#87918E' }}>Tap <b style={{ color: '#F5F7F6' }}>•••</b> at the top right, then <b style={{ color: '#F5F7F6' }}>Open in external browser</b>. Or use Lichess or email below.</span>
+    </div>
+  );
+}
+
+export function QuickSignup({ open, onClose, title, subtitle, returnTo, browserPath }: {
   open: boolean;
   onClose: () => void;
   title: string;
   subtitle?: string;
   /** Page to come back to after signup (defaults to the current page; null when the caller handles it). */
   returnTo?: string | null;
+  /** Inside Instagram etc.: the page (with whatever it needs in the link) to reopen in the phone's browser. */
+  browserPath?: string;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -68,11 +102,7 @@ export function QuickSignup({ open, onClose, title, subtitle, returnTo }: {
         <button type="button" onClick={onClose} aria-label="Close" className="absolute right-4 top-4 p-1" style={{ color: '#87918E' }}><X size={18} /></button>
         <p className="pr-6 text-[19px] font-black leading-tight text-white">{title}</p>
         <p className="mt-1 text-[13px]" style={{ color: '#87918E' }}>{subtitle ?? "Free, no credit card. You'll come straight back here."}</p>
-        <button type="button" onClick={startGoogleSignup}
-          className="mt-5 flex w-full items-center justify-center gap-3 rounded-[14px] py-3.5 text-[15px] font-extrabold"
-          style={{ background: '#FFFFFF', color: '#1F1F1F', boxShadow: '0 10px 26px -12px rgba(0,0,0,.6)' }}>
-          <GoogleMark /> Continue with Google
-        </button>
+        <GoogleSignupButton className="mt-5" path={browserPath} />
         <button type="button" onClick={startLichessSignup}
           className="mt-3 flex w-full items-center justify-center gap-3 rounded-[14px] py-3.5 text-[15px] font-extrabold"
           style={{ background: '#262421', color: '#FFFFFF', border: '1px solid rgba(255,255,255,.14)' }}>

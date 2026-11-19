@@ -34,6 +34,7 @@ export type LandingFunnelEvent =
   | 'guest_game_started' | 'guest_game_finished'
   | 'lichess_oauth_clicked' | 'lichess_signup_completed' | 'lichess_login_completed'
   | 'left_for_signin' | 'google_signin_cancelled' | 'google_signin_abandoned' | 'lichess_signin_abandoned'
+  | 'ig_games_shown' | 'inapp_open_browser'
   | 'scroll_25' | 'scroll_50' | 'scroll_75' | 'scroll_100'
   | 'engaged_10s'
   | 'pro_checkout_stripe' | 'pro_checkout_card' | 'pro_checkout_google_pay' | 'pro_checkout_apple_pay'

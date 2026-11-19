@@ -10,6 +10,8 @@ import { useUser } from '@/hooks/use-user';
 import { rememberReturnTo } from '@/components/QuickSignup';
 
 export const FREE_REVIEW_KEY = 'cs_free_review';
+/** A game picked before signing up (the Instagram page): reviewed as soon as the list loads. */
+export const FREE_REVIEW_REF_KEY = 'cs_free_review_ref';
 type Platform = 'chesscom' | 'lichess';
 type Pending = { platform: Platform; username: string };
 type Recent = { ref: string; white: string; black: string; whiteRating: number; blackRating: number; result: string; opening: string | null; playedAt: string; timeControl: string };
@@ -72,6 +74,15 @@ export default function FreeReview() {
       navigate(`/games/${d.gameId}`);
     } catch (e) { setErr(e instanceof Error ? e.message : 'Couldn’t start the review.'); } finally { setBusy(null); }
   };
+
+  // A game picked before signing up (the Instagram page): start its review straight away.
+  useEffect(() => {
+    if (!games?.length || busy || (status?.used && !status.pro)) return;
+    let ref: string | null = null;
+    try { ref = JSON.parse(localStorage.getItem(FREE_REVIEW_REF_KEY) || 'null'); localStorage.removeItem(FREE_REVIEW_REF_KEY); } catch { /* ignore */ }
+    const g = ref ? games.find((x) => x.ref === ref) : undefined;
+    if (g) void review(g);
+  }, [games, status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const me = who?.username.toLowerCase();
   const resultOf = (g: Recent) => (g.result === 'win' ? { t: 'Won', c: RD.green } : g.result === 'loss' ? { t: 'Lost', c: RD.red } : { t: 'Draw', c: RD.muted });
