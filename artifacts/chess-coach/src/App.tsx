@@ -160,6 +160,7 @@ const PricingPage = lazyRetry(() => import("@/pages/Pricing"));
 const ChesscomGamePage = lazyRetry(() => import("@/pages/ChesscomGame"));
 const FreeReviewPage = lazyRetry(() => import("@/pages/FreeReview"));
 const InstagramStartPage = lazyRetry(() => import("@/pages/InstagramStart"));
+const ShareTargetPage = lazyRetry(() => import("@/pages/ShareTarget"));
 const VsImproveMyChessPage = lazyRetry(() => import("@/pages/VsImproveMyChess"));
 const VsFreeAnalysisPage = lazyRetry(() => import("@/pages/VsFreeAnalysis"));
 const Dashboard = lazyRetry(() => import("@/pages/Dashboard").then(m => ({ default: m.Dashboard })));
@@ -631,6 +632,7 @@ function Router() {
       <Route path="/pricing" component={PricingPage} />
       <Route path="/review" component={FreeReviewPage} />
       <Route path="/instagram" component={InstagramStartPage} />
+      <Route path="/share" component={ShareTargetPage} />
       <Route path="/cc/:gameId" component={ChesscomGamePage} />
       <Route path="/vs/improve-my-chess" component={VsImproveMyChessPage} />
       <Route path="/vs/free-chess-analysis" component={VsFreeAnalysisPage} />

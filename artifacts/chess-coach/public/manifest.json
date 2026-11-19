@@ -1,7 +1,7 @@
 {
   "name": "ChessScout.net",
   "short_name": "ChessScout",
-  "description": "Smart chess coaching — scout opponents, analyze games, improve your play",
+  "description": "Smart chess coaching \u2014 scout opponents, analyze games, improve your play",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -37,5 +37,14 @@
   "categories": [
     "games",
     "education"
-  ]
+  ],
+  "share_target": {
+    "action": "/share",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
 }

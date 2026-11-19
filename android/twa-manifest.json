@@ -17,7 +17,10 @@
   "iconUrl": "https://chessscout.net/icons/icon-512.png?v=4",
   "maskableIconUrl": "https://chessscout.net/icons/icon-maskable-512.png?v=4",
   "splashScreenFadeOutDuration": 300,
-  "signingKey": { "path": "./android.keystore", "alias": "set-by-workflow" },
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "set-by-workflow"
+  },
   "appVersionName": "set-by-workflow",
   "appVersionCode": 1,
   "appVersion": "set-by-workflow",
@@ -26,7 +29,9 @@
   "webManifestUrl": "https://chessscout.net/manifest.json",
   "fallbackType": "customtabs",
   "features": {},
-  "alphaDependencies": { "enabled": false },
+  "alphaDependencies": {
+    "enabled": false
+  },
   "enableSiteSettingsShortcut": true,
   "isChromeOSOnly": false,
   "isMetaQuest": false,
@@ -34,5 +39,14 @@
   "minSdkVersion": 24,
   "fingerprints": [],
   "additionalTrustedOrigins": [],
-  "retainedBundles": []
+  "retainedBundles": [],
+  "shareTarget": {
+    "action": "/share",
+    "method": "GET",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  }
 }
