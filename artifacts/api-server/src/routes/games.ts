@@ -1787,7 +1787,12 @@ async function samedayNotify(userId: string, opts: { minGapMs?: number; quietMs?
   if (opts.quietMs && g.playedAt && Date.now() - new Date(g.playedAt).getTime() < opts.quietMs) return false;
   const side = await coachSideFor(g);
   const { gameMessage } = await import("../lib/gameNotify");
-  const msg = gameMessage({ id: g.id, result: g.result, username: g.username, white_username: g.whiteUsername, black_username: g.blackUsername, review_data: g.reviewData }, side ?? null);
+  // The sitting it belongs to: their Chess.com / Lichess games in the 6 hours before it.
+  const sat = await db.select({ result: gamesTable.result }).from(gamesTable)
+    .where(and(eq(gamesTable.userId, userId), sql`${gamesTable.platform} IN ('chesscom', 'lichess')`,
+      sql`${gamesTable.playedAt} > ${new Date(g.playedAt).toISOString()}::timestamptz - interval '6 hours'`, sql`${gamesTable.playedAt} <= ${new Date(g.playedAt).toISOString()}::timestamptz`));
+  const session = { games: sat.length, wins: sat.filter((x) => x.result === "win").length, losses: sat.filter((x) => x.result === "loss").length, draws: sat.filter((x) => x.result !== "win" && x.result !== "loss").length };
+  const msg = gameMessage({ id: g.id, result: g.result, username: g.username, white_username: g.whiteUsername, black_username: g.blackUsername, review_data: g.reviewData }, side ?? null, session);
   if (!msg) return false;
   let pushed = false, emailed = false;
   if (st.has_push) {
@@ -1795,7 +1800,8 @@ async function samedayNotify(userId: string, opts: { minGapMs?: number; quietMs?
     if (isPushConfigured()) pushed = ((await sendPushToUser(userId, { title: msg.title, body: msg.body, url: msg.url, tag: "cs:sameday" }).catch(() => ({ sent: 0 }))).sent ?? 0) > 0;
   }
   const recent = (t: string | null, days: number) => !!t && Date.now() - new Date(t).getTime() < days * 864e5;
-  if (!pushed && st.email && !st.email_opt_out && !recent(st.emailed_at, 3) && !recent(st.catchup_emailed, 3)) {
+  // No push: an email, at most every 2 days (was 3).
+  if (!pushed && st.email && !st.email_opt_out && !recent(st.emailed_at, 2) && !recent(st.catchup_emailed, 2)) {
     const { sendEmail } = await import("../lib/email");
     const { unsubscribeHeaders, unsubscribeUrl } = await import("../lib/emailPrefs");
     const { trackHtml } = await import("../lib/emailTracking");

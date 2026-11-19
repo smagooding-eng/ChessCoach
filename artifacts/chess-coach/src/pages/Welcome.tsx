@@ -143,9 +143,9 @@ export function Welcome() {
         )}
 
         <form onSubmit={submit} className="space-y-4">
-          <div className="rounded-xl p-3" style={{ background: 'rgba(129,182,76,0.10)', border: '1px solid rgba(129,182,76,0.35)' }}>
+          <div className="rounded-xl p-3" style={{ background: '#121B1D', border: '1px solid rgba(255,255,255,0.08)' }}>
             <p className="text-[13.5px] font-extrabold" style={{ color: TEXT_LIGHT }}>Where do you play?</p>
-            <p className="mt-0.5 text-[12px]" style={{ color: TEXT_MUTED }}>Add your Chess.com or Lichess name and we'll import your games and start reviewing them right away.</p>
+            <p className="mt-0.5 text-[12px]" style={{ color: TEXT_MUTED }}>Add your Chess.com or Lichess name: your last game is reviewed in about a minute, and every new one after that.</p>
           </div>
 
           <div className="space-y-1.5">

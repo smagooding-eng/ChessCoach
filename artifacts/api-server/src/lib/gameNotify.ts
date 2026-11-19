@@ -16,8 +16,16 @@ const label = (m: RM) => `${Math.floor(m.moveIndex / 2) + 1}${m.color === "white
 const worst = (ms: RM[]) => ms.filter((m) => BAD.includes(m.classification))
   .sort((a, b) => BAD.indexOf(a.classification) - BAD.indexOf(b.classification) || (b.cpLoss ?? 0) - (a.cpLoss ?? 0))[0];
 
+/** The games of the session the message is about (their side's results), for a line like
+ *  "4 games today: 3 wins, 1 loss." Only used when there was more than one. */
+export interface SessionTally { games: number; wins: number; losses: number; draws: number }
+const tallyLine = (t: SessionTally) => {
+  const parts = [t.wins && `${t.wins} win${t.wins > 1 ? "s" : ""}`, t.losses && `${t.losses} loss${t.losses > 1 ? "es" : ""}`, t.draws && `${t.draws} draw${t.draws > 1 ? "s" : ""}`].filter(Boolean);
+  return `${t.games} games today${parts.length ? `: ${parts.join(", ")}` : ""}.`;
+};
+
 /** The message for one reviewed game, or null when the review can't say anything specific. */
-export function gameMessage(g: NotifyGame, side: "white" | "black" | null): GameMessage | null {
+export function gameMessage(g: NotifyGame, side: "white" | "black" | null, session?: SessionTally | null): GameMessage | null {
   const rd = g.review_data as { moves?: RM[]; whiteAccuracy?: number; blackAccuracy?: number } | RM[] | null;
   const moves = (Array.isArray(rd) ? rd : rd?.moves ?? []).filter((m) => m && typeof m.moveIndex === "number");
   if (!side || !moves.length) return null;
@@ -48,6 +56,11 @@ export function gameMessage(g: NotifyGame, side: "white" | "black" | null): Game
     title = `Your draw with ${opp}`;
     body = missed.classification === "missed_win" ? `There was a win at ${label(missed)}. See it.` : `${label(missed)} let the advantage go. See the better move.`;
     lead = missed.classification === "missed_win" ? `There was a win at <strong>${escapeHtml(label(missed))}</strong>.` : `<strong>${escapeHtml(label(missed))}</strong> let the advantage go.`;
+  }
+  // Several games in one sitting: say so first, then the game that decided the most.
+  if (session && session.games > 1) {
+    body = `${tallyLine(session)} Latest: ${body}`;
+    lead = `${escapeHtml(tallyLine(session))} All reviewed. In your latest: ${lead}`;
   }
   return {
     title, body, url, subject: title,

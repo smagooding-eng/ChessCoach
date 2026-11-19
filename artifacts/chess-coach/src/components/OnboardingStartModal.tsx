@@ -89,10 +89,28 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
     }).catch((err) => fail(err instanceof Error ? err.message : 'Something went wrong importing your games.'));
   }, [status, username, platform]);
 
+  // The first day's moment of value: their own latest game, reviewed, straight away (not
+  // "check your dashboard in a couple of minutes"). Found once the import is ready.
+  const [latest, setLatest] = useState<{ id: number; opp: string } | null>(null);
+  useEffect(() => {
+    if (status !== 'ready') return;
+    void apiFetch('/api/games?limit=1', { credentials: 'include' }).then((r) => (r.ok ? r.json() : null)).then((d) => {
+      const g = d?.games?.[0] as { id: number; whiteUsername?: string; blackUsername?: string } | undefined;
+      if (!g || !mounted.current) return;
+      const me = (username ?? '').toLowerCase();
+      setLatest({ id: g.id, opp: (g.whiteUsername ?? '').toLowerCase() === me ? (g.blackUsername ?? 'your opponent') : (g.whiteUsername ?? 'your opponent') });
+    }).catch(() => {});
+  }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
   const finish = () => {
     trackFunnelEvent('onboarding_finished');
     onDone();
     navigate('/', { replace: true } as never);
+  };
+  const reviewLatest = () => {
+    if (!latest) return finish();
+    trackFunnelEvent('onboarding_finished');
+    onDone();
+    navigate(`/games/${latest.id}?review=1`, { replace: true } as never);
   };
 
   if (status === 'need-username') {
@@ -166,22 +184,29 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
         )}
         <div>
           <h2 className="text-xl font-black mb-2" style={{ color: TEXT_LIGHT }}>
-            {status === 'ready' ? "You're all set!" : 'Setting up your account'}
+            {status === 'ready' ? (latest ? 'Your last game is ready' : "You're all set!") : 'Bringing in your games'}
           </h2>
           <p className="text-sm leading-relaxed" style={{ color: TEXT_MUTED }}>
             {status === 'ready'
-              ? "Your games are imported and we're reviewing them now — check your dashboard in a couple minutes for your first weaknesses."
-              : "We're pulling your last 20 games and running a full analysis in the background — usually takes a minute or two."}
+              ? latest
+                ? `See your game against ${latest.opp} move by move: every mistake marked, and the better move shown. The rest of your games are being reviewed too.`
+                : 'Your games are in and being reviewed now.'
+              : 'Pulling in your recent games. Usually under a minute.'}
           </p>
         </div>
 
-        <button
-          onClick={finish}
-          className="w-full py-3.5 rounded-[14px] font-extrabold text-[15px]"
-          style={BTN}
-        >
-          Go to my dashboard
-        </button>
+        {status === 'ready' && latest ? (
+          <>
+            <button onClick={reviewLatest} className="w-full py-3.5 rounded-[14px] font-extrabold text-[15px]" style={BTN}>
+              Review my last game
+            </button>
+            <button onClick={finish} className="w-full text-[13px] font-bold underline" style={{ color: TEXT_MUTED }}>Go to my dashboard instead</button>
+          </>
+        ) : (
+          <button onClick={finish} className="w-full py-3.5 rounded-[14px] font-extrabold text-[15px]" style={BTN}>
+            Go to my dashboard
+          </button>
+        )}
         <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Your games keep importing in the background.</p>
       </div>
     </div>
