@@ -1543,6 +1543,12 @@ let reviewServicesStarted = false;
  *  database is made to refuse a second copy. The schema always declared this, but the
  *  live database never had the rule. */
 async function dedupeExternalGames(): Promise<void> {
+  // Once the database refuses second copies (the unique indexes exist), these full-table
+  // passes have nothing left to do -- and on a 240k-game table they tied the database up for
+  // minutes after every deploy, so the app couldn't load games.
+  const have = rowsOfAny<{ n: number }>(await db.execute(sql`SELECT count(*)::int AS n FROM pg_indexes
+    WHERE tablename = 'games' AND indexname IN ('games_user_lichess_unique', 'games_user_chesscom_unique')`).catch(() => ({ rows: [] })));
+  if ((have[0]?.n ?? 0) >= 2) return;
   for (const col of ["lichess_game_id", "chesscom_game_id"] as const) {
     const c = sql.raw(col);
     const rank = sql`ROW_NUMBER() OVER (PARTITION BY user_id, ${c} ORDER BY (review_data IS NOT NULL) DESC, COALESCE(via_chessscout, false) DESC, id ASC)`;
@@ -1559,13 +1565,20 @@ async function dedupeExternalGames(): Promise<void> {
       await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS ${idx} ON games (user_id, ${c}) WHERE ${c} IS NOT NULL`);
     } catch (err) { appLogger.warn({ err, col }, "[games] duplicate clean-up failed"); }
   }
-  // Copies that lost their Lichess id but are the same game (same link, same players)
+  // (Copies that lost their Lichess id are the same moves, so removeSameGameCopies finds
+  // them, one member at a time; the old all-members LIKE join here was far too slow.)
+}
+
+/** The duplicate clean-ups, at most once a day (not on every deploy). */
+async function runCleanupOncePerDay(): Promise<void> {
   try {
-    await db.execute(sql`DELETE FROM games n USING games k
-      WHERE n.user_id = k.user_id AND n.id <> k.id AND n.platform = 'lichess' AND n.lichess_game_id IS NULL
-        AND k.lichess_game_id IS NOT NULL AND n.pgn LIKE '%lichess.org/' || k.lichess_game_id || '%'
-        AND lower(n.white_username) = lower(k.white_username) AND lower(n.black_username) = lower(k.black_username)`);
-  } catch (err) { appLogger.warn({ err }, "[games] id-less duplicate clean-up failed"); }
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS history_backfill_meta (k VARCHAR(32) PRIMARY KEY, v TEXT)`);
+    const [last] = rowsOfAny<{ v: string }>(await db.execute(sql`SELECT v FROM history_backfill_meta WHERE k = 'dedupe_at'`));
+    if (last && Date.now() - Number(last.v) < 24 * 3600_000) return;
+    await db.execute(sql`INSERT INTO history_backfill_meta (k, v) VALUES ('dedupe_at', ${String(Date.now())}) ON CONFLICT (k) DO UPDATE SET v = EXCLUDED.v`);
+    await dedupeExternalGames();
+    await removeSameGameCopies(appLogger);
+  } catch (err) { appLogger.warn({ err }, "[games] clean-up skipped"); }
 }
 
 export async function startReviewServices(): Promise<void> {
@@ -1575,7 +1588,7 @@ export async function startReviewServices(): Promise<void> {
   // ids or none (same players, same moves)
   // Not right at start-up: a new server must answer Render's health check first (these
   // read through months of games).
-  setTimeout(() => { void dedupeExternalGames().then(() => removeSameGameCopies(appLogger)); }, 6 * 60_000).unref();
+  setTimeout(() => { void runCleanupOncePerDay(); }, 6 * 60_000).unref();
   void startCatchupReviews().catch((err) => appLogger.warn({ err }, "catch-up reviews failed to start"));
   void startSamedayReviews().catch((err) => appLogger.warn({ err }, "same-day reviews failed to start"));
   await db.execute(sql`CREATE TABLE IF NOT EXISTS review_after_upgrade (
