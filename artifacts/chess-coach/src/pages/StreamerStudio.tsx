@@ -1,4 +1,4 @@
-// Streamer Studio (admin-only, Features in Development).
+// Streamer Studio (Pro members; the avatar characters and the voice changer are admin-only).
 // A stage the streamer arranges: board (a ChessScout page or any captured window),
 // camera (raw or face-hidden), and a name tag. Voice changer on the mic.
 // Record to a file here; stream through OBS / Discord using Go live (full screen).
@@ -21,7 +21,8 @@ import {
   type MojiLook,
 } from '@/lib/streamer/mojiHead';
 import { SpriteAvatar } from '@/lib/streamer/spriteAvatar';
-import { drawComposite, drawBoardPanel, drawReviewNotes, splitBoardPanel, headSizes, type BoardFeed, type TextRun, type ReviewNotes } from '@/lib/streamer/compositor';
+import { drawComposite, drawBoardPanel, drawReviewNotes, splitBoardPanel, headSizes, withPartnerPanel, type BoardFeed, type TextRun, type ReviewNotes } from '@/lib/streamer/compositor';
+import { CoStreamLink, VoiceMixer } from '@/lib/streamer/costream';
 import { CloudRecorder, type RecStatus } from '@/lib/streamer/recorder';
 import { LiveHost } from '@/lib/streamer/live';
 import { apiFetch } from '@/lib/api';
@@ -160,8 +161,37 @@ function Note({ children }: { children: ReactNode }) {
   return <p className="text-[12px] leading-relaxed mt-2" style={{ color: RD.muted }}>{children}</p>;
 }
 
-export default function StreamerStudio() {
-  const [s, setS] = useState<Settings>(loadSettings);
+/** Pro members and admins; everyone else gets a short note with the way to Pro (no popup). */
+export default function StreamerStudioGate() {
+  const { isPremium, authUser, isAuthLoading } = useUser();
+  if (isAuthLoading) return null;
+  if (!isPremium && !authUser?.isAdmin) {
+    return (
+      <div className="min-h-screen grid place-items-center p-6" style={{ background: BG, color: RD.text }}>
+        <div className="w-full max-w-md rounded-2xl p-6 text-center" style={{ background: CARD, border: `1px solid ${RD.border}` }}>
+          <h1 className="text-xl font-extrabold">Streamer Studio</h1>
+          <p className="mt-2 text-sm" style={{ color: RD.muted }}>
+            Stream and record your games with your board, camera and name on one stage, and co-stream a match with your opponent.
+            Streamer Studio is part of ChessScout Pro.
+          </p>
+          <div className="mt-4 flex justify-center gap-2">
+            <Link href="/subscription?from=studio" className="rounded-xl px-4 py-2.5 text-sm font-extrabold" style={{ background: RD.green, color: '#06110A' }}>See Pro</Link>
+            <Link href="/" className="rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: CARD_LIGHT, color: RD.text }}>Back</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return <StreamerStudio admin={!!authUser?.isAdmin} />;
+}
+
+function StreamerStudio({ admin }: { admin: boolean }) {
+  // Without admin: no avatar characters and no voice changer (settings saved on a shared
+  // device by an admin don't carry them over either).
+  const [s, setS] = useState<Settings>(() => {
+    const x = loadSettings();
+    return admin ? x : { ...x, disguise: x.disguise === 'character' || x.disguise === 'moji' ? 'none' : x.disguise, voice: 'off' };
+  });
   const sRef = useRef(s); sRef.current = s;
   const set = useCallback((patch: Partial<Settings>) => setS((p) => ({ ...p, ...patch })), []);
   const pinch = useRef<{ d: number; s: number } | null>(null);
@@ -369,6 +399,72 @@ export default function StreamerStudio() {
     } catch { flash('Microphone blocked or not found. Allow mic access in the browser and try again.'); setVoiceOn(false); }
   }, [flash, refreshDevices]);
   const stopVoice = useCallback(() => { voice.current.stop(); setVoiceOn(false); }, []);
+
+  // ---- co-streaming with the player you're facing ----
+  // Your camera panel + voice go to them, theirs come to you (see lib/streamer/costream).
+  const partnerVideo = useRef<HTMLVideoElement | null>(null);
+  const partnerAudio = useRef<HTMLAudioElement>(null);
+  const [hearPartner, setHearPartner] = useState(true);
+  const [, setCoTick] = useState(0);
+  const coLink = useRef<CoStreamLink | null>(null);
+  if (!coLink.current) {
+    coLink.current = new CoStreamLink(async () => {
+      if (!voice.current.running) await startVoice();
+      const cv = camCanvas.current as (HTMLCanvasElement & { captureStream?: (fps?: number) => MediaStream }) | null;
+      const out = new MediaStream();
+      const v = cv?.captureStream?.(24).getVideoTracks()[0];
+      if (v) out.addTrack(v);
+      const a = voice.current.stream?.getAudioTracks()[0];
+      if (a) out.addTrack(a);
+      return out;
+    });
+  }
+  const co = coLink.current;
+  useEffect(() => {
+    co.onChange = () => setCoTick((n) => n + 1);
+    co.start();
+    return () => { co.onChange = null; co.stop(); };
+  }, [co]);
+  const coPartner = co.state?.status === 'active' && co.partnerStream ? co.partnerStream : null;
+  const coOnStage = !!coPartner && !edit; // laying out panels: your own camera panel only
+  const coRef = useRef({ on: false, name: '' });
+  coRef.current = { on: coOnStage, name: co.state?.partner ?? '' };
+  useEffect(() => {
+    if (partnerVideo.current && partnerVideo.current.srcObject !== coPartner) { partnerVideo.current.srcObject = coPartner; void partnerVideo.current.play().catch(() => {}); }
+    if (partnerAudio.current && partnerAudio.current.srcObject !== coPartner) { partnerAudio.current.srcObject = coPartner; void partnerAudio.current.play().catch(() => {}); }
+  }, [coPartner]);
+  // Your mic restarted (or turned on) mid co-stream: reconnect so they hear the new one
+  const lastVoiceOn = useRef(voiceOn);
+  useEffect(() => {
+    if (lastVoiceOn.current !== voiceOn) { lastVoiceOn.current = voiceOn; if (voiceOn) void co.refresh(); }
+  }, [voiceOn, co]);
+  // Both voices in what's recorded and broadcast
+  const mixer = useRef(new VoiceMixer());
+  useEffect(() => { mixer.current.setInputs([voice.current.stream, coPartner]); }, [voiceOn, coPartner]);
+  useEffect(() => () => mixer.current.close(), []);
+  // An opponent to invite: the live game you're in now (checked every few seconds)
+  const [liveOpp, setLiveOpp] = useState<{ name: string; bot: boolean } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const check = () => apiFetch('/api/live/active-game', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!alive) return;
+        const g = d?.game; const col = d?.color;
+        if (!g || g.status !== 'active') { setLiveOpp(null); return; }
+        const opp = col === 'w' ? g.black : g.white;
+        setLiveOpp(opp ? { name: opp.username, bot: !!opp.isBot } : null);
+      })
+      .catch(() => {});
+    void check();
+    const t = window.setInterval(check, 5000);
+    return () => { alive = false; window.clearInterval(t); };
+  }, []);
+  const [coBusy, setCoBusy] = useState(false);
+  const coDo = async (f: () => Promise<unknown>) => {
+    setCoBusy(true);
+    try { await f(); } catch (e) { flash((e as Error).message || 'Something went wrong'); } finally { setCoBusy(false); }
+  };
   const [testing, setTesting] = useState<'rec' | 'play' | null>(null);
   const testVoice = useCallback(async () => {
     if (!voice.current.running) await startVoice();
@@ -638,8 +734,10 @@ export default function StreamerStudio() {
       let board: BoardFeed = { kind: 'none' };
       if (st.boardSource === 'screen' && screenVideo.current && screenVideo.current.videoWidth) board = { kind: 'video', video: screenVideo.current, zoom: st.zoom, panX: st.panX, panY: st.panY };
       else if ((st.boardSource === 'app' || st.boardSource === 'follow') && feed.current) board = { kind: 'fen', ...feed.current };
+      const coNow = coRef.current;
       drawComposite(c, W, H, {
-        layout: st.layout, board, cam: camCanvas.current, name: st.name, subtitle: st.subtitle,
+        layout: coNow.on ? withPartnerPanel(st.layout, W, H) : st.layout, board, cam: camCanvas.current, name: st.name, subtitle: st.subtitle,
+        partner: coNow.on && partnerVideo.current ? { video: partnerVideo.current, name: coNow.name, myName: st.name } : null,
         light: looks.current.light, dark: looks.current.dark, pieceSrc: looks.current.pieceSrc,
         live: host.current.live, head: headRef.current, notes: showNotesRef.current ? notesRef.current : null,
       });
@@ -654,8 +752,12 @@ export default function StreamerStudio() {
     if (!cv?.captureStream) { flash('This browser can’t record the stage. Try Chrome.'); return null; }
     if (!voice.current.running) await startVoice();
     const ms = cv.captureStream(30);
-    const a = voice.current.stream?.getAudioTracks()[0];
-    if (a) ms.addTrack(a); else flash('No microphone: recording without sound. Allow the mic in the Voice tab.');
+    // Your voice, plus your co-stream partner's when you're streaming together
+    const hasMic = !!voice.current.stream?.getAudioTracks()[0];
+    mixer.current.setInputs([voice.current.stream, coLink.current?.partnerStream]);
+    const a = mixer.current.track();
+    if (a) ms.addTrack(a);
+    if (!hasMic) flash('No microphone: recording without your voice. Allow the mic in the Voice tab.');
     return ms;
   }, [flash, startVoice]);
 
@@ -992,8 +1094,10 @@ export default function StreamerStudio() {
     ifLeft = Math.min(0, -(VIRTUAL_W * ifScale - boardRect.width) * s.panX);
     ifTop = Math.min(0, -(VIRTUAL_H * ifScale - boardRect.height) * s.panY);
   }
+  // Co-streaming: your camera panel shares its space with your partner's (not while laying out)
+  const lay = coOnStage ? withPartnerPanel(s.layout, stage.w, stage.h) : s.layout;
   const panel = (id: PanelId, label: string, children: ReactNode) => {
-    const r = s.layout[id];
+    const r = lay[id];
     if (r.hidden && !edit) return null;
     return (
       <div key={id} className="absolute overflow-hidden" style={{ ...px(r), zIndex: r.z, opacity: r.hidden ? 0.35 : 1, borderRadius: r.round ? '50%' : 0, boxShadow: r.round ? `0 0 0 3px ${RD.green}, 0 8px 24px rgba(0,0,0,.6)` : undefined }}>
@@ -1068,8 +1172,16 @@ export default function StreamerStudio() {
             onTouchStart={(e) => { if (e.touches.length === 2 && sRef.current.disguise === 'character') pinch.current = { d: Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY), s: sRef.current.charScale }; }}
             onTouchMove={(e) => { const p = pinch.current; if (!p || e.touches.length !== 2) return; const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); set({ charScale: Math.min(3.2, Math.max(0.6, +(p.s * d / p.d).toFixed(2))) }); }}
             onTouchEnd={() => { pinch.current = null; }} />
+          {coOnStage && <CoName name={s.name} round={!!lay.cam.round} />}
         </div>
       ))}
+      {coOnStage && 'partner' in lay && (
+        <div className="absolute overflow-hidden" style={{ ...px(lay.partner), zIndex: lay.partner.z, borderRadius: lay.partner.round ? '50%' : 0, background: '#050A0B', boxShadow: lay.partner.round ? `0 0 0 3px ${RD.green}, 0 8px 24px rgba(0,0,0,.6)` : undefined }}>
+          <video autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover"
+            ref={(el) => { partnerVideo.current = el; if (el && el.srcObject !== coPartner) { el.srcObject = coPartner; void el.play().catch(() => {}); } }} />
+          <CoName name={co.state?.partner ?? ''} round={!!lay.partner.round} />
+        </div>
+      )}
       {headRef.current && panel('head', 'Headline', (() => {
         const hr = px(s.layout.head), fz = headSizes(hr.width, hr.height);
         return (
@@ -1095,6 +1207,8 @@ export default function StreamerStudio() {
   // hidden video element that feeds the camera canvas
   const hiddenVideo = (<>
     <video ref={camVideo} muted playsInline style={{ position: 'fixed', width: 1, height: 1, opacity: 0, pointerEvents: 'none', left: -10, top: -10 }} />
+    {/* Your co-stream partner's voice, so you hear each other (mute it in Go live) */}
+    <audio ref={partnerAudio} autoPlay muted={!hearPartner} />
     <canvas ref={outCanvas} width={720} height={1280} style={{ position: 'fixed', width: 2, height: 2, opacity: 0.01, pointerEvents: 'none', left: 0, top: 0 }} />
   </>);
 
@@ -1110,9 +1224,9 @@ export default function StreamerStudio() {
       {hiddenVideo}
       <div className={clean ? 'flex-1 flex flex-col min-w-0' : 'flex flex-col lg:flex-1 min-w-0 p-3 gap-3'}>
         {!clean && <div className="flex flex-wrap items-center gap-2">
-          <Link href="/admin" className="text-sm font-semibold px-3 py-1.5 rounded-lg" style={{ background: CARD_LIGHT, color: RD.text }}>← Admin</Link>
+          <Link href={admin ? '/admin' : '/'} className="text-sm font-semibold px-3 py-1.5 rounded-lg" style={{ background: CARD_LIGHT, color: RD.text }}>← {admin ? 'Admin' : 'Back'}</Link>
           <h1 className="font-extrabold text-lg">Streamer Studio</h1>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: RD.gold, color: '#050A0B' }}>IN DEVELOPMENT</span>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: RD.gold, color: '#050A0B' }}>BETA</span>
           <div className="w-full sm:w-auto sm:ml-auto flex gap-2">
             <button onClick={() => setEdit((v) => !v)} className="px-3 py-1.5 rounded-lg text-sm font-bold" style={edit ? { background: RD.green, color: '#06110A' } : { background: CARD_LIGHT, color: RD.text }}>{edit ? 'Done' : 'Move & resize'}</button>
             <button onClick={() => void goLive()} className="px-3 py-1.5 rounded-lg text-sm font-bold" style={{ background: RD.red, color: '#fff' }}>◉ Go live</button>
@@ -1126,6 +1240,26 @@ export default function StreamerStudio() {
           </div>
         </div>}
         {!clean && msg && <div className="text-sm px-3 py-2 rounded-lg" style={card}>{msg}</div>}
+        {!clean && co.state && (
+          <div className="flex flex-wrap items-center gap-2 text-sm px-3 py-2 rounded-lg" style={{ ...card, border: `1px solid ${co.state.status === 'active' ? RD.green : RD.border}` }}>
+            {co.state.status === 'invited' && !co.state.invitedByMe && (<>
+              <span className="flex-1 min-w-0"><b>{co.state.partner}</b> wants to stream this match together. You'll see and hear each other, and both of you appear on both streams.</span>
+              <button disabled={coBusy} onClick={() => void coDo(() => co.accept(s.name))} className="px-3 py-1.5 rounded-lg font-bold disabled:opacity-60" style={{ background: RD.green, color: '#06110A' }}>Stream together</button>
+              <button disabled={coBusy} onClick={() => void coDo(() => co.end())} className="px-3 py-1.5 rounded-lg font-bold disabled:opacity-60" style={{ background: CARD_LIGHT, color: RD.text }}>No thanks</button>
+            </>)}
+            {co.state.status === 'invited' && co.state.invitedByMe && (<>
+              <span className="flex-1 min-w-0">Waiting for <b>{co.state.partner}</b> to accept in their Streamer Studio…</span>
+              <button disabled={coBusy} onClick={() => void coDo(() => co.end())} className="px-3 py-1.5 rounded-lg font-bold disabled:opacity-60" style={{ background: CARD_LIGHT, color: RD.text }}>Cancel</button>
+            </>)}
+            {co.state.status === 'active' && (<>
+              <span className="flex-1 min-w-0">
+                🎙️ Streaming together with <b>{co.state.partner}</b> · {co.link === 'connected' ? 'connected' : co.link === 'failed' ? 'reconnecting…' : 'connecting…'}
+              </span>
+              <button onClick={() => setHearPartner((v) => !v)} className="px-3 py-1.5 rounded-lg font-bold" style={{ background: CARD_LIGHT, color: RD.text }}>{hearPartner ? `🔈 Mute ${co.state.partner}` : `🔇 Hear ${co.state.partner}`}</button>
+              <button disabled={coBusy} onClick={() => void coDo(() => co.end())} className="px-3 py-1.5 rounded-lg font-bold disabled:opacity-60" style={{ background: CARD_LIGHT, color: RD.text }}>End co-stream</button>
+            </>)}
+          </div>
+        )}
         <div ref={areaRef} className={clean ? 'flex-1 flex items-center justify-center' : 'flex-1 flex items-center justify-center min-h-[60vh] lg:min-h-0'}>{stageEl}</div>
       </div>
       {clean && <button aria-label="Exit" onDoubleClick={endLive} className="absolute top-0 right-0 w-20 h-20 opacity-0" />}
@@ -1264,8 +1398,8 @@ export default function StreamerStudio() {
 
             <Label>Hide my face</Label>
             <div className="flex flex-wrap gap-2">
-              <Chip on={s.disguise === 'character'} onClick={() => set({ disguise: 'character' })}>🧔 My character</Chip>
-              <Chip on={s.disguise === 'moji'} onClick={() => set({ disguise: 'moji' })}>🙂 3D cartoon head</Chip>
+              {admin && <Chip on={s.disguise === 'character'} onClick={() => set({ disguise: 'character' })}>🧔 My character</Chip>}
+              {admin && <Chip on={s.disguise === 'moji'} onClick={() => set({ disguise: 'moji' })}>🙂 3D cartoon head</Chip>}
               <Chip on={s.disguise === 'pixelate'} onClick={() => set({ disguise: 'pixelate' })}>▦ Pixelate face</Chip>
               <Chip on={s.disguise === 'blur'} onClick={() => set({ disguise: 'blur' })}>◌ Blur face</Chip>
               <Chip on={s.disguise === 'none'} onClick={() => set({ disguise: 'none' })}>🙂 Show my face</Chip>
@@ -1367,6 +1501,7 @@ export default function StreamerStudio() {
             <div className="mt-3 h-2 rounded-full overflow-hidden" style={{ background: CARD_LIGHT }}>
               <div className="h-full transition-[width] duration-100" style={{ width: `${Math.round(level * 100)}%`, background: RD.green }} />
             </div>
+            {admin && (<>
             <Label>Voice</Label>
             {VOICE_GROUPS.map((g) => (
               <div key={g.title} className="mb-2">
@@ -1390,7 +1525,7 @@ export default function StreamerStudio() {
               {testing === 'rec' ? '🔴 Say something… (4 seconds)' : testing === 'play' ? '🔊 Playing it back…' : '🎧 Test my voice'}
             </button>
             <Note>Records 4 seconds with the voice you picked and plays it back, so you can hear how you’ll sound without an echo.</Note>
-            <Label>Send my changed voice to</Label>
+            <Label>{admin ? 'Send my changed voice to' : 'Send my voice to'}</Label>
             <select value={s.output} onChange={(e) => set({ output: e.target.value })} className="w-full px-3 py-2 rounded-lg text-sm" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }}>
               <option value="none">Recordings only</option>
               <option value="default">My speakers / headphones (hear myself)</option>
@@ -1401,11 +1536,26 @@ export default function StreamerStudio() {
               pick <b>CABLE Input</b> here, then pick <b>CABLE Output</b> as your microphone in that app. Only the changed voice leaves your computer.
               Use headphones if you choose your speakers, or you’ll hear an echo.
             </Note>
+            </>)}
           </>)}
 
           {tab === 'videos' && <VideosPanel refreshKey={videosKey} onError={flash} />}
 
           {tab === 'live' && (<>
+            <Label>Stream together</Label>
+            {co.state?.status === 'active' ? (
+              <Note>You're co-streaming with <b>{co.state.partner}</b>: both of you appear on both streams, with both voices. {co.state.partnerLive ? `${co.state.partner} is live too; viewers can switch between your two views on chessscout.net/streams.` : ''}</Note>
+            ) : co.state ? (
+              <Note>{co.state.invitedByMe ? `Invite sent to ${co.state.partner}.` : `${co.state.partner} invited you: answer at the top of the studio.`}</Note>
+            ) : liveOpp && !liveOpp.bot ? (<>
+              <button disabled={coBusy} onClick={() => void coDo(async () => { const who = await co.invite(s.name); flash(`Invite sent to ${who}. They accept in their Streamer Studio.`); })}
+                className="w-full py-2.5 rounded-xl font-extrabold text-sm disabled:opacity-60" style={{ background: RD.green, color: '#06110A' }}>
+                Invite {liveOpp.name} to stream this match together
+              </button>
+              <Note>You'll see and hear each other, and both of you appear on both streams. They need Streamer Studio open (Pro) to accept. Use headphones so your partner doesn't hear themselves.</Note>
+            </>) : (
+              <Note>{liveOpp?.bot ? 'You’re playing a bot. ' : ''}Start a live game against a person (Board → Live game), then invite them here to stream the match together.</Note>
+            )}
             <button onClick={() => void goLive()} className="w-full py-3 rounded-xl font-extrabold text-base" style={{ background: RD.red, color: '#fff' }}>◉ Go live (full screen)</button>
             <Label>When I go live</Label>
             <div className="flex flex-wrap gap-2">
@@ -1413,7 +1563,7 @@ export default function StreamerStudio() {
               <Chip on={s.recordLive} onClick={() => set({ recordLive: !s.recordLive })}>● Save a recording</Chip>
             </div>
             <input value={s.title} onChange={(e) => set({ title: e.target.value.slice(0, 80) })} placeholder="Stream title (optional)" className="mt-2 w-full px-3 py-2 rounded-lg text-sm" style={{ background: CARD_LIGHT, color: RD.text, border: `1px solid ${RD.border}` }} />
-            <Note>Viewers watch on chessscout.net (Admin → Live streams while this is in development). They see your stage and hear your changed voice; your mic turns on automatically. Recordings are saved to chessscout.net with sound and show up in the Videos tab.</Note>
+            <Note>Viewers watch on chessscout.net/streams. They see your stage and hear your {admin ? 'changed ' : ''}voice; your mic turns on automatically. Recordings are saved to chessscout.net with sound and show up in the Videos tab.</Note>
             <Label>Record without going live</Label>
             <div className="flex flex-wrap gap-2">
               <Chip on={false} onClick={() => void startCloudRecording()}>● Record to chessscout.net</Chip>
@@ -1461,7 +1611,7 @@ function VideosPanel({ refreshKey, onError }: { refreshKey: number; onError: (m:
   const [confirmDel, setConfirmDel] = useState<string | null>(null);
   const load = useCallback(async () => {
     try {
-      const r = await apiFetch('/api/admin/stream-recordings', { credentials: 'include' });
+      const r = await apiFetch('/api/stream-recordings', { credentials: 'include' });
       const j = (await r.json()) as { recordings?: SavedVideo[]; error?: string };
       if (!r.ok) throw new Error(j.error || 'failed');
       setList(j.recordings ?? []);
@@ -1470,7 +1620,7 @@ function VideosPanel({ refreshKey, onError }: { refreshKey: number; onError: (m:
   useEffect(() => { void load(); }, [load, refreshKey]);
   const open = async (id: string, download: boolean) => {
     try {
-      const r = await apiFetch(`/api/admin/stream-recordings/${id}/url${download ? '?download=1' : ''}`, { credentials: 'include' });
+      const r = await apiFetch(`/api/stream-recordings/${id}/url${download ? '?download=1' : ''}`, { credentials: 'include' });
       const j = (await r.json()) as { url?: string; error?: string };
       if (!r.ok || !j.url) throw new Error(j.error || 'failed');
       if (download) { const a = document.createElement('a'); a.href = j.url; document.body.appendChild(a); a.click(); a.remove(); }
@@ -1478,7 +1628,7 @@ function VideosPanel({ refreshKey, onError }: { refreshKey: number; onError: (m:
     } catch { onError('Couldn’t open that video.'); }
   };
   const del = async (id: string) => {
-    try { await apiFetch(`/api/admin/stream-recordings/${id}`, { method: 'DELETE', credentials: 'include' }); } catch { /* ignore */ }
+    try { await apiFetch(`/api/stream-recordings/${id}`, { method: 'DELETE', credentials: 'include' }); } catch { /* ignore */ }
     setConfirmDel(null); if (playing?.id === id) setPlaying(null); void load();
   };
   const fmt = (ms: number) => { const sec = Math.round(ms / 1000); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; };
@@ -1513,3 +1663,13 @@ function VideosPanel({ refreshKey, onError }: { refreshKey: number; onError: (m:
   );
 }
 
+/** A player's name on their camera panel while co-streaming (on screen; the stage canvas draws its own). */
+function CoName({ name, round }: { name: string; round: boolean }) {
+  if (!name) return null;
+  return (
+    <span className="absolute z-[3] max-w-[80%] truncate rounded-md px-2 py-0.5 text-[12px] font-extrabold pointer-events-none"
+      style={{ background: 'rgba(5,10,11,.82)', color: '#F5F7F6', ...(round ? { left: '50%', bottom: '8%', transform: 'translateX(-50%)' } : { left: 6, bottom: 6 }) }}>
+      {name}
+    </span>
+  );
+}

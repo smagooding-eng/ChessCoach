@@ -1,4 +1,4 @@
-// Streamer Studio (admin-only while in development):
+// Streamer Studio (Pro members and admins; watching is open to anyone signed in):
 //  - stream recordings, uploaded in parts while recording (R2 multipart) so long videos
 //    never sit in the server's memory; played back / downloaded through short-lived R2 links
 //  - live streams on chessscout.net: the streamer's browser sends video+voice straight to
@@ -18,10 +18,24 @@ import { objectStorageClient } from "../lib/objectStorage";
 
 const router: IRouter = Router();
 
-function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  if (!req.isAuthenticated() || !req.user?.isAdmin) { res.status(403).json({ error: "Admin access required" }); return; }
+// The studio (recording, going live, co-streaming): Pro members and admins.
+async function requireStudio(req: Request, res: Response, next: NextFunction) {
+  if (!req.isAuthenticated() || !req.user) { res.status(401).json({ error: "Sign in first" }); return; }
+  if (req.user.isAdmin) { next(); return; }
+  try {
+    const { hasFullAccess } = await import("../lib/accessControl");
+    if ((await hasFullAccess(String(req.user.id))).full) { next(); return; }
+  } catch { /* fall through */ }
+  res.status(403).json({ error: "Streamer Studio is part of ChessScout Pro." });
+}
+// Watching a live stream: anyone signed in.
+function requireMember(req: Request, res: Response, next: NextFunction) {
+  if (!req.isAuthenticated() || !req.user) { res.status(401).json({ error: "Sign in to watch" }); return; }
   next();
 }
+const isAdmin = (req: Request) => !!req.user?.isAdmin;
+// Every route answers at its old /admin/ path too (older studio pages still open).
+const both = (p: string) => [`/admin${p}`, p];
 
 function bucketAndPrefix(): { bucket: string; prefix: string } {
   const dir = (process.env.PRIVATE_OBJECT_DIR || "").replace(/^\/+/, "").replace(/\/+$/, "");
@@ -46,13 +60,16 @@ const ensureTable = () => (tableReady ??= db.execute(sql`CREATE TABLE IF NOT EXI
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 )`).catch((e) => { tableReady = null; throw e; }));
 
-async function getRec(id: string) {
+async function getRec(id: string, req?: Request) {
   const r = rowsOf(await db.execute(sql`SELECT * FROM stream_recordings WHERE id = ${id}`));
-  return r[0] as { id: string; user_id: string; object_key: string; upload_id: string | null; mime: string; status: string } | undefined;
+  const rec = r[0] as { id: string; user_id: string; object_key: string; upload_id: string | null; mime: string; status: string } | undefined;
+  // A member's own recordings only (admins: anyone's)
+  if (rec && req && !isAdmin(req) && rec.user_id !== String(req.user?.id)) return undefined;
+  return rec;
 }
 
 // Start a recording upload
-router.post("/admin/stream-recordings", requireAdmin, async (req: Request, res: Response) => {
+router.post(both("/stream-recordings"), requireStudio, async (req: Request, res: Response) => {
   try {
     await ensureTable();
     const mime = String(req.body?.mime || "video/webm").slice(0, 80);
@@ -72,10 +89,10 @@ router.post("/admin/stream-recordings", requireAdmin, async (req: Request, res: 
 });
 
 // One part (5MB+ except the last), raw bytes
-router.put("/admin/stream-recordings/:id/parts/:n", requireAdmin, express.raw({ type: () => true, limit: "16mb" }), async (req: Request, res: Response) => {
+router.put(both("/stream-recordings/:id/parts/:n"), requireStudio, express.raw({ type: () => true, limit: "16mb" }), async (req: Request, res: Response) => {
   try {
     await ensureTable();
-    const rec = await getRec(String(req.params.id));
+    const rec = await getRec(String(req.params.id), req);
     const n = Number(req.params.n);
     if (!rec || rec.status !== "uploading" || !rec.upload_id) { res.status(404).json({ error: "Recording not found" }); return; }
     if (!Number.isInteger(n) || n < 1 || n > 10000) { res.status(400).json({ error: "Bad part number" }); return; }
@@ -91,10 +108,10 @@ router.put("/admin/stream-recordings/:id/parts/:n", requireAdmin, express.raw({ 
   }
 });
 
-router.post("/admin/stream-recordings/:id/complete", requireAdmin, async (req: Request, res: Response) => {
+router.post(both("/stream-recordings/:id/complete"), requireStudio, async (req: Request, res: Response) => {
   try {
     await ensureTable();
-    const rec = await getRec(String(req.params.id));
+    const rec = await getRec(String(req.params.id), req);
     if (!rec || !rec.upload_id) { res.status(404).json({ error: "Recording not found" }); return; }
     const parts = (Array.isArray(req.body?.parts) ? req.body.parts : []) as { n: number; etag: string }[];
     if (!parts.length) { res.status(400).json({ error: "No parts" }); return; }
@@ -119,10 +136,10 @@ async function removeRec(rec: { id: string; object_key: string; upload_id: strin
   await db.execute(sql`DELETE FROM stream_recordings WHERE id = ${rec.id}`);
 }
 
-router.delete("/admin/stream-recordings/:id", requireAdmin, async (req: Request, res: Response) => {
+router.delete(both("/stream-recordings/:id"), requireStudio, async (req: Request, res: Response) => {
   try {
     await ensureTable();
-    const rec = await getRec(String(req.params.id));
+    const rec = await getRec(String(req.params.id), req);
     if (rec) await removeRec(rec);
     res.json({ ok: true });
   } catch (err) {
@@ -131,15 +148,18 @@ router.delete("/admin/stream-recordings/:id", requireAdmin, async (req: Request,
   }
 });
 
-router.get("/admin/stream-recordings", requireAdmin, async (req: Request, res: Response) => {
+router.get(both("/stream-recordings"), requireStudio, async (req: Request, res: Response) => {
   try {
     await ensureTable();
     // uploads that never finished (closed tab, lost signal) are cleared after a day
     const stale = rowsOf(await db.execute(sql`SELECT id, object_key, upload_id FROM stream_recordings WHERE status = 'uploading' AND created_at < now() - interval '1 day'`));
+    // (any studio user's visit tidies these; they belong to nobody any more)
     for (const r of stale) await removeRec(r as { id: string; object_key: string; upload_id: string | null });
+    const mine = isAdmin(req) ? null : String(req.user!.id);
     const rows = rowsOf(await db.execute(sql`SELECT r.id, r.title, r.mime, r.size_bytes, r.duration_ms, r.status, r.created_at, COALESCE(u.scout_username, u.lichess_username, u.chesscom_username, u.first_name) AS username
       FROM stream_recordings r LEFT JOIN users u ON u.id = r.user_id
-      ORDER BY r.created_at DESC LIMIT 100`).catch(async () => db.execute(sql`SELECT id, title, mime, size_bytes, duration_ms, status, created_at FROM stream_recordings ORDER BY created_at DESC LIMIT 100`)));
+      WHERE ${mine}::text IS NULL OR r.user_id = ${mine}
+      ORDER BY r.created_at DESC LIMIT 100`));
     res.json({ recordings: rows });
   } catch (err) {
     req.log.error({ err }, "[streams] list failed");
@@ -148,10 +168,10 @@ router.get("/admin/stream-recordings", requireAdmin, async (req: Request, res: R
 });
 
 // Short-lived link to play or download
-router.get("/admin/stream-recordings/:id/url", requireAdmin, async (req: Request, res: Response) => {
+router.get(both("/stream-recordings/:id/url"), requireStudio, async (req: Request, res: Response) => {
   try {
     await ensureTable();
-    const rec = await getRec(String(req.params.id));
+    const rec = await getRec(String(req.params.id), req);
     if (!rec || rec.status !== "ready") { res.status(404).json({ error: "Recording not found" }); return; }
     const { bucket } = bucketAndPrefix();
     const download = req.query.download === "1";
@@ -170,7 +190,7 @@ router.get("/admin/stream-recordings/:id/url", requireAdmin, async (req: Request
 
 // ── Live streams: connection hand-off between the streamer and viewers (kept in memory) ──
 interface Viewer { id: string; offer: string; answer: string | null; at: number; userId: string }
-interface Live { id: string; userId: string; title: string; host: string; startedAt: number; beat: number; viewers: Map<string, Viewer> }
+interface Live { id: string; userId: string; title: string; host: string; startedAt: number; beat: number; viewers: Map<string, Viewer>; coId?: string }
 const lives = new Map<string, Live>();
 const LIVE_TIMEOUT = 20_000;
 function sweep() {
@@ -181,27 +201,33 @@ function sweep() {
   }
 }
 
-router.get("/admin/live-streams", requireAdmin, (_req: Request, res: Response) => {
+router.get(both("/live-streams"), requireMember, (_req: Request, res: Response) => {
   sweep();
-  res.json({ streams: [...lives.values()].map((l) => ({ id: l.id, title: l.title, host: l.host, startedAt: l.startedAt, viewers: [...l.viewers.values()].filter((v) => v.answer).length })) });
+  res.json({ streams: [...lives.values()].map((l) => {
+    // A co-stream: both players' streams carry the same coId, so the watch page shows them as one
+    const co = l.coId ? costreams.get(l.coId) : undefined;
+    return { id: l.id, title: l.title, host: l.host, startedAt: l.startedAt, viewers: [...l.viewers.values()].filter((v) => v.answer).length,
+      coId: co && co.status === "active" ? co.id : undefined };
+  }) });
 });
 
-router.post("/admin/live-streams", requireAdmin, (req: Request, res: Response) => {
+router.post(both("/live-streams"), requireStudio, (req: Request, res: Response) => {
   sweep();
   const uid = String(req.user!.id);
   for (const [id, l] of lives) if (l.userId === uid) lives.delete(id); // one live stream per person
   const id = randomUUID();
   // the stream name the streamer chose (never their account name: they may be anonymous)
   const host = String(req.body?.host || "Streamer").slice(0, 40);
-  lives.set(id, { id, userId: uid, title: String(req.body?.title || "").slice(0, 80), host, startedAt: Date.now(), beat: Date.now(), viewers: new Map() });
+  lives.set(id, { id, userId: uid, title: String(req.body?.title || "").slice(0, 80), host, startedAt: Date.now(), beat: Date.now(), viewers: new Map(), coId: coFor(uid)?.id });
   res.json({ id });
 });
 
 // Streamer heartbeat: returns viewers waiting for an answer
-router.post("/admin/live-streams/:id/beat", requireAdmin, (req: Request, res: Response) => {
+router.post(both("/live-streams/:id/beat"), requireStudio, (req: Request, res: Response) => {
   const l = lives.get(String(req.params.id));
   if (!l || l.userId !== String(req.user!.id)) { res.status(404).json({ error: "Not live" }); return; }
   l.beat = Date.now();
+  l.coId = coFor(l.userId)?.id; // joins / leaves a co-stream started after going live
   if (typeof req.body?.title === "string") l.title = req.body.title.slice(0, 80);
   sweep();
   res.json({
@@ -210,7 +236,7 @@ router.post("/admin/live-streams/:id/beat", requireAdmin, (req: Request, res: Re
   });
 });
 
-router.post("/admin/live-streams/:id/answer", requireAdmin, (req: Request, res: Response) => {
+router.post(both("/live-streams/:id/answer"), requireStudio, (req: Request, res: Response) => {
   const l = lives.get(String(req.params.id));
   if (!l || l.userId !== String(req.user!.id)) { res.status(404).json({ error: "Not live" }); return; }
   const v = l.viewers.get(String(req.body?.viewerId));
@@ -220,13 +246,13 @@ router.post("/admin/live-streams/:id/answer", requireAdmin, (req: Request, res: 
   res.json({ ok: true });
 });
 
-router.delete("/admin/live-streams/:id", requireAdmin, (req: Request, res: Response) => {
+router.delete(both("/live-streams/:id"), requireStudio, (req: Request, res: Response) => {
   const l = lives.get(String(req.params.id));
   if (l && l.userId === String(req.user!.id)) lives.delete(l.id);
   res.json({ ok: true });
 });
 
-router.post("/admin/live-streams/:id/join", requireAdmin, (req: Request, res: Response) => {
+router.post(both("/live-streams/:id/join"), requireMember, (req: Request, res: Response) => {
   sweep();
   const l = lives.get(String(req.params.id));
   if (!l) { res.status(404).json({ error: "This stream has ended." }); return; }
@@ -238,12 +264,110 @@ router.post("/admin/live-streams/:id/join", requireAdmin, (req: Request, res: Re
   res.json({ viewerId: id });
 });
 
-router.get("/admin/live-streams/:id/viewers/:vid", requireAdmin, (req: Request, res: Response) => {
+router.get(both("/live-streams/:id/viewers/:vid"), requireMember, (req: Request, res: Response) => {
   const l = lives.get(String(req.params.id));
   if (!l) { res.json({ ended: true, answer: null }); return; }
   const v = l.viewers.get(String(req.params.vid));
   if (v) v.at = Date.now();
   res.json({ ended: false, answer: v?.answer ?? null });
+});
+
+// ── Co-streams: the two players of a live game streaming their match together ────────
+// One invites from the studio, the other accepts in theirs. Their studios then connect
+// to each other directly (WebRTC: each sends the other its camera panel and voice); this
+// server only relays the connection messages, through a mailbox each side polls.
+interface CoStream {
+  id: string; gameId: string; status: "invited" | "active";
+  from: string; to: string; fromName: string; toName: string;
+  mail: Map<string, unknown[]>; seen: Map<string, number>; at: number;
+}
+const costreams = new Map<string, CoStream>();
+const CO_GONE_MS = 45_000;
+function coSweep() {
+  const now = Date.now();
+  for (const [id, c] of costreams) {
+    const quiet = [c.from, c.to].some((u) => now - (c.seen.get(u) ?? c.at) > CO_GONE_MS);
+    if ((c.status === "invited" && now - c.at > 10 * 60_000) || (c.status === "active" && quiet)) costreams.delete(id);
+  }
+}
+function coFor(userId: string): CoStream | undefined {
+  coSweep();
+  for (const c of costreams.values()) if (c.status === "active" && (c.from === userId || c.to === userId)) return c;
+  return undefined;
+}
+const otherOf = (c: CoStream, uid: string) => (c.from === uid ? c.to : c.from);
+const nameOf = (c: CoStream, uid: string) => (c.from === uid ? c.fromName : c.toName);
+
+// Invite your opponent in the live game you're playing now.
+router.post("/costream/invite", requireStudio, async (req: Request, res: Response) => {
+  coSweep();
+  const uid = String(req.user!.id);
+  const { getActiveGameForUser } = await import("../lib/liveServer");
+  const g = getActiveGameForUser(uid);
+  if (!g || g.state.status !== "active") { res.status(400).json({ error: "Start a live game first: you can co-stream with the player you're facing." }); return; }
+  const opp = g.color === "w" ? g.state.black : g.state.white;
+  if (opp.isBot || !opp.userId) { res.status(400).json({ error: "You're playing a bot: co-streaming is for games against people." }); return; }
+  // They need the studio too (Pro), or they'd never see the invite
+  const { hasFullAccess } = await import("../lib/accessControl");
+  const them = await hasFullAccess(opp.userId).catch(() => ({ full: false }));
+  if (!them.full) { res.status(400).json({ error: `${opp.username} doesn't have Streamer Studio (it's part of Pro), so you can't co-stream with them.` }); return; }
+  for (const [id, c] of costreams) if (c.from === uid || c.to === uid) costreams.delete(id); // one at a time
+  const id = randomUUID();
+  const name = String(req.body?.name || "Streamer").slice(0, 40);
+  costreams.set(id, { id, gameId: g.state.id, status: "invited", from: uid, to: opp.userId, fromName: name, toName: opp.username,
+    mail: new Map(), seen: new Map([[uid, Date.now()]]), at: Date.now() });
+  res.json({ id, partner: opp.username });
+});
+
+// Your co-stream (or an invite to you), and any messages from your partner. Polled ~1/s.
+router.get("/costream/mine", requireStudio, (req: Request, res: Response) => {
+  coSweep();
+  const uid = String(req.user!.id);
+  const c = [...costreams.values()].find((x) => x.from === uid || x.to === uid);
+  if (!c) { res.json({ costream: null }); return; }
+  c.seen.set(uid, Date.now());
+  const messages = c.mail.get(uid) ?? [];
+  c.mail.set(uid, []);
+  const partner = otherOf(c, uid);
+  const partnerLive = [...lives.values()].some((l) => l.userId === partner && Date.now() - l.beat < LIVE_TIMEOUT);
+  res.json({ costream: {
+    id: c.id, gameId: c.gameId, status: c.status, invitedByMe: c.from === uid,
+    partner: nameOf(c, partner), partnerLive, messages,
+  } });
+});
+
+router.post("/costream/:id/accept", requireStudio, (req: Request, res: Response) => {
+  const c = costreams.get(String(req.params.id));
+  const uid = String(req.user!.id);
+  if (!c || c.to !== uid) { res.status(404).json({ error: "That invite has gone." }); return; }
+  for (const [id, x] of costreams) if (id !== c.id && (x.from === uid || x.to === uid)) costreams.delete(id);
+  c.status = "active";
+  c.toName = String(req.body?.name || c.toName).slice(0, 40);
+  c.seen.set(uid, Date.now());
+  // the inviter's studio starts the connection when it sees this
+  c.mail.set(c.from, [...(c.mail.get(c.from) ?? []), { type: "accepted" }]);
+  res.json({ ok: true, partner: c.fromName });
+});
+
+router.post("/costream/:id/signal", requireStudio, (req: Request, res: Response) => {
+  const c = costreams.get(String(req.params.id));
+  const uid = String(req.user!.id);
+  if (!c || c.status !== "active" || (c.from !== uid && c.to !== uid)) { res.status(404).json({ error: "Co-stream ended" }); return; }
+  const msg = req.body?.message;
+  if (!msg || JSON.stringify(msg).length > 200_000) { res.status(400).json({ error: "Bad message" }); return; }
+  const to = otherOf(c, uid);
+  const box = c.mail.get(to) ?? [];
+  if (box.length < 200) box.push(msg);
+  c.mail.set(to, box);
+  res.json({ ok: true });
+});
+
+// Decline an invite, cancel yours, or end the co-stream (either player).
+router.post("/costream/:id/end", requireStudio, (req: Request, res: Response) => {
+  const c = costreams.get(String(req.params.id));
+  const uid = String(req.user!.id);
+  if (c && (c.from === uid || c.to === uid)) costreams.delete(c.id);
+  res.json({ ok: true });
 });
 
 export default router;

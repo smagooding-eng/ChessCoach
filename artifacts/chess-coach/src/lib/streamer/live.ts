@@ -1,4 +1,4 @@
-// Live streams on chessscout.net (admin-only while in development).
+// Live streams on chessscout.net (streaming: Pro members; watching: anyone signed in).
 // The streamer's browser sends the stage video + changed voice straight to each viewer
 // (WebRTC). The API only passes the connection details between them.
 
@@ -35,7 +35,7 @@ export class LiveHost {
   async start(stream: MediaStream, host: string, title: string) {
     this.stop();
     this.stream = stream;
-    const { id } = await post<{ id: string }>('/api/admin/live-streams', { host, title });
+    const { id } = await post<{ id: string }>('/api/live-streams', { host, title });
     this.id = id;
     this.timer = window.setInterval(() => { void this.beat(); }, 2000);
     void this.beat();
@@ -56,7 +56,7 @@ export class LiveHost {
     if (!this.id || this.busy) return;
     this.busy = true;
     try {
-      const r = await post<{ pending: { id: string; offer: string }[]; watching: number }>(`/api/admin/live-streams/${this.id}/beat`, {});
+      const r = await post<{ pending: { id: string; offer: string }[]; watching: number }>(`/api/live-streams/${this.id}/beat`, {});
       for (const v of r.pending) if (!this.pcs.has(v.id)) await this.answer(v.id, v.offer);
       const connected = [...this.pcs.values()].filter((pc) => pc.connectionState === 'connected').length;
       this.watching = Math.max(connected, 0);
@@ -86,7 +86,7 @@ export class LiveHost {
         p.encodings[0].maxBitrate = 2_500_000;
         void s.setParameters(p).catch(() => undefined);
       }
-      await post(`/api/admin/live-streams/${this.id}/answer`, { viewerId, answer: pc.localDescription?.sdp ?? '' });
+      await post(`/api/live-streams/${this.id}/answer`, { viewerId, answer: pc.localDescription?.sdp ?? '' });
     } catch { pc.close(); this.pcs.delete(viewerId); }
   }
 
@@ -94,16 +94,16 @@ export class LiveHost {
     window.clearInterval(this.timer);
     for (const pc of this.pcs.values()) pc.close();
     this.pcs.clear();
-    if (this.id) void post(`/api/admin/live-streams/${this.id}`, undefined, 'DELETE').catch(() => undefined);
+    if (this.id) void post(`/api/live-streams/${this.id}`, undefined, 'DELETE').catch(() => undefined);
     this.id = null; this.watching = 0; this.stream = null;
     this.onChange?.(0);
   }
 }
 
-export interface LiveListing { id: string; title: string; host: string; startedAt: number; viewers: number }
+export interface LiveListing { id: string; title: string; host: string; startedAt: number; viewers: number; coId?: string }
 
 export async function listLive(): Promise<LiveListing[]> {
-  const r = await post<{ streams: LiveListing[] }>('/api/admin/live-streams', undefined, 'GET');
+  const r = await post<{ streams: LiveListing[] }>('/api/live-streams', undefined, 'GET');
   return r.streams;
 }
 
@@ -123,12 +123,12 @@ export async function watchLive(id: string, video: HTMLVideoElement, onState: (s
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
   await iceDone(pc);
-  const { viewerId } = await post<{ viewerId: string }>(`/api/admin/live-streams/${id}/join`, { offer: pc.localDescription?.sdp ?? '' });
+  const { viewerId } = await post<{ viewerId: string }>(`/api/live-streams/${id}/join`, { offer: pc.localDescription?.sdp ?? '' });
   let answered = false;
   const poll = window.setInterval(async () => {
     if (stopped) return;
     try {
-      const r = await post<{ answer: string | null; ended: boolean }>(`/api/admin/live-streams/${id}/viewers/${viewerId}`, undefined, 'GET');
+      const r = await post<{ answer: string | null; ended: boolean }>(`/api/live-streams/${id}/viewers/${viewerId}`, undefined, 'GET');
       if (r.ended) { onState('ended'); window.clearInterval(poll); pc.close(); return; }
       if (r.answer && !answered) { answered = true; await pc.setRemoteDescription({ type: 'answer', sdp: r.answer }); }
     } catch { /* keep trying */ }

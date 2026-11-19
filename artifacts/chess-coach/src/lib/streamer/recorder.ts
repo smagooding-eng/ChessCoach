@@ -42,7 +42,7 @@ export class CloudRecorder {
 
   async start() {
     try {
-      const r = await apiFetch('/api/admin/stream-recordings', {
+      const r = await apiFetch('/api/stream-recordings', {
         method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mime: this.rec.mimeType || this.mime || 'video/webm', title: this.title }),
       });
@@ -67,7 +67,7 @@ export class CloudRecorder {
     if (this.failed || !this.id) return;
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
-        const r = await apiFetch(`/api/admin/stream-recordings/${this.id}/parts/${n}`, { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/octet-stream' }, body: blob });
+        const r = await apiFetch(`/api/stream-recordings/${this.id}/parts/${n}`, { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/octet-stream' }, body: blob });
         if (r.ok) {
           const { etag } = (await r.json()) as { etag: string };
           this.parts.push({ n, etag }); this.queuedParts--;
@@ -93,7 +93,7 @@ export class CloudRecorder {
     await this.queue;
     if (!this.failed && this.id && this.parts.length) {
       try {
-        const r = await apiFetch(`/api/admin/stream-recordings/${this.id}/complete`, {
+        const r = await apiFetch(`/api/stream-recordings/${this.id}/complete`, {
           method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ parts: this.parts, durationMs }),
         });
@@ -101,7 +101,7 @@ export class CloudRecorder {
       } catch { /* fall through to download */ }
     }
     // couldn't save online: keep it on the device
-    if (this.id) void apiFetch(`/api/admin/stream-recordings/${this.id}`, { method: 'DELETE', credentials: 'include' }).catch(() => undefined);
+    if (this.id) void apiFetch(`/api/stream-recordings/${this.id}`, { method: 'DELETE', credentials: 'include' }).catch(() => undefined);
     const type = this.rec.mimeType || this.mime || 'video/webm';
     const blob = new Blob(this.all, { type });
     const a = document.createElement('a');

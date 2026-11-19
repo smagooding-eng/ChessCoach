@@ -26,8 +26,22 @@ export function splitBoardPanel(w: number, h: number) {
 // A text run: the headline's rating line is drawn as coloured pieces side by side.
 export interface TextRun { text: string; color: string }
 
+/** Co-streaming: room for the partner's camera panel. A round camera gets a twin on the other
+ *  side of the stage; any other camera panel is shared, side by side when it's wide, one above
+ *  the other when it's tall. Percent rects; stageW/stageH give the stage's shape. */
+export function withPartnerPanel<L extends { cam: PanelRect }>(layout: L, stageW: number, stageH: number): L & { partner: PanelRect } {
+  const cam = layout.cam;
+  if (cam.round) return { ...layout, partner: { ...cam, x: Math.max(0, 100 - cam.x - cam.w) } };
+  const wide = (cam.w / 100) * stageW >= (cam.h / 100) * stageH;
+  return wide
+    ? { ...layout, cam: { ...cam, w: cam.w / 2 }, partner: { ...cam, x: cam.x + cam.w / 2, w: cam.w / 2 } }
+    : { ...layout, cam: { ...cam, h: cam.h / 2 }, partner: { ...cam, y: cam.y + cam.h / 2, h: cam.h / 2 } };
+}
+
 export interface CompositeInput {
-  layout: Record<'board' | 'cam' | 'tag', PanelRect> & { head?: PanelRect; notes?: PanelRect };
+  layout: Record<'board' | 'cam' | 'tag', PanelRect> & { head?: PanelRect; notes?: PanelRect; partner?: PanelRect };
+  /** Co-streaming: the other player's camera panel, and the names shown on both panels. */
+  partner?: { video: HTMLVideoElement; name: string; myName: string } | null;
   /** Review notes, shown in the notes panel when the board is on its own. */
   notes?: ReviewNotes | null;
   /** The headline panel ("The road to 1500 ELO") and the rating line under it. */
@@ -117,10 +131,11 @@ export function drawComposite(c: CanvasRenderingContext2D, W: number, H: number,
   let tx = sx + ih + gap;
   label.forEach((t, i) => { c.fillStyle = i === 1 ? '#81B64C' : '#F5F7F6'; c.fillText(t, tx, cy); tx += widths[i]; });
 
-  const order = (Object.keys(inp.layout) as ('board' | 'cam' | 'tag' | 'head' | 'notes')[]).filter((k) => !!inp.layout[k]).sort((a, b) => inp.layout[a]!.z - inp.layout[b]!.z);
+  const order = (Object.keys(inp.layout) as ('board' | 'cam' | 'tag' | 'head' | 'notes' | 'partner')[]).filter((k) => !!inp.layout[k]).sort((a, b) => inp.layout[a]!.z - inp.layout[b]!.z);
   for (const id of order) {
     const r = inp.layout[id]!;
     if (r.hidden || (id === 'head' && !inp.head) || id === 'notes') continue; // notes are drawn inside the board panel
+    if (id === 'partner' && !inp.partner) continue;
     const x = (r.x / 100) * W, y = (r.y / 100) * H, w = (r.w / 100) * W, h = (r.h / 100) * H;
     c.save();
     if (r.round) { c.beginPath(); c.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); c.clip(); }
@@ -150,6 +165,14 @@ export function drawComposite(c: CanvasRenderingContext2D, W: number, H: number,
         const cw = inp.cam.width, ch = inp.cam.height, s = Math.max(w / cw, h / ch);
         c.drawImage(inp.cam, x + (w - cw * s) / 2, y + (h - ch * s) / 2, cw * s, ch * s);
       } else { c.fillStyle = '#0D1516'; c.fillRect(x, y, w, h); }
+      if (inp.partner) nameChip(c, inp.partner.myName, x, y, w, h, !!r.round);
+    } else if (id === 'partner') {
+      const v = inp.partner!.video;
+      if (v.videoWidth > 2) {
+        const vw = v.videoWidth, vh = v.videoHeight, s = Math.max(w / vw, h / vh);
+        c.drawImage(v, x + (w - vw * s) / 2, y + (h - vh * s) / 2, vw * s, vh * s);
+      } else { c.fillStyle = '#0D1516'; c.fillRect(x, y, w, h); }
+      nameChip(c, inp.partner!.name, x, y, w, h, !!r.round);
     } else if (id === 'head') {
       drawHead(c, inp.head!, x, y, w, h);
 
@@ -166,7 +189,7 @@ export function drawComposite(c: CanvasRenderingContext2D, W: number, H: number,
       c.fillText(inp.subtitle, tx2, y + h * 0.78, maxW);
     }
     c.restore();
-    if (id === 'cam' && r.round) {
+    if ((id === 'cam' || id === 'partner') && r.round) {
       c.beginPath(); c.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
       c.lineWidth = Math.max(3, W * 0.006); c.strokeStyle = '#81B64C'; c.stroke();
     }
@@ -177,6 +200,17 @@ export function drawComposite(c: CanvasRenderingContext2D, W: number, H: number,
     c.fillStyle = '#fff'; c.font = `900 ${ph * 0.55}px "DM Sans", sans-serif`; c.textAlign = 'center'; c.textBaseline = 'middle';
     c.fillText('● LIVE', px + pw / 2, py + ph / 2);
   }
+}
+
+/** A player's name on their camera panel while co-streaming. */
+function nameChip(c: CanvasRenderingContext2D, name: string, x: number, y: number, w: number, h: number, round: boolean) {
+  const fs = Math.max(10, Math.min(h * 0.075, w * 0.07));
+  c.font = `800 ${fs}px "DM Sans", sans-serif`;
+  const tw = Math.min(c.measureText(name).width, w * 0.8), ph = fs * 1.7, pw = tw + fs * 1.2;
+  const px = round ? x + (w - pw) / 2 : x + fs * 0.5, py = y + h - ph - (round ? h * 0.08 : fs * 0.5);
+  rr(c, px, py, pw, ph, ph * 0.3); c.fillStyle = 'rgba(5,10,11,.82)'; c.fill();
+  c.fillStyle = '#F5F7F6'; c.textAlign = 'left'; c.textBaseline = 'middle';
+  c.fillText(name, px + fs * 0.6, py + ph / 2, tw);
 }
 
 /** Font sizes for the headline panel, shared with the on-screen stage so both match. */

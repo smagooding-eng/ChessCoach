@@ -364,6 +364,9 @@ const PTrapTraining  = () => <ProtectedRoute component={TrapTrainingPage} />;
 const PBeginnerCourses = () => <ProtectedRoute component={BeginnerCoursesPage} requireAdmin />;
 const PStreamerStudio = () => <ProtectedRoute component={StreamerStudioPage} requireAdmin fullscreen />;
 const PLiveStreams = () => <ProtectedRoute component={LiveStreamsPage} requireAdmin fullscreen />;
+// Pro members' studio (the page itself checks Pro) and the watch page for anyone signed in
+const PStudio = () => <ProtectedRoute component={StreamerStudioPage} fullscreen />;
+const PStreams = () => <ProtectedRoute component={LiveStreamsPage} fullscreen />;
 // Chess for Kids works without signing in (progress stays on the device), so
 // a child locked in Kid Mode is never bounced to a login screen.
 const kidsPage = (C: React.ComponentType) => () => <ErrorBoundary fallbackNav="/kids"><C /></ErrorBoundary>;
@@ -667,6 +670,8 @@ function Router() {
 <Route path="/admin/beginner-courses" component={PBeginnerCourses} />
 <Route path="/admin/streamer" component={PStreamerStudio} />
 <Route path="/admin/live-streams" component={PLiveStreams} />
+      <Route path="/studio" component={PStudio} />
+      <Route path="/streams" component={PStreams} />
       <Route path="/beginner/:unit/:lesson" component={PBeginnerLessonPlay} />
       <Route path="/beginner" component={PBeginnerPath} />
       <Route path="/kids/benny" component={PKidsGame} />

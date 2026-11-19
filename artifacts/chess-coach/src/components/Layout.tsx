@@ -11,7 +11,7 @@ import { GooglePlayBadge, PlayLogo } from '@/components/GooglePlayBadge';
 import { PLAY_STORE_URL, shouldShowPlayBadge } from '@/lib/playApp';
 import { runPageSwipe, pageCanSwipe, swipeAllowedFrom, swipeAllowedLoose } from '@/lib/swipeNav';
 import { useLiveRatings, bestLiveRating } from '@/hooks/use-live-ratings';
-import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard, Camera, Shield, Target, BarChart3, Zap, Crosshair, Radio, Users, Medal, Baby, Newspaper, Clapperboard, X } from 'lucide-react';
+import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard, Camera, Shield, Target, BarChart3, Zap, Crosshair, Radio, Users, Medal, Baby, Newspaper, Clapperboard, Video, X } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 import { InstallGuide } from '@/components/InstallGuide';
 import { cn } from '@/lib/utils';
@@ -88,6 +88,8 @@ const MENU_GROUPS: { title: string; items: NavItem[] }[] = [
     { href: '/watch',       label: 'Watch Live',    icon: Radio },
     { href: '/friends',     label: 'Friends',       icon: Users },
     { href: '/tournaments', label: 'Tournaments',   icon: Medal },
+    { href: '/streams',     label: 'Live Streams',  icon: Video },
+    { href: '/studio',      label: 'Streamer Studio', icon: Clapperboard },
     { href: '/kids',        label: 'Chess for Kids', icon: Baby },
   ] },
   { title: 'Your games', items: [
