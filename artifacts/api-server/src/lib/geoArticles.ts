@@ -336,4 +336,187 @@ Don't just look at the best move. Ask why it's best: what does it threaten, and 
 
 ${FREE_PRO}`,
   },
+  {
+    slug: 'review-chess-com-games-without-membership',
+    title: 'How to Review Your Chess.com Games Without a Membership',
+    targetKeyword: 'review chess.com games free',
+    metaDescription: 'Review every Chess.com game for free, without a Diamond membership: link your username and each game is checked move by move with Stockfish.',
+    content: `You don't need a paid Chess.com plan to go through your games properly. Chess.com publishes every finished game, so any review tool can read them.
+
+## The quickest way
+
+1. Go to [ChessScout](/) and sign up free (Google, Lichess or email).
+2. Type your Chess.com username. Your recent games come in automatically, and new ones arrive after you play.
+3. Open any game. Every move is checked by Stockfish and labeled: best, excellent, good, inaccuracy, mistake, blunder or missed win, with your accuracy for the game.
+4. Step through it move by move. On a costly move, see the better move and play it out.
+
+There's no daily limit on reviews: wins, losses and draws.
+
+## What to look at first
+
+- **The turning point:** the one move where the evaluation swung against you.
+- **Missed wins:** positions where you were winning and let it go.
+- **Repeats:** the same kind of mistake across several games (hanging pieces, missed forks, time trouble).
+
+## After a few games
+
+Your openings page shows your win rate with each line you actually play, and the endgames page shows how you convert (or don't) once the queens come off. That's where reviewing turns into improving.
+
+${FREE_PRO}`,
+  },
+  {
+    slug: 'how-to-analyze-lichess-games',
+    title: 'How to Analyze Your Lichess Games (and Learn From Them)',
+    targetKeyword: 'analyze lichess games',
+    metaDescription: 'Lichess gives free computer analysis. Here is how to use it well, and how to review all your Lichess games together to find what keeps costing you.',
+    content: `Lichess offers free computer analysis on every game: open the game, tap "Request a computer analysis" and you get an evaluation graph and Stockfish's best moves. That's great for one game. The harder part is learning across many games.
+
+## Analyze one game well
+
+- Find the biggest swing on the graph and start there, not at move 1.
+- Before looking at the engine's move, ask what your opponent was threatening.
+- Play the better move out a few moves so you see why it's better.
+
+## Analyze all your games together
+
+On [ChessScout](/), sign in with Lichess (one tap) and your games are imported and reviewed automatically. Every move gets a label, every game an accuracy score, and your openings and endgames are tracked over time, so you see patterns, not just single mistakes.
+
+You can also play on Lichess straight from ChessScout and have the game reviewed when it ends.
+
+${FREE_PRO}`,
+  },
+  {
+    slug: 'chess-move-labels-explained',
+    title: 'Brilliant, Best, Inaccuracy, Mistake, Blunder: Chess Move Labels Explained',
+    targetKeyword: 'chess blunder vs mistake vs inaccuracy',
+    metaDescription: 'What the move labels in a chess game review mean: brilliant, great, best, excellent, good, inaccuracy, mistake, blunder and missed win, and how they are decided.',
+    content: `Game reviews label each move by how much it changed the position compared with the engine's best move. The loss is measured in centipawns (hundredths of a pawn).
+
+## The labels
+
+- **Best:** the engine's top choice, or as good as it.
+- **Excellent / Good:** close to best; small or no loss.
+- **Inaccuracy:** a small loss; the position got somewhat worse.
+- **Mistake:** a clear loss; a real part of your advantage (or your safety) is gone.
+- **Blunder:** a big loss, usually material or the game.
+- **Missed win:** you had a winning move and played something that let the win go.
+- **Great / Brilliant:** the only good move in a hard position, or a strong sacrifice that works.
+- **Book:** a known opening move.
+
+## Why the same move can get different labels
+
+The label depends on the position, not the move. Losing a pawn's worth when you're a queen up barely matters; losing it in an equal endgame can decide the game. Good reviewers also don't punish moves in positions that were already lost.
+
+## Using the labels
+
+Don't count blunders, find the turning point: the first move where the game swung for good. On [ChessScout](/) every review starts with the moves that cost the most, and you can replay the better move on the spot.
+
+${FREE_PRO}`,
+  },
+  {
+    slug: 'chess-accuracy-score-explained',
+    title: 'What Is Accuracy in Chess? Your Accuracy Score Explained',
+    targetKeyword: 'chess accuracy score',
+    metaDescription: 'What a chess accuracy score measures, what a good accuracy is at your level, and why your accuracy can be high in a game you lost.',
+    content: `Accuracy is a 0 to 100 score for how close your moves were to the engine's best moves over a whole game. It's based on how much winning chance each move gave away.
+
+## What's a good accuracy?
+
+It depends on your level and the game. Club players often score in the 60s to 80s; strong players regularly go above 90 in quiet games. Short, sharp games and long, simple ones score very differently, so compare games of the same kind.
+
+## Why accuracy can mislead
+
+- **You can lose with high accuracy:** one blunder in an otherwise clean game.
+- **You can win with low accuracy:** your opponent blundered more.
+- **Simple positions inflate it:** forced recaptures and obvious moves count too.
+
+## What to do with it
+
+Track it over many games, not one. A slowly rising average means you're improving. On [ChessScout](/) every reviewed game shows both players' accuracy, and your games over time show the trend.
+
+${FREE_PRO}`,
+  },
+  {
+    slug: 'how-to-get-better-at-chess-fast',
+    title: 'How to Get Better at Chess Fast (What Actually Works)',
+    targetKeyword: 'how to get better at chess',
+    metaDescription: 'A practical plan to improve at chess quickly: review your own games, fix the one mistake you repeat most, do targeted puzzles, and play longer games.',
+    content: `Most players improve slowly because they play a lot and review nothing. Here's a plan that works at any level below master.
+
+## 1. Review every game you lose
+
+Find the turning point and the better move. Ten minutes per game is enough. On [ChessScout](/) your Chess.com and Lichess games are imported and reviewed for free, so this takes one tap.
+
+## 2. Find the one thing you repeat
+
+After ten reviewed games, one pattern will stand out: hanging pieces, missed tactics, a bad opening, time trouble. Fix that before anything else.
+
+## 3. Puzzles on your weak spot
+
+Do puzzles of the type you keep missing (forks, pins, back-rank mates), not random ones. Fifteen focused minutes a day beats an hour of random puzzles.
+
+## 4. Play some longer games
+
+Blitz builds speed, not understanding. Play rapid (10 or 15 minutes) a few times a week so you have time to think, and review those games.
+
+## 5. Know your openings by results
+
+You don't need deep theory. Look at your win rate with each opening you actually play and drop or fix the worst one.
+
+${FREE_PRO}`,
+  },
+  {
+    slug: 'best-chess-openings-for-beginners',
+    title: 'Best Chess Openings for Beginners (and How to Pick Yours)',
+    targetKeyword: 'best chess openings for beginners',
+    metaDescription: 'Simple, sound chess openings for beginners with White and Black, the ideas behind them, and how to choose by checking your own results.',
+    content: `The best opening for a beginner is one that develops pieces quickly, fights for the center and keeps the king safe. You don't need memorized lines, just the ideas.
+
+## With White
+
+- **Italian Game (1.e4 e5 2.Nf3 Nc6 3.Bc4):** fast development, natural plans, aims at f7.
+- **London System (1.d4, 2.Bf4, e3, Nf3):** the same setup against almost anything; easy to learn.
+
+## With Black against 1.e4
+
+- **1...e5:** classical and sound; meet the Italian or Ruy Lopez with natural development.
+- **Caro-Kann (1...c6):** solid, few early traps, good pawn structure.
+
+## With Black against 1.d4
+
+- **Queen's Gambit Declined (1...d5 2.c4 e6):** solid and principled.
+
+## How to choose yours
+
+Play what you enjoy, then check the numbers. [ChessScout](/) shows your win rate with every opening you actually play, from your real Chess.com and Lichess games, so you can see which lines are working and which keep losing.
+
+${FREE_PRO}`,
+  },
+  {
+    slug: 'stop-losing-on-time-in-chess',
+    title: 'How to Stop Losing on Time in Chess',
+    targetKeyword: 'losing on time chess',
+    metaDescription: 'Why you keep running out of time in chess games and practical habits to fix it: opening speed, when to think long, and choosing the right time control.',
+    content: `Flagging (running out of time) loses as many games as blunders at club level. The fix is mostly habit.
+
+## Why it happens
+
+- Thinking long on easy moves in the opening.
+- Searching for a perfect move when a good one is enough.
+- Panicking after a mistake and burning time.
+
+## Habits that fix it
+
+1. **Play your first 8 to 10 moves quickly:** know your openings well enough to.
+2. **Think long only at critical moments:** captures, checks, threats, and positions where the plan changes.
+3. **Use a budget:** at move 20 you should still have about half your time.
+4. **When short on time, simplify:** trade pieces and make safe moves.
+5. **Choose the right time control:** if you flag a lot in 5 minutes, add increment (5|3) or play 10.
+
+## Check it in your games
+
+Reviews on [ChessScout](/) show where each game turned. If your losses keep coming late in the game, time management, not chess knowledge, is what's costing you.
+
+${FREE_PRO}`,
+  },
 ];
