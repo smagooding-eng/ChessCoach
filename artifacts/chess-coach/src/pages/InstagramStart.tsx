@@ -95,7 +95,7 @@ export default function InstagramStart() {
 
         <h1 className="text-[30px] font-black leading-[1.1]">Review every game you play. <span style={{ color: RD.green }}>Free.</span></h1>
         <p className="mt-2 text-[15px] leading-relaxed" style={{ color: RD.muted }}>
-          Your Chess.com and Lichess games, gone through move by move by an AI coach. Wins, losses and draws, no membership.
+          Your Chess.com and Lichess games, gone through move by move with every mistake marked. Wins, losses and draws, no membership.
         </p>
 
         {!shown && (

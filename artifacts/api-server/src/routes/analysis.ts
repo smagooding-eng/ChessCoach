@@ -729,7 +729,7 @@ router.post("/analysis/scan-position", async (req: Request, res: Response): Prom
       res.status(403).json({
         error: "pro_required",
         feature: "scan_position",
-        message: "Scanning a board from a photo uses AI vision and is part of Pro.",
+        message: "Scanning a board from a photo is part of Pro.",
       });
       return;
     }

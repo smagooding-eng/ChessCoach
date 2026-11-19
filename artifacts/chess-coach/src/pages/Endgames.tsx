@@ -201,7 +201,7 @@ export function Endgames() {
         <ProUpsell
           title="Master the endgames you actually reach"
           text="Pro finds the endgames from your own games and turns them into lessons and drills, from basic checkmates to rook endings."
-          perks={['Checkmate patterns, pawn and rook endings', 'Positions taken from your own games', 'Plus the AI coach on every game you review']}
+          perks={['Checkmate patterns, pawn and rook endings', 'Positions taken from your own games', 'Plus your coach on every game you review']}
         />
       </div>
     );
@@ -213,7 +213,7 @@ export function Endgames() {
         <ProUpsell
           title="Master the endgames you actually reach"
           text="Pro finds the endgames from your own games and turns them into lessons and drills, from basic checkmates to rook endings."
-          perks={['Checkmate patterns, pawn and rook endings', 'Positions taken from your own games', 'Plus the AI coach on every game you review']}
+          perks={['Checkmate patterns, pawn and rook endings', 'Positions taken from your own games', 'Plus your coach on every game you review']}
         />
       </div>
     );

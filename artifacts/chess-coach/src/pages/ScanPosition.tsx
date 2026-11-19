@@ -397,7 +397,7 @@ export function ScanPosition() {
         <ProUpsell
           compact
           title="Photo scanning is part of Pro"
-          text="AI vision reads the board for you. The position editor below is free: set up any position by hand."
+          text="The coach reads the board from your photo. The position editor below is free: set up any position by hand."
         />
       )}
 
@@ -496,7 +496,7 @@ export function ScanPosition() {
       {state === 'error' && isLimitReached && (
         <UpgradeNudge
           headline="Scanning a photo is part of Pro"
-          subtext="Reading a board from a photo uses AI vision. The position editor below is always free: set up any position and play it against Stockfish."
+          subtext="Reading a board from a photo is part of Pro. The position editor below is always free: set up any position and play it against Stockfish."
         />
       )}
 

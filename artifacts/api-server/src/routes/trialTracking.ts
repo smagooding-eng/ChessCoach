@@ -21,7 +21,7 @@ function ensureTable(): Promise<void> {
   })().catch((e) => { ready = null; throw e; }));
 }
 
-const SOURCES = new Set(['promo', 'subscription', 'pricing', 'email']);
+const SOURCES = new Set(['promo', 'subscription', 'pricing', 'email', 'coach']);
 export const trialSource = (s: unknown): string => (typeof s === 'string' && SOURCES.has(s) ? s : 'subscription');
 
 /** One step of the trial funnel for a member (never throws). */
@@ -132,7 +132,7 @@ router.get('/admin/trial-stats', requireAdmin, async (req: Request, res: Respons
         tappedThenCheckout: path.checkout_after, checkoutPeople: path.checkout_any, checkoutFailed: path.failed } : null,
       promo: { shown: count('shown'), start: count('start'), dismiss: count('dismiss'),
         closeMedianSecs: close?.median != null ? Math.round(close.median * 10) / 10 : null, closedUnder4s: close?.quick ?? 0 },
-      checkout: { total: count('checkout'), promo: count('checkout', 'promo'), subscription: count('checkout', 'subscription'), pricing: count('checkout', 'pricing'), email: count('checkout', 'email') },
+      checkout: { total: count('checkout'), promo: count('checkout', 'promo'), subscription: count('checkout', 'subscription'), pricing: count('checkout', 'pricing'), email: count('checkout', 'email'), coach: count('checkout', 'coach') },
       trials: { started, inTrial: by('in_trial'), cancelling: by('cancelling'), paid: by('paid') + by('paid_cancelling'), paidCancelling: by('paid_cancelling'), paymentFailed: by('payment_failed'), ended: by('ended') },
       recent: trials.sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, 25),
       stripeError,

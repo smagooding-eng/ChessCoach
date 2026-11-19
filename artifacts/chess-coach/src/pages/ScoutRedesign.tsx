@@ -304,7 +304,7 @@ export function ScoutRedesign(props: {
       <ProUpsell
         compact
         title={`See ${result?.username ?? 'this player'}'s weaknesses`}
-        text="Pro adds an AI scouting report: where they go wrong, and how to exploit it."
+        text="Pro adds a coach scouting report: where they go wrong, and how to exploit it."
       />
     );
   }

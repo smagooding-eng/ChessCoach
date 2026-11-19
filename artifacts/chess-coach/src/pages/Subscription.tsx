@@ -10,10 +10,10 @@ import { EmbeddedCheckoutForm } from '@/components/EmbeddedCheckoutForm';
 import { trackFunnelEvent } from '@/lib/funnelTracking';
 
 const PREMIUM_FEATURES = [
-  { icon: BrainCircuit, label: 'AI Coach on Every Game', desc: 'Plain-English explanations for every move, plus a summary of what decided the game' },
+  { icon: BrainCircuit, label: 'Your Coach on Every Game', desc: 'Plain-English explanations for every move, plus a summary of what decided the game' },
   { icon: GraduationCap, label: 'Personalized Courses', desc: 'Lessons built from the real mistakes in your own games' },
-  { icon: Swords, label: 'AI Scouting Reports', desc: 'Your opponent\'s weaknesses and how to exploit them' },
-  { icon: Volume2, label: 'Natural Coach Voice', desc: 'Lessons read aloud in a natural voice, plus AI puzzle explanations and board scanning from a photo' },
+  { icon: Swords, label: 'Coach Scouting Reports', desc: 'Your opponent\'s weaknesses and how to exploit them' },
+  { icon: Volume2, label: 'Natural Coach Voice', desc: 'Lessons read aloud in a natural voice, plus coach puzzle explanations and board scanning from a photo' },
   { icon: Crown, label: 'Pro Tournaments', desc: 'Join every Pro tournament, and host your own: earn $1 for each player who goes Pro to join' },
 ];
 

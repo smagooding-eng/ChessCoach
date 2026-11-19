@@ -19,10 +19,10 @@ const BOARDS = /^\/(live|lichess|daily|play|puzzles?|bots?|challenge|tournaments
 const SKIP = /^\/(setup|login|signup|subscription|pricing|review|admin|kids|embed)(\/|$)/;
 
 const FEATURES = [
-  'The AI coach on every game you review',
+  'Your coach on every game you review',
   'Courses built from your own mistakes',
   'Deep weakness analysis across your games',
-  'AI scouting reports on any opponent',
+  'Coach scouting reports on any opponent',
 ];
 
 type Price = { id: string; unit_amount: number; recurring?: { interval?: string } };

@@ -18,7 +18,7 @@ import { RD } from '@/lib/redesignTheme';
 function CoursesProShowcase({ redesign }: { redesign: boolean }) {
   const steps = [
     { t: 'We find the mistakes that cost you games', d: 'Stockfish scans your reviewed games for the patterns that keep coming up.' },
-    { t: 'The AI coach turns them into lessons', d: 'Each lesson uses a real position from your own games: the idea, your move, and the fix.' },
+    { t: 'Your coach turns them into lessons', d: 'Each lesson uses a real position from your own games: the idea, your move, and the fix.' },
     { t: 'You practise until it sticks', d: 'Drills from your own positions, with the lesson read aloud as you go.' },
   ];
   return (
@@ -38,7 +38,7 @@ function CoursesProShowcase({ redesign }: { redesign: boolean }) {
         </div>
         <ProUpsell
           title="Get courses built from your own games"
-          perks={['Lessons from the real mistakes in your games', 'Drills from your own positions', 'Natural-voice read-aloud', 'Plus the AI coach on every game you review']}
+          perks={['Lessons from the real mistakes in your games', 'Drills from your own positions', 'Natural-voice read-aloud', 'Plus your coach on every game you review']}
           cta="Unlock my courses"
         />
       </div>

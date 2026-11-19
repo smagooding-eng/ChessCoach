@@ -1,3 +1,4 @@
+import { startTrial } from '@/lib/startTrial';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Chess } from 'chess.js';
@@ -140,6 +141,38 @@ export interface GuidedReviewProps {
   onUpgrade?: () => void;
   /** Admin: show the Remix button (a random board and pieces on every move, for content). */
   canRemix?: boolean;
+}
+
+/** Free reviews: the coach's card on a costly move, locked, with the trial one tap away. */
+function CoachTeaser({ label, onUpgrade }: { label: string; onUpgrade?: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const go = async () => {
+    setBusy(true); setErr('');
+    const e = await startTrial('coach');
+    if (e) { setErr(e); setBusy(false); }
+  };
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.12 }}
+      className="relative overflow-hidden rounded-[14px] px-3.5 py-3" style={{ background: '#162022', border: '1px solid rgba(255,255,255,.07)' }}>
+      <p className="mb-1.5 text-[11.5px] font-bold uppercase tracking-wide text-[#87918E]">Coach</p>
+      {/* the shape of the coach's note, unreadable: what it would explain */}
+      <div aria-hidden="true" className="space-y-1.5 blur-[1.5px]">
+        <div className="h-2.5 w-[92%] rounded-full bg-white/15" />
+        <div className="h-2.5 w-[78%] rounded-full bg-white/15" />
+        <div className="flex gap-1.5"><span className="text-[11px] font-black text-[#81B64C]">+</span><div className="mt-0.5 h-2.5 w-[60%] rounded-full bg-white/10" /></div>
+        <div className="flex gap-1.5"><span className="text-[11px] font-black text-[#F0605D]">−</span><div className="mt-0.5 h-2.5 w-[66%] rounded-full bg-white/10" /></div>
+      </div>
+      <p className="mt-2.5 text-[13px] font-bold leading-snug text-[#F5F7F6]">Why was this {label}? Your coach explains it, and what to play instead.</p>
+      <div className="mt-2 flex items-center gap-2">
+        <button onClick={() => void go()} disabled={busy} className="flex-1 rounded-xl py-2 text-[13px] font-extrabold disabled:opacity-60" style={{ background: GREEN, color: '#06110A' }}>
+          {busy ? 'Opening…' : 'Try Pro free for 3 days'}
+        </button>
+        {onUpgrade && <button onClick={onUpgrade} className="rounded-xl px-3 py-2 text-[12px] font-bold text-[#C9CFCD]" style={{ background: 'rgba(255,255,255,.06)' }}>What's in Pro</button>}
+      </div>
+      {err && <p className="mt-1.5 text-[11.5px] font-bold text-[#FF7A80]">{err}</p>}
+    </motion.div>
+  );
 }
 
 type Mode = { kind: 'main' } | { kind: 'best'; step: number } | { kind: 'reply'; step: number } | { kind: 'retry'; state: 'trying' | 'right' | 'wrong' };
@@ -555,6 +588,14 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
 
         {/* Between the board and the move strip: the start and end summaries (scrolls if tall). */}
         <div className="hide-scrollbar min-h-0 flex-1 overflow-y-auto pb-1 lg:col-start-2 lg:row-start-2 lg:[&>div]:mx-0">
+        {/* Free accounts, on a move that cost something: where Pro's coach notes go, what the
+            coach would tell them (Pro reviews are untouched: this needs !canFullAnalysis). */}
+        {!canFullAnalysis && !detail && bad && mode.kind === 'main' && ply > 0 && status === 'ready' && (
+          <div className="px-3 pt-2">
+            <CoachTeaser key={animKey} label={({ inaccuracy: 'an inaccuracy', mistake: 'a mistake', blunder: 'a blunder', missed_win: 'a missed win' } as Record<string, string>)[rev!.classification] ?? 'a mistake'} onUpgrade={onUpgrade} />
+          </div>
+        )}
+
         {/* More from the coach about this move */}
         {detail && (
           <div className="px-3 pt-2">

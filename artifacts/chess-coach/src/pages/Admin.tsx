@@ -3228,7 +3228,7 @@ function LandingFunnelPanel() {
 type TrialStats = {
   path?: { saw: number; tapped: number; closedOnly: number; neither: number; tappedThenCheckout: number; checkoutPeople: number; checkoutFailed: number } | null;
   promo: { shown: number; start: number; dismiss: number; closeMedianSecs?: number | null; closedUnder4s?: number };
-  checkout: { total: number; promo: number; subscription: number; pricing: number; email: number };
+  checkout: { total: number; promo: number; subscription: number; pricing: number; email: number; coach?: number };
   trials: { started: number; inTrial: number; cancelling: number; paid: number; paidCancelling: number; paymentFailed: number; ended: number };
   recent: { email: string | null; status: string; startedAt: string; trialEnd: string | null; outcome: string }[];
   stripeError: string | null;
@@ -3386,6 +3386,7 @@ function TrialStatsPanel() {
                 <Stat label="Subscription page" value={data.checkout.subscription} />
                 <Stat label="Pricing page" value={data.checkout.pricing} />
                 <Stat label="Email offer" value={data.checkout.email} />
+                <Stat label="Coach card on reviews" value={data.checkout.coach ?? 0} />
               </div>
             </div>
             <div>
@@ -4297,7 +4298,7 @@ ${divider}
 </table>
 ${divider}
 <p style="text-align:center;"><a href="https://chessscout.net/puzzles" style="${btnStyle}">Solve Today's Puzzles →</a></p>
-<p style="text-align:center;margin-top:8px;color:#87918E;font-size:12px;">Unlimited puzzles for everyone &nbsp;|&nbsp; Pro adds AI explanations</p>`,
+<p style="text-align:center;margin-top:8px;color:#87918E;font-size:12px;">Unlimited puzzles for everyone &nbsp;|&nbsp; Pro adds coach explanations</p>`,
   },
   {
     name: '📊 Your Weekly Stats',

@@ -627,7 +627,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
                       <Crown className="w-5 h-5" style={{ color: '#E8B447' }} />
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-extrabold" style={{ color: TEXT_LIGHT }}>Go Pro</span>
-                        <span className="block text-[11.5px]" style={{ color: TEXT_MUTED }}>AI coach, courses and scouting reports · $5/mo</span>
+                        <span className="block text-[11.5px]" style={{ color: TEXT_MUTED }}>Your coach, courses and scouting reports · $5/mo</span>
                       </span>
                       <ChevronRight className="w-4 h-4" style={{ color: '#E8B447' }} />
                     </div>

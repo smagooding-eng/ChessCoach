@@ -15,15 +15,15 @@ const CARD = '#1c1b19';
 const ROWS: { feature: string; free: boolean | string; pro: boolean | string; chesscomFree: boolean | string }[] = [
   { feature: 'Cross-game pattern detection', free: false, pro: true, chesscomFree: false },
   { feature: 'Single-game review (Stockfish)', free: true, pro: true, chesscomFree: true },
-  { feature: 'AI coach explanations & game summary', free: false, pro: true, chesscomFree: false },
+  { feature: 'Coach explanations & game summary', free: false, pro: true, chesscomFree: false },
   { feature: 'Basic analysis (from reviewed games)', free: true, pro: true, chesscomFree: false },
   { feature: 'Deep weakness analysis', free: false, pro: true, chesscomFree: false },
   { feature: 'Personalized courses', free: false, pro: true, chesscomFree: false },
-  { feature: 'Opponent scouting', free: 'Unlimited stats', pro: '+ AI weaknesses & prep', chesscomFree: false } as any,
+  { feature: 'Opponent scouting', free: 'Unlimited stats', pro: '+ Coach weaknesses & prep', chesscomFree: false } as any,
   { feature: 'Practice bots & Opening Trainer', free: true, pro: true, chesscomFree: false },
   { feature: 'Local Play', free: true, pro: true, chesscomFree: false },
   { feature: 'Scan Position (photo → board)', free: false, pro: true, chesscomFree: false },
-  { feature: 'Puzzles', free: 'Unlimited', pro: '+ AI explanations', chesscomFree: true } as any,
+  { feature: 'Puzzles', free: 'Unlimited', pro: '+ Coach explanations', chesscomFree: true } as any,
   { feature: 'Lesson read-aloud', free: 'Device voice', pro: 'Natural coach voice', chesscomFree: false } as any,
   { feature: 'Games viewable', free: 'Unlimited', pro: 'Unlimited', chesscomFree: '—' } as any,
   { feature: 'Create tournaments', free: true, pro: true, chesscomFree: false },
@@ -90,12 +90,12 @@ export default function PricingPage() {
             <p className="text-3xl font-black mb-1" style={{ color: TEXT }}>$5<span className="text-sm font-normal" style={{ color: MUTED }}>{t('/mo')}</span></p>
             <p className="text-xs mb-4" style={{ color: MUTED }}>{t('Cancel anytime')}</p>
             <ul className="space-y-2 text-sm mb-6" style={{ color: TEXT }}>
-              <li>{t('AI coach on every game you review')}</li>
+              <li>{t('Your coach on every game you review')}</li>
               <li>{t('Personalized courses from your mistakes')}</li>
-              <li>{t('AI scouting reports: weaknesses & prep')}</li>
-              <li>{t('Full AI weakness analysis')}</li>
+              <li>{t('Coach scouting reports: weaknesses & prep')}</li>
+              <li>{t('Full coach weakness analysis')}</li>
               <li>{t('Scan a board from a photo')}</li>
-              <li>{t('AI puzzle explanations & natural-voice lessons')}</li>
+              <li>{t('Coach puzzle explanations & natural-voice lessons')}</li>
               <li>{t('Join every Pro tournament free')}</li>
               <li>{t('Host Pro tournaments and earn $1 per new Pro signup')}</li>
             </ul>

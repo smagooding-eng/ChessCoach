@@ -532,8 +532,8 @@ export function AnalysisRedesign() {
             {freePlan && (
               <ProUpsell
                 title="Get courses built from your own games"
-                text="The AI coach turns the mistakes Stockfish finds in your games into short lessons and drills."
-                perks={['Lessons from your real positions', 'The AI coach on every game you review', 'AI scouting reports on your opponents']}
+                text="Your coach turns the mistakes Stockfish finds in your games into short lessons and drills."
+                perks={['Lessons from your real positions', 'Your coach on every game you review', 'Coach scouting reports on your opponents']}
               />
             )}
             {courses.length ? (

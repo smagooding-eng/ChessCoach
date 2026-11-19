@@ -2489,7 +2489,7 @@ router.post("/free-review", requireAuth, async (req, res): Promise<void> => {
   const pro = await isUserPremium(userId).catch(() => false);
   if (!pro) {
     const [used] = rowsOfAny<{ game_id: number }>(await db.execute(sql`SELECT game_id FROM free_ai_reviews WHERE user_id = ${userId}`));
-    if (used) { res.status(409).json({ error: "You've already used your free AI review.", gameId: used.game_id }); return; }
+    if (used) { res.status(409).json({ error: "You've already used your free coach review.", gameId: used.game_id }); return; }
     const [{ n } = { n: 0 }] = rowsOfAny<{ n: number }>(await db.execute(sql`SELECT count(*)::int AS n FROM free_ai_reviews WHERE created_at > now() - interval '1 day'`));
     if (n >= FREE_REVIEW_DAILY_CAP) { res.status(429).json({ error: "Today's free reviews are all taken. Come back tomorrow." }); return; }
   }

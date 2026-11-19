@@ -204,7 +204,7 @@ const DEFAULT_PREFS = {
   /** With remix on: a new board and pieces every move, or once per scene (a run of moves, a card, the intro…). */
   remixEvery: 'move' as 'move' | 'scene', captions: true, effects: true, arrow: true, sound: true, watermark: true,
   bg: 'green', betterLine: true, guessRating: false, outro: true, progress: true, intro: true, safeArea: true, showNames: false,
-  handle: '@chessscout.net3', outroLine: 'Free AI game review: chessscout.net/review',
+  handle: '@chessscout.net3', outroLine: 'Free game review: chessscout.net/review',
   /** Call to action on the closing splash: spoken (with the voiceover on) and shown as big subtitles. */
   splashCta: true, ctaLine: 'Follow for more chess, and share this with a friend who needs to see it!',
   /** Adds a ChessScout.net line after the call to action (spoken and subtitled). */
@@ -244,7 +244,7 @@ function loadPrefs(): Prefs {
     // Once: the tilted board was briefly the default; it's flat now.
     if (!saved.tiltV1) { saved.tilt = false; saved.tiltV1 = 1; }
     // Once: the old end-card line becomes the free AI review link (and the end card is back on).
-    if (!saved.outroV2) { if (!saved.outroLine || saved.outroLine === 'Review your games free') saved.outroLine = 'Free AI game review: chessscout.net/review'; saved.outro = true; saved.outroV2 = 1; }
+    if (!saved.outroV2) { if (!saved.outroLine || saved.outroLine === 'Review your games free') saved.outroLine = 'Free game review: chessscout.net/review'; saved.outro = true; saved.outroV2 = 1; }
     if (!saved.voiceV2) { if (!saved.voiceName || saved.voiceName === 'onyx' || saved.voiceName === 'nova') saved.voiceName = 'ash'; saved.voiceV2 = 1; }
     return { ...DEFAULT_PREFS, ...saved };
   } catch { return DEFAULT_PREFS; }

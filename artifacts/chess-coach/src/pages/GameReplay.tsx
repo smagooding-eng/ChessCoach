@@ -1670,7 +1670,7 @@ export function GameReplay() {
                   <span className="text-[12.5px] font-extrabold" style={{ color: '#81B64C' }}>Add</span>
                 </button>
               ) : (
-                <ProUpsell compact title="Stockfish review" text="Get the AI coach's plain-English explanation for every move and a summary of the game." />
+                <ProUpsell compact title="Stockfish review" text="Get your coach's plain-English explanation for every move and a summary of the game." />
               )}
             </div>
           )}
@@ -1960,7 +1960,7 @@ export function GameReplay() {
           {isSubscriptionLoaded && !isPremium && reviewMoves.length > 0 && reviewAi === false && (
             <ProUpsell
               title="See why the game was won or lost"
-              text="This report is from Stockfish. Pro adds the AI coach on every game you review."
+              text="This report is from Stockfish. Pro adds your coach on every game you review."
               perks={['A plain-English explanation for every move', 'A game summary: key mistakes, strengths and what to work on', 'Courses built from these mistakes']}
             />
           )}

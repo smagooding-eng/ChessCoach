@@ -222,7 +222,7 @@ export function useBackToClose(onClose: () => void, active = true) {
 // link. It plays after the reel's own ending (in previews and MP4 renders).
 export const FOLLOW_END_MS = 2600;
 export const FOLLOW_HANDLE = '@chessscout.net3';
-export const FREE_REVIEW_LINE = 'Free AI review of your game';
+export const FREE_REVIEW_LINE = 'Free review of your game';
 export const FREE_REVIEW_URL = 'chessscout.net/review';
 
 /** play() calls end.reset() when it starts and end.finish(onDone) where it used to call onDone. */

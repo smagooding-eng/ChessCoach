@@ -2148,7 +2148,7 @@ function ProfileRedesign() {
           <div className="lg:col-span-2">
             <ProUpsell
               title="Get the full coach"
-              perks={['The AI coach on every game you review', 'Courses built from your own mistakes', 'AI scouting reports on your opponents']}
+              perks={['Your coach on every game you review', 'Courses built from your own mistakes', 'Coach scouting reports on your opponents']}
             />
           </div>
         )}

@@ -94,14 +94,14 @@ export default function FreeReview() {
           <img src={`${import.meta.env.BASE_URL}images/logo.svg`} alt="" className="h-8 w-8" />
           <span className="text-[17px] font-black">Chess<span style={{ color: RD.green }}>Scout</span></span>
         </div>
-        <h1 className="text-[30px] font-black leading-tight">Get a free AI review of one of your games</h1>
+        <h1 className="text-[30px] font-black leading-tight">Get a free coach review of one of your games</h1>
         <p className="mt-2 text-[15px] leading-relaxed" style={{ color: RD.muted }}>
           Your coach goes through the game move by move: your accuracy, the moves that cost you, what you should have played, and what to work on.
         </p>
 
         {status?.used && !status.pro && (
           <div className="mt-6 rounded-2xl p-4" style={card}>
-            <p className="text-[15px] font-extrabold">You've used your free AI review</p>
+            <p className="text-[15px] font-extrabold">You've used your free coach review</p>
             <p className="mt-1 text-[13.5px]" style={{ color: RD.muted }}>It's saved in your games. Pro reviews every game you play.</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {status.gameId && <button onClick={() => navigate(`/games/${status.gameId}`)} className="rounded-xl px-4 py-2.5 text-[13.5px] font-extrabold" style={{ background: RD.green, color: '#06110A' }}>Open my review</button>}

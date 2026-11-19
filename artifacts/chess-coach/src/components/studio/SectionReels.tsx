@@ -56,7 +56,7 @@ export const SECTIONS: SectionDef[] = [
       { type: 'board', caption: 'Every move, rated by Stockfish', sans: 'e4 e5 Bc4 Nc6 Qh5 Nf6 Qxf7#'.split(' '), stepMs: 1100, top: 'Opponent', bottom: 'You', flipped: true,
         badges: { 1: 'book', 2: 'book', 3: 'good', 4: 'good', 5: 'inaccuracy', 6: 'blunder', 7: 'checkmate' },
         arrows: { 6: [{ from: 'g7', to: 'g6', color: G }] }, say: { 6: 'Blunder. g6 stops the mate.', 7: 'Checkmate.' } },
-      { type: 'list', caption: 'See exactly what went wrong', title: 'Move labels', items: [{ label: 'Brilliant', color: '#1BACA6' }, { label: 'Best', color: G }, { label: 'Inaccuracy', color: GOLD }, { label: 'Mistake', color: ORANGE }, { label: 'Blunder', color: RED }, { label: 'The AI coach explains why', pro: true }] },
+      { type: 'list', caption: 'See exactly what went wrong', title: 'Move labels', items: [{ label: 'Brilliant', color: '#1BACA6' }, { label: 'Best', color: G }, { label: 'Inaccuracy', color: GOLD }, { label: 'Mistake', color: ORANGE }, { label: 'Blunder', color: RED }, { label: 'Your coach explains why', pro: true }] },
     ] },
   { id: 'weaknesses', label: 'Weaknesses 🎯', closer: 'Find your weaknesses free', url: 'chessscout.net', caption: "What's really losing you games? ChessScout finds it in your own games. 🎯",
     scenes: [
@@ -90,7 +90,7 @@ export const SECTIONS: SectionDef[] = [
     scenes: [
       { type: 'hook', icon: 'puzzle', title: 'Unlimited free puzzles', flips: ['no daily limit', 'hints when you need them', 'every theme'] },
       demoBoard('mate-in-2', 'White to play. Can you find it?', { badges: {} }),
-      { type: 'list', caption: 'As many as you want', title: 'Puzzles', items: [{ label: 'Unlimited, free' }, { label: 'Hints show the next move' }, { label: 'AI explanations', pro: true }] },
+      { type: 'list', caption: 'As many as you want', title: 'Puzzles', items: [{ label: 'Unlimited, free' }, { label: 'Hints show the next move' }, { label: 'Coach explanations', pro: true }] },
     ] },
   { id: 'scan', label: 'Scan a position 📸', closer: 'Scan your board', url: 'chessscout.net/scan', caption: 'Snap a photo of any chess board and see the best move. 📸',
     scenes: [
@@ -102,7 +102,7 @@ export const SECTIONS: SectionDef[] = [
     scenes: [
       { type: 'hook', icon: 'crosshair', title: 'Know your opponent first', flips: ['their openings', 'their weak spots', 'how they lose'] },
       { type: 'list', caption: 'Type any username', title: 'Opponent Scout', typed: 'their_username', tag: 'Example', items: [{ label: 'Favourite opening as white', sub: 'Italian Game', pct: 46, color: G }, { label: 'Favourite defence as black', sub: 'Sicilian', pct: 41, color: G }, { label: 'Games they lose on time', pct: 18, color: GOLD }] },
-      { type: 'list', caption: 'Walk in prepared', title: 'Your prep', items: [{ label: 'Their stats, unlimited and free' }, { label: 'Their results with each opening' }, { label: 'AI weaknesses and prep', pro: true }] },
+      { type: 'list', caption: 'Walk in prepared', title: 'Your prep', items: [{ label: 'Their stats, unlimited and free' }, { label: 'Their results with each opening' }, { label: 'Coach weaknesses and prep', pro: true }] },
     ] },
   { id: 'kids', label: 'Kids 🧒', closer: 'Start your kids free', url: 'chessscout.net/kids', caption: 'Chess for kids: short lessons, one piece at a time. 🧒',
     scenes: [

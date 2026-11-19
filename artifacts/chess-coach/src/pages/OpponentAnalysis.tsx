@@ -517,7 +517,7 @@ export function OpponentAnalysis() {
         statusMsg={statusMsg}
         error={error}
         isLimitReached={isLimitReached}
-        limitNudge={<UpgradeNudge headline="See this player's weaknesses" subtext="Free scouts show the record, openings and head-to-head. Pro adds an AI scouting report: their weaknesses and how to exploit them." />}
+        limitNudge={<UpgradeNudge headline="See this player's weaknesses" subtext="Free scouts show the record, openings and head-to-head. Pro adds a coach scouting report: their weaknesses and how to exploit them." />}
         result={result}
         topPlayers={topPlayers}
         history={scoutHistory}
@@ -629,7 +629,7 @@ export function OpponentAnalysis() {
       {error && isLimitReached && (
         <UpgradeNudge
           headline="See this player's weaknesses"
-          subtext="Free scouts show the record, openings and head-to-head. Pro adds an AI scouting report: their weaknesses and how to exploit them."
+          subtext="Free scouts show the record, openings and head-to-head. Pro adds a coach scouting report: their weaknesses and how to exploit them."
         />
       )}
 
