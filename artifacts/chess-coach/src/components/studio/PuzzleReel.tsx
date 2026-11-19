@@ -351,7 +351,7 @@ export function PuzzleReel({ opts: initial, render = false, onClose }: { opts?: 
           </label>
           <LookPicker value={opts.look} onChange={(v) => setOpts({ ...opts, look: v })} />
           <EngagePicker kind="puzzle" value={opts.engage} onChange={(v) => setOpts({ ...opts, engage: v })} label="Comment prompt beside the countdown (and first line of the caption)" />
-          <CaptionBox key={caption + (opts.engage ?? '')} text={withEngage(opts.engage, caption)} />
+          <CaptionBox firstComment={false} key={caption + (opts.engage ?? '')} text={withEngage(opts.engage, caption)} />
           {p && <PinnedBox text={hiddenAnswer(answerSan || 'see tomorrow’s reel')} />}
           <p className="text-[11.5px] text-white/45">Every puzzle you make an MP4 or Clean view of is saved with its answer in the Content Studio’s <b>Answers 📌</b> tab. The small #{p?.id ?? 'number'} on the reel tells you which one a comment is about.</p>
           {!opts.reveal && <p className="text-[11.5px] text-white/45">Tip: post the answer as its own reel the next day ("Yesterday's puzzle: here's the answer"), with the same puzzle and "Show the answer" ticked.</p>}

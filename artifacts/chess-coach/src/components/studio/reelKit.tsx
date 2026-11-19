@@ -15,7 +15,33 @@ export function reelFrameSize(full: boolean): React.CSSProperties {
 }
 
 /** A caption you can edit and copy in one tap. */
-export function CaptionBox({ text, label = 'Caption' }: { text: string; label?: string }) {
+// Every reel's caption asks for a comment, and an automatic DM sends the link (set up once
+// in Buzzfy / Instagram: keyword REVIEW → the Instagram page). A link in a DM gets tapped far
+// more than "link in bio", and it opens the page made for Instagram visitors.
+export const DM_KEYWORD = 'REVIEW';
+export const DM_LINK = 'https://chessscout.net/instagram?utm_source=instagram&utm_medium=dm&utm_campaign=comment_dm';
+const DM_CTA = `💬 Comment ${DM_KEYWORD} and I'll DM you the free link`;
+export const FIRST_COMMENT = `Want this for your own games? Comment ${DM_KEYWORD} 👇 and I'll send you the link. Free reviews of your Chess.com and Lichess games.`;
+/** The caption with the comment-for-the-link line, right after the first paragraph. */
+export const withDmCta = (caption: string) => {
+  if (caption.includes(`Comment ${DM_KEYWORD}`)) return caption;
+  const parts = caption.split('\n\n');
+  parts.splice(Math.min(1, parts.length), 0, DM_CTA);
+  return parts.join('\n\n');
+};
+
+export function CaptionBox({ text: raw, label = 'Caption', firstComment = true }: { text: string; label?: string; firstComment?: boolean }) {
+  const isCaption = label === 'Caption';
+  const text = isCaption ? withDmCta(raw) : raw;
+  return (
+    <>
+      <CopyBox text={text} label={label} />
+      {isCaption && firstComment && <div className="mt-2"><CopyBox text={FIRST_COMMENT} label="First comment (post it, then pin it)" /></div>}
+    </>
+  );
+}
+
+function CopyBox({ text, label }: { text: string; label: string }) {
   const [edit, setEdit] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const value = edit ?? text;

@@ -305,7 +305,7 @@ export function NumbersReel({ opts: initial = NUMBERS_REEL_DEFAULT, render = fal
             </select>
           </label>
           <LookPicker value={opts.look} onChange={(v) => setOpts({ ...opts, look: v })} />
-          <CaptionBox key={opts.question} text={withEngage(opts.question, `There are about 10^120 possible chess games, and only about 10^80 atoms in the observable universe. After just five moves each there are already 69,352,859,712,417 ways the game could have gone.\n\nSo unless it ended early, your last game was probably a first. You can't memorise chess, but you can learn your own patterns. Free game reviews at chessscout.net ♟️\n\n#chess #chesstok #chessfacts #shannonnumber #chessscout`)} />
+          <CaptionBox firstComment={false} key={opts.question} text={withEngage(opts.question, `There are about 10^120 possible chess games, and only about 10^80 atoms in the observable universe. After just five moves each there are already 69,352,859,712,417 ways the game could have gone.\n\nSo unless it ended early, your last game was probably a first. You can't memorise chess, but you can learn your own patterns. Free game reviews at chessscout.net ♟️\n\n#chess #chesstok #chessfacts #shannonnumber #chessscout`)} />
           <PinnedBox text={'Fun fact: after just 3 moves each there are already 119,060,324 possible games ♟️ What was your first move today?'} />
           <div className="flex flex-wrap gap-2">
             <button onClick={() => play()} className="inline-flex items-center gap-1.5 rounded-lg bg-[#81B64C] px-3 py-1.5 text-[12.5px] font-black text-white"><Play size={14} />Replay</button>

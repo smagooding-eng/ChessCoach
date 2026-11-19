@@ -409,7 +409,7 @@ export function TrapReel({ opts: initial, render = false, onClose }: { opts?: Tr
             </select>
           </label>
           <LookPicker value={opts.look} onChange={(v) => setOpts({ ...opts, look: v })} />
-          <CaptionBox key={caption} text={caption} />
+          <CaptionBox firstComment={false} key={caption} text={caption} />
           <PinnedBox text={`Have you ever fallen for the ${trap.name}? 😅\nFull line: ${pgn}`} />
           <div className="flex flex-wrap gap-2">
             <button onClick={() => play()} className="inline-flex items-center gap-1.5 rounded-lg bg-[#81B64C] px-3 py-1.5 text-[12.5px] font-black text-white"><Play size={14} />Replay</button>

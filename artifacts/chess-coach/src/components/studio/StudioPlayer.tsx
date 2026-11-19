@@ -12,7 +12,7 @@ import { StudioSplash } from './StudioSplash';
 import { RenderMp4 } from './RenderMp4';
 import { StudioMusic, MUSIC_STYLES, bpmOf, type MusicStyle } from './studioMusic';
 import { mapTree, findEpisode, nextEpisode, partLabel, type MapEpisode } from './openingMap';
-import { reelFrameSize, EngagePicker, useBackToClose } from './reelKit';
+import { reelFrameSize, EngagePicker, useBackToClose, withDmCta, FIRST_COMMENT } from './reelKit';
 import { useFreeVoices } from './freeVoices';
 
 // Content Studio player: a game moment or a trap lesson as a 9:16 clip for
@@ -2052,7 +2052,7 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
   };
 
   // ── Post kit ────────────────────────────────────────────────────────────
-  const postText = clip ? `${earlyText ? `${earlyText}\n` : ''}${isComp ? stripEmoji(compTitle) : hook}\n\n${clip.isTrap ? 'Would you fall for it? 👇' : clip.isPuzzle ? 'Did you solve it? Drop the first move in the comments 👇' : clip.isReview ? 'Which move would you have played differently? 👇' : clip.isLesson ? 'Learning chess? Save this one and share it with a friend 👇' : clip.isMap ? 'Which of these do you play? Drop it in the comments 👇' : clip.isOpening ? 'Which line do you play? Drop it in the comments 👇' : clip.isScout ? 'Who should I scout next? Drop a username 👇' : clip.isScan ? 'Want me to scan your board? Drop a photo in the comments 👇' : clip.isPromo ? (clip.promo?.template === 'versus' ? 'Would you switch? 👇' : clip.promo?.template === 'live' ? 'Blitz or rapid? Tell me below 👇' : clip.promo?.template === 'tour' ? 'Which one are you trying first? 👇' : 'Tag the friend you want to beat 👇') : 'Would you have found it? Comment your move 👇'}\nReview your own games free at chessscout.net${clip.isPromo ? '\nOn Lichess? Join our team: lichess.org/team/chessscoutnet' : ''}\n\n${hashtagsFor(clip)}` : '';
+  const postText = clip ? withDmCta(`${earlyText ? `${earlyText}\n` : ''}${isComp ? stripEmoji(compTitle) : hook}\n\n${clip.isTrap ? 'Would you fall for it? 👇' : clip.isPuzzle ? 'Did you solve it? Drop the first move in the comments 👇' : clip.isReview ? 'Which move would you have played differently? 👇' : clip.isLesson ? 'Learning chess? Save this one and share it with a friend 👇' : clip.isMap ? 'Which of these do you play? Drop it in the comments 👇' : clip.isOpening ? 'Which line do you play? Drop it in the comments 👇' : clip.isScout ? 'Who should I scout next? Drop a username 👇' : clip.isScan ? 'Want me to scan your board? Drop a photo in the comments 👇' : clip.isPromo ? (clip.promo?.template === 'versus' ? 'Would you switch? 👇' : clip.promo?.template === 'live' ? 'Blitz or rapid? Tell me below 👇' : clip.promo?.template === 'tour' ? 'Which one are you trying first? 👇' : 'Tag the friend you want to beat 👇') : 'Would you have found it? Comment your move 👇'}\nReview your own games free at chessscout.net${clip.isPromo ? '\nOn Lichess? Join our team: lichess.org/team/chessscoutnet' : ''}\n\n${hashtagsFor(clip)}`) : '';
   const [copied, setCopied] = useState(false);
   const copyPost = () => { navigator.clipboard?.writeText(postText).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }).catch(() => {}); };
 
@@ -3633,6 +3633,8 @@ export function StudioPlayer({ source, queue: initialQueue, title, onClose, onNe
           <p className="mb-1 mt-3 text-[11px] font-bold uppercase tracking-wide text-white/50">Post caption</p>
           <textarea readOnly value={postText} rows={6} className="w-full resize-none rounded-lg bg-white/5 p-2.5 text-[12.5px] text-white/85 ring-1 ring-white/10" />
           <button onClick={copyPost} className="mt-1.5 flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-[12.5px] font-bold"><Copy size={13} />{copied ? 'Copied' : 'Copy caption'}</button>
+          <p className="mt-2 text-[11.5px] font-bold uppercase tracking-wide text-white/50">First comment (post it, then pin it)</p>
+          <textarea readOnly value={FIRST_COMMENT} rows={2} onFocus={(e) => e.currentTarget.select()} className="w-full resize-none rounded-lg bg-white/5 p-2.5 text-[12.5px] text-white/85 ring-1 ring-white/10" />
 
           <p className="mt-3 text-[11.5px] leading-snug text-white/45">
             Music is made live in the browser (original, no copyright claims); it starts on the beat when you press Play. Space plays, arrows step, R restarts, N / P next and previous moment, Esc leaves clean view. "Record clip" saves just the frame (Chrome on a computer: pick this tab and turn on tab audio for move sounds).
