@@ -2063,7 +2063,8 @@ router.post("/games/:id/coach-gaps", requireAuth, async (req, res): Promise<void
   const rd = game.reviewData as Record<string, unknown> | null;
   const moves = rd && Array.isArray(rd.moves) ? (rd.moves as MoveReview[]) : null;
   // One try per review: moves the coach still can't cover aren't asked about on every visit
-  if (!rd || !moves || !aiFlag(rd) || rd.coachGapsTried || !(await aiCoachForOwner(game.userId))) { res.json({ filled: 0 }); return; }
+  // coachGapsDone: gaps filled (the first version could leave some, marked coachGapsTried)
+  if (!rd || !moves || !aiFlag(rd) || rd.coachGapsDone || !(await aiCoachForOwner(game.userId))) { res.json({ filled: 0 }); return; }
   if (coachGapRuns.has(id)) { res.json({ filled: 0, busy: true }); return; }
   coachGapRuns.add(id);
   try {
@@ -2071,7 +2072,7 @@ router.post("/games/:id/coach-gaps", requireAuth, async (req, res): Promise<void
       moves, whiteUsername: game.whiteUsername, blackUsername: game.blackUsername,
       opening: game.opening ?? null, result: game.result ?? "", userId: game.userId ?? undefined,
     });
-    await db.update(gamesTable).set({ reviewData: { ...rd, moves, coachGapsTried: true } as unknown as Record<string, unknown> }).where(eq(gamesTable.id, id));
+    await db.update(gamesTable).set({ reviewData: { ...rd, moves, coachGapsDone: true } as unknown as Record<string, unknown> }).where(eq(gamesTable.id, id));
     res.json({
       filled,
       reviewData: filled > 0 ? {

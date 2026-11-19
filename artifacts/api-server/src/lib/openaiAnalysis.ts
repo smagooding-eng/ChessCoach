@@ -1269,6 +1269,19 @@ export async function fillCoachGaps(opts: {
     };
   };
 
+  const factsFor = (i: number) => {
+    const m = moves[i], fenB = before(i), fenA = after(i);
+    if (!fenB || !fenA) return null;
+    let legal = 0;
+    try { legal = new Chess(fenB).moves().length; } catch { return null; }
+    return computeEngineFacts({
+      fenBefore: fenB, fenAfter: fenA, evalBefore: evalAt(i),
+      evalAfter: { ...evalAt(i + 1), cpWhite: m.evalAfterCp ?? evalAt(i + 1).cpWhite },
+      sanPlayed: m.san, classification: m.classification, playerColor: m.color,
+      inBook: m.classification === "book", legalMoveCount: legal,
+    });
+  };
+
   const lines: Array<{ i: number; line: string }> = [];
   for (const i of gaps) {
     const m = moves[i], fen = before(i);
@@ -1277,13 +1290,11 @@ export async function fillCoachGaps(opts: {
     try { legal = new Chess(fen).moves().length; } catch { continue; }
     lines.push({ i, line: `${i}: ${Math.floor(i / 2) + 1}${m.color === "white" ? "." : "..."} ${m.san} [fen:${fen}] [legal:${legal}] [engine: ${m.classification}]` });
   }
-  if (lines.length === 0) return 0;
-
   const GROUP = 12;
   const groups: Array<typeof lines> = [];
   for (let k = 0; k < lines.length; k += GROUP) groups.push(lines.slice(k, k + GROUP));
   const model = "gpt-5.6-luna";
-  const settled = await Promise.allSettled(groups.map((g) => openai.chat.completions.create({
+  const settled = lines.length === 0 ? [] : await Promise.allSettled(groups.map((g) => openai.chat.completions.create({
     model,
     max_completion_tokens: Math.min(8192, 600 + g.length * 260),
     response_format: { type: "json_object" },
@@ -1315,16 +1326,8 @@ JSON format:
       if (typeof i !== "number" || !asked.has(i)) continue;
       const m = moves[i];
       if ((m.pros?.length ?? 0) || (m.cons?.length ?? 0)) continue;
-      const fenB = before(i), fenA = after(i);
-      if (!fenB || !fenA) continue;
-      let legal = 0;
-      try { legal = new Chess(fenB).moves().length; } catch { continue; }
-      const facts = computeEngineFacts({
-        fenBefore: fenB, fenAfter: fenA, evalBefore: evalAt(i),
-        evalAfter: { ...evalAt(i + 1), cpWhite: m.evalAfterCp ?? evalAt(i + 1).cpWhite },
-        sanPlayed: m.san, classification: m.classification, playerColor: m.color,
-        inBook: m.classification === "book", legalMoveCount: legal,
-      });
+      const facts = factsFor(i);
+      if (!facts) continue;
       const pros = (Array.isArray(a.pros) ? a.pros : []).filter((p): p is string => typeof p === "string" && !!p.trim());
       const cons = (Array.isArray(a.cons) ? a.cons : []).filter((c): c is string => typeof c === "string" && !!c.trim());
       const cleanPros = pros.filter((p) => reconcileExplanation(p, facts).ok);
@@ -1342,6 +1345,18 @@ JSON format:
   });
   if (promptTokens || completionTokens) {
     void trackAiUsage({ userId: opts.userId, feature: AI_FEATURES.FULL_GAME_REVIEW, model, usage: { prompt_tokens: promptTokens, completion_tokens: completionTokens } });
+  }
+  // Whatever the coach still didn't cover (its request failed, or it skipped the move):
+  // the engine-based notes, as the main review uses when the AI's text doesn't fit.
+  // No move of an AI review is left without notes.
+  for (const i of coachGaps(moves)) {
+    const facts = factsFor(i);
+    if (!facts) continue;
+    const fb = buildFallbackProsCons(facts);
+    if (!fb.pros.length && !fb.cons.length) continue;
+    moves[i].pros = fb.pros;
+    moves[i].cons = fb.cons;
+    filled++;
   }
   logger.info({ gaps: gaps.length, filled }, "Coach gap pass");
   return filled;
