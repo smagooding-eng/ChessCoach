@@ -1,3 +1,4 @@
+import { markValueMoment } from '@/lib/valueMoment';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getApiBase, apiFetch, getAuthToken } from '@/lib/api';
 
@@ -498,6 +499,8 @@ export function useLivePlay() {
 
   const reset = useCallback(() => {
     const g = gameRef.current;
+    // Back to the lobby after a finished game: a moment the Pro offer can follow.
+    if (g && g.status === 'finished') markValueMoment('live_game');
     // Mid-game: just step back to the lobby; the game (and clock) carries on. A bot game
     // ends instead (it's casual): there's nothing to come back to.
     const vsBot = !!g && (colorRef.current === 'w' ? g.black : colorRef.current === 'b' ? g.white : null)?.isBot;

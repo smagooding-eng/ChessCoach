@@ -1,3 +1,4 @@
+import { markValueMoment } from '@/lib/valueMoment';
 import { startTrial } from '@/lib/startTrial';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
@@ -472,6 +473,13 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
   const studioPros = studioMain ? JSON.stringify(rev!.pros ?? []) : '[]', studioCons = studioMain ? JSON.stringify(rev!.cons ?? []) : '[]';
 
   const atEnd = ply >= max && mode.kind === 'main';
+  // Went through the whole game: a moment the Pro offer can follow (free accounts only).
+  const endMarked = useRef(false);
+  useEffect(() => {
+    if (!atEnd || endMarked.current || canFullAnalysis || status !== 'ready' || max < 2) return;
+    endMarked.current = true;
+    markValueMoment('review');
+  }, [atEnd, canFullAnalysis, status, max]);
   let look: BoardLook | null = null;
   if (remixOn) { look = remixLooks.current.get(ply) ?? randomLook(); remixLooks.current.set(ply, look); }
   const canExpand = mode.kind === 'main' && !!rev && ply > 0 && !!splitText(rev.explanation).rest;

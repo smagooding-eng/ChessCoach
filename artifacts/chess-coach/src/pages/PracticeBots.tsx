@@ -1,3 +1,4 @@
+import { markValueMoment } from '@/lib/valueMoment';
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { ShareButton, SHARE_BASE } from '@/components/ShareButton';
 import { RatePlayCard } from '@/components/RatePlayCard';
@@ -416,6 +417,8 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
     } else {
       setResult('draw');
     }
+    // A finished practice game: the Pro offer can follow, once they've seen the result.
+    window.setTimeout(() => markValueMoment('bot_game'), 2500);
   }, [playerColor]);
 
   const deferAnalysis = useCallback((fenBefore: string, san: string, idx: number) => {

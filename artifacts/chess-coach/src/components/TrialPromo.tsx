@@ -1,6 +1,7 @@
 // The 3-day Pro trial, offered at most once a day to members who can still take it: a pawn walks
 // across three "days" and promotes to a queen, then the offer. Not a paywall: it shows
 // once a day, closes with "Maybe later", and stops for good once they start the trial.
+import { VALUE_EVENT, type ValueMoment } from '@/lib/valueMoment';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { Crown, X, Loader2 } from 'lucide-react';
@@ -14,7 +15,6 @@ const SEEN = (uid: string) => `cs_trial_promo_v2:${uid}`;
 const EVERY_MS = 24 * 60 * 60_000;
 /** Shown in the last couple of minutes (the notifications nudge waits its turn). */
 export const PROMO_OPEN_KEY = 'cs_promo_open_at';
-const BOARDS = /^\/(live|lichess|daily|play|puzzles?|bots?|challenge|tournaments?|studio|cc)(\/|$)/;
 // Places it would get in the way (sign-up, checkout, the free review page, the studio)
 const SKIP = /^\/(setup|login|signup|subscription|pricing|review|admin|kids|embed)(\/|$)/;
 
@@ -39,14 +39,20 @@ export function TrialPromo() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
-  // Only right as they move to another page, never while they're busy on one, and never
-  // onto a board they play or solve on.
-  const prevPath = useRef(path);
+  // Only right after something worth having: the end of a game review, or a game played
+  // here (live or against a practice bot). Never on its own, never mid-task.
+  const [moment, setMoment] = useState<{ kind: ValueMoment; at: number } | null>(null);
   useEffect(() => {
-    const moved = prevPath.current !== path; prevPath.current = path;
-    if (!moved) return;
+    const on = (e: Event) => setMoment({ kind: (e as CustomEvent<ValueMoment>).detail, at: Date.now() });
+    window.addEventListener(VALUE_EVENT, on);
+    return () => window.removeEventListener(VALUE_EVENT, on);
+  }, []);
+  const pathRef = useRef(path); pathRef.current = path;
+  useEffect(() => {
+    if (!moment) return;
+    const path = pathRef.current;
     if (!authUser || !isSubscriptionLoaded || isPremium || open) return;
-    if (STUDIO_FRAME || window.self !== window.top || SKIP.test(path) || BOARDS.test(path)) return;
+    if (STUDIO_FRAME || window.self !== window.top || SKIP.test(path)) return;
     let seen = false;
     try { const at = Number(localStorage.getItem(SEEN(authUser.id)) || 0); seen = !!at && Date.now() - at < EVERY_MS; } catch { /* storage off */ }
     if (seen) return;
@@ -64,9 +70,9 @@ export function TrialPromo() {
         const monthly = (p?.data?.[0]?.prices as Price[] | undefined)?.find((x) => x.recurring?.interval === 'month');
         if (!gone && monthly) setPrice(monthly);
       } catch { /* try again next visit */ }
-    }, 700);
+    }, moment.kind === 'review' ? 1200 : 900);
     return () => { gone = true; clearTimeout(t); };
-  }, [path]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [moment]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!open) return null;
 
@@ -124,7 +130,9 @@ export function TrialPromo() {
         </div>
 
         <div className="px-6 pb-6 pt-1 text-center">
-          <p className="tp-in text-[11.5px] font-extrabold uppercase tracking-[.2em]" style={{ color: '#E8B447', animationDelay: '.1s' }}>New · Free trial</p>
+          <p className="tp-in text-[11.5px] font-extrabold uppercase tracking-[.2em]" style={{ color: '#E8B447', animationDelay: '.1s' }}>
+            {moment?.kind === 'review' ? 'Nice review · Free trial' : moment ? 'Good game · Free trial' : 'New · Free trial'}
+          </p>
           <h2 className="tp-in mt-1.5 text-[28px] font-extrabold leading-[1.1] tracking-tight" style={{ color: '#F5F7F6', animationDelay: '.16s' }}>
             {days} days of Pro,<br />on us
           </h2>
