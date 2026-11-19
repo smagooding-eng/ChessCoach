@@ -45,6 +45,19 @@ const BOT_OFFER_MS = 20 * 1000;
 // bot: the bot comes at 7 s, or at 14 s when the app is also looking on Lichess.
 const AUTO_BOT_MS = parseInt(process.env.LIVE_AUTO_BOT_MS || "") || 7 * 1000;
 const LICHESS_FIRST_BOT_MS = 14 * 1000;
+// Other ChessScout players are on Live play right now (free, not in a game): give them a
+// chance to take the game before Lichess or a bot does.
+const HANDOFF_PEOPLE_HERE_MS = 15 * 1000;
+function othersFreeHere(userId: string): number {
+  let n = 0;
+  for (const u of userSockets.keys()) if (u !== userId && !userActiveGame.has(u)) n++;
+  return n;
+}
+// Searchers who went to play on Lichess (their screen tells us), so a late joiner hears why.
+const onLichessSince = new Map<string, number>();
+// A ChessScout player wants to play someone who's in a bot game: waiting for them to switch.
+interface SwitchAsk { joinerId: string; joinerName: string; joinerWs: WebSocket; gameId: string; timer: ReturnType<typeof setTimeout> }
+const switchAsks = new Map<string, SwitchAsk>(); // seekerId -> ask
 const DISCONNECT_GRACE_MS = 30 * 1000;    // opponent disconnect → 30s to reconnect
 const WIDEN_INTERVAL_MS = 2_000;          // periodic match scanner
 const HUMAN_COUNTRIES = [
@@ -747,12 +760,16 @@ async function joinQueue(ws: WebSocket, userId: string, username: string, tcIdIn
 
   const seed = await seedRatingFromImports(userId, tcId);
   const myRating = seed.rating;
+  onLichessSince.delete(userId);
+  // People here who could take the game: Lichess / the bot wait a little longer.
+  const peopleHere = othersFreeHere(userId) > 0;
+  const handoffMs = peopleHere ? HANDOFF_PEOPLE_HERE_MS : AUTO_BOT_MS;
 
   const key = flex ? flexKey(mode) : queueKey(tcId, mode);
   const queue = queues.get(key)!;
   const joinedAt0 = Date.now();
   queue.push({ userId, username, rating: myRating, ws, tc, mode, joinedAt: joinedAt0 });
-  send(ws, { type: 'queued', tcId: flex ? 'any' : tcId, mode, botOfferMs: BOT_OFFER_MS, autoBotMs: AUTO_BOT_MS });
+  send(ws, { type: 'queued', tcId: flex ? 'any' : tcId, mode, botOfferMs: BOT_OFFER_MS, autoBotMs: handoffMs, handoffMs });
   // Nobody to play after a short wait: start a game against a bot opponent (a little later
   // when the app is also looking for a real game on Lichess).
   const joinedAt = joinedAt0;
@@ -761,7 +778,7 @@ async function joinQueue(ws: WebSocket, userId: string, username: string, tcIdIn
     const still = (queues.get(key) ?? []).find((w) => w.userId === userId && w.joinedAt === joinedAt);
     if (!still || still.ws.readyState !== WebSocket.OPEN) return;
     void spawnBotMatch(still.ws, userId, username, flex ? 'any' : tcId).catch(() => {});
-  }, noAutoBot ? LICHESS_FIRST_BOT_MS : AUTO_BOT_MS);
+  }, noAutoBot ? handoffMs + (LICHESS_FIRST_BOT_MS - AUTO_BOT_MS) : handoffMs);
   // Try immediate match (same clock first, then anyone flexible)
   tryMatchInQueue(key);
   if (queue.some(w => w.userId === userId)) tryMatchFlex(mode);
@@ -779,7 +796,10 @@ async function joinSeek(ws: WebSocket, userId: string, username: string, seekerI
   if (!seekerId || seekerId === userId) { send(ws, { type: 'seek_gone', seekerId, self: true }); return; }
   if (userActiveGame.has(userId)) {
     const g = games.get(userActiveGame.get(userId)!);
-    if (g) { subscribeWs(ws, g.id); send(ws, { type: 'match_found', state: gamePublicState(g), color: g.white.userId === userId ? 'w' : 'b' }); return; }
+    const opp = g ? (g.white.userId === userId ? g.black : g.white) : undefined;
+    // Your own bot game gives way to a real player (bot games are casual).
+    if (g && g.status === 'active' && opp?.kind === 'bot') finishGame(g, g.white.userId === userId ? 'black' : 'white', 'abandoned');
+    else if (g) { subscribeWs(ws, g.id); send(ws, { type: 'match_found', state: gamePublicState(g), color: g.white.userId === userId ? 'w' : 'b' }); return; }
   }
   let seeker: WaitingPlayer | undefined;
   let list: WaitingPlayer[] | undefined;
@@ -788,7 +808,27 @@ async function joinSeek(ws: WebSocket, userId: string, username: string, seekerI
     if (w) { seeker = w; list = l; break; }
   }
   if (!seeker || !list || seeker.ws.readyState !== WebSocket.OPEN || userActiveGame.has(seekerId)) {
-    send(ws, { type: 'seek_gone', seekerId });
+    // Playing a bot (a stand-in because nobody was around): ask them to switch to you.
+    const gid = userActiveGame.get(seekerId);
+    const g = gid ? games.get(gid) : undefined;
+    const opp = g ? (g.white.userId === seekerId ? g.black : g.white) : undefined;
+    if (g && g.status === 'active' && opp?.kind === 'bot' && userSockets.has(seekerId) && !switchAsks.has(seekerId)) {
+      cancelQueue(userId);
+      const timer = setTimeout(() => {
+        const a = switchAsks.get(seekerId);
+        if (!a || a.joinerId !== userId) return;
+        switchAsks.delete(seekerId);
+        for (const sw of userSockets.get(seekerId) ?? []) send(sw, { type: 'switch_offer_gone' });
+        send(ws, { type: 'seek_gone', seekerId, reason: 'declined' });
+      }, 25_000);
+      switchAsks.set(seekerId, { joinerId: userId, joinerName: username, joinerWs: ws, gameId: g.id, timer });
+      for (const sw of userSockets.get(seekerId) ?? []) send(sw, { type: 'switch_offer', from: username });
+      send(ws, { type: 'seek_waiting', seekerId, reason: 'bot' });
+      return;
+    }
+    const lichessAt = onLichessSince.get(seekerId);
+    const reason = lichessAt && Date.now() - lichessAt < 40 * 60_000 ? 'lichess' : userActiveGame.has(seekerId) ? 'game' : 'gone';
+    send(ws, { type: 'seek_gone', seekerId, reason });
     return;
   }
   // Claim them before any await so a second tapper can't get them too.
@@ -798,6 +838,24 @@ async function joinSeek(ws: WebSocket, userId: string, username: string, seekerI
   const me: WaitingPlayer = { userId, username, rating: seed.rating, ws, tc: seeker.tc, mode: seeker.mode, joinedAt: Date.now() };
   if (seeker.ws.readyState !== WebSocket.OPEN || userActiveGame.has(seekerId)) { send(ws, { type: 'seek_gone', seekerId }); return; }
   await startHumanMatch(seeker, me);
+}
+
+// The player in a bot game said yes to the ChessScout player who wants a game: the bot game
+// ends (bot games are casual, so no rating changes) and the real one starts for both.
+async function acceptSwitch(ws: WebSocket, userId: string, username: string) {
+  const a = switchAsks.get(userId);
+  if (!a) { send(ws, { type: 'switch_offer_gone' }); return; }
+  clearTimeout(a.timer); switchAsks.delete(userId);
+  if (a.joinerWs.readyState !== WebSocket.OPEN || userActiveGame.has(a.joinerId)) { send(ws, { type: 'switch_offer_gone' }); return; }
+  const g = games.get(a.gameId);
+  const tc = g?.tc ?? TIME_CONTROLS[FLEX_DEFAULT_TC];
+  if (g && g.status === 'active') finishGame(g, g.white.userId === userId ? 'black' : 'white', 'abandoned');
+  const [seedMe, seedThem] = await Promise.all([seedRatingFromImports(userId, tc.id), seedRatingFromImports(a.joinerId, tc.id)]);
+  if (a.joinerWs.readyState !== WebSocket.OPEN) { send(ws, { type: 'switch_offer_gone' }); return; }
+  await startHumanMatch(
+    { userId, username, rating: seedMe.rating, ws, tc, mode: 'casual', joinedAt: Date.now() },
+    { userId: a.joinerId, username: a.joinerName, rating: seedThem.rating, ws: a.joinerWs, tc, mode: 'casual', joinedAt: Date.now() },
+  );
 }
 
 function cancelQueue(userId: string) {
@@ -1486,6 +1544,18 @@ export function attachLiveServer(server: HttpServer) {
           case 'join_seek':
             await joinSeek(ws, info.userId, info.username, String(msg.seekerId ?? ''));
             break;
+          case 'on_lichess':
+            onLichessSince.set(info.userId, Date.now());
+            cancelQueue(info.userId);
+            break;
+          case 'switch_accept':
+            await acceptSwitch(ws, info.userId, info.username);
+            break;
+          case 'switch_decline': {
+            const a = switchAsks.get(info.userId);
+            if (a) { clearTimeout(a.timer); switchAsks.delete(info.userId); send(a.joinerWs, { type: 'seek_gone', seekerId: info.userId, reason: 'declined' }); }
+            break;
+          }
           case 'play_bot':
             await spawnBotMatch(ws, info.userId, info.username, msg.timeControl);
             break;

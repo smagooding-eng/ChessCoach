@@ -84,6 +84,15 @@ export function useLivePlay() {
   // When queued: when we joined and when the "play a bot instead" offer appears.
   const [queuedAt, setQueuedAt] = useState<number | null>(null);
   const [botOfferMs, setBotOfferMs] = useState<number>(20000);
+  /** How long to look on ChessScout before Lichess / a bot (longer when other players are here). */
+  const [handoffMs, setHandoffMs] = useState<number>(7000);
+  /** Why the player you tried to join couldn't be joined (lichess, declined, game, gone, noanswer). */
+  const [seekGoneReason, setSeekGoneReason] = useState<string | null>(null);
+  /** Joining someone who's in a bot game: we've asked them to switch. */
+  const [seekWaiting, setSeekWaiting] = useState<string | null>(null);
+  /** You're in a bot game and a ChessScout player wants to play you. */
+  const [switchOffer, setSwitchOffer] = useState<string | null>(null);
+  const seekTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Accepted a friend's challenge but they're not online yet.
   const [waitingFor, setWaitingFor] = useState<string | null>(null);
   const pendingAcceptRef = useRef<string | null>(null);
@@ -168,7 +177,9 @@ export function useLivePlay() {
         ws.send(JSON.stringify({ type: 'approve_request', code: pendingApproveRef.current }));
         return;
       }
-      if (pendingSeekRef.current && !(g && g.status === 'active')) {
+      // Joining someone: your own bot game (if any) gives way, so send it even then.
+      const myOpp = g && colorRef.current ? (colorRef.current === 'w' ? g.black : g.white) : null;
+      if (pendingSeekRef.current && (!(g && g.status === 'active') || myOpp?.isBot)) {
         ws.send(JSON.stringify({ type: 'join_seek', seekerId: pendingSeekRef.current }));
         return;
       }
@@ -208,6 +219,7 @@ export function useLivePlay() {
           setQueuedMode(msg.mode);
           setQueuedAt(Date.now());
           if (typeof msg.botOfferMs === 'number') setBotOfferMs(msg.botOfferMs);
+          setHandoffMs(typeof msg.handoffMs === 'number' ? msg.handoffMs : 7000);
           setStatus('queued');
           break;
         case 'challenge_waiting':
@@ -236,10 +248,25 @@ export function useLivePlay() {
           break;
         case 'seek_gone':
           pendingSeekRef.current = null;
+          if (seekTimer.current) { clearTimeout(seekTimer.current); seekTimer.current = null; }
+          setSeekWaiting(null);
+          setSeekGoneReason(typeof msg.reason === 'string' ? msg.reason : null);
           setSeekGone(String(msg.seekerId ?? ''));
+          break;
+        case 'seek_waiting':
+          if (seekTimer.current) { clearTimeout(seekTimer.current); seekTimer.current = null; }
+          setSeekWaiting(String(msg.reason ?? 'bot'));
+          break;
+        case 'switch_offer':
+          setSwitchOffer(String(msg.from ?? 'A player'));
+          break;
+        case 'switch_offer_gone':
+          setSwitchOffer(null);
           break;
         case 'match_found':
           pendingSeekRef.current = null;
+          if (seekTimer.current) { clearTimeout(seekTimer.current); seekTimer.current = null; }
+          setSeekWaiting(null); setSwitchOffer(null);
           setSeekGone(null);
           setTournamentWaiting(null);
           pendingApproveRef.current = null;
@@ -259,6 +286,9 @@ export function useLivePlay() {
           break;
         case 'state':
           if (msg.state?.id && msg.state.id === leftGameId.current) break;
+          // A game you've just moved on from (a bot game ended for a real one) finishing late
+          // mustn't replace the game you're in now.
+          if (msg.state?.id && gameRef.current && gameRef.current.id !== msg.state.id && gameRef.current.status === 'active') break;
           if (typeof msg.state?.serverNow === 'number') setServerOffset(msg.state.serverNow - Date.now());
           setGame(msg.state);
           if (msg.state.status === 'finished') { setStatus('finished'); setMinimized(false); }
@@ -373,12 +403,24 @@ export function useLivePlay() {
   // Tapped "<name> is looking for a game": play them if they're still searching.
   const joinSeek = useCallback((seekerId: string) => {
     setError(null);
-    setSeekGone(null);
+    setSeekGone(null); setSeekGoneReason(null); setSeekWaiting(null);
     pendingSeekRef.current = seekerId;
     const ws = wsRef.current;
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'join_seek', seekerId }));
+    // Never a spinner forever: no answer in a few seconds, say so.
+    if (seekTimer.current) clearTimeout(seekTimer.current);
+    seekTimer.current = setTimeout(() => {
+      seekTimer.current = null;
+      if (pendingSeekRef.current !== seekerId) return;
+      pendingSeekRef.current = null;
+      setSeekGoneReason('noanswer'); setSeekGone(seekerId);
+    }, 9000);
   }, []);
-  const clearSeekGone = useCallback(() => setSeekGone(null), []);
+  const clearSeekGone = useCallback(() => { setSeekGone(null); setSeekGoneReason(null); setSeekWaiting(null); }, []);
+  const acceptSwitch = useCallback(() => { setSwitchOffer(null); const ws = wsRef.current; if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'switch_accept' })); }, []);
+  const declineSwitch = useCallback(() => { setSwitchOffer(null); const ws = wsRef.current; if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'switch_decline' })); }, []);
+  /** Off to play on Lichess: tells anyone who taps your "looking for a game" alert where you went. */
+  const noteOnLichess = useCallback(() => { const ws = wsRef.current; if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'on_lichess' })); }, []);
   // Accept a request someone made through your open challenge link.
   const approveRequest = useCallback((code: string) => {
     setError(null);
@@ -456,7 +498,7 @@ export function useLivePlay() {
 
   return {
     status, error, game, color, queuedTc, queuedMode, opponentDisconnect, premove, setPremove,
-    queuedAt, botOfferMs, waitingFor, waitingKind, serverOffset, notice, approveRequest, connected, joinSeek, seekGone, clearSeekGone,
+    queuedAt, botOfferMs, waitingFor, waitingKind, serverOffset, notice, approveRequest, connected, joinSeek, seekGone, clearSeekGone, seekGoneReason, seekWaiting, switchOffer, acceptSwitch, declineSwitch, noteOnLichess, handoffMs,
     enterQueue, offerRematch, declineRematch, cancel, playBot, acceptChallenge, move, resign, takeback, offerDraw, acceptDraw, declineDraw,
     reset, tournamentWaiting, tournamentOver, tournamentReady, tournamentPause,
     minimized, restore: () => setMinimized(false), chat, sendChat,

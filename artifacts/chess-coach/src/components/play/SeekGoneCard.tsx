@@ -21,17 +21,28 @@ export function takeSeekParams(): SeekInfo | null {
 }
 
 /** "Joining <name>'s game…" while we try to grab the seek. */
-export function SeekJoiningCard({ seek }: { seek: SeekInfo }) {
+export function SeekJoiningCard({ seek, waiting }: { seek: SeekInfo; waiting?: string | null }) {
   return (
     <div className="flex items-center gap-3 p-4" style={cardStyle}>
       <Loader2 className="h-6 w-6 shrink-0 animate-spin" style={{ color: PT.green }} />
-      <p className="text-[14.5px] font-extrabold" style={{ color: PT.text }}>Joining {seek.name}'s game…</p>
+      <div className="min-w-0">
+        <p className="text-[14.5px] font-extrabold" style={{ color: PT.text }}>
+          {waiting === 'bot' ? `Asking ${seek.name} to switch to you…` : `Joining ${seek.name}'s game…`}
+        </p>
+        {waiting === 'bot' && <p className="text-[12.5px]" style={{ color: PT.muted }}>Nobody was around, so they started a game against a bot. If they switch, your game opens right away.</p>}
+      </div>
     </div>
   );
 }
 
 /** Someone else got there first: offer to challenge that player directly. */
-export function SeekGoneCard({ seek, kind, onClose }: { seek: SeekInfo; kind: 'live' | 'daily'; onClose: () => void }) {
+export function SeekGoneCard({ seek, kind, onClose, reason, onPlayNow }: { seek: SeekInfo; kind: 'live' | 'daily'; onClose: () => void; reason?: string | null; onPlayNow?: () => void }) {
+  // Why you couldn't join them, and what happens if you challenge them now.
+  const why = reason === 'lichess' ? { title: `${seek.name} is mid-game on Lichess`, body: `Play them next: they get your challenge, and when they accept, the game opens for both of you.` }
+    : reason === 'declined' ? { title: `${seek.name} kept playing their current game`, body: `Challenge them for the next one: when they accept, the game opens for both of you.` }
+    : reason === 'game' ? { title: `${seek.name} is already in a game`, body: `Play them next: when they accept your challenge, the game opens for both of you.` }
+    : reason === 'noanswer' ? { title: `Couldn't reach ${seek.name}'s game`, body: `They may have just started one. Challenge them: when they accept, the game opens for both of you.` }
+    : { title: `${seek.name} already found a game. Challenge them?`, body: `Someone accepted first. Send ${seek.name} a challenge and play them next.` };
   const [state, setState] = useState<'ask' | 'sending' | 'sent'>('ask');
   const [err, setErr] = useState('');
   const send = async () => {
@@ -69,14 +80,16 @@ export function SeekGoneCard({ seek, kind, onClose }: { seek: SeekInfo; kind: 'l
             </>
           ) : (
             <>
-              <p className="text-[14.5px] font-extrabold" style={{ color: PT.text }}>{seek.name} already found a game. Challenge them?</p>
-              <p className="text-[12.5px]" style={{ color: PT.muted }}>Someone accepted first. Send {seek.name} a challenge and play them next.</p>
+              <p className="text-[14.5px] font-extrabold" style={{ color: PT.text }}>{why.title}</p>
+              <p className="text-[12.5px]" style={{ color: PT.muted }}>{why.body}</p>
               {err && <p className="mt-1 text-[12px]" style={{ color: '#F0605D' }}>{err}</p>}
               <div className="mt-3 flex gap-2">
                 <button onClick={send} disabled={state === 'sending' || !seek.tc} className="flex-1 rounded-xl px-3 py-2.5 text-[13px] font-extrabold disabled:opacity-60" style={greenBtn}>
-                  {state === 'sending' ? 'Sending…' : `Challenge ${seek.name}`}
+                  {state === 'sending' ? 'Sending…' : reason === 'lichess' || reason === 'game' ? 'Play them next' : `Challenge ${seek.name}`}
                 </button>
-                <button onClick={onClose} className="flex-1 rounded-xl px-3 py-2.5 text-[13px] font-bold" style={ghostBtn}>Not now</button>
+                {onPlayNow
+                  ? <button onClick={onPlayNow} className="flex-1 rounded-xl px-3 py-2.5 text-[13px] font-bold" style={ghostBtn}>Play someone now</button>
+                  : <button onClick={onClose} className="flex-1 rounded-xl px-3 py-2.5 text-[13px] font-bold" style={ghostBtn}>Not now</button>}
               </div>
             </>
           )}

@@ -34,7 +34,8 @@ type Hosted = { code: string; url: string; label: string };
 // Nobody on ChessScout: the clocks Lichess lets apps play (10 minutes and up), and
 // how long to look here first before handing over to a real Lichess game.
 const LICHESS_CLOCK: Record<string, string> = { rapid_10_0: '10+0', rapid_15_0: '15+0', any: '10+0' };
-const LICHESS_HANDOFF_MS = 7000; // 7 s on ChessScout, then 7 s on Lichess; a bot game starts at 14 s
+// 7 s on ChessScout, then 7 s on Lichess; a bot game starts at 14 s. When other ChessScout players
+// are on Live play the server makes the first wait 15 s (live.handoffMs).
 
 type OnlineTab = 'live' | 'daily';
 const readTab = (): OnlineTab | null => {
@@ -132,7 +133,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
   const waitedSoFar = live.queuedAt ? now - live.queuedAt : 0;
   useEffect(() => {
     if (live.status !== 'queued') { handedOff.current = false; stopLichessSearch(); return; }
-    if (handedOff.current || !lichess || !lichessClock || waitedSoFar < LICHESS_HANDOFF_MS) return;
+    if (handedOff.current || !lichess || !lichessClock || waitedSoFar < live.handoffMs) return;
     handedOff.current = true;
     trackPlay('lichess_search');
     const ac = new AbortController(); liSearch.current = ac; setLiSearching(true);
@@ -143,6 +144,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
       if (statusRef.current !== 'queued') { void abortLichess(e.game.gameId); return; }
       ac.abort(); live.cancel();
       trackPlay('lichess_game');
+      live.noteOnLichess();
       navigate(`/lichess?game=${e.game.gameId}&from=live`);
     }, ac.signal).catch(() => {});
     void lichessSeek({ minutes: m, increment: inc, rated: live.queuedMode === 'ranked' }, ac.signal)
@@ -186,12 +188,28 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
   useEffect(() => { if (showBotOffer) trackPlay('bot_offer_shown'); }, [showBotOffer]);
   const showConnect = live.status === 'queued' && !lichess && !!lichessClock;
   useEffect(() => { if (showConnect) trackPlay('connect_shown'); }, [showConnect]);
-  useEffect(() => { if (live.status === 'queued' && waitedMs >= LICHESS_HANDOFF_MS) trackPlay('nobody_here'); }, [live.status, waitedMs >= LICHESS_HANDOFF_MS]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (live.status === 'queued' && waitedMs >= live.handoffMs) trackPlay('nobody_here'); }, [live.status, waitedMs >= live.handoffMs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep the game on screen through a reconnect (status can briefly read
   // connecting/disconnected/idle while the socket comes back).
   if (live.game && !live.minimized && (live.status === 'in_game' || live.status === 'finished' || live.game.status === 'active')) {
-    return <LiveGame live={live} onLeave={() => live.reset()} />;
+    return (
+      <>
+        {live.switchOffer && (
+          <div className="fixed inset-x-0 top-0 z-[130] flex justify-center p-3 pt-[max(.75rem,env(safe-area-inset-top))]" role="dialog" aria-label="A real player wants to play you">
+            <div className="w-full max-w-md rounded-2xl p-4" style={{ background: '#0D1516', border: '1px solid rgba(129,182,76,.6)', boxShadow: '0 18px 40px -12px rgba(0,0,0,.85)' }}>
+              <p className="text-[15px] font-black" style={{ color: '#F5F7F6' }}>{live.switchOffer} wants to play you</p>
+              <p className="mt-0.5 text-[12.5px]" style={{ color: '#87918E' }}>A real ChessScout player. Switch and this bot game ends (it's casual, so no rating change).</p>
+              <div className="mt-3 flex gap-2">
+                <button onClick={live.acceptSwitch} className="flex-1 rounded-xl py-2.5 text-[14px] font-extrabold" style={greenBtn}>Play {live.switchOffer}</button>
+                <button onClick={live.declineSwitch} className="rounded-xl px-4 py-2.5 text-[13.5px] font-bold" style={ghostBtn}>Keep playing</button>
+              </div>
+            </div>
+          </div>
+        )}
+        <LiveGame live={live} onLeave={() => live.reset()} />
+      </>
+    );
   }
   // Backed out to the lobby mid-game: the game carries on, one tap returns.
   const g = live.game;
@@ -277,8 +295,8 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
         </div>
       )}
       {seek && tab === 'live' && (live.seekGone === seek.seekerId
-        ? <SeekGoneCard seek={seek} kind="live" onClose={closeSeek} />
-        : live.status !== 'queued' && <SeekJoiningCard seek={seek} />)}
+        ? <SeekGoneCard seek={seek} kind="live" reason={live.seekGoneReason} onClose={closeSeek} onPlayNow={() => { closeSeek(); queueFor('any', mode); }} />
+        : live.status !== 'queued' && <SeekJoiningCard seek={seek} waiting={live.seekWaiting} />)}
 
       {live.status === 'queued' ? (
         <div className="space-y-3">
