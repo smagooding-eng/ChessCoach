@@ -1594,13 +1594,20 @@ export function getLiveGameState(gameId: string): ReturnType<typeof gamePublicSt
   return g ? gamePublicState(g) : null;
 }
 
-export function getActiveGameForUser(userId: string): { state: ReturnType<typeof gamePublicState>; color: 'w' | 'b' } | null {
+export function getActiveGameForUser(userId: string, opts: { endBotGame?: boolean } = {}): { state: ReturnType<typeof gamePublicState>; color: 'w' | 'b' } | null {
   const gid = userActiveGame.get(userId);
   if (!gid) return null;
   const g = games.get(gid);
   if (!g) return null;
   const color: 'w' | 'b' | null = g.white.userId === userId ? 'w' : g.black.userId === userId ? 'b' : null;
   if (!color) return null;
+  // Asked from anywhere but the game screen: a bot game they walked away from is over
+  // (casual, no rating), so there's nothing to come back to.
+  const opp = color === 'w' ? g.black : g.white;
+  if (opts.endBotGame && opp.kind === 'bot') {
+    if (g.status === 'active') finishGame(g, color === 'w' ? 'black' : 'white', 'abandoned');
+    return null;
+  }
   return { state: gamePublicState(g), color };
 }
 

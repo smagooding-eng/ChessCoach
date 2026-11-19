@@ -64,7 +64,8 @@ router.get('/live/history', requireAuth, async (req: Request, res: Response) => 
 });
 
 router.get('/live/active-game', requireAuth, (req: Request, res: Response) => {
-  const result = getActiveGameForUser(req.user!.id);
+  // keepBot=1: the game screen itself (a reload) or the Studio; elsewhere a bot game left behind ends.
+  const result = getActiveGameForUser(req.user!.id, { endBotGame: req.query.keepBot !== '1' });
   if (!result) { res.json({ game: null }); return; }
   res.json({ game: result.state, color: result.color });
 });

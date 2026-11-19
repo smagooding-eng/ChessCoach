@@ -447,7 +447,7 @@ function StreamerStudio({ admin }: { admin: boolean }) {
   const [liveOpp, setLiveOpp] = useState<{ name: string; bot: boolean } | null>(null);
   useEffect(() => {
     let alive = true;
-    const check = () => apiFetch('/api/live/active-game', { credentials: 'include' })
+    const check = () => apiFetch('/api/live/active-game?keepBot=1', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (!alive) return;

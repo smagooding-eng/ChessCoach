@@ -117,6 +117,8 @@ export function useLivePlay() {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const gameRef = useRef<LiveGameState | null>(null);
   const colorRef = useRef<'w' | 'b' | null>(null);
+  /** A bot game walked away from: its final state mustn't bring the result screen back. */
+  const leftGameId = useRef<string | null>(null);
   const queuedTcRef = useRef<string | null>(null);
   const queuedModeRef = useRef<LiveMode | null>(null);
   const statusRef = useRef<LiveStatus>('idle');
@@ -149,7 +151,7 @@ export function useLivePlay() {
       // server whether this user has an active live game and rehydrate it before subscribing.
       if (!g) {
         try {
-          const r = await apiFetch('/api/live/active-game', { credentials: 'include' });
+          const r = await apiFetch('/api/live/active-game?keepBot=1', { credentials: 'include' });
           if (r.ok) {
             const j = await r.json();
             if (j?.game) {
@@ -256,6 +258,7 @@ export function useLivePlay() {
           setStatus(msg.state.status === 'finished' ? 'finished' : 'in_game');
           break;
         case 'state':
+          if (msg.state?.id && msg.state.id === leftGameId.current) break;
           if (typeof msg.state?.serverNow === 'number') setServerOffset(msg.state.serverNow - Date.now());
           setGame(msg.state);
           if (msg.state.status === 'finished') { setStatus('finished'); setMinimized(false); }
@@ -438,8 +441,11 @@ export function useLivePlay() {
 
   const reset = useCallback(() => {
     const g = gameRef.current;
-    // Mid-game: just step back to the lobby; the game (and clock) carries on.
-    if (g && g.status === 'active') { setMinimized(true); return; }
+    // Mid-game: just step back to the lobby; the game (and clock) carries on. A bot game
+    // ends instead (it's casual): there's nothing to come back to.
+    const vsBot = !!g && (colorRef.current === 'w' ? g.black : colorRef.current === 'b' ? g.white : null)?.isBot;
+    if (g && g.status === 'active' && vsBot) { leftGameId.current = g.id; send({ type: 'resign', gameId: g.id }); }
+    else if (g && g.status === 'active') { setMinimized(true); return; }
     setMinimized(false);
     setChat([]);
     if (g && g.status === 'finished') send({ type: 'leave_game', gameId: g.id });
