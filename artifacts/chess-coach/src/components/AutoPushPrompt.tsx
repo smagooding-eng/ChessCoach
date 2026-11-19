@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useUser } from '@/hooks/use-user';
 import { usePushNotifications, ensurePushSubscription } from '@/hooks/use-push-notifications';
+import { NotifyNudge } from '@/components/NotifyNudge';
 
 
 // Keeps notifications working for people who've allowed them: on every app start (and
@@ -22,7 +23,8 @@ export function AutoPushPrompt() {
 
   // The automatic "Allow notifications?" box on load is gone: browsers hide or ignore a
   // prompt nobody tapped for, and a quick "Block" can't be asked again. People are asked
-  // with a Turn on button where notifications matter instead (NotifyPrompt).
+  // with a Turn on button where notifications matter instead (NotifyPrompt), and by a
+  // short reminder card every 2-3 days while they're off (NotifyNudge).
 
-  return null;
+  return <NotifyNudge />;
 }

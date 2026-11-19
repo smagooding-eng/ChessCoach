@@ -190,5 +190,5 @@ export function usePushNotifications() {
     }
   }, [supported]);
 
-  return { permission, isSubscribed, loading, error, supported, inApp, subscribe, unsubscribe };
+  return { permission, isSubscribed, loading, error, supported, inApp, blockedHelp, subscribe, unsubscribe };
 }

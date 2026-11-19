@@ -1,6 +1,6 @@
-// The 3-day Pro trial, announced once per member on their next visit: a pawn walks
+// The 3-day Pro trial, offered at most once a day to members who can still take it: a pawn walks
 // across three "days" and promotes to a queen, then the offer. Not a paywall: it shows
-// once, closes with "Maybe later", and only to members who can still take the trial.
+// once a day, closes with "Maybe later", and stops for good once they start the trial.
 import { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
 import { Crown, X, Loader2 } from 'lucide-react';
@@ -11,6 +11,9 @@ import { STUDIO_FRAME } from '@/lib/studioFrame';
 // v2: the first version kept the offer hidden for 3 seconds behind its animation, so
 // nearly everyone closed it unseen; members who didn't start get the fixed one once.
 const SEEN = (uid: string) => `cs_trial_promo_v2:${uid}`;
+const EVERY_MS = 24 * 60 * 60_000;
+/** Shown in the last couple of minutes (the notifications nudge waits its turn). */
+export const PROMO_OPEN_KEY = 'cs_promo_open_at';
 // Places it would get in the way (sign-up, checkout, the free review page, the studio)
 const SKIP = /^\/(setup|login|signup|subscription|pricing|review|admin|kids|embed)(\/|$)/;
 
@@ -39,7 +42,7 @@ export function TrialPromo() {
     if (!authUser || !isSubscriptionLoaded || isPremium || open) return;
     if (STUDIO_FRAME || window.self !== window.top || SKIP.test(path)) return;
     let seen = false;
-    try { seen = !!localStorage.getItem(SEEN(authUser.id)); } catch { /* storage off */ }
+    try { const at = Number(localStorage.getItem(SEEN(authUser.id)) || 0); seen = !!at && Date.now() - at < EVERY_MS; } catch { /* storage off */ }
     if (seen) return;
     let gone = false;
     const t = setTimeout(async () => {
@@ -48,7 +51,7 @@ export function TrialPromo() {
         const d = r.ok ? await r.json() : null;
         if (gone || !d?.eligible) return;
         setDays(Number(d.days) || 3);
-        try { localStorage.setItem(SEEN(authUser.id), String(Date.now())); } catch { /* storage off */ }
+        try { localStorage.setItem(SEEN(authUser.id), String(Date.now())); localStorage.setItem(PROMO_OPEN_KEY, String(Date.now())); } catch { /* storage off */ }
         setOpen(true);
         track('shown');
         const p = await apiFetchLocal('/api/stripe/products').then((x) => (x.ok ? x.json() : null)).catch(() => null);
