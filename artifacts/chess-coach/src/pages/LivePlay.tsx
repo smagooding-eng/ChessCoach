@@ -272,7 +272,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
   return (
     <div className="mx-auto max-w-[760px] space-y-4 p-4 md:p-0 pb-24">
       {resumeCard}
-      {!live.game && live.notice && <p className="rounded-xl px-4 py-3 text-[13px] font-semibold" style={{ background: 'rgba(232,180,71,0.14)', border: '1px solid rgba(232,180,71,0.5)', color: '#F5F7F6' }}>{live.notice}</p>}
+      {!live.game && live.notice && <p className="rounded-xl px-4 py-3 text-[13px] font-semibold" style={{ background: '#121B1D', border: '1px solid rgba(255,255,255,.08)', color: '#F5F7F6' }}>{live.notice}</p>}
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl md:text-3xl font-black" style={{ color: PT.text, letterSpacing: '-0.02em' }}>Play Online</h1>

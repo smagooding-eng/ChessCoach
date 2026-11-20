@@ -39,7 +39,7 @@ export function ProUpsell({
       <Link
         href="/subscription"
         className={`flex items-center gap-3 rounded-[14px] px-3.5 py-3 transition-transform active:scale-[.99] ${className}`}
-        style={{ background: 'linear-gradient(135deg, rgba(232,180,71,.12), rgba(129,182,76,.06))', border: '1px solid rgba(232,180,71,.35)' }}
+        style={{ background: '#0D1516', border: '1px solid rgba(255,255,255,.08)' }}
       >
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px]" style={{ background: 'rgba(255,255,255,.07)', color: '#F5F7F6' }}>
           <Crown size={16} />
@@ -59,12 +59,10 @@ export function ProUpsell({
     <section
       className={`relative overflow-hidden rounded-[20px] p-5 ${className}`}
       style={{
-        background: redesign ? 'linear-gradient(160deg, #15160E 0%, #0B1213 100%)' : 'linear-gradient(180deg, #383532 0%, #2a2825 100%)',
-        border: '1px solid rgba(232,180,71,.38)',
-        boxShadow: '0 18px 50px -28px rgba(232,180,71,.45)',
+        background: '#0D1516',
+        border: '1px solid rgba(255,255,255,.08)',
       }}
     >
-      <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full" style={{ background: 'radial-gradient(circle, rgba(232,180,71,.16) 0%, transparent 70%)' }} />
       <div className="relative">
         <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10.5px] font-extrabold" style={{ background: 'linear-gradient(180deg,#F2C560,#D99A24)', color: '#1A1205' }}>
           <Crown size={11} /> PRO

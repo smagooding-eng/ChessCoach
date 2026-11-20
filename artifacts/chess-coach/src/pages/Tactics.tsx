@@ -124,7 +124,7 @@ export function Tactics() {
 
         {/* Review (Pro) */}
         {due.length > 0 && (pro ? (
-          <div className="rounded-[16px] p-3" style={{ background: 'rgba(232,180,71,.10)', border: '1px solid rgba(232,180,71,.35)' }}>
+          <div className="rounded-[16px] p-3" style={{ background: '#0D1516', border: '1px solid rgba(255,255,255,.08)' }}>
             <p className="text-[13.5px] font-extrabold" style={{ color: RD.gold }}>Time to review: {due.length} pattern{due.length === 1 ? '' : 's'}</p>
             <div className="mt-2 flex flex-wrap gap-1.5">{due.map((m) => <Link key={m.id} href={`/tactics/${m.id}?tab=drill`} className="rounded-full px-3 py-1 text-[12.5px] font-bold" style={{ background: 'rgba(255,255,255,.08)', color: RD.text }}>{m.name}</Link>)}</div>
           </div>

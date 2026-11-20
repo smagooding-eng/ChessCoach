@@ -623,7 +623,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
               <nav className="overflow-y-auto overscroll-contain px-3 pt-1 pb-[calc(1.5rem+env(safe-area-inset-bottom))]" onPointerDownCapture={(e) => e.stopPropagation()}>
                 {freePlan && (
                   <Link href="/subscription" replace className="mb-3 block">
-                    <div className="flex items-center gap-3 rounded-xl px-3.5 py-3" style={{ background: 'linear-gradient(135deg, rgba(232,180,71,.16), rgba(129,182,76,.06))', border: '1px solid rgba(232,180,71,.4)' }}>
+                    <div className="flex items-center gap-3 rounded-xl px-3.5 py-3" style={{ background: '#0D1516', border: '1px solid rgba(255,255,255,.08)' }}>
                       <Crown className="w-5 h-5" style={{ color: '#E8B447' }} />
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-extrabold" style={{ color: TEXT_LIGHT }}>Go Pro</span>

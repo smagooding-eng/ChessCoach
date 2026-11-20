@@ -458,7 +458,7 @@ export function LichessPlay() {
         <div className="space-y-3 p-6 text-center" style={cardStyle}>
           <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl" style={{ background: '#81B64C', color: '#fff' }}><Zap size={26} /></span>
           <p className="text-[20px] font-black" style={{ color: PT.text }}>{fromLive ? 'Nobody free on ChessScout right now' : 'Play on Lichess'}</p>
-          {connectNote && connectNote !== 'connected' && <p className="rounded-xl px-3 py-2 text-[13px] font-semibold" style={{ background: 'rgba(232,180,71,0.14)', border: '1px solid rgba(232,180,71,0.5)', color: PT.text }}>{connectNote === 'declined' ? 'You chose not to connect Lichess.' : connectNote === 'expired' ? 'That connection took too long. Tap Connect Lichess again.' : "Lichess didn't finish connecting. Tap Connect Lichess to try again."}</p>}
+          {connectNote && connectNote !== 'connected' && <p className="rounded-xl px-3 py-2 text-[13px] font-semibold" style={{ background: '#121B1D', border: '1px solid rgba(255,255,255,.08)', color: PT.text }}>{connectNote === 'declined' ? 'You chose not to connect Lichess.' : connectNote === 'expired' ? 'That connection took too long. Tap Connect Lichess again.' : "Lichess didn't finish connecting. Tap Connect Lichess to try again."}</p>}
           <p className="text-[12px]" style={{ color: PT.muted }}>Tip: if Lichess asks you to log in and then shows its home page, come back here and tap Connect Lichess once more. You'll go straight to Authorize.</p>
           <p className="text-[13.5px]" style={{ color: PT.muted }}>Connect your Lichess account and we'll find you a real opponent from Lichess's players in seconds, right here on ChessScout. Games count on your Lichess rating and get reviewed here afterwards.</p>
           <button onClick={() => void connectLichess(`/lichess${window.location.search}`)} className="w-full rounded-xl py-3.5 text-[15px] font-extrabold" style={greenBtn}>Connect Lichess</button>
@@ -532,7 +532,7 @@ export function LichessPlay() {
           </div>
         )}
         {gone?.gone && phase === 'playing' && (
-          <div className="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-[13px] font-bold" style={{ background: 'rgba(232,180,71,.14)', border: '1px solid rgba(232,180,71,.5)', color: PT.text }}>
+          <div className="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-[13px] font-bold" style={{ background: '#121B1D', border: '1px solid rgba(255,255,255,.08)', color: PT.text }}>
             <span>Your opponent left.{gone.claimWinInSeconds ? ` You can claim the win in ${gone.claimWinInSeconds}s.` : ''}</span>
             {!gone.claimWinInSeconds && <button onClick={() => void claimVictory(full.id)} className="rounded-lg px-3 py-1.5" style={greenBtn}>Claim win</button>}
           </div>

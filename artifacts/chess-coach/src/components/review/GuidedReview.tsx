@@ -158,7 +158,7 @@ function CoachTeaser({ label, onUpgrade }: { label: string; onUpgrade?: () => vo
       className="rounded-[14px] px-3 py-2.5" style={{ background: '#162022', border: '1px solid rgba(255,255,255,.07)' }}>
       {/* Compact, so it fits under the board without scrolling */}
       <div className="flex items-center gap-2">
-        <span className="shrink-0 rounded-md px-1.5 py-0.5 text-[10.5px] font-black uppercase tracking-wide" style={{ background: 'rgba(232,180,71,.16)', color: '#E8B447' }}>Coach · Pro</span>
+        <span className="shrink-0 rounded-md px-1.5 py-0.5 text-[10.5px] font-black uppercase tracking-wide" style={{ background: '#E8B447', color: '#1C1C1C' }}>Coach · Pro</span>
         <p className="min-w-0 flex-1 text-[12.5px] font-bold leading-snug text-[#F5F7F6]">Why was this {label}? Your coach explains it.</p>
       </div>
       <div className="mt-2 flex items-center gap-2">
