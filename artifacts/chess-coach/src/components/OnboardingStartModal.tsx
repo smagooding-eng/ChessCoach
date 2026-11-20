@@ -1,3 +1,5 @@
+import { BoardSetupCard, markSetupSeen } from '@/components/BoardSetupCard';
+import { useUser } from '@/hooks/use-user';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
 import { apiFetch } from '@/lib/api';
@@ -42,6 +44,8 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
   const [linkError, setLinkError] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
   const [importErrorMessage, setImportErrorMessage] = useState<string | null>(null);
+  const [setupDone, setSetupDone] = useState(false);
+  const { authUser } = useUser();
 
   const submitUsername = async () => {
     const trimmed = usernameInput.trim();
@@ -166,6 +170,17 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
           >
             {linking ? 'Saving…' : 'Continue'}
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // While the games import (and until they've finished it): the board & play set-up.
+  if (!setupDone && status !== 'need-username') {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto px-3 py-4" style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(6px)' }}>
+        <div className="mx-auto w-full max-w-md">
+          <BoardSetupCard mode="first" progress={status === 'ready' ? 'ready' : 'importing'} onDone={() => { markSetupSeen(authUser?.id); setSetupDone(true); }} />
         </div>
       </div>
     );

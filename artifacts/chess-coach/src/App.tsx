@@ -29,6 +29,7 @@ import { GamesRedesign } from "@/pages/GamesRedesign";
 import { AnalysisRedesign } from "@/pages/AnalysisRedesign";
 import { ImportStatusWatcher } from "@/components/ImportStatusWatcher";
 import { AutoPushPrompt } from "@/components/AutoPushPrompt";
+import { BoardSetupPrompt } from "@/components/BoardSetupPrompt";
 import { TrialPromo } from "@/components/TrialPromo";
 import { useDashboardRedesignFlag } from "@/hooks/use-app-config";
 import { BackgroundJobsWatcher } from "@/components/BackgroundJobsWatcher";
@@ -771,6 +772,7 @@ function App() {
                     <BackgroundJobsWatcher />
                     <AutoPushPrompt />
                     <TrialPromo />
+                    <BoardSetupPrompt />
                     <AfterSignInRedirect />
                     <RealtimeBridge />
                   </NotInKidMode>

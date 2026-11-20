@@ -1,3 +1,4 @@
+import { BoardSetupCard } from '@/components/BoardSetupCard';
 import { useState } from 'react';
 import { SocialLinks } from '@/components/SocialLinks';
 import { Link } from 'wouter';
@@ -117,7 +118,7 @@ export default function SettingsPage() {
 
   const { enabled: redesign } = useDashboardRedesignFlag();
   // Enhanced UI groups the page into tabs; classic shows everything in one list as before.
-  const [stab, setStab] = useState<'pieces' | 'boards' | 'themes' | 'play'>('boards');
+  const [stab, setStab] = useState<'setup' | 'pieces' | 'boards' | 'themes' | 'play'>('setup');
   const vis = (k: typeof stab) => (!redesign || stab === k ? '' : 'hidden');
   // In the enhanced UI the board groups are separate choices: picking a classic
   // colour switches off a photographic board (otherwise the photo would keep
@@ -161,11 +162,11 @@ export default function SettingsPage() {
           />
           <p className="-mt-1 px-1 pb-1 text-[13px]" style={{ color: RD.muted }}>Customize how ChessScout.net looks and plays</p>
           <div className="sticky top-0 z-20 -mx-1 px-1 pb-1 pt-1" style={{ background: RD.bg }}>
-            <div className="grid grid-cols-4 gap-1 rounded-[16px] p-1 lg:max-w-[640px]" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
-              {([['boards', 'Boards'], ['pieces', 'Pieces'], ['themes', 'Themes'], ['play', 'Play & Sound']] as const).map(([id, label]) => {
+            <div className="grid grid-cols-5 gap-1 rounded-[16px] p-1 lg:max-w-[760px]" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
+              {([['setup', 'Set-up'], ['boards', 'Boards'], ['pieces', 'Pieces'], ['themes', 'Themes'], ['play', 'Play & Sound']] as const).map(([id, label]) => {
                 const on = stab === id;
                 return (
-                  <button key={id} onClick={() => setStab(id)} aria-pressed={on} className="rounded-[12px] py-2.5 text-[12.5px] font-bold transition-colors"
+                  <button key={id} onClick={() => setStab(id)} aria-pressed={on} className="rounded-[12px] py-2.5 text-[11.5px] font-bold transition-colors sm:text-[12.5px]"
                     style={on ? { background: 'rgba(255,255,255,.08)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                     {label}
                   </button>
@@ -198,7 +199,12 @@ export default function SettingsPage() {
       </>
       )}
 
-      <LanguageSettings text={TEXT_LIGHT} muted={TEXT_MUTED} card={BG_CARD} border="rgba(255,255,255,0.1)" />
+      {redesign && (
+        <section className={vis('setup')}>
+          <BoardSetupCard mode="settings" />
+        </section>
+      )}
+      {(!redesign || stab !== 'setup') && <LanguageSettings text={TEXT_LIGHT} muted={TEXT_MUTED} card={BG_CARD} border="rgba(255,255,255,0.1)" />}
 
       {redesign && (
         <section className={vis('pieces')}>
