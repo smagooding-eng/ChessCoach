@@ -2,7 +2,8 @@
 // games import; everyone else on their next visit, with their own choices marked "Yours"),
 // and the top of Settings. Every option scrolls sideways; taps only change a draft shown on
 // the preview board, and nothing is saved until Save (backing out keeps their settings).
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { lichessAuth, syncLichessAuth, connectLichess, type LichessAuth } from '@/lib/lichessBoard';
 import { PIECE_THEME_TYPES } from '@/lib/pieceThemes';
 import { BOARD_GROUPS } from '@/lib/boardGroups';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
@@ -120,6 +121,20 @@ export function BoardSetupCard({ mode, onDone, progress, kicker }: {
     onDone?.();
   };
 
+  // Lichess: play real Lichess players from ChessScout (the connection lives on their account).
+  const [lich, setLich] = useState<LichessAuth | null>(() => lichessAuth());
+  const [lichChecked, setLichChecked] = useState(() => !!lichessAuth());
+  useEffect(() => {
+    let live = true;
+    void syncLichessAuth().then((a) => { if (live) setLich(a); }).catch(() => {}).finally(() => { if (live) setLichChecked(true); });
+    return () => { live = false; };
+  }, []);
+  const goConnect = () => {
+    // Leaving for lichess.org: an explicit tap, so keep what they picked here first.
+    if (changed) save(); else onDone?.();
+    void connectLichess(`${window.location.pathname}${window.location.search}`);
+  };
+
   const pieces = useMemo(() => {
     const list = [...PIECES];
     if (showYours && !list.includes(was.current.piece) && was.current.piece !== 'default') list.unshift(was.current.piece);
@@ -234,6 +249,22 @@ export function BoardSetupCard({ mode, onDone, progress, kicker }: {
             {ctl}
           </div>
         ))}
+      </div>
+
+      <div className="mt-3 rounded-[14px] p-3" style={{ background: INNER, border: `1px solid ${LINE}` }}>
+        <div className="flex items-center gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] text-[18px]" style={{ background: '#F5F7F6', color: '#0D1516' }} aria-hidden="true">♞</span>
+          <span className="min-w-0 flex-1">
+            <b className="block text-[13.5px]">Play on Lichess</b>
+            <small className="block text-[11.5px] leading-snug" style={{ color: MUTED }}>
+              {lich ? <>Connected as <b style={{ color: TEXT }}>{lich.username}</b>. Real Lichess opponents, right here.</> : 'Real Lichess opponents in seconds, played here and reviewed after. Counts on your Lichess rating.'}
+            </small>
+          </span>
+          {lich
+            ? <span className="shrink-0 rounded-[8px] px-2.5 py-1.5 text-[11.5px] font-black" style={{ background: G, color: '#06110A' }}>✓ On</span>
+            : lichChecked && <button type="button" onClick={goConnect} className="shrink-0 rounded-[10px] px-3 py-2 text-[12px] font-black" style={{ background: G, color: '#06110A' }}>{changed ? 'Save & connect' : 'Connect'}</button>}
+        </div>
+        {!lich && lichChecked && <p className="mt-2 text-[11px]" style={{ color: MUTED }}>You sign in on lichess.org and come straight back. ChessScout can only play games for you. No account? <a href="https://lichess.org/signup" target="_blank" rel="noreferrer" className="font-bold underline" style={{ color: G }}>Make one free</a>.</p>}
       </div>
 
       {(onDone || changed) && (
