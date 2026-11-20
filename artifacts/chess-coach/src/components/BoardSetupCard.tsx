@@ -255,16 +255,16 @@ export function BoardSetupCard({ mode, onDone, progress, kicker }: {
         <div className="flex items-center gap-3">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] text-[18px]" style={{ background: '#F5F7F6', color: '#0D1516' }} aria-hidden="true">♞</span>
           <span className="min-w-0 flex-1">
-            <b className="block text-[13.5px]">Play on Lichess</b>
+            <b className="block text-[13.5px]">Live Play</b>
             <small className="block text-[11.5px] leading-snug" style={{ color: MUTED }}>
-              {lich ? <>Connected as <b style={{ color: TEXT }}>{lich.username}</b>. Real Lichess opponents, right here.</> : 'Real Lichess opponents in seconds, played here and reviewed after. Counts on your Lichess rating.'}
+              {lich ? <>All set, playing as <b style={{ color: TEXT }}>{lich.username}</b> on Lichess.</> : 'Real opponents in seconds, any time of day, played and reviewed right here.'}
             </small>
           </span>
           {lich
-            ? <span className="shrink-0 rounded-[8px] px-2.5 py-1.5 text-[11.5px] font-black" style={{ background: G, color: '#06110A' }}>✓ On</span>
-            : lichChecked && <button type="button" onClick={goConnect} className="shrink-0 rounded-[10px] px-3 py-2 text-[12px] font-black" style={{ background: G, color: '#06110A' }}>{changed ? 'Save & connect' : 'Connect'}</button>}
+            ? <span className="shrink-0 rounded-[8px] px-2.5 py-1.5 text-[11.5px] font-black" style={{ background: G, color: '#06110A' }}>✓ Ready</span>
+            : lichChecked && <button type="button" onClick={goConnect} className="shrink-0 rounded-[10px] px-3 py-2 text-[12px] font-black" style={{ background: G, color: '#06110A' }}>{changed ? 'Save & set up Live Play' : 'Set up Live Play'}</button>}
         </div>
-        {!lich && lichChecked && <p className="mt-2 text-[11px]" style={{ color: MUTED }}>You sign in on lichess.org and come straight back. ChessScout can only play games for you. No account? <a href="https://lichess.org/signup" target="_blank" rel="noreferrer" className="font-bold underline" style={{ color: G }}>Make one free</a>.</p>}
+        {!lich && lichChecked && <p className="mt-2 text-[11px]" style={{ color: MUTED }}>Uses your Lichess account: a quick sign-in on lichess.org and you’re back. No account? <a href="https://lichess.org/signup" target="_blank" rel="noreferrer" className="font-bold underline" style={{ color: G }}>Make one free</a>.</p>}
       </div>
 
       {(onDone || changed) && (
