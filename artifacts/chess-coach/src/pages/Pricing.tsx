@@ -21,6 +21,7 @@ const ROWS: { feature: string; free: boolean | string; pro: boolean | string; ch
   { feature: 'Personalized courses', free: false, pro: true, chesscomFree: false },
   { feature: 'Opponent scouting', free: 'Unlimited stats', pro: '+ Coach weaknesses & prep', chesscomFree: false } as any,
   { feature: 'Practice bots & Opening Trainer', free: true, pro: true, chesscomFree: false },
+  { feature: 'Chess traps', free: 'Beginner & intermediate', pro: '+ Advanced traps', chesscomFree: false } as any,
   { feature: 'Local Play', free: true, pro: true, chesscomFree: false },
   { feature: 'Scan Position (photo → board)', free: false, pro: true, chesscomFree: false },
   { feature: 'Puzzles', free: 'Unlimited', pro: '+ Coach explanations', chesscomFree: true } as any,

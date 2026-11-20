@@ -12,7 +12,7 @@ import { apiFetch, setAuthToken } from '@/lib/api';
 import { useSiteImg } from '@/hooks/use-app-config';
 import { GooglePlayBadge } from '@/components/GooglePlayBadge';
 import { TeacherApprovedBadge } from '@/components/TeacherApprovedBadge';
-import { SiteStatsLine, HappeningNow } from '@/components/SiteStats';
+import { SiteStatsLine, HappeningNow, useSiteStats } from '@/components/SiteStats';
 import { t, tn, noGT } from '@/lib/i18n';
 import { LanguageSelect } from '@/components/LanguagePicker';
 
@@ -336,6 +336,72 @@ function AnimatedCount({ target, duration = 1500 }: { target: number; duration?:
   return <span>{count.toLocaleString()}</span>;
 }
 
+// Real totals, big: the games players have brought in and had reviewed (the same live numbers
+// as the hero line; the server only sends ones of 1,000 or more).
+function BigNumbers() {
+  const metrics = useSiteStats().slice(0, 3);
+  if (!metrics.length) return null;
+  const fmtBig = (n: number) => (n >= 100_000 ? `${Math.floor(n / 1000).toLocaleString()}k+` : n.toLocaleString());
+  return (
+    <section data-track-section="numbers" className="relative z-10 mx-auto w-full max-w-7xl px-4 pt-10 sm:px-8">
+      <div className="grid gap-3 rounded-[20px] p-5 sm:grid-cols-3" style={{ background: '#0D1516', border: '1px solid rgba(255,255,255,0.08)' }}>
+        {metrics.map((m) => (
+          <div key={m.key} className="text-center">
+            <p className="text-[clamp(1.8rem,7vw,2.6rem)] font-black leading-none" style={{ color: TEXT }}>{fmtBig(m.value)}</p>
+            <p className="mt-1.5 text-[13px] font-semibold" style={{ color: MUTED }}>{t(m.label)}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// What's free and what Pro adds, on the homepage (the full table is on /pricing).
+function FreeVsPro({ onSignup }: { onSignup: () => void }) {
+  const free = [
+    t('Play live, daily and bot games, and tournaments'),
+    t('Every game reviewed with Stockfish: every move graded, accuracy, the better move'),
+    t('Your Chess.com and Lichess games imported automatically'),
+    t('Openings and endgames stats from your own games'),
+    t('Unlimited puzzles and opponent scouting stats'),
+  ];
+  const pro = [
+    t('Your coach explains every move and sums up the game'),
+    t('Coach scouting reports: an opponent\'s weaknesses and how to prepare'),
+    t('Courses built from your own mistakes'),
+    t('Scan a board from a photo'),
+    t('Advanced traps'),
+  ];
+  return (
+    <section data-track-section="pricing" className="relative z-10 mx-auto w-full max-w-7xl px-4 pt-10 sm:px-8">
+      <h2 className="text-[clamp(1.5rem,6vw,2.2rem)] font-black leading-tight" style={{ color: TEXT }}>{t('Free, or Pro')}</h2>
+      <p className="mt-2 max-w-2xl text-[14.5px] leading-relaxed" style={{ color: MUTED }}>{t('Most of ChessScout is free for good. Pro adds your coach.')}</p>
+      <div className="mt-5 grid gap-3 md:grid-cols-2">
+        <div className="rounded-[20px] p-5" style={{ background: '#0D1516', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <p className="text-[18px] font-black" style={{ color: TEXT }}>{t('Free')}</p>
+          <p className="text-[13px]" style={{ color: MUTED }}>{t('No card, no time limit')}</p>
+          <ul className="mt-3 grid gap-2">
+            {free.map((x) => <li key={x} className="flex items-start gap-2 text-[14px] leading-snug" style={{ color: TEXT }}><Check className="mt-0.5 h-4 w-4 shrink-0" style={{ color: G }} />{x}</li>)}
+          </ul>
+          <button onClick={onSignup} className="mt-4 w-full rounded-xl py-3 text-[14.5px] font-extrabold" style={{ background: G, color: ON_G }}>{t('Join Free')}</button>
+        </div>
+        <div className="rounded-[20px] p-5" style={{ background: '#0D1516', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <p className="flex items-center gap-2 text-[18px] font-black" style={{ color: TEXT }}>
+            {t('Pro')} <span className="rounded px-1.5 py-0.5 text-[10.5px] font-black" style={{ background: '#E8B447', color: '#1C1C1C' }}>$5/mo</span>
+          </p>
+          <p className="text-[13px]" style={{ color: MUTED }}>{t('Everything in Free, plus:')}</p>
+          <ul className="mt-3 grid gap-2">
+            {pro.map((x) => <li key={x} className="flex items-start gap-2 text-[14px] leading-snug" style={{ color: TEXT }}><Check className="mt-0.5 h-4 w-4 shrink-0" style={{ color: '#E8B447' }} />{x}</li>)}
+          </ul>
+          <Link href="/pricing" className="mt-4 flex w-full items-center justify-center gap-1.5 rounded-xl py-3 text-[14.5px] font-extrabold" style={{ background: 'rgba(255,255,255,.06)', color: TEXT, border: '1px solid rgba(255,255,255,.12)' }}>
+            {t('Compare everything')} <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function SocialProofBar() {
   const [stats, setStats] = useState<{ users: number; gamesImported: number; gamesAnalyzed: number } | null>(null);
 
@@ -500,6 +566,9 @@ function LandingExplore({ onSignup }: { onSignup: () => void }) {
     { href: '/chess-openings', title: t('Openings & traps'), text: t('What top players play, how they score, and the traps to set and avoid.') },
   ];
   return (
+    <>
+    <BigNumbers />
+    <FreeVsPro onSignup={onSignup} />
     <section data-track-section="explore" className="relative z-10 mx-auto w-full max-w-7xl px-4 pb-16 pt-10 sm:px-8">
       <h2 className="text-[clamp(1.5rem,6vw,2.2rem)] font-black leading-tight" style={{ color: TEXT }}>{t('Everything you need to play and get better')}</h2>
       <p className="mt-2 max-w-2xl text-[14.5px] leading-relaxed" style={{ color: MUTED }}>{t('Free to play, free to learn, in 28 languages, in your browser or on Android.')}</p>
@@ -522,6 +591,7 @@ function LandingExplore({ onSignup }: { onSignup: () => void }) {
         <Link href="/learn" className="text-[14px] font-bold hover:underline" style={{ color: MUTED }}>{t('Chess improvement articles')}</Link>
       </div>
     </section>
+    </>
   );
 }
 
