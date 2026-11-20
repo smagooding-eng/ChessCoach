@@ -414,7 +414,7 @@ function DeviceRetentionCard() {
             </table>
           </div>
           <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
-            Members who signed up since {new Date(data.since).toLocaleDateString()}, by the device of their first visit as a member. “Came back” means they used ChessScout on a later day.
+            Members who signed up since {new Date(data.since).toLocaleDateString(undefined, { timeZone: 'UTC' })}, by the device of their first visit as a member. “Came back” means they used ChessScout on a later day.
             {unknown > 0 ? ` ${fmt(unknown)} sign-ups had no device recorded and are left out.` : ''} Small numbers swing a lot; give it a few weeks.
           </p>
         </>
