@@ -12,7 +12,7 @@ import { STUDIO_FRAME } from '@/lib/studioFrame';
 // v2: the first version kept the offer hidden for 3 seconds behind its animation, so
 // nearly everyone closed it unseen; members who didn't start get the fixed one once.
 const SEEN = (uid: string) => `cs_trial_promo_v2:${uid}`;
-const EVERY_MS = 24 * 60 * 60_000;
+const EVERY_MS = 3 * 24 * 60 * 60_000; // every few days, only after a review or a finished game
 /** Shown in the last couple of minutes (the notifications nudge waits its turn). */
 export const PROMO_OPEN_KEY = 'cs_promo_open_at';
 // Places it would get in the way (sign-up, checkout, the free review page, the studio)
