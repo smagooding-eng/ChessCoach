@@ -1,22 +1,46 @@
 // "Your board & play": the quick set-up every member sees once (new members while their
 // games import; everyone else on their next visit, with their own choices marked "Yours"),
-// and the top of Settings. Changes apply straight away (the preview board shows them);
-// the full lists stay in Settings' other tabs.
-import { useMemo, useRef, useState } from 'react';
-import { useSettings, PIECE_SHAPES, BOARD_TEXTURES, BOARD_THEMES, isPhotoBoard, type PieceShape, type BoardTexture, type BoardTheme } from '@/context/SettingsContext';
+// and the top of Settings. Every option scrolls sideways; taps only change a draft shown on
+// the preview board, and nothing is saved until Save (backing out keeps their settings).
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { PIECE_THEME_TYPES } from '@/lib/pieceThemes';
+import { BOARD_GROUPS } from '@/lib/boardGroups';
+import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
+import { useSettings, LookOverride, BG_PHOTOS, PIECE_SHAPES, BOARD_TEXTURES, BOARD_THEMES, isPhotoBoard, type BoardLook, type PieceShape, type BoardTexture, type BoardTheme } from '@/context/SettingsContext';
 import { SOUND_PACKS, playSound, type SoundPack } from '@/lib/sounds';
 import { ChessBoard } from '@/components/ChessBoard';
 
 const G = '#81B64C', TEXT = '#F5F7F6', MUTED = '#87918E', INNER = '#121B1D', LINE = 'rgba(255,255,255,.08)';
 const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
 
-const PIECES: PieceShape[] = ['ink-cream', 'walnut-maple', 'marble-gold', 'crystal-ice', 'cburnett', 'brushed-steel'];
+// Every main option, in the same order as Settings: piece sets by type, photo boards by
+// material, then the plain two-tone colours; every sound pack.
+const PIECES: PieceShape[] = PIECE_THEME_TYPES.flatMap((t) => t.shapes).filter((k) => k !== 'default');
 type BoardPick = { kind: 'photo'; key: BoardTexture } | { kind: 'color'; key: Exclude<BoardTheme, 'custom'> };
-const BOARDS: BoardPick[] = [
-  { kind: 'photo', key: 'cs-tournament' as BoardTexture }, { kind: 'photo', key: 'cs-walnut' as BoardTexture }, { kind: 'color', key: 'green' },
-  { kind: 'photo', key: 'cs-emerald' as BoardTexture }, { kind: 'photo', key: 'cs-obsidian' as BoardTexture }, { kind: 'color', key: 'classic' },
+const boardsFor = (enhanced: boolean): BoardPick[] => [
+  ...[...new Set(BOARD_GROUPS.flatMap((g) => g.boards))]
+    .filter((k) => isPhotoBoard(k) && BOARD_TEXTURES[k] && (enhanced || !BOARD_TEXTURES[k].enhancedOnly))
+    .map((key) => ({ kind: 'photo' as const, key })),
+  ...(Object.keys(BOARD_THEMES) as Exclude<BoardTheme, 'custom'>[]).map((key) => ({ kind: 'color' as const, key })),
 ];
-const SOUNDS: SoundPack[] = ['scout', 'staunton', 'stone', 'soft'];
+const SOUNDS = Object.keys(SOUND_PACKS) as SoundPack[];
+
+/** A sideways-scrolling row that opens with the current choice in view. */
+function ScrollRow({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const row = ref.current;
+    const on = row?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (row && on) row.scrollLeft = on.offsetLeft - (row.clientWidth - on.offsetWidth) / 2;
+  }, []);
+  return (
+    <div ref={ref} className={`relative -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1.5 ${className}`}
+      style={{ scrollbarWidth: 'thin', WebkitMaskImage: 'linear-gradient(90deg,#000 88%,transparent)', maskImage: 'linear-gradient(90deg,#000 88%,transparent)' }}>
+      {children}
+      <span className="w-6 shrink-0" aria-hidden="true" />
+    </div>
+  );
+}
 
 function preview(pack: SoundPack) {
   const gap = SOUND_PACKS[pack]?.group === 'natural' ? 560 : 380;
@@ -52,6 +76,12 @@ function Seg<T extends string | boolean>({ value, options, onChange }: { value: 
   );
 }
 
+type Draft = {
+  piece: PieceShape; texture: BoardTexture; theme: BoardTheme; sound: SoundPack | 'off';
+  promo: 'queen' | 'ask'; confirm: boolean; legal: boolean; coords: boolean;
+  look: 'standard' | string;   // 'standard' (solid cards) or a backdrop id
+};
+
 export function BoardSetupCard({ mode, onDone, progress }: {
   /** first: a new member · returning: has made choices before · settings: the Settings page */
   mode: 'first' | 'returning' | 'settings';
@@ -60,42 +90,64 @@ export function BoardSetupCard({ mode, onDone, progress }: {
   progress?: 'importing' | 'ready' | null;
 }) {
   const s = useSettings();
-  // What they had when the card opened: marked "Yours" (not for brand-new members).
-  const was = useRef({ piece: s.pieceShape, texture: s.boardTexture, theme: s.boardTheme, sound: s.soundEnabled ? s.soundPack : 'off' });
+  // What they have now. Every tap only changes this draft (the preview board shows it);
+  // nothing is saved until they tap Save, so backing out leaves their settings as they were.
+  const current = (): Draft => ({
+    piece: s.pieceShape, texture: s.boardTexture, theme: s.boardTheme, sound: s.soundEnabled ? s.soundPack : 'off',
+    promo: s.promotionChoice, confirm: s.confirmMoves, legal: s.showLegalMoves, coords: s.showCoordinates,
+    look: s.uiStyle === 'photo' ? s.bgPhoto : 'standard',
+  });
+  const was = useRef<Draft>(current());
+  const [d, setD] = useState<Draft>(was.current);
+  const set = (patch: Partial<Draft>) => setD((x) => ({ ...x, ...patch }));
+  const changed = (Object.keys(d) as (keyof Draft)[]).some((k) => d[k] !== was.current[k]);
   const showYours = mode !== 'first';
-  const [changed, setChanged] = useState(false);
-  const touch = () => setChanged(true);
+
+  const save = () => {
+    const w = was.current;
+    if (d.piece !== w.piece) s.setPieceShape(d.piece);
+    if (d.texture !== w.texture) s.setBoardTexture(d.texture);
+    if (d.theme !== w.theme) s.setBoardTheme(d.theme);
+    if (d.sound !== w.sound) { if (d.sound === 'off') s.setSoundEnabled(false); else { s.setSoundEnabled(true); s.setSoundPack(d.sound); } }
+    if (d.promo !== w.promo) s.setPromotionChoice(d.promo);
+    if (d.confirm !== w.confirm) s.setConfirmMoves(d.confirm);
+    if (d.legal !== w.legal) s.setShowLegalMoves(d.legal);
+    if (d.coords !== w.coords) s.setShowCoordinates(d.coords);
+    if (d.look !== w.look) { if (d.look === 'standard') s.setUiStyle('standard'); else { s.setBgPhoto(d.look); s.setUiStyle('photo'); } }
+    was.current = d;
+    onDone?.();
+  };
 
   const pieces = useMemo(() => {
     const list = [...PIECES];
     if (showYours && !list.includes(was.current.piece) && was.current.piece !== 'default') list.unshift(was.current.piece);
     return list;
   }, [showYours]);
-  const boards = useMemo(() => {
-    const list = [...BOARDS];
-    const w = was.current;
-    if (showYours) {
-      if (isPhotoBoard(w.texture) && !list.some((b) => b.kind === 'photo' && b.key === w.texture)) list.unshift({ kind: 'photo', key: w.texture });
-      if (!isPhotoBoard(w.texture) && w.theme !== 'custom' && !list.some((b) => b.kind === 'color' && b.key === w.theme)) list.unshift({ kind: 'color', key: w.theme as Exclude<BoardTheme, 'custom'> });
-    }
-    return list;
-  }, [showYours]);
+  const { enabled: enhanced } = useDashboardRedesignFlag();
+  const boards = useMemo(() => boardsFor(enhanced), [enhanced]);
 
-  const boardOn = (b: BoardPick) => (b.kind === 'photo' ? s.boardTexture === b.key : !isPhotoBoard(s.boardTexture) && s.boardTheme === b.key);
-  const boardWas = (b: BoardPick) => (b.kind === 'photo' ? was.current.texture === b.key : !isPhotoBoard(was.current.texture) && was.current.theme === b.key);
+  const boardIs = (b: BoardPick, x: Draft) => (b.kind === 'photo' ? x.texture === b.key : !isPhotoBoard(x.texture) && x.theme === b.key);
   const pickBoard = (b: BoardPick) => {
-    if (b.kind === 'photo') s.setBoardTexture(b.key);
-    else { s.setBoardTheme(b.key); if (isPhotoBoard(s.boardTexture)) s.setBoardTexture('flat' as BoardTexture); }
-    touch();
+    if (b.kind === 'photo') set({ texture: b.key });
+    else set({ theme: b.key, texture: isPhotoBoard(d.texture) ? ('flat' as BoardTexture) : d.texture });
   };
   const boardLabel = (b: BoardPick) => (b.kind === 'photo' ? BOARD_TEXTURES[b.key]?.label : BOARD_THEMES[b.key]?.label) ?? '';
-  const currentBoard = boards.find(boardOn);
-  const soundNow = s.soundEnabled ? s.soundPack : 'off';
+  const currentBoard = boards.find((b) => boardIs(b, d));
+  const lookLabelNow = d.look === 'standard' ? 'Standard' : BG_PHOTOS.find((p) => p.id === d.look)?.label ?? 'Backdrop';
+
+  const previewLook = {
+    boardTheme: d.theme === 'custom' ? s.boardTheme : d.theme, boardTexture: d.texture, pieceShape: d.piece,
+    pieceStyle: s.pieceStyle, showCoordinates: d.coords,
+  } as unknown as BoardLook;
 
   const title = mode === 'returning' ? 'Your current set-up' : mode === 'first' ? 'Set up your board' : 'Board & play';
   const sub = mode === 'returning' ? 'These are the choices you made before. Keep them, or tap to change anything.'
     : mode === 'first' ? 'Pick how your board looks and plays. You can change it any time.'
-    : 'Changes apply straight away. More boards, pieces and themes are in the other tabs.';
+    : 'Try anything on the board below. Nothing changes until you tap Save.';
+  const head = (label: string, value: string) => (
+    <p className="mb-1.5 flex justify-between text-[11px] font-black uppercase tracking-[.12em]" style={{ color: MUTED }}>{label} <b className="normal-case tracking-normal" style={{ color: TEXT }}>{value}</b></p>
+  );
+  const chip = (on: boolean) => (on ? { background: G, color: '#06110A' } : { background: INNER, border: `1px solid ${LINE}`, color: '#C9CFCD' });
 
   return (
     <div className="rounded-[22px] p-4" style={{ background: '#0D1516', border: `1px solid ${LINE}`, color: TEXT }}>
@@ -104,57 +156,76 @@ export function BoardSetupCard({ mode, onDone, progress }: {
       <p className="mt-0.5 text-[12.5px] leading-snug" style={{ color: MUTED }}>{sub}</p>
 
       <div className="pointer-events-none mx-auto mt-3.5 w-[216px]" aria-hidden="true">
-        <ChessBoard fen={START} maxWidthOverride={216} suppressConfirmMoves />
+        <LookOverride look={previewLook}>
+          <ChessBoard fen={START} maxWidthOverride={216} suppressConfirmMoves />
+        </LookOverride>
       </div>
 
       <div className="mt-3.5">
-        <p className="mb-1.5 flex justify-between text-[11px] font-black uppercase tracking-[.12em]" style={{ color: MUTED }}>Pieces <b className="normal-case tracking-normal" style={{ color: TEXT }}>{PIECE_SHAPES[s.pieceShape]?.label}</b></p>
-        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 pt-2">
+        {head('Pieces', PIECE_SHAPES[d.piece]?.label ?? '')}
+        <ScrollRow className="pt-2">
           {pieces.map((k) => (
-            <Tile key={k} on={s.pieceShape === k} yours={showYours && was.current.piece === k} label={PIECE_SHAPES[k]?.label ?? k} onClick={() => { s.setPieceShape(k); touch(); }}>
-              {pieceImg(k) ? <img src={pieceImg(k)!} alt="" className="h-10 w-10 object-contain" /> : <span className="text-2xl">♞</span>}
+            <Tile key={k} on={d.piece === k} yours={showYours && was.current.piece === k} label={PIECE_SHAPES[k]?.label ?? k} onClick={() => set({ piece: k })}>
+              {pieceImg(k) ? <img src={pieceImg(k)!} alt="" loading="lazy" className="h-10 w-10 object-contain" /> : <span className="text-2xl">♞</span>}
             </Tile>
           ))}
-        </div>
+        </ScrollRow>
       </div>
 
       <div className="mt-2.5">
-        <p className="mb-1.5 flex justify-between text-[11px] font-black uppercase tracking-[.12em]" style={{ color: MUTED }}>Board <b className="normal-case tracking-normal" style={{ color: TEXT }}>{currentBoard ? boardLabel(currentBoard) : 'Custom'}</b></p>
-        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 pt-2">
+        {head('Board', currentBoard ? boardLabel(currentBoard) : 'Custom')}
+        <ScrollRow className="pt-2">
           {boards.map((b) => (
-            <Tile key={`${b.kind}:${b.key}`} on={boardOn(b)} yours={showYours && boardWas(b)} label={boardLabel(b)} onClick={() => pickBoard(b)}>
+            <Tile key={`${b.kind}:${b.key}`} on={boardIs(b, d)} yours={showYours && boardIs(b, was.current)} label={boardLabel(b)} onClick={() => pickBoard(b)}>
               {b.kind === 'photo'
-                ? <span className="block h-10 w-10" style={{ background: `url('${BOARD_TEXTURES[b.key]?.thumb ?? BOARD_TEXTURES[b.key]?.boardImage}') center/cover` }} />
+                ? <img src={BOARD_TEXTURES[b.key]?.thumb ?? BOARD_TEXTURES[b.key]?.boardImage} alt="" loading="lazy" className="block h-10 w-10 object-cover" />
                 : <span className="grid h-10 w-10 grid-cols-2">{[0, 1, 2, 3].map((i) => <i key={i} style={{ background: i === 0 || i === 3 ? BOARD_THEMES[b.key].light : BOARD_THEMES[b.key].dark }} />)}</span>}
             </Tile>
           ))}
-        </div>
+        </ScrollRow>
       </div>
 
       <div className="mt-2.5">
-        <p className="mb-1.5 flex justify-between text-[11px] font-black uppercase tracking-[.12em]" style={{ color: MUTED }}>Move sounds <b className="normal-case tracking-normal" style={{ color: TEXT }}>{soundNow === 'off' ? 'Off' : SOUND_PACKS[soundNow as SoundPack]?.label}</b></p>
-        <div className="flex flex-wrap gap-1.5">
-          {[...SOUNDS, ...(showYours && was.current.sound !== 'off' && !SOUNDS.includes(was.current.sound as SoundPack) ? [was.current.sound as SoundPack] : [])].map((k) => {
-            const on = soundNow === k;
-            return (
-              <button key={k} type="button" onClick={() => { s.setSoundEnabled(true); s.setSoundPack(k); preview(k); touch(); }}
-                className="rounded-[10px] px-3 py-1.5 text-[12px] font-extrabold" style={on ? { background: G, color: '#06110A' } : { background: INNER, border: `1px solid ${LINE}`, color: '#C9CFCD' }}>
-                {SOUND_PACKS[k]?.label} ▸
-              </button>
-            );
-          })}
-          <button type="button" onClick={() => { s.setSoundEnabled(false); touch(); }} className="rounded-[10px] px-3 py-1.5 text-[12px] font-extrabold"
-            style={soundNow === 'off' ? { background: G, color: '#06110A' } : { background: INNER, border: `1px solid ${LINE}`, color: '#C9CFCD' }}>Off</button>
-        </div>
+        {head('Theme', lookLabelNow)}
+        <ScrollRow className="pt-2">
+          <Tile on={d.look === 'standard'} yours={showYours && was.current.look === 'standard'} label="Standard" onClick={() => set({ look: 'standard' })}>
+            <span className="relative block h-10 w-10" style={{ background: '#050A0B' }}>
+              <i className="absolute left-1 right-1 top-1.5 h-3 rounded-[3px]" style={{ background: '#0D1516', border: '1px solid rgba(255,255,255,.12)' }} />
+              <i className="absolute bottom-1.5 left-1 h-3 w-4 rounded-[3px]" style={{ background: '#0D1516', border: '1px solid rgba(255,255,255,.12)' }} />
+              <i className="absolute bottom-1.5 right-1 h-3 w-3 rounded-[3px]" style={{ background: G }} />
+            </span>
+          </Tile>
+          {BG_PHOTOS.map((p) => (
+            <Tile key={p.id} on={d.look === p.id} yours={showYours && was.current.look === p.id} label={p.label} onClick={() => set({ look: p.id })}>
+              {p.css
+                ? <span className="block h-10 w-10" style={{ background: p.css, backgroundSize: '50% 50%' }} />
+                : <img src={p.thumb ?? p.src} alt="" loading="lazy" className="cs-keep-img block h-10 w-10 object-cover" />}
+            </Tile>
+          ))}
+        </ScrollRow>
+      </div>
+
+      <div className="mt-2.5">
+        {head('Move sounds', d.sound === 'off' ? 'Off' : SOUND_PACKS[d.sound]?.label ?? '')}
+        <ScrollRow>
+          {SOUNDS.map((k) => (
+            <button key={k} type="button" aria-pressed={d.sound === k} onClick={() => { set({ sound: k }); preview(k); }}
+              className="shrink-0 whitespace-nowrap rounded-[10px] px-3 py-1.5 text-[12px] font-extrabold" style={chip(d.sound === k)}>
+              {SOUND_PACKS[k]?.label} ▸
+            </button>
+          ))}
+          <button type="button" aria-pressed={d.sound === 'off'} onClick={() => set({ sound: 'off' })}
+            className="shrink-0 rounded-[10px] px-3 py-1.5 text-[12px] font-extrabold" style={chip(d.sound === 'off')}>Off</button>
+        </ScrollRow>
       </div>
 
       <div className="mt-3">
         <p className="mb-1 text-[11px] font-black uppercase tracking-[.12em]" style={{ color: MUTED }}>Play</p>
         {([
-          ['Pawn promotion', 'Auto-queen, or choose each time', <Seg key="p" value={s.promotionChoice} options={[['queen', 'Auto-queen'], ['ask', 'Ask']]} onChange={(v) => { s.setPromotionChoice(v); touch(); }} />],
-          ['Confirm moves', 'Tap twice before a move counts', <Seg key="c" value={s.confirmMoves} options={[[true, 'On'], [false, 'Off']]} onChange={(v) => { s.setConfirmMoves(v); touch(); }} />],
-          ['Show legal moves', null, <Seg key="l" value={s.showLegalMoves} options={[[true, 'On'], [false, 'Off']]} onChange={(v) => { s.setShowLegalMoves(v); touch(); }} />],
-          ['Board coordinates', null, <Seg key="x" value={s.showCoordinates} options={[[true, 'On'], [false, 'Off']]} onChange={(v) => { s.setShowCoordinates(v); touch(); }} />],
+          ['Pawn promotion', 'Auto-queen, or choose each time', <Seg key="p" value={d.promo} options={[['queen', 'Auto-queen'], ['ask', 'Ask']]} onChange={(v) => set({ promo: v })} />],
+          ['Confirm moves', 'Tap your clock before a move counts', <Seg key="c" value={d.confirm} options={[[true, 'On'], [false, 'Off']]} onChange={(v) => set({ confirm: v })} />],
+          ['Show legal moves', null, <Seg key="l" value={d.legal} options={[[true, 'On'], [false, 'Off']]} onChange={(v) => set({ legal: v })} />],
+          ['Board coordinates', null, <Seg key="x" value={d.coords} options={[[true, 'On'], [false, 'Off']]} onChange={(v) => set({ coords: v })} />],
         ] as [string, string | null, React.ReactNode][]).map(([label, hint, ctl]) => (
           <div key={label} className="flex items-center justify-between gap-3 py-2" style={{ borderTop: `1px solid rgba(255,255,255,.06)` }}>
             <span className="min-w-0 text-[13px] font-bold">{label}{hint && <small className="block text-[11px] font-medium" style={{ color: MUTED }}>{hint}</small>}</span>
@@ -163,12 +234,14 @@ export function BoardSetupCard({ mode, onDone, progress }: {
         ))}
       </div>
 
-      {onDone && (
+      {(onDone || changed) && (
         <>
-          <button type="button" onClick={onDone} className="mt-3.5 w-full rounded-[14px] py-3 text-[15px] font-black" style={{ background: G, color: '#06110A' }}>
-            {mode === 'returning' && !changed ? 'Keep my set-up' : mode === 'first' && !changed ? 'Looks good' : 'Save my set-up'}
+          <button type="button" onClick={save} className="mt-3.5 w-full rounded-[14px] py-3 text-[15px] font-black" style={{ background: G, color: '#06110A' }}>
+            {changed ? 'Save my set-up' : mode === 'first' ? 'Looks good' : 'Keep my set-up'}
           </button>
-          <p className="mt-2 text-center text-[12px]" style={{ color: MUTED }}>You can change these any time in Settings</p>
+          {mode === 'settings'
+            ? <button type="button" onClick={() => setD(was.current)} className="mt-2 w-full text-center text-[12px] font-bold" style={{ color: MUTED }}>Undo changes</button>
+            : <p className="mt-2 text-center text-[12px]" style={{ color: MUTED }}>Nothing changes unless you tap Save. You can change these any time in Settings.</p>}
         </>
       )}
       {progress && (
