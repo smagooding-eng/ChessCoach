@@ -158,7 +158,7 @@ export function PlayNow() {
           <ChessBoard fen={fen} flipped={color === 'b'} practiceMode={myTurn} expectedMoveSan={null}
             onMovePlayed={(san) => onMove(san)} lastMove={lastMove} reserveConfirmSpace
             boardOverlay={result !== 'playing' ? (
-              <GameOverOverlay gameKey={key} outcome={result === 'win' ? 'win' : result === 'loss' ? 'loss' : 'draw'} yourColor={color === 'w' ? 'white' : 'black'} subtitle={subtitle}
+              <GameOverOverlay gameKey={key} delayMs={new Chess(fen).isCheckmate() ? 1500 : 250} outcome={result === 'win' ? 'win' : result === 'loss' ? 'loss' : 'draw'} yourColor={color === 'w' ? 'white' : 'black'} subtitle={subtitle}
                 actions={!isAuthenticated ? (
                   <OverlayButton primary onClick={signUp}><Sparkles size={15} /> {fromChallenge ? `Now play ${fromChallenge.vs}: sign up free` : 'Get this game reviewed free'}</OverlayButton>
                 ) : (

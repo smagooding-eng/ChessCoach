@@ -496,7 +496,7 @@ export function LichessPlay() {
             status: phase !== 'playing' ? 'Game over' : myTurn ? 'Your move' : 'Opponent to move',
           } : undefined}
           boardOverlay={phase === 'over' && (!full.rated || typeof myDiff === 'number' || ratingWaitOver) ? (
-            <GameOverOverlay gameKey={full.id} outcome={outcome} yourColor={myColor === 'w' ? 'white' : 'black'} ratingDelta={myDiff ?? null} subtitle={ratingLine ? `${LICHESS_STATUS_TEXT[st.status] ?? ''}${LICHESS_STATUS_TEXT[st.status] ? ' · ' : ''}${ratingLine}` : LICHESS_STATUS_TEXT[st.status]}
+            <GameOverOverlay gameKey={full.id} delayMs={st.status === 'mate' ? 1500 : 0} outcome={outcome} yourColor={myColor === 'w' ? 'white' : 'black'} ratingDelta={myDiff ?? null} subtitle={ratingLine ? `${LICHESS_STATUS_TEXT[st.status] ?? ''}${LICHESS_STATUS_TEXT[st.status] ? ' · ' : ''}${ratingLine}` : LICHESS_STATUS_TEXT[st.status]}
               actions={<>
                 {canReview && <OverlayButton primary onClick={() => void reviewThis()}>{opening ? <Loader2 size={15} className="animate-spin" /> : <Sparkles size={15} />} Review this game</OverlayButton>}
                 {full.speed === 'correspondence'
