@@ -155,23 +155,19 @@ function CoachTeaser({ label, onUpgrade }: { label: string; onUpgrade?: () => vo
   };
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.12 }}
-      className="relative overflow-hidden rounded-[14px] px-3.5 py-3" style={{ background: '#162022', border: '1px solid rgba(255,255,255,.07)' }}>
-      <p className="mb-1.5 text-[11.5px] font-bold uppercase tracking-wide text-[#87918E]">Coach</p>
-      {/* the shape of the coach's note, unreadable: what it would explain */}
-      <div aria-hidden="true" className="space-y-1.5 blur-[1.5px]">
-        <div className="h-2.5 w-[92%] rounded-full bg-white/15" />
-        <div className="h-2.5 w-[78%] rounded-full bg-white/15" />
-        <div className="flex gap-1.5"><span className="text-[11px] font-black text-[#81B64C]">+</span><div className="mt-0.5 h-2.5 w-[60%] rounded-full bg-white/10" /></div>
-        <div className="flex gap-1.5"><span className="text-[11px] font-black text-[#F0605D]">−</span><div className="mt-0.5 h-2.5 w-[66%] rounded-full bg-white/10" /></div>
+      className="rounded-[14px] px-3 py-2.5" style={{ background: '#162022', border: '1px solid rgba(255,255,255,.07)' }}>
+      {/* Compact, so it fits under the board without scrolling */}
+      <div className="flex items-center gap-2">
+        <span className="shrink-0 rounded-md px-1.5 py-0.5 text-[10.5px] font-black uppercase tracking-wide" style={{ background: 'rgba(232,180,71,.16)', color: '#E8B447' }}>Coach · Pro</span>
+        <p className="min-w-0 flex-1 text-[12.5px] font-bold leading-snug text-[#F5F7F6]">Why was this {label}? Your coach explains it.</p>
       </div>
-      <p className="mt-2.5 text-[13px] font-bold leading-snug text-[#F5F7F6]">Why was this {label}? Your coach explains it, and what to play instead.</p>
       <div className="mt-2 flex items-center gap-2">
         <button onClick={() => void go()} disabled={busy} className="flex-1 rounded-xl py-2 text-[13px] font-extrabold disabled:opacity-60" style={{ background: GREEN, color: '#06110A' }}>
           {busy ? 'Opening…' : 'Try Pro free for 3 days'}
         </button>
-        {onUpgrade && <button onClick={onUpgrade} className="rounded-xl px-3 py-2 text-[12px] font-bold text-[#C9CFCD]" style={{ background: 'rgba(255,255,255,.06)' }}>What's in Pro</button>}
+        {onUpgrade && <button onClick={onUpgrade} className="shrink-0 px-1 text-[12px] font-bold text-[#C9CFCD] underline">What's in Pro</button>}
       </div>
-      {err && <p className="mt-1.5 text-[11.5px] font-bold text-[#FF7A80]">{err}</p>}
+      {err && <p className="mt-1 text-[11.5px] font-bold text-[#FF7A80]">{err}</p>}
     </motion.div>
   );
 }
