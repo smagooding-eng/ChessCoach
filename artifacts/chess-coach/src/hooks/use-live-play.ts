@@ -477,13 +477,18 @@ export function useLivePlay() {
   const activeGameId = game && game.status === 'active' ? game.id : null;
   useEffect(() => {
     if (!activeGameId) return;
-    const report = () => send({ type: 'presence', gameId: activeGameId, visible: document.visibilityState === 'visible' });
+    // Playing inside the Streamer Studio while it's on air (live, recording or in Go live view):
+    // the streamer is there even when the browser calls the window hidden (covered by OBS or
+    // the stream chat, another tab), so that doesn't count as leaving the game.
+    const onAir = () => { try { return window.top !== window.self && !!(window.top as unknown as { __csStudioOnAir?: boolean }).__csStudioOnAir; } catch { return false; } };
+    const visible = () => document.visibilityState === 'visible' || onAir();
+    const report = () => send({ type: 'presence', gameId: activeGameId, visible: visible() });
     report();
     const onVis = () => report();
-    const onHide = () => send({ type: 'presence', gameId: activeGameId, visible: false });
+    const onHide = () => { if (!onAir()) send({ type: 'presence', gameId: activeGameId, visible: false }); };
     document.addEventListener('visibilitychange', onVis);
     window.addEventListener('pagehide', onHide);
-    const t = setInterval(() => { if (document.visibilityState === 'visible') report(); }, 5000);
+    const t = setInterval(() => { if (visible()) report(); }, 5000);
     return () => {
       document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('pagehide', onHide);

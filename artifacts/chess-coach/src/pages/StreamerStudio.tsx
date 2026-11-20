@@ -780,6 +780,14 @@ function StreamerStudio({ admin }: { admin: boolean }) {
   })();
   headRef.current = s.headline.trim() || headLine.length ? { title: s.headline.trim(), runs: headLine } : null;
 
+  // On air (broadcasting, recording, or in Go live view): a live game in the board panel keeps
+  // counting the streamer as present even if the browser calls this window hidden.
+  const onAir = clean || watching !== null || !!recording || cloud?.phase === 'recording';
+  useEffect(() => {
+    (window as unknown as { __csStudioOnAir?: boolean }).__csStudioOnAir = onAir;
+    return () => { (window as unknown as { __csStudioOnAir?: boolean }).__csStudioOnAir = false; };
+  }, [onAir]);
+
   // ---- the composite stage canvas (what's recorded and broadcast) ----
   useEffect(() => {
     let raf = 0, lastDraw = 0;
