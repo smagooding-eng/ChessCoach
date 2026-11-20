@@ -293,6 +293,12 @@ const PACKS: Record<SoundPack, Record<SoundEvent, Voice>> = {
 const VOICE_FOR: Partial<Record<SoundEvent, SoundEvent>> = { check: 'capture', capture: 'check' };
 
 export const DEFAULT_SOUND_PACK: SoundPack = 'scout';
+/** The click of pressing a real chess clock (the confirm-move lever). */
+export function playClockClick() {
+  const ac = audio();
+  if (!ac) return;
+  try { clockPress(ac, ac.currentTime + 0.003, 1); } catch {}
+}
 export function playSound(event: SoundEvent, pack: SoundPack = DEFAULT_SOUND_PACK) {
   const ac = audio();
   if (!ac) return;

@@ -722,6 +722,7 @@ export function ChessBoard({
           onCancel={cancelPendingMove}
           busy={confirming}
           time={sidePanel?.clocks?.bottom.text}
+          san={pendingMove.san}
         />, confirmTarget)}
       {pendingMove && confirmTarget === undefined && (
         // Confirm Move: dark Cancel strip + a big green clock you tap to play
@@ -732,6 +733,7 @@ export function ChessBoard({
           onCancel={cancelPendingMove}
           busy={confirming}
           time={sidePanel?.clocks?.bottom.text}
+          san={pendingMove.san}
         />
       )}
       {/* Practice feedback overlay */}
