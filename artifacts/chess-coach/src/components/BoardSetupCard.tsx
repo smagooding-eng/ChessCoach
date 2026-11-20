@@ -82,7 +82,9 @@ type Draft = {
   look: 'standard' | string;   // 'standard' (solid cards) or a backdrop id
 };
 
-export function BoardSetupCard({ mode, onDone, progress }: {
+export function BoardSetupCard({ mode, onDone, progress, kicker }: {
+  /** Small line above the title (default "Your board & play"). */
+  kicker?: string;
   /** first: a new member · returning: has made choices before · settings: the Settings page */
   mode: 'first' | 'returning' | 'settings';
   onDone?: () => void;
@@ -151,7 +153,7 @@ export function BoardSetupCard({ mode, onDone, progress }: {
 
   return (
     <div className="rounded-[22px] p-4" style={{ background: '#0D1516', border: `1px solid ${LINE}`, color: TEXT }}>
-      <p className="text-[11px] font-black uppercase tracking-[.14em]" style={{ color: G }}>Your board &amp; play</p>
+      <p className="text-[11px] font-black uppercase tracking-[.14em]" style={{ color: G }}>{kicker ?? 'Your board & play'}</p>
       <h2 className="mt-1 text-[22px] font-black leading-tight">{title}</h2>
       <p className="mt-0.5 text-[12.5px] leading-snug" style={{ color: MUTED }}>{sub}</p>
 

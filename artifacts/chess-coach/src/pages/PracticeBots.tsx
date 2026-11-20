@@ -1,5 +1,6 @@
 import { markValueMoment } from '@/lib/valueMoment';
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useBoardSetupMoment } from '@/lib/setupMoment';
 import { ShareButton, SHARE_BASE } from '@/components/ShareButton';
 import { RatePlayCard } from '@/components/RatePlayCard';
 import { PieceTile } from '@/components/DesignSystem';
@@ -1483,6 +1484,7 @@ export function PracticeBots() {
   const [urlPick] = useState(readInitialOpeningPick);
   const [tab, setTab] = useState<'bots' | 'openings'>(() => readInitialOpeningParam() ? 'openings' : readInitialTabParam());
   const { enabled: redesign } = useDashboardRedesignFlag();
+  useBoardSetupMoment(!selectedBot);
 
   // Strip the ?fen=&rating=&color=&onboarding= params from the URL exactly
   // once, after mount — not as a side effect inside the useState

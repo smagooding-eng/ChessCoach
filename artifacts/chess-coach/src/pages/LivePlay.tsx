@@ -1,5 +1,6 @@
 import { trackPlay, newPlaySearch } from '@/lib/playFunnel';
 import { useGameBusy } from '@/lib/gameBusy';
+import { useBoardSetupMoment } from '@/lib/setupMoment';
 import React, { useEffect, useRef, useState } from 'react';
 import { announceChallengeSent } from '@/lib/challengeSent';
 import { useLivePlay, type LiveMode } from '@/hooks/use-live-play';
@@ -202,6 +203,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
 
   // Keep the game on screen through a reconnect (status can briefly read
   // connecting/disconnected/idle while the socket comes back).
+  useBoardSetupMoment(live.status === 'idle' && !live.game);
   if (live.game && !live.minimized && (live.status === 'in_game' || live.status === 'finished' || live.game.status === 'active')) {
     return (
       <>

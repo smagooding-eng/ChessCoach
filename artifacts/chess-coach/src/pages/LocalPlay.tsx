@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useBoardSetupMoment } from '@/lib/setupMoment';
 import { PageHero } from '@/components/DesignSystem';
 import { Chess } from 'chess.js';
 import { ChessBoard } from '@/components/ChessBoard';
@@ -38,6 +39,7 @@ interface MoveRecord {
 export function LocalPlay() {
   const [timeControl, setTimeControl] = useState<TimeControl | null>(null);
   const [gameStarted, setGameStarted] = useState(false);
+  useBoardSetupMoment(!gameStarted);
   const [chess] = useState(() => new Chess());
   const [fen, setFen] = useState(chess.fen());
   const [result, setResult] = useState<GameResult>('playing');
