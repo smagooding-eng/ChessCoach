@@ -312,6 +312,19 @@ export function ChessBoard({
   }, [fxPlan, moveFx]);
   const fxLive = fxPlan && fxDone !== fxPlan.id ? fxPlan : null;
 
+  // Checkmate badge waits until the mating piece has finished sliding in, so it never shows
+  // before the move does. Opening straight onto a mated position shows it at once.
+  const slideMs = moveFx ? moveFx + 30 : (animationMs ?? 150);
+  const mountPos = useRef(position);
+  const [mateReady, setMateReady] = useState<string | null>(() => position);
+  useEffect(() => {
+    if (!checkmateInfo || position === mountPos.current || slideMs <= 0) { setMateReady(position); return undefined; }
+    setMateReady(null);
+    const t = setTimeout(() => setMateReady(position), slideMs + 40);
+    return () => clearTimeout(t);
+  }, [position, checkmateInfo, slideMs]);
+  const showMate = !!checkmateInfo && mateReady === position;
+
   const [prevPosition, setPrevPosition] = useState(position);
   if (position !== prevPosition) {
     setPrevPosition(position);
@@ -640,7 +653,7 @@ export function ChessBoard({
           aligned even when the promotion picker / confirm bar below adds height. */}
       {/* Not shown when a game-over card is on the board: the card tells the
           story (the losing king topples), so the board stays clean. */}
-      {checkmateInfo && !boardOverlay && (
+      {checkmateInfo && showMate && !boardOverlay && (
         <div className="absolute inset-x-0 top-0 aspect-square pointer-events-none">
         <CheckmateOverlay
           winningKingSquare={checkmateInfo.winningKingSquare}
