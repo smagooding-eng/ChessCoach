@@ -719,7 +719,8 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
                 subtitle={chess.isCheckmate() ? 'by checkmate' : chess.isStalemate() ? 'by stalemate'
                   : chess.isThreefoldRepetition() ? 'by repetition' : chess.isInsufficientMaterial() ? 'insufficient material'
                   : chess.isDraw() ? 'by the 50-move rule' : result === 'loss' ? 'You resigned' : undefined}
-                delayMs={chess.isCheckmate() ? 1500 : 250}
+                checkmate={chess.isCheckmate()}
+                delayMs={chess.isCheckmate() ? 1000 : 250}
                 actions={isOnboarding ? undefined : <>
                   <OverlayButton primary onClick={() => handleNewGame(playerColor === 'w' ? 'b' : 'w')}>
                     <RotateCcw className="w-4 h-4" /> Rematch

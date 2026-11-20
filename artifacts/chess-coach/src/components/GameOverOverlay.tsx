@@ -78,12 +78,23 @@ const GO_CSS = `
 /* text and buttons */
 .go-in { animation: goIn .45s cubic-bezier(.2,.9,.3,1) var(--at, 0s) both; }
 @keyframes goIn { from { opacity: 0; transform: translateY(10px); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
+/* checkmate: "Checkmate" lands with the king, then makes way for the result */
+.go-mate { overflow: hidden; max-height: 120px; animation: goIn .45s cubic-bezier(.2,.9,.3,1) var(--at, 0s) both, goOut .4s ease-in var(--out, 2s) forwards; }
+@keyframes goOut { to { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; filter: blur(3px); } }
+/* the result part of the card opens up as "Checkmate" goes */
+.go-grow { overflow: hidden; max-height: 0; animation: goGrow .55s cubic-bezier(.2,.9,.3,1) var(--grow, 2s) forwards; }
+@keyframes goGrow { to { max-height: 460px; } }
+.go-hash { animation: goHash .5s cubic-bezier(.2,1.4,.4,1) var(--at, 0s) both; }
+@keyframes goHash { from { opacity: 0; transform: scale(.3) rotate(-20deg); } to { opacity: 1; transform: none; } }
+.go-fadeout { animation: goFadeOut .45s ease-in var(--end, 3s) forwards; }
+@keyframes goFadeOut { to { opacity: 0; } }
 .go-actions > * { animation: goIn .4s cubic-bezier(.2,.9,.3,1) both; }
 .go-actions > *:nth-child(1) { animation-delay: var(--a1, 1.15s); }
 .go-actions > *:nth-child(2) { animation-delay: calc(var(--a1, 1.15s) + .1s); }
 .go-actions > *:nth-child(3) { animation-delay: calc(var(--a1, 1.15s) + .2s); }
 @media (prefers-reduced-motion: reduce) {
-  .go-scrim, .go-card, .go-shake, .go-board, .go-flash, .go-glow, .go-ring, .go-ring2, .go-pop, .go-spark, .go-fall, .go-fshadow, .go-kl, .go-kr, .go-in, .go-actions > * { animation: none !important; }
+  .go-scrim, .go-card, .go-shake, .go-board, .go-flash, .go-glow, .go-ring, .go-ring2, .go-pop, .go-spark, .go-fall, .go-fshadow, .go-kl, .go-kr, .go-in, .go-mate, .go-hash, .go-actions > * { animation: none !important; }
+  .go-mate { display: none; } .go-grow { max-height: none; }
   .go-ring, .go-ring2, .go-pop, .go-spark { display: none; }
   .go-board { opacity: 1; } .go-flash { opacity: .2; } .go-glow { opacity: .5; }
   .go-fall { transform: rotate(90deg); } .go-fshadow { transform: translateX(38px) scaleX(1.8); }
@@ -199,8 +210,14 @@ function CountUp({ to, at }: { to: number; at: number }) {
  * it back.
  */
 export function GameOverOverlay({
-  outcome, title: titleOverride, subtitle, ratingDelta, actions, delayMs = 0, gameKey, yourColor = 'white',
+  outcome, title: titleOverride, subtitle, ratingDelta, actions, delayMs = 0, gameKey, yourColor = 'white', checkmate, winner, bare,
 }: {
+  /** The game ended in checkmate: the card opens on "Checkmate" (as the king falls), then shows the result. */
+  checkmate?: boolean;
+  /** Who mated, for the "White wins" line under "Checkmate". */
+  winner?: 'white' | 'black';
+  /** Just the "Checkmate" moment (reviews, puzzles): no close button or result, fades away by itself. */
+  bare?: boolean;
   outcome: GameOutcome;
   /** Your side, so the falling king is the right colour (yours on a loss, the opponent's on a win). */
   yourColor?: 'white' | 'black';
@@ -229,9 +246,37 @@ export function GameOverOverlay({
   const title = titleOverride ?? (outcome === 'win' ? 'You Won!' : outcome === 'loss' ? 'You Lost' : 'Draw');
   const accent = outcome === 'win' ? '#81B64C' : outcome === 'loss' ? '#C9454A' : '#B9C2BF';
   // text follows the animation: it waits for the king to land
-  const t0 = outcome === 'draw' ? 0.55 : HIT + 0.05;
+  const mateAt = HIT + 0.05;
+  const mateHold = 1.1; // how long "Checkmate" stays before the result takes over
+  const t0 = outcome === 'draw' ? 0.55 : checkmate && !bare ? mateAt + mateHold + 0.15 : HIT + 0.05;
   // the king that falls: the opponent's when you win, yours when you lose
   const fallingLight = outcome === 'win' ? yourColor === 'black' : yourColor === 'white';
+  const won = winner ?? (outcome === 'win' ? yourColor : outcome === 'loss' ? (yourColor === 'white' ? 'black' : 'white') : undefined);
+  const winsLine = won ? `${won === 'white' ? 'White' : 'Black'} wins` : null;
+  const mateTitle = (cls: string, style: React.CSSProperties) => (
+    <div className={`${cls} flex flex-col items-center`} style={style}>
+      <p className="inline-flex items-center gap-2 text-[28px] font-black leading-none text-white" style={{ letterSpacing: '-0.02em' }}>
+        <span className="go-hash grid h-8 w-8 place-items-center rounded-[9px] text-[19px]" style={{ ['--at' as string]: `${mateAt}s`, background: '#81B64C', color: '#06110A' }}>#</span>
+        Checkmate
+      </p>
+      {winsLine && <p className="mt-2 text-[13px] font-bold" style={{ color: '#9AA3A0' }}>{winsLine}</p>}
+    </div>
+  );
+
+  if (bare) {
+    // the checkmate moment on its own: falls, says Checkmate, fades
+    return (
+      <div key={gameKey} className="go-scrim go-fadeout absolute inset-0 flex items-center justify-center rounded-[10px] p-4 pointer-events-none"
+        style={{ background: 'rgba(0,0,0,.4)', ['--end' as string]: `${mateAt + 1.6}s` }}>
+        <style>{GO_CSS}</style>
+        <div className="go-card relative w-full max-w-[270px] overflow-hidden rounded-[20px] text-center"
+          style={{ background: 'linear-gradient(180deg, #141413 0%, #0c0c0b 100%)', border: '1px solid rgba(255,255,255,.09)', boxShadow: '0 30px 60px -20px rgba(0,0,0,.85)' }}>
+          <div className="px-3 pt-4"><Stage outcome={outcome} fallingLight={fallingLight} accent={accent} /></div>
+          {mateTitle('go-in px-5 pb-5 pt-1', { ['--at' as string]: `${mateAt}s` })}
+        </div>
+      </div>
+    );
+  }
 
   if (closed) {
     return (
@@ -257,6 +302,8 @@ export function GameOverOverlay({
 
         <div className="px-3 pt-4"><Stage outcome={outcome} fallingLight={fallingLight} accent={accent} /></div>
 
+        {checkmate && mateTitle('go-mate px-5 pb-5 pt-1', { ['--at' as string]: `${mateAt}s`, ['--out' as string]: `${mateAt + mateHold}s` })}
+        <div className={checkmate ? 'go-grow' : undefined} style={checkmate ? { ['--grow' as string]: `${mateAt + mateHold + 0.05}s` } : undefined}>
         <div className="px-5 pb-1 pt-1">
           <p className="go-in text-[28px] font-black leading-none text-white" style={{ ['--at' as string]: `${t0}s`, letterSpacing: '-0.02em' }}>{title}</p>
           {subtitle && <p className="go-in mt-2 text-[13px] font-bold first-letter:uppercase" style={{ ['--at' as string]: `${t0 + 0.08}s`, color: '#9AA3A0' }}>{subtitle}</p>}
@@ -270,6 +317,7 @@ export function GameOverOverlay({
         </div>
         {actions && <div className="go-actions flex flex-col gap-2 px-4 pb-4 pt-3" style={{ ['--a1' as string]: `${t0 + 0.25}s` }}>{actions}</div>}
         {!actions && <div className="h-4" />}
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
+import { GameOverOverlay } from './GameOverOverlay';
 import { Chess } from 'chess.js';
 import { squareBox } from './SquareBadge';
 
@@ -23,8 +24,8 @@ export function checkmateSquares(fen: string): { winningKingSquare: string; losi
 // Premium checkmate presentation, used by every board (classic and enhanced UI):
 //  - winning king: a glowing gold square and a gold crown medallion in the corner
 //  - mated king: a deep crimson square glow and a crimson "#" medallion
-//  - a short "Checkmate" ribbon across the board that settles away after a moment,
-//    so the final position is left clear to look at.
+//  - the result card's checkmate moment (falling king, "Checkmate", who won) that fades
+//    away after a few seconds, so the final position is left clear to look at.
 // Everything is inline SVG/CSS -- no image assets to load.
 
 function Crown() {
@@ -71,10 +72,12 @@ export function CheckmateOverlay({ winningKingSquare, losingKingSquare, flipped,
   /** Changes when a new mate position arrives, to replay the ribbon. */
   positionKey: string;
 }) {
+  // the side to move in the mated position lost
+  const winner: 'white' | 'black' = positionKey.split(' ')[1] === 'w' ? 'black' : 'white';
   const [ribbon, setRibbon] = useState(true);
   useEffect(() => {
     setRibbon(true);
-    const t = setTimeout(() => setRibbon(false), 2200);
+    const t = setTimeout(() => setRibbon(false), 3400);
     return () => clearTimeout(t);
   }, [positionKey]);
 
@@ -98,30 +101,12 @@ export function CheckmateOverlay({ winningKingSquare, losingKingSquare, flipped,
         <Medallion kind="loss" />
       </motion.div>
 
-      {/* ribbon */}
-      <AnimatePresence>
-        {ribbon && (
-          <motion.div key={positionKey} className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none" style={{ containerType: 'inline-size' }}
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.35 }}>
-            <motion.div
-              initial={{ scaleX: 0.2, opacity: 0 }} animate={{ scaleX: 1, opacity: 1 }} exit={{ scaleX: 0.6, opacity: 0 }}
-              transition={{ duration: 0.45, ease: [0.2, 0.8, 0.2, 1] }}
-              className="w-full py-[3.5%] text-center"
-              style={{
-                background: 'linear-gradient(90deg, rgba(10,8,2,0) 0%, rgba(10,8,2,.82) 18%, rgba(10,8,2,.82) 82%, rgba(10,8,2,0) 100%)',
-                borderTop: '1px solid rgba(242,193,78,.55)', borderBottom: '1px solid rgba(242,193,78,.55)',
-              }}>
-              <span style={{
-                fontFamily: "Georgia, 'Times New Roman', serif", fontWeight: 700, letterSpacing: '0.22em',
-                fontSize: 'clamp(18px, 6.5cqw, 40px)',
-                background: 'linear-gradient(180deg, #FFF3C4 0%, #F2C14E 55%, #B57C14 100%)',
-                WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent',
-                textShadow: '0 2px 18px rgba(242,193,78,.25)',
-              }}>CHECKMATE</span>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* the checkmate moment: the result card's falling king and "Checkmate", then it fades */}
+      {ribbon && (
+        <div className="absolute inset-0 z-30 pointer-events-none">
+          <GameOverOverlay bare gameKey={positionKey} outcome="win" yourColor={winner} winner={winner} delayMs={200} />
+        </div>
+      )}
     </>
   );
 }

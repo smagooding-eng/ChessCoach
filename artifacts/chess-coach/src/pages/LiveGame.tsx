@@ -382,7 +382,8 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
             yourColor={youAreWhite ? 'white' : 'black'}
             subtitle={describeEnding(game.termination, outcome)}
             ratingDelta={myRatingDelta}
-            delayMs={game.termination === 'checkmate' ? 1500 : 0}
+            checkmate={game.termination === 'checkmate'}
+            delayMs={game.termination === 'checkmate' ? 1000 : 0}
             actions={<>
               {rematchAskedByOpp && <p className="text-[13px] font-bold" style={{ color: '#EDEDED' }}>{opponentIsBot ? 'The bot' : 'Your opponent'} wants a rematch!</p>}
               {notice && <p className="text-[12px] font-bold" style={{ color: '#ec6b6b' }}>{notice}</p>}
