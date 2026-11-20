@@ -708,9 +708,11 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
           {tool('Best', <Star size={21} />, mode.kind === 'best', canBest, () => { if (mode.kind === 'best') setMode({ kind: 'main' }); else { setAutoPlay(true); soundFor(bestLine[0].san); setMode({ kind: 'best', step: 0 }); } })}
           {tool('Retry', <RotateCcw size={21} />, mode.kind === 'retry', canRetry, () => setMode(mode.kind === 'retry' ? { kind: 'main' } : { kind: 'retry', state: 'trying' }))}
           <button onClick={atEnd && mode.kind === 'main' ? openReport : next}
-            className="ml-auto flex h-[52px] flex-1 items-center justify-center gap-1.5 rounded-[14px] text-[18px] font-black text-white transition-transform active:scale-[0.98]"
+            className="relative ml-auto flex h-[52px] flex-1 items-center justify-center gap-1.5 rounded-[14px] text-[18px] font-black text-white transition-transform active:scale-[0.98]"
             style={{ background: `linear-gradient(180deg, #8FC25A, ${GREEN})`, boxShadow: '0 4px 0 #5F8F36' }}>
             {mode.kind !== 'main' ? <><X size={18} /> Back to game</> : ply === 0 ? (status === 'ready' ? 'Start review' : 'Next') : atEnd ? <span className="text-[clamp(14px,4.4vw,18px)]">Continue to Pro report</span> : 'Next'}
+            {/* Free accounts: the same PRO badge as the full-analysis icon above */}
+            {!canFullAnalysis && atEnd && mode.kind === 'main' && <span className="absolute -right-1 -top-2 rounded-md px-1.5 py-0.5 text-[10px] font-black shadow" style={{ background: '#E8B447', color: '#1C1C1C' }}>PRO</span>}
           </button>
         </div>
       </div>
