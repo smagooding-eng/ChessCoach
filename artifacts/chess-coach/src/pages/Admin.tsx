@@ -354,7 +354,8 @@ function DeviceRetentionCard() {
     return () => { live = false; };
   }, [days]);
   const items = [
-    { key: 'mobile', label: 'Phone', color: CHESSCOM_GREEN },
+    { key: 'mobile_app', label: 'Phone app', color: CHESSCOM_GREEN },
+    { key: 'mobile', label: 'Phone browser', color: '#B7E07A' },
     { key: 'desktop', label: 'PC / laptop', color: '#4FA3E0' },
     { key: 'tablet', label: 'Tablet', color: '#E8B447' },
   ];
@@ -399,7 +400,7 @@ function DeviceRetentionCard() {
                 <tr style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                   <td className="py-2 pr-3 font-bold">Sign-ups</td>
                   {items.map((it) => { const x = g(it.key); return (
-                    <td key={it.key} className="py-2 px-2"><b className="text-[16px] font-black">{fmt(x.signups)}</b>{it.key === 'mobile' && x.inApp > 0 && <span className="block text-[10.5px]" style={{ color: TEXT_MUTED }}>{fmt(x.inApp)} in the app</span>}</td>
+                    <td key={it.key} className="py-2 px-2"><b className="text-[16px] font-black">{fmt(x.signups)}</b></td>
                   ); })}
                 </tr>
                 {rows.map((r) => (
@@ -414,7 +415,7 @@ function DeviceRetentionCard() {
             </table>
           </div>
           <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
-            Members who signed up since {new Date(data.since).toLocaleDateString(undefined, { timeZone: 'UTC' })}, by the device of their first visit as a member. “Came back” means they used ChessScout on a later day.
+            Members who signed up since {new Date(data.since).toLocaleDateString(undefined, { timeZone: 'UTC' })}, by the device of their first visit as a member. Phone app = the Android app or the installed web app; phone browser = Chrome, Safari and so on. “Came back” means they used ChessScout on a later day.
             {unknown > 0 ? ` ${fmt(unknown)} sign-ups had no device recorded and are left out.` : ''} Small numbers swing a lot; give it a few weeks.
           </p>
         </>

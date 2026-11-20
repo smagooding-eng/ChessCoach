@@ -93,7 +93,7 @@ router.get("/admin/device-retention", requireAdmin, async (req: Request, res: Re
           COALESCE(BOOL_OR(d.day >= su.d0 + 7), false) AS week_later
         FROM su LEFT JOIN user_activity_days d ON d.user_id = su.id GROUP BY su.id
       )
-      SELECT COALESCE(dev.device, 'unknown') AS device,
+      SELECT CASE WHEN dev.device = 'mobile' AND dev.app_mode IN ('android_app', 'installed') THEN 'mobile_app' ELSE COALESCE(dev.device, 'unknown') END AS device,
         COUNT(*)::int AS signups,
         COUNT(*) FILTER (WHERE dev.app_mode IN ('android_app', 'installed'))::int AS in_app,
         COUNT(*) FILTER (WHERE su.linked)::int AS linked,
