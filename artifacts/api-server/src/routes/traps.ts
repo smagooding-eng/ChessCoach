@@ -5,15 +5,26 @@ import { eq, and, asc } from "drizzle-orm";
 
 const router: IRouter = Router();
 
+// Advanced traps are part of Pro; beginner and intermediate stay free for everyone.
+const isProTrap = (t: { difficulty: string }) => t.difficulty === "advanced";
+async function canSeeProTraps(req: Request): Promise<boolean> {
+  if ((req.user as { isAdmin?: boolean } | undefined)?.isAdmin) return true;
+  try {
+    const { hasFullAccess } = await import("../lib/accessControl");
+    return (await hasFullAccess(String(req.user!.id))).full;
+  } catch { return false; }
+}
+
 // Viewing and training routes just need a logged-in user -- this is a
 // real, launched feature now. Content-management routes (create/edit/
 // archive) stay admin-only, gated per-route further down.
-router.get("/traps", requireAuth, async (_req: Request, res: Response) => {
+router.get("/traps", requireAuth, async (req: Request, res: Response) => {
   try {
     const traps = await db.select().from(chessTrapsTable)
       .where(eq(chessTrapsTable.archived, false))
       .orderBy(asc(chessTrapsTable.orderIndex));
-    res.json({ traps });
+    const pro = await canSeeProTraps(req);
+    res.json({ traps: traps.map((t) => ({ ...t, pro: isProTrap(t), locked: isProTrap(t) && !pro })) });
   } catch (err: any) {
     res.status(500).json({ error: "Failed to load traps" });
   }
@@ -33,9 +44,12 @@ router.get("/traps/:id", requireAuth, async (req: Request, res: Response) => {
       return;
     }
 
-    // No paywall: traps are static training content with no AI/API cost,
-    // so every difficulty is free for any logged-in user. (This used to
-    // return summary-only + locked:true for non-beginner traps.)
+    // Advanced traps are Pro: others get the name and summary only (the page shows the Pro card).
+    if (isProTrap(trap) && !(await canSeeProTraps(req))) {
+      const { id: tid, name, category, difficulty, trapSide, summary, startingFen } = trap;
+      res.json({ trap: { id: tid, name, category, difficulty, trapSide, summary, startingFen }, locked: true, progress: { commit: false, avoid: false } });
+      return;
+    }
     let progress: { commit: boolean; avoid: boolean } = { commit: false, avoid: false };
     const rows = await db.select().from(trapProgressTable)
       .where(and(eq(trapProgressTable.trapId, id), eq(trapProgressTable.userId, req.user!.id)));
@@ -70,6 +84,7 @@ router.post("/traps/:id/attempt", requireAuth, async (req: Request, res: Respons
       res.status(404).json({ error: "Trap not found" });
       return;
     }
+    if (isProTrap(trap) && !(await canSeeProTraps(req))) { res.status(403).json({ error: "pro_required" }); return; }
 
     const [existing] = await db.select().from(trapProgressTable)
       .where(and(

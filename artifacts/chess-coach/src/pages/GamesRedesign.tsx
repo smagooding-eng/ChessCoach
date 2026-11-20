@@ -231,7 +231,7 @@ export function GamesRedesign() {
 
         {!!bulkJobId && <NotifyPrompt id="games" className="mb-2.5" reason="Reviews take a few minutes. Turn on notifications and we'll tell you the moment they're ready." />}
         {source === 'all' && (unreviewedCount > 0 || !!bulkJobId) && (
-          <div className="mt-3 flex items-center gap-3 rounded-[16px] px-4 py-3" style={{ background: 'rgba(129,182,76,.07)', border: '1px solid rgba(129,182,76,.28)' }}>
+          <div className="mt-3 flex items-center gap-3 rounded-[16px] px-4 py-3" style={{ background: '#0D1516', border: '1px solid rgba(255,255,255,.08)' }}>
             <div className="min-w-0 flex-1 text-[13px]">
               {bulkJobId && bulkProgress ? (
                 <span><b>Reviewing…</b> <span style={{ color: RD.muted }}>{bulkProgress.reviewedSoFar} of {bulkProgress.total} done</span></span>

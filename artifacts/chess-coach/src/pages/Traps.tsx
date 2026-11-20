@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'wouter';
-import { Crosshair, ChevronRight, Swords, Loader2 } from 'lucide-react';
+import { Crosshair, ChevronRight, Swords, Loader2, Lock } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { RD } from '@/lib/redesignTheme';
@@ -27,6 +27,9 @@ interface TrapSummary {
   startingFen?: string;
   trapLineSan?: string[];
   criticalMoveIndex?: number;
+  /** Advanced traps are Pro; locked = this member can't open it yet. */
+  pro?: boolean;
+  locked?: boolean;
 }
 
 const DIFFICULTY_COLOR: Record<string, string> = {
@@ -95,7 +98,7 @@ function TrapsClassic({ traps, loading }: { traps: TrapSummary[]; loading: boole
                           <p className="font-bold text-sm truncate flex items-center gap-1.5">
                             {trap.name}
                           </p>
-                          <p className="text-xs truncate" style={{ color: MUTED }}>{trap.summary}</p>
+                          <p className="text-xs" style={{ color: MUTED }}>{trap.summary}</p>
                         </div>
                         <span
                           className="text-[10px] font-black uppercase px-2 py-1 rounded-full shrink-0"
@@ -148,14 +151,21 @@ function TrapsRedesign({ traps, loading }: { traps: TrapSummary[]; loading: bool
   const row = (trap: TrapSummary) => {
     const chip = CHIP[trap.difficulty] ?? { bg: 'rgba(255,255,255,.1)', fg: RD.muted, bd: RD.border };
     return (
-      <Link key={trap.id} href={`/traps/${trap.id}`} className="flex items-center gap-3 transition-opacity active:opacity-80">
-        <FenThumb fen={trapFen(trap)} size={58} />
-        <span className="flex min-w-0 flex-1 items-center gap-2 rounded-[16px] py-3 pl-4 pr-3" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
+      // Fits the screen: the summary wraps instead of running off the edge.
+      <Link key={trap.id} href={`/traps/${trap.id}`} className="flex w-full min-w-0 items-center gap-3 transition-opacity active:opacity-80">
+        <span className="relative shrink-0">
+          <FenThumb fen={trapFen(trap)} size={58} />
+          {trap.locked && <span className="absolute inset-0 grid place-items-center rounded-[8px]" style={{ background: 'rgba(5,10,11,.55)' }}><Lock size={18} color="#F5F7F6" /></span>}
+        </span>
+        <span className="flex min-w-0 flex-1 items-center gap-2 rounded-[16px] py-3 pl-4 pr-3" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
           <span className="min-w-0 flex-1">
-            <b className="block truncate text-[16px] font-extrabold">{trap.name}</b>
-            <span className="block truncate text-[13px]" style={{ color: RD.muted }}>{trap.summary}</span>
+            <span className="flex flex-wrap items-center gap-1.5">
+              <b className="text-[15.5px] font-extrabold leading-snug">{trap.name}</b>
+              {trap.pro && <span className="rounded px-1.5 py-0.5 text-[9.5px] font-black" style={{ background: '#E8B447', color: '#1C1C1C' }}>PRO</span>}
+            </span>
+            <span className="mt-0.5 block text-[12.5px] leading-snug" style={{ color: RD.muted }}>{trap.summary}</span>
+            <span className="mt-1.5 inline-flex items-center rounded-[7px] px-2 py-0.5 text-[11px] font-extrabold capitalize" style={NEUTRAL_CHIP}><span className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: chip.fg }} />{trap.difficulty}</span>
           </span>
-          <span className="shrink-0 rounded-[8px] px-2.5 py-1.5 text-[12px] font-extrabold capitalize" style={NEUTRAL_CHIP}><span className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full align-middle" style={{ background: chip.fg }} />{trap.difficulty}</span>
           <ChevronRight size={16} className="shrink-0" style={{ color: RD.muted }} />
         </span>
       </Link>
@@ -181,14 +191,14 @@ function TrapsRedesign({ traps, loading }: { traps: TrapSummary[]; loading: bool
           })}
         </div>
 
-        <div className="mt-3 grid gap-2.5 lg:grid-cols-2 lg:gap-3">
+        <div className="mt-3 grid min-w-0 grid-cols-1 gap-2.5 lg:grid-cols-2 lg:gap-3">
           {loading ? (
             <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin" style={{ color: RD.green }} /></div>
           ) : traps.length === 0 ? (
             <div className="rounded-[20px] p-8 text-center text-[13px]" style={{ background: RD.card, border: `1px solid ${RD.border}`, color: RD.muted }}>No traps added yet.</div>
           ) : grouped ? (
             (Object.entries(grouped) as [string, TrapSummary[]][]).map(([name, list]) => (
-              <div key={name} className="grid gap-2.5 lg:col-span-2 lg:grid-cols-2">
+              <div key={name} className="grid min-w-0 gap-2.5 lg:col-span-2 lg:grid-cols-2">
                 <p className="mt-2 px-1 text-[11.5px] font-extrabold uppercase tracking-[.14em]" style={{ color: RD.muted }}>{name}</p>
                 {list.map(row)}
               </div>

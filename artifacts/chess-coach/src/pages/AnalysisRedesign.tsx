@@ -209,7 +209,7 @@ function InsightCard({ icon, title, text, onClick }: { icon: React.ReactNode; ti
   const Tag = onClick ? 'button' : 'div';
   return (
     <Tag onClick={onClick} className="flex w-full items-center gap-3 rounded-[18px] p-4 text-left"
-      style={{ background: 'linear-gradient(135deg, rgba(129,182,76,.10), rgba(129,182,76,.03))', border: '1px solid rgba(129,182,76,.35)' }}>
+      style={{ background: '#0D1516', border: '1px solid rgba(255,255,255,.08)' }}>
       <span className="shrink-0">{icon}</span>
       <span className="min-w-0 flex-1">
         <b className="block text-[15px] font-extrabold" style={{ color: RD.green }}>{title}</b>

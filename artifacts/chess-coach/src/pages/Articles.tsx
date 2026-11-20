@@ -136,7 +136,7 @@ export function ArticlePage() {
       {!isAuthenticated && (
         <button type="button" onClick={() => setSignupOpen(true)}
           className="mt-4 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left"
-          style={{ background: 'rgba(129,182,76,0.10)', border: '1px solid rgba(129,182,76,0.35)' }}>
+          style={{ background: '#0D1516', border: '1px solid rgba(255,255,255,.08)' }}>
           <span className="min-w-0 flex-1 text-[13px] font-semibold" style={{ color: TEXT_LIGHT }}>
             Play, analyze your games and solve puzzles on ChessScout.net. Free.
           </span>

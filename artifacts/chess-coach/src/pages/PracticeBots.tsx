@@ -657,7 +657,7 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
     // pieces, move analysis) change height, which made the board jump.
     <div className="space-y-3 pb-20 px-4 pt-4 md:px-0 md:pt-0" style={{ overflowAnchor: 'none' }}>
       {isOnboarding ? (
-        <div className="rounded-xl p-3 flex items-center gap-2.5" style={{ background: 'rgba(129,182,76,0.08)', border: '1px solid rgba(129,182,76,0.2)' }}>
+        <div className="rounded-xl p-3 flex items-center gap-2.5" style={{ background: '#0D1516', border: '1px solid rgba(255,255,255,.08)' }}>
           <div className="w-2 h-2 rounded-full shrink-0 animate-pulse" style={{ background: '#81b64c' }} />
           <p className="text-xs text-muted-foreground">
             We're pulling your last 20 games and running a full analysis in the background. Play this quick game against Mia while you wait — it sets your starting Scout ELO.
@@ -881,7 +881,7 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         className="rounded-xl p-4"
-                        style={{ background: 'rgba(129,182,76,0.1)', border: '1px solid rgba(129,182,76,0.25)' }}
+                        style={{ background: '#0D1516', border: '1px solid rgba(255,255,255,.08)' }}
                       >
                         <p className="text-xs font-semibold text-muted-foreground mb-1">Your starting Scout ELO</p>
                         <p className="text-3xl font-black" style={{ color: '#81b64c' }}>{seededRating}</p>

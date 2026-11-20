@@ -25,7 +25,7 @@ export function UpgradeNudge({ headline, subtext, compact = false }: UpgradeNudg
   if (compact) {
     return (
       <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
-        style={{ background: 'rgba(129,182,76,0.08)', border: '1px solid rgba(129,182,76,0.25)' }}>
+        style={{ background: '#0D1516', border: '1px solid rgba(255,255,255,.08)' }}>
         <div className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: '#81B64C' }}>
           <Sparkles className="w-4 h-4" style={{ color: '#FFFFFF' }} />
         </div>
