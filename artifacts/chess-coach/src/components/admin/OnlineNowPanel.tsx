@@ -1,6 +1,37 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Swords, RefreshCw, Loader2, Check, X, Radio } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { BOARD_TEXTURES, BOARD_THEMES, PIECE_SHAPES, isPhotoBoard, type BoardTexture, type BoardTheme, type PieceShape } from '@/context/SettingsContext';
+
+/** A small picture of a member's board: their board (photo or colours) with a few of their pieces. */
+function BoardThumb({ look }: { look: OnlineUser['look'] }) {
+  if (!look) {
+    return <div className="grid h-14 w-14 shrink-0 place-items-center rounded-md border border-white/10 text-center text-[8.5px] leading-tight text-muted-foreground">board<br />not sent yet</div>;
+  }
+  const tex = look.boardTexture as BoardTexture | undefined;
+  const photo = tex && isPhotoBoard(tex) ? BOARD_TEXTURES[tex] : null;
+  const theme = BOARD_THEMES[(look.boardTheme ?? 'green') as Exclude<BoardTheme, 'custom'>];
+  const light = look.light ?? theme?.light ?? '#EEEED2', dark = look.dark ?? theme?.dark ?? '#769656';
+  const shape = (look.pieceShape ?? 'cburnett') as PieceShape;
+  const info = PIECE_SHAPES[shape];
+  const set = shape === 'default' || !info ? 'cburnett' : shape;
+  const src = (p: string) => (info?.raster && set === shape ? `/pieces/${set}/${p}.webp?v=${info.version ?? 1}` : `/pieces/${set}/${p}.svg`);
+  const name = [photo?.label ?? theme?.label ?? 'Custom colours', info?.label ?? 'Classic'].join(' · ');
+  // 4×4 corner of a board: a white king and knight against a black queen and pawn
+  const pieces: Record<number, string> = { 1: 'bQ', 6: 'bP', 9: 'wN', 14: 'wK' };
+  return (
+    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md border border-white/10" title={name}
+      style={photo ? { background: `url('${photo.thumb ?? photo.boardImage}') center/cover` } : undefined}>
+      <div className="grid h-full w-full grid-cols-4">
+        {Array.from({ length: 16 }, (_, i) => (
+          <div key={i} className="relative" style={photo ? undefined : { background: (Math.floor(i / 4) + i) % 2 === 0 ? light : dark }}>
+            {pieces[i] && <img src={src(pieces[i])} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-contain" />}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // Admin: who's on ChessScout.net right now, and a Challenge button that
 // sends them a game invite. It appears on their dashboard under "You've
@@ -9,6 +40,7 @@ import { apiFetch } from '@/lib/api';
 interface OnlineUser {
   id: string; label: string; email: string | null; scoutUsername: string | null; chesscomUsername: string | null; lichessUsername: string | null;
   status: string; path: string | null; lastSeenAt: string | null; onLivePlay: boolean; inLiveGame: boolean; pushEnabled?: boolean;
+  look?: { boardTheme?: string; boardTexture?: string; pieceShape?: string; light?: string; dark?: string } | null;
 }
 interface Tc { id: string; label: string }
 
@@ -123,7 +155,8 @@ export function OnlineNowPanel({ labelForPath }: { labelForPath: (p: string) => 
         {data?.users.map((u) => (
           <div key={u.id} className="rounded-lg border border-white/5 bg-white/5 p-3">
             <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
+              <BoardThumb look={u.look} />
+              <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1.5 truncate text-xs font-bold">
                   <span className={`h-2 w-2 shrink-0 rounded-full ${u.status === 'online' ? 'bg-primary' : u.status.startsWith('app') ? 'bg-yellow-400' : 'bg-white/30'}`} />
                   {u.label}

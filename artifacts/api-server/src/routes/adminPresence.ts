@@ -34,6 +34,12 @@ router.get("/admin/online-now", requireAdmin, async (req: Request, res: Response
       WHERE id IN (${sql.join(ids.map((i) => sql`${i}`), sql`, `)}) AND id NOT IN (SELECT id FROM analytics_excluded_users)`));
     const pushOn = new Set(rowsOf<{ user_id: string }>(await db.execute(sql`
       SELECT DISTINCT user_id FROM push_subscriptions WHERE user_id IN (${sql.join(ids.map((i) => sql`${i}`), sql`, `)})`)).map((r) => r.user_id));
+    // their board look (board + pieces), for the thumbnail; never blocks the list
+    const looks = new Map<string, Record<string, string>>();
+    try {
+      for (const r of rowsOf<{ user_id: string; look: Record<string, string> }>(await db.execute(sql`
+        SELECT user_id, look FROM user_board_looks WHERE user_id IN (${sql.join(ids.map((i) => sql`${i}`), sql`, `)})`))) looks.set(r.user_id, r.look);
+    } catch { /* table not there yet */ }
     const openBy = new Map(open.map((o) => [o.userId, o]));
     const recentBy = new Map(recent.map((r) => [r.user_id, r]));
     const list = users.map((u) => {
@@ -48,6 +54,7 @@ router.get("/admin/online-now", requireAdmin, async (req: Request, res: Response
         pushEnabled: pushOn.has(u.id),
         onLivePlay: isLiveConnected(u.id),
         inLiveGame: isInLiveGame(u.id),
+        look: looks.get(u.id) ?? null,
       };
     }).sort((a, b) => (a.status === "online" ? 0 : 1) - (b.status === "online" ? 0 : 1) || (b.lastSeenAt ?? "").localeCompare(a.lastSeenAt ?? ""));
     res.json({ users: list, recentMinutes: RECENT_MIN, liveTimeControls: listTimeControls() });

@@ -82,6 +82,7 @@ async function runSchemaMigrations() {
     // How the game started: handoff (a ChessScout search that moved to Lichess), daily (a daily search that Lichess filled), lichess (Play on Lichess).
     await db.execute(sql`ALTER TABLE lichess_cs_games ADD COLUMN IF NOT EXISTS source varchar(16)`);
     // "Where did you find us?": one answer per user, asked after a win or a streak.
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS user_board_looks (user_id varchar PRIMARY KEY, look jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`);
     await db.execute(sql`CREATE TABLE IF NOT EXISTS user_heard_from (user_id varchar PRIMARY KEY, source varchar(32) NOT NULL, detail varchar(80), created_at timestamptz NOT NULL DEFAULT now())`);
     // Answer pages for Google and ChatGPT (free game review, stop blundering...). An article
     // that already exists is left as it is, so edits in the admin stay.
