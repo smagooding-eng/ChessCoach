@@ -176,7 +176,7 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
   }
 
   // While the games import (and until they've finished it): the board & play set-up.
-  if (!setupDone && status !== 'need-username') {
+  if (!setupDone) {
     return (
       <div className="fixed inset-0 z-50 overflow-y-auto px-3 py-4" style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(6px)' }}>
         <div className="mx-auto w-full max-w-md">
