@@ -860,10 +860,10 @@ export function Puzzles() {
                     return mate ? <CheckmateOverlay {...mate} flipped={boardOrientation === 'black'} positionKey={game.fen()} /> : null;
                   })()}
                   </div>
-                  {pendingMove && (
-                    // Same chess-clock Cancel / Confirm pad as every other board.
-                    <ConfirmPad className="mt-3"
-                      onConfirm={() => { const p = pendingMove; setPendingMove(null); tryMoveFromTo(p.from, p.to); }}
+                  {(pendingMove || confirmMoves) && (
+                    // Same chess-clock lever as every other board; stays put while Confirm Moves is on.
+                    <ConfirmPad className="mt-3" idle={!pendingMove}
+                      onConfirm={() => { const p = pendingMove; if (!p) return; setPendingMove(null); tryMoveFromTo(p.from, p.to); }}
                       onCancel={() => setPendingMove(null)} />
                   )}
 

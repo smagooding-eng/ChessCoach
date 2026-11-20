@@ -85,8 +85,10 @@ function secondsOf(t?: string): number | null {
  * clicks like a real clock; Confirm rocks the lever down first. Amber under 20s, red under 10s.
  */
 export function ConfirmPad({
-  onConfirm, onCancel, busy, time, san, className = '',
+  onConfirm, onCancel, busy, time, san, idle, className = '',
 }: {
+  /** No move waiting yet: the lever sits pressed down and dimmed, and taps do nothing. */
+  idle?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
   busy?: boolean;
@@ -108,15 +110,15 @@ export function ConfirmPad({
   }, []);
   const click = () => { if (settings?.soundEnabled !== false) playClockClick(); };
   const confirm = () => {
-    if (busy || pressed) return;
+    if (busy || pressed || idle) return;
     click(); setPressed(true);
     window.setTimeout(() => { onConfirm(); setPressed(false); }, 110);
   };
-  const cancel = () => { if (busy) return; click(); onCancel(); };
+  const cancel = () => { if (busy || idle) return; click(); onCancel(); };
 
   const secs = secondsOf(time);
   const tone = secs == null ? 'go' : secs < 10 ? 'red' : secs < 20 ? 'amber' : 'go';
-  const up = !pressed;                       // is your (green) side raised?
+  const up = !pressed && !idle;              // is your (green) side raised?
   const H = 68, C = 31, R = 11;
   const W = w - 12, X0 = 6;                  // lever inside the clock plate
   const P = Math.round(Math.min(W * 0.3, 130)), SEAM = 12;
@@ -138,7 +140,7 @@ export function ConfirmPad({
   const timeSize = Math.min(30, Math.max(22, w * 0.075)) * ((time?.length ?? 0) > 5 ? 0.78 : 1);
 
   return (
-    <div ref={ref} className={`${/\b(absolute|fixed)\b/.test(className) ? '' : 'relative '}h-[68px] select-none ${className}`} style={{ opacity: busy ? 0.6 : 1 }}>
+    <div ref={ref} className={`${/\b(absolute|fixed)\b/.test(className) ? '' : 'relative '}h-[68px] select-none ${className}`} style={{ opacity: busy ? 0.6 : idle ? 0.5 : 1, transition: 'opacity .15s' }}>
       <svg width={w} height={H} viewBox={`0 0 ${w} ${H}`} className="absolute inset-0" aria-hidden="true">
         <defs>
           <clipPath id={`c${id}`}><path d={outline(0, 0, 0)} /></clipPath>
@@ -162,17 +164,17 @@ export function ConfirmPad({
         {time ? (
           <g fill={ink} fontWeight="900" opacity={up ? 1 : 0.8}>
             <text x={gx + 14} y={C + timeSize * 0.36} fontSize={timeSize} style={{ fontVariantNumeric: 'tabular-nums' }}>{time}</text>
-            <text x={X0 + W - 14} y={C - 4} textAnchor="end" fontSize="9" letterSpacing="1" opacity=".75">{pressed ? 'PLAYED' : busy ? 'PLAYING…' : 'TAP TO PLAY'}</text>
-            <text x={X0 + W - 14} y={C + 13} textAnchor="end" fontSize="16">{san ? `${san} ✓` : 'Confirm ✓'}</text>
+            <text x={X0 + W - 14} y={C - 4} textAnchor="end" fontSize="9" letterSpacing="1" opacity=".75">{idle ? 'CONFIRM MOVES ON' : pressed ? 'PLAYED' : busy ? 'PLAYING…' : 'TAP TO PLAY'}</text>
+            <text x={X0 + W - 14} y={C + 13} textAnchor="end" fontSize="16">{idle ? 'Make a move' : san ? `${san} ✓` : 'Confirm ✓'}</text>
           </g>
         ) : (
           <text x={mid} y={C + 7} textAnchor="middle" fill={ink} fontWeight="900" fontSize="19" opacity={up ? 1 : 0.8}>
-            {busy ? 'Playing…' : san ? `✓ Play ${san}` : '✓ Confirm'}
+            {idle ? 'Make a move' : busy ? 'Playing…' : san ? `✓ Play ${san}` : '✓ Confirm'}
           </text>
         )}
       </svg>
-      <button type="button" onClick={cancel} disabled={busy} aria-label="Cancel move" className="absolute inset-y-0 left-0" style={{ width: X0 + P + SEAM / 2 }} />
-      <button type="button" onClick={confirm} disabled={busy} aria-label={san ? `Confirm ${san}` : 'Confirm move'} className="absolute inset-y-0 right-0" style={{ left: X0 + P + SEAM / 2 }} />
+      <button type="button" onClick={cancel} disabled={busy || idle} aria-label="Cancel move" className="absolute inset-y-0 left-0" style={{ width: X0 + P + SEAM / 2 }} />
+      <button type="button" onClick={confirm} disabled={busy || idle} aria-label={san ? `Confirm ${san}` : 'Confirm move'} className="absolute inset-y-0 right-0" style={{ left: X0 + P + SEAM / 2 }} />
     </div>
   );
 }

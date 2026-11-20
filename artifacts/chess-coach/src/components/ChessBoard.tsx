@@ -712,30 +712,30 @@ export function ChessBoard({
         );
       })()}
 
-      {confirmTarget === undefined && !pendingMove && !promotionPending && reserveConfirmSpace && confirmMoves && !suppressConfirmMoves && (
-        <div aria-hidden className={`mt-3 h-[68px] ${sidePanel ? 'lg:hidden' : ''}`} />
-      )}
-      {pendingMove && confirmTarget && createPortal(
-        <ConfirmPad
-          className={`absolute inset-x-0 top-0 z-30 ${sidePanel ? 'lg:hidden' : ''}`}
-          onConfirm={confirmPendingMove}
-          onCancel={cancelPendingMove}
-          busy={confirming}
-          time={sidePanel?.clocks?.bottom.text}
-          san={pendingMove.san}
-        />, confirmTarget)}
-      {pendingMove && confirmTarget === undefined && (
-        // Confirm Move: dark Cancel strip + a big green clock you tap to play
-        // the move (shows your time when the game has a clock).
-        <ConfirmPad
-          className={`mt-3 ${sidePanel ? 'lg:hidden' : ''}`}
-          onConfirm={confirmPendingMove}
-          onCancel={cancelPendingMove}
-          busy={confirming}
-          time={sidePanel?.clocks?.bottom.text}
-          san={pendingMove.san}
-        />
-      )}
+      {(() => {
+        // With Confirm Moves on, the clock lever stays put under the board: dimmed and
+        // pressed down until a move is waiting, then it lifts. Nothing appears or vanishes.
+        const keep = confirmMoves && !suppressConfirmMoves && !expectedMoveSan;
+        if (!pendingMove && !keep) {
+          return confirmTarget === undefined && !promotionPending && reserveConfirmSpace && confirmMoves && !suppressConfirmMoves
+            ? <div aria-hidden className={`mt-3 h-[68px] ${sidePanel ? 'lg:hidden' : ''}`} /> : null;
+        }
+        const pad = (cls: string) => (
+          <ConfirmPad
+            className={`${cls} ${sidePanel ? 'lg:hidden' : ''}`}
+            onConfirm={confirmPendingMove}
+            onCancel={cancelPendingMove}
+            busy={confirming}
+            idle={!pendingMove}
+            time={sidePanel?.clocks?.bottom.text}
+            san={pendingMove?.san}
+          />
+        );
+        if (confirmTarget === undefined) return pad('mt-3');
+        if (!confirmTarget) return null;
+        // Live games: always there → its own spot under the board; otherwise it floats over the strip below as before.
+        return createPortal(pad(keep ? 'mb-2' : 'absolute inset-x-0 top-0 z-30'), confirmTarget);
+      })()}
       {/* Practice feedback overlay */}
       {feedback && (
         <div className={`absolute inset-0 rounded-[10px] pointer-events-none flex items-center justify-center
