@@ -557,6 +557,9 @@ function finishGame(g: LiveGame, result: 'white' | 'black' | 'draw', termination
 }
 
 async function persistFinishedGame(g: LiveGame) {
+  // Aborted: over after only one or two moves. Like Chess.com it doesn't count: no rating
+  // change and not saved to anyone's games (tournament games still count).
+  if (g.sanMoves.length < 3 && !g.tournamentId) return;
   const wScore = g.result === 'white' ? 1 : g.result === 'draw' ? 0.5 : 0;
   const bScore = 1 - wScore;
   const ws = g.ratingSnapshots.white;

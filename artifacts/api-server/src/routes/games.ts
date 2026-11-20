@@ -1589,6 +1589,8 @@ export async function startReviewServices(): Promise<void> {
   // Not right at start-up: a new server must answer Render's health check first (these
   // read through months of games).
   setTimeout(() => { void runCleanupOncePerDay(); }, 6 * 60_000).unref();
+  // once ever: games that ended after one or two moves become aborted (see correspondence.ts)
+  setTimeout(() => { void import("../lib/correspondence").then((m) => m.abortShortGamesOnce()); }, 8 * 60_000).unref();
   void startCatchupReviews().catch((err) => appLogger.warn({ err }, "catch-up reviews failed to start"));
   void startSamedayReviews().catch((err) => appLogger.warn({ err }, "same-day reviews failed to start"));
   await db.execute(sql`CREATE TABLE IF NOT EXISTS review_after_upgrade (

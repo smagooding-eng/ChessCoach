@@ -268,7 +268,38 @@ type Result = "white" | "black" | "draw";
 let dailyFinishHook: ((g: CorrespondenceGame) => Promise<void>) | null = null;
 export function setDailyFinishHook(fn: (g: CorrespondenceGame) => Promise<void>): void { dailyFinishHook = fn; }
 
+/** Moves played (plies) in a game's PGN. */
+export function pliesOf(pgn: string): number {
+  if (!pgn) return 0;
+  try { const c = new Chess(); c.loadPgn(pgn); return c.history().length; } catch { return 0; }
+}
+
+async function inTournament(gameId: string): Promise<boolean> {
+  try {
+    const r = await db.execute(sql`SELECT 1 FROM tournament_games WHERE game_id = ${gameId} LIMIT 1`);
+    return ((r as unknown as { rows?: unknown[] }).rows ?? []).length > 0;
+  } catch { return false; }
+}
+
 async function finishGame(game: CorrespondenceGame, result: Result, termination: string, pgn: string, fen: string): Promise<CorrespondenceGame> {
+  // Aborted: over after only one or two moves (a side never really played). Like Chess.com it
+  // doesn't count: no result or rating change, not in anyone's games, lists or reviews.
+  // Tournament games still count (the bracket / arena needs a result).
+  if (pliesOf(pgn) < 3 && !(await inTournament(game.id))) {
+    const [ab] = await db.update(correspondenceGamesTable).set({
+      status: "aborted", result: null, termination: "aborted", finishedAt: new Date(), pgn, fen, drawOfferFrom: null,
+    }).where(and(eq(correspondenceGamesTable.id, game.id), eq(correspondenceGamesTable.status, "active"))).returning();
+    if (!ab) {
+      const [cur] = await db.select().from(correspondenceGamesTable).where(eq(correspondenceGamesTable.id, game.id));
+      return cur;
+    }
+    touched(ab);
+    for (const isWhite of [true, false]) {
+      push(isWhite ? ab.whiteUserId : ab.blackUserId, "Daily game aborted",
+        `vs ${isWhite ? ab.blackUsername : ab.whiteUsername}: it ended before the second move, so it doesn't count.`, gameUrl(ab.id));
+    }
+    return ab;
+  }
   // Only the first caller finishes it (guards against a timeout sweep and a
   // move landing at the same moment).
   const [claimed] = await db.update(correspondenceGamesTable).set({
@@ -641,3 +672,30 @@ export async function getDailyRating(userId: string) {
   return { rating: Math.round(r.rating), rd: Math.round(r.rd), gamesPlayed: r.gamesPlayed, isProvisional: r.gamesPlayed < 8 };
 }
 
+
+// One-time tidy-up: daily games that ended after only one or two moves become aborted, and
+// ChessScout games (live and daily) that short come out of everyone's games. Ratings already
+// changed by such ranked games are left as they are.
+export async function abortShortGamesOnce(): Promise<void> {
+  try {
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS one_time_jobs (name varchar PRIMARY KEY, done_at timestamptz NOT NULL DEFAULT now())`);
+    const claim = await db.execute(sql`INSERT INTO one_time_jobs (name) VALUES ('abort_short_games_v1') ON CONFLICT DO NOTHING RETURNING name`);
+    if (!((claim as unknown as { rows?: unknown[] }).rows ?? []).length) return;
+    const rows = (r: unknown) => ((r as { rows?: Record<string, unknown>[] }).rows ?? []);
+    // daily games (a game with 3+ moves always has "2. " in its moves)
+    let daily = 0;
+    for (const g of rows(await db.execute(sql`SELECT id, pgn FROM correspondence_games WHERE status = 'finished' AND pgn NOT LIKE '%2. %'`))) {
+      if (pliesOf(String(g.pgn ?? "")) >= 3 || (await inTournament(String(g.id)))) continue;
+      await db.execute(sql`UPDATE correspondence_games SET status = 'aborted', result = NULL, termination = 'aborted' WHERE id = ${g.id}`);
+      daily++;
+    }
+    // ChessScout games in the games list (live, daily, bots)
+    let games = 0;
+    for (const g of rows(await db.execute(sql`SELECT id, pgn FROM games WHERE platform = 'chessscout' AND pgn NOT LIKE '%2. %'`))) {
+      if (pliesOf(String(g.pgn ?? "")) >= 3) continue;
+      await db.execute(sql`DELETE FROM games WHERE id = ${g.id}`);
+      games++;
+    }
+    logger.info({ daily, games }, "[abort-short] tidied up");
+  } catch (err) { logger.warn({ err }, "[abort-short] tidy-up failed"); }
+}
