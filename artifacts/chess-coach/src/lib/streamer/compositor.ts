@@ -5,9 +5,12 @@
 export interface PanelRect { x: number; y: number; w: number; h: number; z: number; hidden?: boolean; round?: boolean }
 
 export type BoardFeed =
-  | { kind: 'fen'; fen: string; flipped: boolean; last: string; top?: string; bottom?: string }
+  | { kind: 'fen'; fen: string; flipped: boolean; last: string; top?: string; bottom?: string; confirm?: ConfirmFeed }
   | { kind: 'video'; video: HTMLVideoElement; zoom: number; panX: number; panY: number }
   | { kind: 'none' };
+
+/** The confirm-move clock lever under the board (Confirm Moves on), as the page shows it. */
+export interface ConfirmFeed { state: 'idle' | 'pending' | 'played'; time: string; san: string; tone: 'go' | 'amber' | 'red' }
 
 /** A game review's coach note and the eval bar + names, for a board-only view (see GuidedReview data-studio). */
 export interface ReviewNotes {
@@ -68,18 +71,84 @@ function rr(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: num
 
 type Look = Pick<CompositeInput, 'light' | 'dark' | 'pieceSrc'>;
 
-/** The board panel for a position: the board, with the players' names above and below when given. */
+/** The board panel for a position: the board, with the players' names above and below when given,
+ *  and the confirm-move clock lever under it when the page has one. */
 export function drawBoardPanel(c: CanvasRenderingContext2D, b: Extract<BoardFeed, { kind: 'fen' }>, x: number, y: number, w: number, h: number, look: Look) {
   c.fillStyle = '#050A0B'; c.fillRect(x, y, w, h);
   const names = !!(b.top || b.bottom);
   const strip = names ? Math.max(16, Math.min(w, h) * 0.07) : 0;
-  const size = Math.min(w, h - strip * 2) * 0.98;
-  const bx = x + (w - size) / 2, by = y + (h - size) / 2;
+  // lever height relative to the board (68px under a ~390px board in the app)
+  const lever = b.confirm ? 0.175 : 0, gap = b.confirm ? 0.03 : 0;
+  const size = Math.min(w * 0.98, (h - strip * 2) / (1 + lever + gap) * 0.98);
+  const total = size * (1 + lever + gap) + strip * 2;
+  const bx = x + (w - size) / 2, by = y + (h - total) / 2 + strip;
   drawBoard(c, b, bx, by, size, look);
+  if (b.confirm) drawClockLever(c, bx, by + size + strip + size * gap, size, size * lever, b.confirm);
   if (!names) return;
   c.font = `800 ${Math.round(strip * 0.62)}px "DM Sans", sans-serif`; c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillStyle = '#F5F7F6';
   if (b.top) c.fillText(b.top, bx + 2, by - strip / 2, size - 4);
   if (b.bottom) c.fillText(b.bottom, bx + 2, by + size + strip / 2, size - 4);
+}
+
+/** The confirm-move rocker lever seen from above (same drawing as ConfirmPad in the app). */
+function drawClockLever(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, cf: ConfirmFeed) {
+  const k = h / 68, up = cf.state === 'pending', idle = cf.state === 'idle';
+  const C = 31 * k, R = 11 * k, X0 = 6 * k, W = w - 12 * k;
+  const P = Math.min(W * 0.3, 130 * k), SEAM = 12 * k;
+  const hL = (up ? 21.5 : 25) * k, hR = (up ? 25 : 21.5) * k;
+  const outline = (dx: number, d0: number, d1: number) => {
+    const tl = C - hL + d0, tr = C - hR + d1, bl = C + hL + d0, br = C + hR + d1;
+    const yt = (v: number) => tl + (tr - tl) * v / W, yb = (v: number) => bl + (br - bl) * v / W;
+    const X = (v: number) => x + X0 + dx + v;
+    c.beginPath();
+    c.moveTo(X(R), y + yt(R)); c.lineTo(X(W - R), y + yt(W - R)); c.quadraticCurveTo(X(W), y + tr, X(W), y + tr + R);
+    c.lineTo(X(W), y + br - R); c.quadraticCurveTo(X(W), y + br, X(W - R), y + yb(W - R));
+    c.lineTo(X(R), y + yb(R)); c.quadraticCurveTo(X(0), y + bl, X(0), y + bl - R);
+    c.lineTo(X(0), y + tl + R); c.quadraticCurveTo(X(0), y + tl, X(R), y + yt(R)); c.closePath();
+  };
+  c.save();
+  c.globalAlpha = idle ? 0.5 : 1;
+  rr(c, x, y, w, h, 16 * k); c.fillStyle = '#0E1213'; c.fill();
+  c.lineWidth = Math.max(1, k); c.strokeStyle = 'rgba(255,255,255,.07)'; c.stroke();
+  // shadow: wide under the raised end
+  c.save(); c.filter = `blur(${(1.8 * k).toFixed(1)}px)`; c.globalAlpha *= 0.85; c.fillStyle = '#000';
+  if (up) outline(2 * k, 1.5 * k, 9 * k); else outline(2 * k, 9 * k, 1.5 * k);
+  c.fill(); c.restore();
+  // the lever
+  const [g1, g2] = cf.tone === 'red' ? ['#B8302A', '#E2483E'] : cf.tone === 'amber' ? ['#C98222', '#EDAA45'] : up ? ['#78AD46', '#A2D86A'] : ['#6C9C3F', '#557E30'];
+  const [k1, k2] = up ? ['#1C2224', '#2A3133'] : ['#3B4345', '#2B3234'];
+  c.save(); outline(0, 0, 0); c.clip();
+  const lg = (a: string, b2: string, from: number, to: number) => { const gr = c.createLinearGradient(from, 0, to, 0); gr.addColorStop(0, a); gr.addColorStop(1, b2); return gr; };
+  c.fillStyle = lg(k1, k2, x + X0, x + X0 + P); c.fillRect(x + X0, y, P, h);
+  c.fillStyle = '#0A0E0F'; c.fillRect(x + X0 + P, y, SEAM, h);
+  const gx = x + X0 + P + SEAM;
+  c.fillStyle = lg(g1, g2, gx, x + X0 + W); c.fillRect(gx, y, x + X0 + W - gx, h);
+  const hl = c.createLinearGradient(up ? x : x + w, 0, up ? x + w : x, 0); hl.addColorStop(0, 'rgba(255,255,255,0)'); hl.addColorStop(1, 'rgba(255,255,255,.35)');
+  c.strokeStyle = hl; c.lineWidth = 2.4 * k; c.beginPath(); c.moveTo(x + X0, y + C - hL + 1.2 * k); c.lineTo(x + X0 + W, y + C - hR + 1.2 * k); c.stroke();
+  c.strokeStyle = 'rgba(0,0,0,.25)'; c.lineWidth = 4 * k; c.beginPath(); c.moveTo(x + X0, y + C + hL - 2 * k); c.lineTo(x + X0 + W, y + C + hR - 2 * k); c.stroke();
+  c.restore();
+  // pin
+  const pg = c.createRadialGradient(x + X0 + P + SEAM / 2 - 1.5 * k, y + C - 1.5 * k, 0, x + X0 + P + SEAM / 2, y + C, 4.5 * k);
+  pg.addColorStop(0, '#EEF1F2'); pg.addColorStop(1, '#7D8587');
+  c.fillStyle = pg; c.beginPath(); c.arc(x + X0 + P + SEAM / 2, y + C, 4.5 * k, 0, Math.PI * 2); c.fill();
+  // text
+  const ink = cf.tone === 'red' ? '#FFFFFF' : '#06110A';
+  c.textBaseline = 'alphabetic'; c.textAlign = 'center'; c.fillStyle = '#C9CFCD'; c.font = `900 ${12 * k}px "DM Sans", sans-serif`;
+  c.fillText('✕ CANCEL', x + X0 + P / 2, y + C + 4.5 * k);
+  c.globalAlpha *= up ? 1 : 0.8; c.fillStyle = ink;
+  const right = x + X0 + W - 14 * k;
+  if (cf.time) {
+    const ts = Math.min(30, Math.max(22, w / k * 0.075)) * k * (cf.time.length > 5 ? 0.78 : 1);
+    c.textAlign = 'left'; c.font = `900 ${ts}px "DM Sans", sans-serif`; c.fillText(cf.time, gx + 14 * k, y + C + ts * 0.36);
+    c.textAlign = 'right'; c.font = `900 ${9 * k}px "DM Sans", sans-serif`; c.globalAlpha *= 0.75;
+    c.fillText(idle ? 'CONFIRM MOVES ON' : cf.state === 'played' ? 'PLAYED' : 'TAP TO PLAY', right, y + C - 4 * k);
+    c.globalAlpha /= 0.75; c.font = `900 ${16 * k}px "DM Sans", sans-serif`;
+    c.fillText(idle ? 'Make a move' : cf.san ? `${cf.san} ✓` : 'Confirm ✓', right, y + C + 13 * k);
+  } else {
+    c.textAlign = 'center'; c.font = `900 ${19 * k}px "DM Sans", sans-serif`;
+    c.fillText(idle ? 'Make a move' : cf.san ? `✓ Play ${cf.san}` : '✓ Confirm', (gx + x + X0 + W) / 2, y + C + 7 * k);
+  }
+  c.restore();
 }
 
 function drawBoard(c: CanvasRenderingContext2D, b: Extract<BoardFeed, { kind: 'fen' }>, x: number, y: number, size: number, inp: Look) {

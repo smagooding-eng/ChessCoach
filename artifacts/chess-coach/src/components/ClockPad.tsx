@@ -140,7 +140,8 @@ export function ConfirmPad({
   const timeSize = Math.min(30, Math.max(22, w * 0.075)) * ((time?.length ?? 0) > 5 ? 0.78 : 1);
 
   return (
-    <div ref={ref} className={`${/\b(absolute|fixed)\b/.test(className) ? '' : 'relative '}h-[68px] select-none ${className}`} style={{ opacity: busy ? 0.6 : idle ? 0.5 : 1, transition: 'opacity .15s' }}>
+    <div ref={ref} data-studio="confirm" data-state={idle ? 'idle' : pressed ? 'played' : 'pending'} data-time={time ?? ''} data-san={san ?? ''} data-tone={tone}
+      className={`${/\b(absolute|fixed)\b/.test(className) ? '' : 'relative '}h-[68px] select-none ${className}`} style={{ opacity: busy ? 0.6 : idle ? 0.5 : 1, transition: 'opacity .15s' }}>
       <svg width={w} height={H} viewBox={`0 0 ${w} ${H}`} className="absolute inset-0" aria-hidden="true">
         <defs>
           <clipPath id={`c${id}`}><path d={outline(0, 0, 0)} /></clipPath>

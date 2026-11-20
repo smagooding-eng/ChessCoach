@@ -83,13 +83,13 @@ interface Settings {
 
 const RAW_PRESETS: Record<Aspect, { id: string; label: string; layout: BaseLayout }[]> = {
   '9:16': [
-    { id: 'board-top', label: 'Board top · camera bottom', layout: { head: { x: 0, y: 0, w: 100, h: 8, z: 4 }, board: { x: 0, y: 8, w: 100, h: 56.25, z: 1 }, cam: { x: 0, y: 64.25, w: 100, h: 28.75, z: 2 }, tag: { x: 0, y: 93, w: 100, h: 7, z: 3 } } },
-    { id: 'board-bottom', label: 'Camera top · board bottom', layout: { tag: { x: 0, y: 0, w: 100, h: 7, z: 3 }, head: { x: 0, y: 7, w: 100, h: 8, z: 4 }, cam: { x: 0, y: 15, w: 100, h: 28.75, z: 2 }, board: { x: 0, y: 43.75, w: 100, h: 56.25, z: 1 } } },
-    { id: 'pip', label: 'Big board · round camera', layout: { cam: { x: 4, y: 2.5, w: 40, h: 22.5, z: 2, round: true }, head: { x: 47, y: 2, w: 50, h: 8, z: 4 }, tag: { x: 47, y: 11, w: 50, h: 8.5, z: 3 }, board: { x: 0, y: 28, w: 100, h: 56.25, z: 1 } } },
+    { id: 'board-top', label: 'Board top · camera bottom', layout: { head: { x: 0, y: 0, w: 100, h: 5, z: 4 }, board: { x: 0, y: 5, w: 100, h: 70, z: 1 }, cam: { x: 0, y: 75, w: 100, h: 19.5, z: 2 }, tag: { x: 0, y: 94.5, w: 100, h: 5.5, z: 3 } } },
+    { id: 'board-bottom', label: 'Camera top · board bottom', layout: { tag: { x: 0, y: 0, w: 100, h: 5.5, z: 3 }, head: { x: 0, y: 5.5, w: 100, h: 5, z: 4 }, cam: { x: 0, y: 10.5, w: 100, h: 19.5, z: 2 }, board: { x: 0, y: 30, w: 100, h: 70, z: 1 } } },
+    { id: 'pip', label: 'Big board · round camera', layout: { cam: { x: 3, y: 1.5, w: 28, h: 15.75, z: 2, round: true }, head: { x: 34, y: 2.5, w: 63, h: 6.5, z: 4 }, tag: { x: 34, y: 10, w: 63, h: 6.5, z: 3 }, board: { x: 0, y: 18, w: 100, h: 75, z: 1 } } },
   ],
   '16:9': [
-    { id: 'board-left', label: 'Board left · camera right', layout: { board: { x: 0, y: 0, w: 56.25, h: 100, z: 1 }, head: { x: 56.25, y: 0, w: 43.75, h: 16, z: 4 }, cam: { x: 56.25, y: 16, w: 43.75, h: 70, z: 2 }, tag: { x: 56.25, y: 86, w: 43.75, h: 14, z: 3 } } },
-    { id: 'board-right', label: 'Camera left · board right', layout: { head: { x: 0, y: 0, w: 43.75, h: 16, z: 4 }, cam: { x: 0, y: 16, w: 43.75, h: 70, z: 2 }, tag: { x: 0, y: 86, w: 43.75, h: 14, z: 3 }, board: { x: 43.75, y: 0, w: 56.25, h: 100, z: 1 } } },
+    { id: 'board-left', label: 'Board left · camera right', layout: { board: { x: 0, y: 0, w: 56.25, h: 100, z: 1 }, head: { x: 56.25, y: 0, w: 43.75, h: 10, z: 4 }, cam: { x: 56.25, y: 10, w: 43.75, h: 81, z: 2 }, tag: { x: 56.25, y: 91, w: 43.75, h: 9, z: 3 } } },
+    { id: 'board-right', label: 'Camera left · board right', layout: { head: { x: 0, y: 0, w: 43.75, h: 10, z: 4 }, cam: { x: 0, y: 10, w: 43.75, h: 81, z: 2 }, tag: { x: 0, y: 91, w: 43.75, h: 9, z: 3 }, board: { x: 43.75, y: 0, w: 56.25, h: 100, z: 1 } } },
     { id: 'pip', label: 'Board centre · camera corner', layout: { board: { x: 21.875, y: 0, w: 56.25, h: 100, z: 1 }, head: { x: 1.5, y: 3, w: 19, h: 18, z: 4 }, cam: { x: 79, y: 3, w: 19.5, h: 34.67, z: 2 }, tag: { x: 1.5, y: 84, w: 19, h: 13, z: 3 } } },
   ],
 };
@@ -156,6 +156,11 @@ function loadSettings(): Settings {
       }
       // layouts saved before the review-notes panel, or with its first position (which could cover the camera)
       if (!(saved as { notesV2?: number }).notesV2) { merged.layout = { ...merged.layout, notes: placeNotes(merged.layout) }; (merged as { notesV2?: number }).notesV2 = 1; }
+      if (!(saved as { roomV3?: number }).roomV3) {
+        const pre = PRESETS[merged.aspect]?.find((p) => p.id === merged.preset);
+        if (pre && merged.preset !== 'custom') merged.layout = pre.layout;
+        (merged as { roomV3?: number }).roomV3 = 1;
+      }
       merged.layout = withNotes(merged.layout);
       return merged;
     }
@@ -690,8 +695,22 @@ function StreamerStudio({ admin }: { admin: boolean }) {
             const count = (f: string) => f.split(' ')[0].replace(/[^a-z]/gi, '').length;
             voice.current.sfx(count(fen) < count(prev.fen) ? 'capture' : 'move');
           }
-          feed.current = { fen, flipped: be.getAttribute('data-flipped') === '1', last: be.getAttribute('data-last') || '' };
+          // the confirm-move clock lever under the board (Confirm Moves on), drawn under the board on stream
+          const cfEl = doc.querySelector('[data-studio="confirm"]') as HTMLElement | null;
+          const cfOk = !!cfEl && cfEl.getBoundingClientRect().height > 20;
+          const confirm = cfOk ? {
+            state: (cfEl!.getAttribute('data-state') || 'pending') as 'idle' | 'pending' | 'played',
+            time: cfEl!.getAttribute('data-time') || '', san: cfEl!.getAttribute('data-san') || '',
+            tone: (cfEl!.getAttribute('data-tone') || 'go') as 'go' | 'amber' | 'red',
+          } : undefined;
+          feed.current = { fen, flipped: be.getAttribute('data-flipped') === '1', last: be.getAttribute('data-last') || '', confirm };
         } else feed.current = null;
+        // the confirm lever just under the board joins the fitted area (so it shows and can be tapped)
+        {
+          const bb = best as { x: number; y: number; w: number; h: number } | null;
+          const cr = (doc.querySelector('[data-studio="confirm"]') as HTMLElement | null)?.getBoundingClientRect();
+          if (bb && cr && cr.height > 20 && cr.top >= bb.y + bb.h - 4 && cr.top - (bb.y + bb.h) < bb.w * 0.4) bb.h = cr.bottom - bb.y;
+        }
         // keep the board inside the page's view when we're fitting it
         const found = best as { x: number; y: number; w: number; h: number } | null;
         const vh = boardFrame.current?.clientHeight ?? VIRTUAL_H;
@@ -720,7 +739,7 @@ function StreamerStudio({ admin }: { admin: boolean }) {
         setBoardBox((prev) => {
           const b = best as { x: number; y: number; w: number; h: number } | null;
           if (!b) return null;
-          if (prev && Math.abs(prev.x - b.x) < 1 && Math.abs(prev.y - b.y) < 1 && Math.abs(prev.w - b.w) < 1) return prev;
+          if (prev && Math.abs(prev.x - b.x) < 1 && Math.abs(prev.y - b.y) < 1 && Math.abs(prev.w - b.w) < 1 && Math.abs(prev.h - b.h) < 1) return prev;
           return b;
         });
       } catch { /* not loaded yet */ }
