@@ -27,7 +27,7 @@ import {
   type MojiLook,
 } from '@/lib/streamer/mojiHead';
 import { SpriteAvatar } from '@/lib/streamer/spriteAvatar';
-import { drawComposite, drawBoardPanel, drawReviewNotes, splitBoardPanel, headSizes, withPartnerPanel, type BoardFeed, type TextRun, type ReviewNotes } from '@/lib/streamer/compositor';
+import { drawComposite, drawBoardPanel, drawReviewNotes, splitBoardPanel, headSizes, withPartnerPanel, type BoardFeed, type TextRun, type ReviewNotes, type ConfirmFeed } from '@/lib/streamer/compositor';
 import { CoStreamLink, VoiceMixer } from '@/lib/streamer/costream';
 import { CloudRecorder, type RecStatus } from '@/lib/streamer/recorder';
 import { LiveHost } from '@/lib/streamer/live';
@@ -290,7 +290,7 @@ function StreamerStudio({ admin }: { admin: boolean }) {
   const [cloud, setCloud] = useState<(RecStatus & { start: number }) | null>(null);
   const host = useRef(new LiveHost());
   const [watching, setWatching] = useState<number | null>(null);
-  const feed = useRef<{ fen: string; flipped: boolean; last: string; top?: string; bottom?: string } | null>(null);
+  const feed = useRef<{ fen: string; flipped: boolean; last: string; top?: string; bottom?: string; confirm?: ConfirmFeed } | null>(null);
   const outCanvas = useRef<HTMLCanvasElement>(null);
   const { boardColors, pieceShape } = useSettings();
   const looks = useRef({ light: '#eeeed2', dark: '#769656', pieceSrc: (k: string) => `/pieces/ink-cream/${k}.webp?v=1` });
