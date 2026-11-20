@@ -43,6 +43,8 @@ const CLS: Record<Classification, { color: string; glyph: string; phrase: string
   missed_win: { color: '#B8343E', glyph: '✗', phrase: 'is a miss', strip: true, textColor: '#F0605D' },
 };
 const BAD = new Set<Classification>(['inaccuracy', 'mistake', 'blunder', 'missed_win']);
+// Shown inside another page of ours (the Streamer Studio's board panel).
+const IN_FRAME = (() => { try { return window.self !== window.top && window.parent.location.origin === window.location.origin; } catch { return false; } })();
 const GOOD_REPLY = new Set<Classification>(['best', 'brilliant', 'great', 'excellent', 'checkmate']);
 
 /** "Nf3" -> "♘f3" (outlined for White, solid for Black), as text not emoji. */
@@ -188,7 +190,7 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
   const lastPly = useRef(ply);
   useEffect(() => {
     const was = lastPly.current; lastPly.current = ply;
-    if (!canFullAnalysis || !onReport || mode.kind !== 'main' || moves.length === 0 || ply !== moves.length || was >= ply) return undefined;
+    if (IN_FRAME || !canFullAnalysis || !onReport || mode.kind !== 'main' || moves.length === 0 || ply !== moves.length || was >= ply) return undefined;
     const t = window.setTimeout(() => onReport(), 3500);
     return () => window.clearTimeout(t);
   }, [ply, mode.kind]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -238,6 +240,39 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   }, [go, ply]);
+  // Streamer Studio remote: when this review is shown inside the Studio's board panel, the
+  // Studio steers it (moves, mistakes, flip) from controls outside the stream picture,
+  // and this tells it where we are. Only active inside a frame on the same site.
+  useEffect(() => {
+    if (!IN_FRAME) return undefined;
+    const post = () => {
+      try {
+        window.parent.postMessage({
+          src: 'cs-review', ply, total: max, flipped, white: whiteName ?? '', black: blackName ?? '',
+          moves: moves.map((m, i) => ({ san: m.san, cls: byIndex.get(i)?.classification ?? null })),
+        }, window.location.origin);
+      } catch { /* parent gone */ }
+    };
+    post();
+    const badAt = (i: number) => { const c = byIndex.get(i)?.classification; return !!c && BAD.has(c); };
+    const h = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin || e.source !== window.parent) return;
+      const m = e.data as { src?: string; cmd?: string; n?: number; d?: number } | null;
+      if (!m || m.src !== 'cs-remote') return;
+      if (m.cmd === 'hello') post();
+      else if (m.cmd === 'go' && typeof m.n === 'number') go(m.n);
+      else if (m.cmd === 'step' && typeof m.d === 'number') go(ply + m.d);
+      else if (m.cmd === 'flip') onFlip();
+      else if (m.cmd === 'mistake' && typeof m.d === 'number') {
+        // plies are 1-based: move index i is shown at ply i + 1
+        if (m.d > 0) { for (let i = ply; i < max; i++) if (badAt(i)) { go(i + 1); return; } }
+        else { for (let i = ply - 2; i >= 0; i--) if (badAt(i)) { go(i + 1); return; } go(0); }
+      }
+    };
+    window.addEventListener('message', h);
+    return () => window.removeEventListener('message', h);
+  }, [ply, max, flipped, moves, byIndex, go, onFlip, whiteName, blackName]);
+  useEffect(() => () => { if (IN_FRAME) try { window.parent.postMessage({ src: 'cs-review', gone: true }, window.location.origin); } catch { /* */ } }, []);
   const touch = useRef<{ x: number; y: number } | null>(null);
   const onTouchStart = (e: React.TouchEvent) => { if (mode.kind === 'retry') return; touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; };
   const onTouchEnd = (e: React.TouchEvent) => {

@@ -32,6 +32,7 @@ import { CoStreamLink, VoiceMixer } from '@/lib/streamer/costream';
 import { CloudRecorder, type RecStatus } from '@/lib/streamer/recorder';
 import { LiveHost } from '@/lib/streamer/live';
 import { apiFetch } from '@/lib/api';
+import { StudioRemote } from '@/components/studio/StudioRemote';
 import { lastLichessGame, lastPlayedGame, saveLichessGame } from '@/lib/lastLichessGame';
 import { useUser } from '@/hooks/use-user';
 import { useLichessGame } from '@/components/watch/LiveVideo';
@@ -1322,6 +1323,15 @@ function StreamerStudio({ admin }: { admin: boolean }) {
           </div>
         )}
         <div ref={areaRef} className={clean ? 'flex-1 flex items-center justify-center' : 'flex-1 flex items-center justify-center min-h-[60vh] lg:min-h-0'}>{stageEl}</div>
+        {!clean && s.boardSource === 'app' && (
+          // Remote for games and reviews in the board panel: off the stream picture, big targets.
+          <div className="shrink-0 flex justify-center">
+            <StudioRemote frame={boardFrame} appPath={s.appPath} onOpen={(p) => { setPeek(false); set({ boardSource: 'app', appPath: p }); }}
+              notesOn={s.framePad === 'board'} setNotesOn={(v) => set({ framePad: v ? 'board' : 'players' })}
+              peek={peek} setPeek={setPeek}
+              myNames={[authUser?.chesscomUsername, authUser?.lichessUsername, s.followUser].filter((x): x is string => !!x && !!x.trim())} />
+          </div>
+        )}
       </div>
       {clean && <button aria-label="Exit" onDoubleClick={endLive} className="absolute top-0 right-0 w-20 h-20 opacity-0" />}
       {clean && (watching !== null || (cloud && cloud.phase === 'recording')) && (
