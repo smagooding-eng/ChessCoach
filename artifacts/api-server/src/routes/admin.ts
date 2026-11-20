@@ -69,6 +69,53 @@ function computeUserStatus(email: string | null, createdAt: string | Date, strip
 // The ChessScout bot on Lichess: games it has played (logged by lib/lichessBot.ts), its
 // all-time numbers from Lichess, and visits / signups that came from its link.
 // Games started on ChessScout that were played on Lichess (recorded by /lichess/board/played).
+// Phone vs computer: of the members who signed up on each kind of device, how many linked an
+// account, came back on a later day, came back a week or more later, and only ever used it on
+// the day they joined. Device = the device of their first page view as a member (recorded
+// from Nov 4, 2026). "Came back" counts only members old enough to have had the chance.
+router.get("/admin/device-retention", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const days = Math.min(120, Math.max(7, Number(req.query.days) || 30));
+    const since = new Date(Math.max(Date.now() - days * 86400_000, Date.UTC(2026, 10, 4)));
+    const rows = (await db.execute(sql`
+      WITH su AS (
+        SELECT u.id, u.created_at, (u.created_at AT TIME ZONE 'UTC')::date AS d0,
+          (u.chesscom_username IS NOT NULL OR u.lichess_username IS NOT NULL) AS linked
+        FROM users u
+        WHERE u.created_at >= ${since} AND u.id NOT IN (SELECT id FROM analytics_excluded_users)
+      ), dev AS (
+        SELECT DISTINCT ON (pv.user_id) pv.user_id, pv.device, pv.app_mode
+        FROM page_views pv JOIN su ON su.id = pv.user_id
+        WHERE pv.device IS NOT NULL
+        ORDER BY pv.user_id, pv.created_at ASC
+      ), act AS (
+        SELECT su.id, COUNT(DISTINCT d.day) FILTER (WHERE d.day > su.d0)::int AS later_days,
+          COALESCE(BOOL_OR(d.day >= su.d0 + 7), false) AS week_later
+        FROM su LEFT JOIN user_activity_days d ON d.user_id = su.id GROUP BY su.id
+      )
+      SELECT COALESCE(dev.device, 'unknown') AS device,
+        COUNT(*)::int AS signups,
+        COUNT(*) FILTER (WHERE dev.app_mode IN ('android_app', 'installed'))::int AS in_app,
+        COUNT(*) FILTER (WHERE su.linked)::int AS linked,
+        COUNT(*) FILTER (WHERE su.created_at < now() - interval '3 days')::int AS old3,
+        COUNT(*) FILTER (WHERE su.created_at < now() - interval '3 days' AND act.later_days > 0)::int AS back,
+        COUNT(*) FILTER (WHERE su.created_at < now() - interval '3 days' AND act.later_days >= 2)::int AS back3,
+        COUNT(*) FILTER (WHERE su.created_at < now() - interval '8 days')::int AS old8,
+        COUNT(*) FILTER (WHERE su.created_at < now() - interval '8 days' AND act.week_later)::int AS week
+      FROM su JOIN act ON act.id = su.id LEFT JOIN dev ON dev.user_id = su.id
+      GROUP BY 1`)).rows as Record<string, number | string>[];
+    res.json({
+      since: since.toISOString(), days,
+      groups: rows.map((r) => ({
+        device: String(r.device), signups: Number(r.signups), inApp: Number(r.in_app), linked: Number(r.linked),
+        old3: Number(r.old3), back: Number(r.back), back3: Number(r.back3), old8: Number(r.old8), week: Number(r.week),
+      })),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: "Failed to load device retention", details: err?.message });
+  }
+});
+
 router.get("/admin/lichess-play", requireAdmin, async (_req: Request, res: Response) => {
   const rows = <T,>(r: unknown): T[] => (Array.isArray(r) ? r : ((r as { rows?: T[] })?.rows ?? [])) as T[];
   try {

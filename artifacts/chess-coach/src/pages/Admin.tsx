@@ -340,6 +340,89 @@ function DevicesCard({ rows }: { rows: NonNullable<AdminStats['devices']> }) {
   );
 }
 
+/** Phone vs computer: who signs up, links an account, comes back, or leaves after day one. */
+function DeviceRetentionCard() {
+  type G = { device: string; signups: number; inApp: number; linked: number; old3: number; back: number; back3: number; old8: number; week: number };
+  const [days, setDays] = useState(30);
+  const [data, setData] = useState<{ since: string; groups: G[] } | null>(null);
+  const [err, setErr] = useState(false);
+  useEffect(() => {
+    let live = true; setErr(false);
+    apiFetch(`/api/admin/device-retention?days=${days}`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => { if (live) setData(d); }).catch(() => { if (live) setErr(true); });
+    return () => { live = false; };
+  }, [days]);
+  const items = [
+    { key: 'mobile', label: 'Phone', color: CHESSCOM_GREEN },
+    { key: 'desktop', label: 'PC / laptop', color: '#4FA3E0' },
+    { key: 'tablet', label: 'Tablet', color: '#E8B447' },
+  ];
+  const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : '–');
+  const g = (k: string): G => data?.groups.find((x) => x.device === k) ?? { device: k, signups: 0, inApp: 0, linked: 0, old3: 0, back: 0, back3: 0, old8: 0, week: 0 };
+  const unknown = g('unknown').signups;
+  const rows: { label: string; hint: string; val: (x: G) => [number, number] }[] = [
+    { label: 'Linked Chess.com or Lichess', hint: 'of everyone who signed up', val: (x) => [x.linked, x.signups] },
+    { label: 'Came back on another day', hint: 'joined 3+ days ago', val: (x) => [x.back, x.old3] },
+    { label: 'Came back on 2+ more days', hint: 'joined 3+ days ago', val: (x) => [x.back3, x.old3] },
+    { label: 'Still around a week later', hint: 'joined 8+ days ago', val: (x) => [x.week, x.old8] },
+    { label: 'Left after day one', hint: 'joined 3+ days ago, never came back', val: (x) => [x.old3 - x.back, x.old3] },
+  ];
+  return (
+    <div className="rounded-xl p-4 flex flex-col gap-3 sm:col-span-2 lg:col-span-3" style={{ background: BG_CARD, border: '1px solid rgba(255,255,255,0.05)' }}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: TEXT_MUTED }}>Phone vs PC: who stays</p>
+        <div className="flex gap-1">
+          {[14, 30, 60].map((d) => (
+            <button key={d} onClick={() => setDays(d)} className="rounded-full px-2.5 py-1 text-[11px] font-bold"
+              style={{ background: days === d ? `${CHESSCOM_GREEN}33` : 'transparent', color: days === d ? TEXT_LIGHT : TEXT_MUTED, border: '1px solid rgba(255,255,255,0.08)' }}>
+              {d} days
+            </button>
+          ))}
+        </div>
+      </div>
+      {err && <p className="text-[12px]" style={{ color: TEXT_MUTED }}>Couldn’t load this right now.</p>}
+      {!data && !err && <p className="text-[12px]" style={{ color: TEXT_MUTED }}>Loading…</p>}
+      {data && (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[12px]" style={{ color: TEXT_LIGHT }}>
+              <thead>
+                <tr style={{ color: TEXT_MUTED }}>
+                  <th className="py-1.5 pr-3 font-bold">Signed up on</th>
+                  {items.map((it) => (
+                    <th key={it.key} className="py-1.5 px-2 font-bold whitespace-nowrap"><span className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ background: it.color }} />{it.label}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  <td className="py-2 pr-3 font-bold">Sign-ups</td>
+                  {items.map((it) => { const x = g(it.key); return (
+                    <td key={it.key} className="py-2 px-2"><b className="text-[16px] font-black">{fmt(x.signups)}</b>{it.key === 'mobile' && x.inApp > 0 && <span className="block text-[10.5px]" style={{ color: TEXT_MUTED }}>{fmt(x.inApp)} in the app</span>}</td>
+                  ); })}
+                </tr>
+                {rows.map((r) => (
+                  <tr key={r.label} style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                    <td className="py-2 pr-3"><span className="font-bold">{r.label}</span><span className="block text-[10.5px]" style={{ color: TEXT_MUTED }}>{r.hint}</span></td>
+                    {items.map((it) => { const [a, b] = r.val(g(it.key)); return (
+                      <td key={it.key} className="py-2 px-2"><b className="text-[16px] font-black">{pct(a, b)}</b><span className="block text-[10.5px]" style={{ color: TEXT_MUTED }}>{fmt(a)} of {fmt(b)}</span></td>
+                    ); })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[11px]" style={{ color: TEXT_MUTED }}>
+            Members who signed up since {new Date(data.since).toLocaleDateString()}, by the device of their first visit as a member. “Came back” means they used ChessScout on a later day.
+            {unknown > 0 ? ` ${fmt(unknown)} sign-ups had no device recorded and are left out.` : ''} Small numbers swing a lot; give it a few weeks.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 function StatCard({
   icon: Icon,
   label,
@@ -630,6 +713,7 @@ export function Admin() {
             footnote={`${stats.todayWho ? `Today: ${fmt(stats.todayWho.anonVisitors)} not signed in (could sign up) · ${fmt(stats.todayWho.activeMembers)} existing members. ` : ''}By IP address: ${fmt(stats.uniqueVisitors.totalByIp)} total, ${fmt(stats.uniqueVisitors.todayByIp)} today — often more accurate, since the number above double-counts anyone using multiple browsers or the installed app.`}
           />
           {stats.devices && <DevicesCard rows={stats.devices} />}
+          <DeviceRetentionCard />
           <LichessBotCard />
           {stats.bots && (
             <StatCard
