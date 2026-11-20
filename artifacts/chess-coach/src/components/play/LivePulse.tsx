@@ -1,3 +1,4 @@
+import { useUser } from '@/hooks/use-user';
 import { useEffect, useState } from 'react';
 import { Link } from 'wouter';
 import { ChevronRight, Trophy } from 'lucide-react';
@@ -53,12 +54,14 @@ const dot = (color: string, pulse = false) => (
   </span>
 );
 
-/** One line: "● 3 players online · 1 looking for a game", then the Live Hour. */
+/** One line: "● 3 players online · 1 looking for a game" (admins only), then the Live Hour. */
 export function LivePulse({ className = '', compact = false }: { className?: string; compact?: boolean }) {
   const p = useLivePulse();
+  const { authUser } = useUser();
   if (!p) return null;
   const lh = p.liveHour ? liveHourText(p.liveHour) : null;
-  const people = p.online > 0
+  // The online / looking-for-a-game count is for admins only; everyone still sees the Live Hour.
+  const people = authUser?.isAdmin && p.online > 0
     ? `${p.online} ${p.online === 1 ? 'player' : 'players'} online${p.searching > 0 ? ` · ${p.searching} looking for a game` : p.playing > 0 ? ` · ${p.playing} playing` : ''}`
     : null;
   if (!people && !lh) return null;
