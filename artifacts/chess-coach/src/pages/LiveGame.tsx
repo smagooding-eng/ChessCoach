@@ -375,7 +375,6 @@ export function LiveGame({ live, onLeave }: { live: ReturnType<typeof useLivePla
         premove={premove}
         onPremoveSet={(p) => setPremove(p)}
         confirmTarget={confirmEl}
-        suppressConfirmMoves={finished}
         boardOverlay={finished && !browser.viewing ? (
           <GameOverOverlay
             gameKey={game.id}

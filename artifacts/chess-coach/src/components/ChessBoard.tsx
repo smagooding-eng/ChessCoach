@@ -325,23 +325,6 @@ export function ChessBoard({
   }, [position, checkmateInfo, slideMs]);
   const showMate = !!checkmateInfo && mateReady === position;
 
-  // A result card (game over) waits until the final move has landed, plus a beat to see it
-  // (longer after checkmate, so the mate and its badge show first). Opening a page on a
-  // finished game shows it straight away.
-  const posChangedAt = useRef(0);
-  useEffect(() => { if (position !== mountPos.current) posChangedAt.current = Date.now(); }, [position]);
-  const hasOverlay = !!boardOverlay;
-  const [overlayReady, setOverlayReady] = useState(hasOverlay);
-  useEffect(() => {
-    if (!hasOverlay) { setOverlayReady(false); return undefined; }
-    const since = Date.now() - posChangedAt.current;
-    const wait = Math.max(0, slideMs + (checkmateInfo ? 1000 : 350) - since);
-    if (wait === 0 || since > 4000) { setOverlayReady(true); return undefined; }
-    const t = setTimeout(() => setOverlayReady(true), wait);
-    return () => clearTimeout(t);
-  }, [hasOverlay]); // eslint-disable-line react-hooks/exhaustive-deps
-  const overlayShown = hasOverlay && overlayReady;
-
   const [prevPosition, setPrevPosition] = useState(position);
   if (position !== prevPosition) {
     setPrevPosition(position);
@@ -670,7 +653,7 @@ export function ChessBoard({
           aligned even when the promotion picker / confirm bar below adds height. */}
       {/* Not shown when a game-over card is on the board: the card tells the
           story (the losing king topples), so the board stays clean. */}
-      {checkmateInfo && showMate && !overlayShown && (
+      {checkmateInfo && showMate && !boardOverlay && (
         <div className="absolute inset-x-0 top-0 aspect-square pointer-events-none">
         <CheckmateOverlay
           winningKingSquare={checkmateInfo.winningKingSquare}
@@ -681,7 +664,7 @@ export function ChessBoard({
         </div>
       )}
 
-      {overlayShown && (
+      {boardOverlay && (
         <div className="absolute inset-x-0 top-0 z-20 aspect-square">{boardOverlay}</div>
       )}
 
@@ -745,7 +728,7 @@ export function ChessBoard({
       {(() => {
         // With Confirm Moves on, the clock lever stays put under the board: dimmed and
         // pressed down until a move is waiting, then it lifts. Nothing appears or vanishes.
-        const keep = confirmMoves && !suppressConfirmMoves && !expectedMoveSan && !boardOverlay;
+        const keep = confirmMoves && !suppressConfirmMoves && !expectedMoveSan;
         if (!pendingMove && !keep) {
           return confirmTarget === undefined && !promotionPending && reserveConfirmSpace && confirmMoves && !suppressConfirmMoves
             ? <div aria-hidden className={`mt-3 h-[68px] ${sidePanel ? 'lg:hidden' : ''}`} /> : null;

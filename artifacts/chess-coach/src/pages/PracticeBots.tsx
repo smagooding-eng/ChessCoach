@@ -711,7 +711,6 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
             lastMove={browser.viewing ? browser.lastMove : lastMove}
             moveQuality={browser.viewing ? null : latestQuality}
             reserveConfirmSpace
-            suppressConfirmMoves={result !== 'playing'}
             boardOverlay={result !== 'playing' && !browser.viewing ? (
               <GameOverOverlay
                 gameKey={String(gameIdRef.current)}

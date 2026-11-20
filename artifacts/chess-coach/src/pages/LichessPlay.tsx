@@ -495,7 +495,6 @@ export function LichessPlay() {
             },
             status: phase !== 'playing' ? 'Game over' : myTurn ? 'Your move' : 'Opponent to move',
           } : undefined}
-          suppressConfirmMoves={phase === 'over'}
           boardOverlay={phase === 'over' && (!full.rated || typeof myDiff === 'number' || ratingWaitOver) ? (
             <GameOverOverlay gameKey={full.id} outcome={outcome} yourColor={myColor === 'w' ? 'white' : 'black'} ratingDelta={myDiff ?? null} subtitle={ratingLine ? `${LICHESS_STATUS_TEXT[st.status] ?? ''}${LICHESS_STATUS_TEXT[st.status] ? ' · ' : ''}${ratingLine}` : LICHESS_STATUS_TEXT[st.status]}
               actions={<>
