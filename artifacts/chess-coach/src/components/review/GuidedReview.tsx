@@ -240,6 +240,16 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
   }, [go, ply]);
+  // Game alerts ask (every 5th review, see GameAlerts): this game's review was looked at.
+  const seenSent = useRef(false);
+  useEffect(() => {
+    if (seenSent.current || status !== 'ready' || !reviewMoves.length) return;
+    const id = window.location.pathname.match(/\/games\/([^/?#]+)/)?.[1];
+    if (!id) return;
+    seenSent.current = true;
+    window.dispatchEvent(new CustomEvent('cs:review-seen', { detail: id }));
+  }, [status, reviewMoves.length]);
+
   // Streamer Studio remote: when this review is shown inside the Studio's board panel, the
   // Studio steers it (moves, mistakes, flip) from controls outside the stream picture,
   // and this tells it where we are. Only active inside a frame on the same site.

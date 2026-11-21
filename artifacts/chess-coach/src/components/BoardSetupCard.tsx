@@ -10,6 +10,7 @@ import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
 import { useSettings, LookOverride, BG_PHOTOS, PIECE_SHAPES, BOARD_TEXTURES, BOARD_THEMES, isPhotoBoard, type BoardLook, type PieceShape, type BoardTexture, type BoardTheme } from '@/context/SettingsContext';
 import { SOUND_PACKS, playSound, type SoundPack } from '@/lib/sounds';
 import { ChessBoard } from '@/components/ChessBoard';
+import { GameAlertsRow } from '@/components/GameAlerts';
 
 const G = '#81B64C', TEXT = '#F5F7F6', MUTED = '#87918E', INNER = '#121B1D', LINE = 'rgba(255,255,255,.08)';
 const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
@@ -266,6 +267,8 @@ export function BoardSetupCard({ mode, onDone, progress, kicker }: {
         </div>
         {!lich && lichChecked && <p className="mt-2 text-[11px]" style={{ color: MUTED }}>Uses your Lichess account: a quick sign-in on lichess.org and you’re back. No account? <a href="https://lichess.org/signup" target="_blank" rel="noreferrer" className="font-bold underline" style={{ color: G }}>Make one free</a>.</p>}
       </div>
+
+      <div className="mt-2"><GameAlertsRow /></div>
 
       {(onDone || changed) && (
         <>

@@ -1767,7 +1767,7 @@ async function samedayOne(u: { id: string; chesscom_username: string | null; lic
   await samedayNotify(u.id).catch((err) => appLogger.warn({ err, userId: u.id }, "[sameday] notify failed"));
 }
 
-async function samedayNotify(userId: string, opts: { minGapMs?: number; quietMs?: number } = {}): Promise<boolean> {
+async function samedayNotify(userId: string, opts: { minGapMs?: number; quietMs?: number; emailQuietMs?: number; emailGapDays?: number } = {}): Promise<boolean> {
   const minGapMs = opts.minGapMs ?? 20 * 3600_000;
   const [st] = rowsOfAny<{ notified_at: string | null; game_id: number | null; emailed_at: string | null; catchup_emailed: string | null; seen: string; has_push: boolean;
     email: string | null; first_name: string | null; email_opt_out: boolean }>(await db.execute(sql`
@@ -1802,8 +1802,14 @@ async function samedayNotify(userId: string, opts: { minGapMs?: number; quietMs?
     if (isPushConfigured()) pushed = ((await sendPushToUser(userId, { title: msg.title, body: msg.body, url: msg.url, tag: "cs:sameday" }).catch(() => ({ sent: 0 }))).sent ?? 0) > 0;
   }
   const recent = (t: string | null, days: number) => !!t && Date.now() - new Date(t).getTime() < days * 864e5;
-  // No push: an email, at most every 2 days (was 3).
-  if (!pushed && st.email && !st.email_opt_out && !recent(st.emailed_at, 2) && !recent(st.catchup_emailed, 2)) {
+  // No push: an email instead, once their session is over (no new game for emailQuietMs),
+  // at most every emailGapDays (2 by default).
+  if (!pushed && opts.emailQuietMs) {
+    const newest = Math.max(await newestPlayed(userId, "chesscom"), await newestPlayed(userId, "lichess"));
+    if (Date.now() - newest < opts.emailQuietMs) return false; // still playing: try again on the next check
+  }
+  const emailGap = opts.emailGapDays ?? 2;
+  if (!pushed && st.email && !st.email_opt_out && !recent(st.emailed_at, emailGap) && !recent(st.catchup_emailed, emailGap)) {
     const { sendEmail } = await import("../lib/email");
     const { unsubscribeHeaders, unsubscribeUrl } = await import("../lib/emailPrefs");
     const { trackHtml } = await import("../lib/emailTracking");
@@ -1953,8 +1959,11 @@ async function startHistoryBackfill(): Promise<void> {
 // When a new game shows up it's imported and reviewed straight away (engine only), and
 // once they've stopped playing for 8 minutes they get one message about their latest
 // game: at most one every 3 hours. quick_detect records how long each step took.
-const QUICK_HOT_MS = 3 * 60_000, QUICK_WARM_MS = 15 * 60_000, QUICK_COLD_MS = 60 * 60_000, QUICK_AWAY_MS = 6 * 3600_000;
-const QUICK_QUIET_MS = 8 * 60_000, QUICK_GAP_MS = 3 * 3600_000;
+// How often to look for new games: mid-session, around lately, this month, away.
+const QUICK_HOT_MS = 2 * 60_000, QUICK_WARM_MS = 5 * 60_000, QUICK_COLD_MS = 60 * 60_000, QUICK_AWAY_MS = 6 * 3600_000;
+// Push: as soon as a new game is reviewed (then quiet for QUICK_GAP_MS). Email (no push):
+// once no new game has come in for 10 minutes, at most once a day.
+const QUICK_QUIET_MS = 0, QUICK_GAP_MS = 3 * 3600_000, QUICK_EMAIL_QUIET_MS = 10 * 60_000, QUICK_EMAIL_GAP_DAYS = 0.95;
 const QUICK_UA = "ChessScout.net/1.0 (+https://chessscout.net)";
 let quickRunning = false;
 let quickPauseUntil = 0;
@@ -2028,7 +2037,7 @@ async function quickOne(u: QuickMember): Promise<void> {
       } catch (err) { appLogger.warn({ err, gameId: g.id }, "[quick] review failed"); }
     }
   }
-  await samedayNotify(u.id, { minGapMs: QUICK_GAP_MS, quietMs: QUICK_QUIET_MS }).catch((err) => appLogger.warn({ err, userId: u.id }, "[quick] notify failed"));
+  await samedayNotify(u.id, { minGapMs: QUICK_GAP_MS, quietMs: QUICK_QUIET_MS, emailQuietMs: QUICK_EMAIL_QUIET_MS, emailGapDays: QUICK_EMAIL_GAP_DAYS }).catch((err) => appLogger.warn({ err, userId: u.id }, "[quick] notify failed"));
 
   // When to look again
   const newest = Math.max(await newestPlayed(u.id, "chesscom"), await newestPlayed(u.id, "lichess"));
