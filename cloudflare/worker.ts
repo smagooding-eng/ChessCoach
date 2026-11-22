@@ -19,7 +19,8 @@ import { previewGames } from './api/previewGames';
 // missing even if the folder starting with a dot isn't uploaded with the files).
 import assetlinks from '../artifacts/chess-coach/public/.well-known/assetlinks.json';
 
-interface Env {
+import { runMonitor, type MonitorEnv } from './api/monitor';
+interface Env extends MonitorEnv {
   ASSETS: { fetch: (req: Request) => Promise<Response> };
   STRIPE_SECRET_KEY?: string;
   API_URL?: string;
@@ -201,6 +202,11 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 }) as typeof fetch;
 
 export default {
+  // every minute (wrangler.jsonc triggers): uptime alerts, see api/monitor.ts
+  async scheduled(_event: unknown, env: Env, ctx: Ctx): Promise<void> {
+    ctx.waitUntil(runMonitor(env));
+  },
+
   async fetch(request: Request, env: Env, ctx: Ctx): Promise<Response> {
     assets = env.ASSETS;
     const url = new URL(request.url);

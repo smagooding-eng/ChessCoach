@@ -1,5 +1,6 @@
 // Prefer IPv4 for every outgoing connection (Stripe, Lichess, email…). From Render,
 // some IPv6 routes hang instead of failing, which made checkout take a minute.
+import { PREVIEW_MODE } from "./lib/previewMode";
 import dns from "node:dns";
 dns.setDefaultResultOrder("ipv4first");
 import { runMigrations } from 'stripe-replit-sync';
@@ -515,8 +516,8 @@ startTournamentEngine();
 // Official scheduled tournaments (nightly blitz, weekend knockout, weekly daily).
 import("./lib/officialTournaments").then(({ startOfficialTournaments }) => startOfficialTournaments()).catch((err) => logger.warn({ err }, "official tournaments start failed"));
 import("./lib/popularBook").then(({ startPopularBook }) => startPopularBook()).catch((err) => logger.warn({ err }, "popular book start failed"));
-import("./lib/contentMoments").then(({ startContentScanner }) => startContentScanner()).catch((err) => logger.warn({ err }, "content scanner start failed"));
-import("./lib/subscriptionSync").then(({ startSubscriptionSync }) => startSubscriptionSync()).catch((err) => logger.warn({ err }, "subscription sync start failed"));
+if (!PREVIEW_MODE) import("./lib/contentMoments").then(({ startContentScanner }) => startContentScanner()).catch((err) => logger.warn({ err }, "content scanner start failed"));
+if (!PREVIEW_MODE) import("./lib/subscriptionSync").then(({ startSubscriptionSync }) => startSubscriptionSync()).catch((err) => logger.warn({ err }, "subscription sync start failed"));
 httpServer.listen(port, (err?: Error) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
@@ -527,24 +528,24 @@ httpServer.listen(port, (err?: Error) => {
 
 runSchemaMigrations().then(() => {
   // Public player pages: table + slow weekly refresh from Chess.com.
-  ensurePublicPlayersTable().then(() => startPublicPlayersRefresher()).catch((err) => logger.warn({ err }, 'public players setup failed'));
-  ensureSeoTranslationsTable().then(() => startSeoTranslator()).catch((err) => logger.warn({ err }, 'seo translations setup failed'));
+  if (!PREVIEW_MODE) ensurePublicPlayersTable().then(() => startPublicPlayersRefresher()).catch((err) => logger.warn({ err }, 'public players setup failed'));
+  if (!PREVIEW_MODE) ensureSeoTranslationsTable().then(() => startSeoTranslator()).catch((err) => logger.warn({ err }, 'seo translations setup failed'));
   // IndexNow: full submission of public pages at most once a week.
-  import("./lib/indexNow").then(({ startIndexNow }) => startIndexNow()).catch((err) => logger.warn({ err }, 'indexnow start failed'));
+  if (!PREVIEW_MODE) import("./lib/indexNow").then(({ startIndexNow }) => startIndexNow()).catch((err) => logger.warn({ err }, 'indexnow start failed'));
   // Club outreach: weekly search for new club / organizer contacts.
-  import("./lib/clubOutreach").then(({ startClubOutreachSchedule }) => startClubOutreachSchedule()).catch((err) => logger.warn({ err }, 'club outreach start failed'));
+  if (!PREVIEW_MODE) import("./lib/clubOutreach").then(({ startClubOutreachSchedule }) => startClubOutreachSchedule()).catch((err) => logger.warn({ err }, 'club outreach start failed'));
   void seedBotPersonas().catch((err) => logger.warn({ err }, 'seedBotPersonas failed'));
   // "Review all": resume jobs cut off by a restart; Coach review after upgrading.
-  import("./routes/games").then(({ startReviewServices }) => startReviewServices()).catch((err) => logger.warn({ err }, 'review services start failed'));
+  if (!PREVIEW_MODE) import("./routes/games").then(({ startReviewServices }) => startReviewServices()).catch((err) => logger.warn({ err }, 'review services start failed'));
   // Name the openings of ChessScout / bot games saved without one.
   import("./lib/openingName").then(({ backfillChessScoutOpenings }) => backfillChessScoutOpenings()).catch((err) => logger.warn({ err }, 'opening backfill failed'));
   // The ChessScout bot on Lichess (only when LICHESS_BOT_TOKEN is set).
-  import("./lib/lichessBot").then(({ startLichessBot }) => startLichessBot()).catch((err) => logger.warn({ err }, 'lichess bot failed to start'));
-  import("./routes/lichessConnect").then(({ startLichessDailyWatch }) => startLichessDailyWatch()).catch((err) => logger.warn({ err }, 'lichess daily watch failed to start'));
+  if (!PREVIEW_MODE) import("./lib/lichessBot").then(({ startLichessBot }) => startLichessBot()).catch((err) => logger.warn({ err }, 'lichess bot failed to start'));
+  if (!PREVIEW_MODE) import("./routes/lichessConnect").then(({ startLichessDailyWatch }) => startLichessDailyWatch()).catch((err) => logger.warn({ err }, 'lichess daily watch failed to start'));
   import("./lib/trapSeed").then(({ seedTraps }) => seedTraps()).catch((err) => logger.warn({ err }, 'trap seed failed'));
   // Content Studio openings: built in the background a few minutes after start-up (the cache is in memory, so a deploy empties it).
   setTimeout(() => { import("./lib/studioOpenings").then(({ warmStudioOpenings }) => warmStudioOpenings()).catch(() => {}); }, 3 * 60 * 1000);
-  import("./lib/growthScheduler").then(({ startGrowthScheduler }) => {
+  if (!PREVIEW_MODE) import("./lib/growthScheduler").then(({ startGrowthScheduler }) => {
     startGrowthScheduler();
   }).catch((err) => {
     logger.error({ err }, "Growth scheduler failed to start");

@@ -31,6 +31,7 @@ import { ImportStatusWatcher } from "@/components/ImportStatusWatcher";
 import { AutoPushPrompt } from "@/components/AutoPushPrompt";
 import { ReviewAlertsPrompt } from '@/components/GameAlerts';
 import { recordEntryIntent, takeEntryIntent, openBeforeLinking } from '@/lib/entryIntent';
+import { MaintenanceNotice } from '@/components/MaintenanceNotice';
 import { BoardLookReporter } from '@/components/BoardLookReporter';
 import { BoardSetupPrompt } from "@/components/BoardSetupPrompt";
 import { TrialPromo } from "@/components/TrialPromo";
@@ -787,6 +788,7 @@ function App() {
                     <BackgroundJobsWatcher />
                     <AutoPushPrompt />
                     <TrialPromo />
+                    <MaintenanceNotice />
                     <BoardSetupPrompt />
                     <BoardLookReporter />
                     <EntryIntentRecorder />

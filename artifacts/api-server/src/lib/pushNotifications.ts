@@ -1,3 +1,4 @@
+import { PREVIEW_MODE, previewAllowsEmail } from "./previewMode";
 import webpush from "web-push";
 import { db, pushSubscriptionsTable, usersTable, gamesTable } from "@workspace/db";
 import { eq, and, gte, lte, inArray } from "drizzle-orm";
@@ -121,6 +122,12 @@ export async function sendPushToUsers(userIds: string[], payload: PushPayload): 
     throw new Error("Push notifications are not configured (missing VAPID keys)");
   }
   if (userIds.length === 0) return { sent: 0, failed: 0, pruned: 0 };
+  // Preview server: only to members whose email is on the allow list
+  if (PREVIEW_MODE) {
+    const ok = await db.select({ id: usersTable.id, email: usersTable.email }).from(usersTable).where(inArray(usersTable.id, userIds));
+    userIds = ok.filter((u) => u.email && previewAllowsEmail(u.email)).map((u) => u.id);
+    if (userIds.length === 0) return { sent: 0, failed: 0, pruned: 0 };
+  }
 
   const subs = await db.select().from(pushSubscriptionsTable).where(inArray(pushSubscriptionsTable.userId, userIds));
 

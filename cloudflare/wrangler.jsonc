@@ -27,5 +27,7 @@
     ]
   },
   "vars": { "API_URL": "https://chesscoach-api-kbf8.onrender.com" },
+  // Uptime alerts every minute (api/monitor.ts). Needs the NTFY_TOPIC secret to send anything.
+  "triggers": { "crons": ["* * * * *"] },
   "observability": { "enabled": true }
 }

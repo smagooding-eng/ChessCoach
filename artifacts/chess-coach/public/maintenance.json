@@ -1,0 +1,6 @@
+{
+  "_how": "Scheduled downtime notice. Set start and end (ISO time with offset, e.g. 2026-11-29T02:00:00-05:00) and push: members see a banner from up to 7 days before, and an 'upgrading' screen during the window. Leave start empty when nothing is planned.",
+  "start": "",
+  "end": "",
+  "message": "We're moving ChessScout to a faster server."
+}

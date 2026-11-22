@@ -1,3 +1,4 @@
+import { PREVIEW_MODE, previewAllowsEmail } from "./previewMode";
 import { Resend } from 'resend';
 import { RAFFLE } from './raffle';
 import { emailLayout, emailP, emailFeatures, emailPanel, emailDivider, escapeHtml, EMAIL, EMAIL_FONT } from './emailTheme';
@@ -42,6 +43,12 @@ export interface SendEmailOptions {
 }
 
 export async function sendEmail(options: SendEmailOptions) {
+  // Preview server: only to the allowed addresses (never real members)
+  if (PREVIEW_MODE) {
+    const to = (Array.isArray(options.to) ? options.to : [options.to]).filter(previewAllowsEmail);
+    if (!to.length) return { id: "preview-skipped" } as never;
+    options = { ...options, to };
+  }
   validateFromEmail();
   const resend = getResend();
   const { data, error } = await resend.emails.send({

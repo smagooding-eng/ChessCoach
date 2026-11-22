@@ -38,7 +38,16 @@ WORKDIR /repo
 COPY . .
 
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @workspace/api-server run build
+# ARM servers (Oracle Cloud): the workspace leaves out esbuild's Linux ARM build to keep
+# installs small, so fetch the matching one here and point esbuild at it. On x64 (Render)
+# this step does nothing and the build is exactly as before.
+RUN set -e; \
+    if [ "$(uname -m)" = "aarch64" ]; then \
+      V=$(node -p "require(require.resolve('esbuild/package.json', { paths: ['/repo/artifacts/api-server'] })).version"); \
+      npm install --no-save --no-audit --no-fund --prefix /opt/esbuild-arm "@esbuild/linux-arm64@$V"; \
+      export ESBUILD_BINARY_PATH=/opt/esbuild-arm/node_modules/@esbuild/linux-arm64/bin/esbuild; \
+    fi; \
+    pnpm --filter @workspace/api-server run build
 
 ENV NODE_ENV=production
 EXPOSE 8080

@@ -11,7 +11,7 @@ import { ADMIN_EMAILS } from "./lib/auth";
 import { WebhookHandlers } from "./lib/webhookHandlers";
 import { analytics } from "@heycatch/sdk";
 import { getStripeSecretKey, stripeAgent } from "./lib/stripeClient";
-import { db, usersTable } from "@workspace/db";
+import { db, pool, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 const app: Express = express();
@@ -79,6 +79,17 @@ async function trackSubscriptionEventBestEffort(payload: Buffer, signature: stri
 // Render's health check, answered before anything else (logging, sessions, body parsing):
 // it times out after 5 s, and a busy moment elsewhere shouldn't make it fail.
 app.get('/api/healthz', (_req, res) => { res.json({ status: 'ok' }); });
+// For the uptime alerts (cloudflare/api/monitor.ts): also checks the database answers.
+// Kept separate so the host's own health check never restarts the server over a database blip.
+app.get('/api/healthz/deep', async (_req, res) => {
+  const t = Date.now();
+  try {
+    await Promise.race([pool.query('SELECT 1'), new Promise((_, no) => setTimeout(() => no(new Error('timeout')), 5000))]);
+    res.set('Cache-Control', 'no-store').json({ status: 'ok', db: 'ok', ms: Date.now() - t });
+  } catch (e) {
+    res.set('Cache-Control', 'no-store').status(503).json({ status: 'degraded', db: e instanceof Error && e.message === 'timeout' ? 'slow (5 s+)' : 'error' });
+  }
+});
 
 app.post(
   '/api/stripe/webhook',

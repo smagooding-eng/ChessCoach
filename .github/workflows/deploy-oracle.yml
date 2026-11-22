@@ -1,0 +1,24 @@
+# Deploys the API to the Oracle server: a push to main → the live server, a push to preview →
+# the preview server. Does nothing until the ORACLE_HOST and ORACLE_SSH_KEY secrets exist
+# (pc.sh ci-key prints them). The key can only run ops/oracle/ci-deploy.sh on the server.
+name: Deploy API to Oracle
+on:
+  push:
+    branches: [main, preview]
+  workflow_dispatch:
+    inputs:
+      target: { description: "prod or preview", required: true, default: preview }
+concurrency: { group: "oracle-${{ github.ref_name }}", cancel-in-progress: false }
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy
+        env:
+          HOST: ${{ secrets.ORACLE_HOST }}
+          KEY: ${{ secrets.ORACLE_SSH_KEY }}
+          TARGET: ${{ inputs.target || (github.ref_name == 'main' && 'prod' || 'preview') }}
+        run: |
+          if [ -z "$HOST" ] || [ -z "$KEY" ]; then echo "Oracle secrets not set yet; skipping."; exit 0; fi
+          mkdir -p ~/.ssh && printf '%s\n' "$KEY" > ~/.ssh/k && chmod 600 ~/.ssh/k
+          ssh -i ~/.ssh/k -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 "ubuntu@$HOST" "$TARGET"

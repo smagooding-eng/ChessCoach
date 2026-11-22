@@ -1,0 +1,38 @@
+# Release: ship everything on the preview branch to the live site (main).
+# GitHub → Actions → "Release preview to live" → Run workflow. Meant for every other week;
+# emergency fixes go straight to main (see sync-preview.yml, which brings them back to preview).
+name: Release preview to live
+on:
+  workflow_dispatch:
+    inputs:
+      note:
+        description: "What's in this release (goes in the merge message)"
+        required: false
+        default: ""
+permissions:
+  contents: write
+concurrency: { group: release, cancel-in-progress: false }
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0, ref: main }
+      - name: Merge preview into main
+        run: |
+          git config user.name "Shann"
+          git config user.email "smagooding@gmail.com"
+          git fetch origin preview
+          AHEAD=$(git rev-list --count main..origin/preview)
+          if [ "$AHEAD" = "0" ]; then echo "Nothing new on preview."; exit 0; fi
+          echo "Releasing $AHEAD commit(s):"; git log --oneline main..origin/preview | head -100
+          git merge --no-ff origin/preview -m "Release $(date -u +%Y-%m-%d): ${{ inputs.note }}"
+          git push origin main
+      - name: Summary
+        run: |
+          {
+            echo "## Released to live"
+            git log --oneline -1
+            echo
+            echo "Cloudflare (website) and the API server deploy from main now; check https://chessscout.net in a few minutes."
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,30 @@
+# Keeps preview up to date with anything that went straight to main (emergency fixes, releases),
+# so the next release never undoes a fix. Runs on every push to main.
+name: Bring main's fixes into preview
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+concurrency: { group: sync-preview, cancel-in-progress: false }
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Merge main into preview
+        run: |
+          git config user.name "Shann"
+          git config user.email "smagooding@gmail.com"
+          if ! git ls-remote --exit-code --heads origin preview >/dev/null; then echo "No preview branch yet."; exit 0; fi
+          git fetch origin preview main
+          git checkout -B preview origin/preview
+          if git merge-base --is-ancestor origin/main preview; then echo "Preview already has everything on main."; exit 0; fi
+          if git merge --no-edit origin/main -m "Bring main's fixes into preview"; then
+            git push origin preview
+          else
+            git merge --abort
+            echo "::error::main and preview changed the same lines; merge main into preview by hand."
+            exit 1
+          fi
