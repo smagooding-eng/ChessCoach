@@ -39,7 +39,7 @@ Cloudflare → Workers & Pages → **Create** → Import a repository → `Chess
 - **Project name:** `chesscoach-preview`
 - **Production branch:** `preview`
 - **Build command:** same as chesscoach1's
-- **Deploy command:** `npx wrangler deploy --config cloudflare/wrangler.jsonc --name chesscoach-preview --var API_URL:https://api-preview.chessscout.net`
+- **Deploy command:** `npx wrangler deploy --name chesscoach-preview --var API_URL:https://api-preview.chessscout.net`
 - **Build variables:** `PREVIEW_API_URL=https://api-preview.chessscout.net` (add this once the Oracle preview server is running)
 - **Settings → Domains & Routes:** add the custom domain `preview.chessscout.net`
 - Don't give it the `NTFY_TOPIC` secret, so only the live Worker sends alerts.
