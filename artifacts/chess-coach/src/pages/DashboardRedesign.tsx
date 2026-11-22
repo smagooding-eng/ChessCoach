@@ -1,4 +1,5 @@
 import { SocialLinks } from '@/components/SocialLinks';
+import { MaintenanceBanner } from '@/components/MaintenanceNotice';
 import React, { useEffect, useRef, useState } from 'react';
 import { autoImportLinkedAccounts } from '@/lib/autoImport';
 import { Link, useLocation } from 'wouter';
@@ -176,6 +177,7 @@ export function DashboardRedesign() {
       {/* Desktop (lg+): two columns at full width instead of the phone column centred */}
       <div className="mx-auto grid grid-cols-1 w-full max-w-[760px] gap-5 lg:max-w-[1200px] lg:grid-cols-2 lg:gap-6 lg:items-start">
         <div className="lg:col-span-2 empty:hidden"><EmailVerifyBanner /></div>
+        <MaintenanceBanner className="lg:col-span-2" />
         <NotifyPrompt id="home" className="lg:col-span-2" reason="Get a heads-up when your games are reviewed, a friend challenges you, or it's your move in a daily game." />
 
         {/* ── Player summary ── */}
