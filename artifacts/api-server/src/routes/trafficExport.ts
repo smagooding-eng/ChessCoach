@@ -294,6 +294,43 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
         chesscom: !!r.chesscom, lichess: !!r.lichess, pro: !!r.paying || !!r.comped,
       })),
     };
+    // What each new member actually did: their page views in order, from half an hour before
+    // signing up to two days after (minutes from sign-up; repeats of the same page in a row
+    // folded together). Newest sign-ups first, up to 60 people and 80 steps each.
+    const journeyRows = await db.execute(sql`
+      WITH u AS (
+        SELECT id, created_at, COALESCE(scout_username, chesscom_username, lichess_username, 'member') AS label, country,
+          (chesscom_username IS NOT NULL) AS chesscom, (lichess_username IS NOT NULL) AS lichess
+        FROM users WHERE created_at >= ${since} AND created_at <= ${until} AND id NOT IN (SELECT id FROM analytics_excluded_users)
+        ORDER BY created_at DESC LIMIT 60
+      ),
+      browsers AS (SELECT DISTINCT pv.user_id, pv.visitor_id FROM pv_people pv JOIN u ON pv.user_id = u.id WHERE pv.visitor_id IS NOT NULL)
+      SELECT u.id, u.label, u.country, u.chesscom, u.lichess, u.created_at,
+        round((extract(epoch FROM (p.created_at - u.created_at)) / 60.0)::numeric, 1) AS mins,
+        regexp_replace(regexp_replace(p.path, '/[0-9]+(?=/|$)', '/:id', 'g'), '/[A-Za-z0-9_-]{20,}(?=/|$)', '/:token', 'g') AS path, p.device
+      FROM u
+      JOIN (SELECT pv.id, pv.created_at, pv.path, pv.device, b.user_id AS owner FROM pv_people pv JOIN browsers b ON b.visitor_id = pv.visitor_id
+            UNION SELECT pv.id, pv.created_at, pv.path, pv.device, pv.user_id AS owner FROM pv_people pv WHERE pv.user_id IN (SELECT id FROM u)) p ON p.owner = u.id
+      WHERE p.created_at >= u.created_at - interval '30 minutes' AND p.created_at <= u.created_at + interval '48 hours'
+      ORDER BY u.created_at DESC, p.created_at ASC`).catch((err) => { logger.warn({ err }, "[traffic-export] journeys failed"); return []; });
+    const journeys = new Map<string, { member: string; country: string | null; signedUp: string; linked: string[]; device: string | null; views: number; steps: { min: number; page: string; times?: number }[] }>();
+    for (const r of rowsOf<Record<string, unknown>>(journeyRows)) {
+      const id = String(r.id);
+      let j = journeys.get(id);
+      if (!j) {
+        j = { member: String(r.label), country: (r.country as string | null) ?? null, signedUp: new Date(String(r.created_at)).toISOString(),
+          linked: [r.chesscom ? 'chesscom' : '', r.lichess ? 'lichess' : ''].filter(Boolean), device: (r.device as string | null) ?? null, views: 0, steps: [] };
+        journeys.set(id, j);
+      }
+      j.views++;
+      const page = String(r.path), last = j.steps[j.steps.length - 1];
+      if (last && last.page === page) { last.times = (last.times ?? 1) + 1; continue; }
+      if (j.steps.length < 80) j.steps.push({ min: Number(r.mins), page });
+    }
+    const signupJourneys = {
+      note: "Each new member's page views in order: min = minutes from signing up (negative = before), times = the same page several times in a row. From 30 minutes before sign-up to 48 hours after, all their browsers. Newest first, up to 60 members.",
+      members: [...journeys.values()],
+    };
     const t = rowsOf<Record<string, unknown>>(totals)[0] ?? {};
     const catchup = await import("./games").then((m) => m.catchupReviewStatus()).catch(() => null);
     res.json({
@@ -336,6 +373,7 @@ router.get("/admin/traffic-export", requireAdmin, async (req: Request, res: Resp
       entryPages: rowsOf<Record<string, unknown>>(entries).map((r) => ({ path: r.path, visitors: num(r.visitors), everSignedIn: num(r.became_or_were_signed_in) })),
       signupsBySource: [...bySource.values()].sort((a, b) => b.signups - a.signups),
       signups: signupRows,
+      signupJourneys,
       signupEntryPages: rowsOf<Record<string, unknown>>(signupEntries).map((r) => ({ path: r.path, signups: num(r.signups) })),
       exitPages: rowsOf<Record<string, unknown>>(exits).map((r) => ({ path: r.path, exits: num(r.exits) })),
       visitSources: rowsOf<Record<string, unknown>>(sources).map((r) => ({
