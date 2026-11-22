@@ -1,6 +1,7 @@
 # Deploys the API to the Oracle server: a push to main → the live server, a push to preview →
 # the preview server. Does nothing until the ORACLE_HOST and ORACLE_SSH_KEY secrets exist
-# (pc.sh ci-key prints them). The key can only run ops/oracle/ci-deploy.sh on the server.
+# (pc.sh ci-key prints them; the key can only run ops/oracle/ci-deploy.sh on the server),
+# or ORACLE_ADMIN_KEY from the "Oracle server" workflow.
 name: Deploy API to Oracle
 on:
   push:
@@ -17,8 +18,11 @@ jobs:
         env:
           HOST: ${{ secrets.ORACLE_HOST }}
           KEY: ${{ secrets.ORACLE_SSH_KEY }}
+          ADMIN: ${{ secrets.ORACLE_ADMIN_KEY }}
           TARGET: ${{ inputs.target || (github.ref_name == 'main' && 'prod' || 'preview') }}
         run: |
-          if [ -z "$HOST" ] || [ -z "$KEY" ]; then echo "Oracle secrets not set yet; skipping."; exit 0; fi
-          mkdir -p ~/.ssh && printf '%s\n' "$KEY" > ~/.ssh/k && chmod 600 ~/.ssh/k
-          ssh -i ~/.ssh/k -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 "ubuntu@$HOST" "$TARGET"
+          if [ -z "$HOST" ] || { [ -z "$KEY" ] && [ -z "$ADMIN" ]; }; then echo "Oracle secrets not set yet; skipping."; exit 0; fi
+          mkdir -p ~/.ssh && printf '%s\n' "${KEY:-$ADMIN}" | tr -d '\r' > ~/.ssh/k && chmod 600 ~/.ssh/k
+          # skip quietly until the server is set up
+          C="$TARGET"; [ -z "$KEY" ] && C="[ -x /opt/chessscout/ops/ci-deploy.sh ] && SSH_ORIGINAL_COMMAND=$TARGET bash /opt/chessscout/ops/ci-deploy.sh || echo 'Server not set up yet; skipping.'"
+          ssh -i ~/.ssh/k -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 "ubuntu@$HOST" "$C"
