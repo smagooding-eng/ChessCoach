@@ -555,6 +555,17 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
 
       <main ref={mainRef} className="flex-1 min-h-screen overflow-x-hidden pb-20 md:pb-6 md:px-5 md:pt-5">
         <div className={`md:mx-auto ${redesign ? 'md:max-w-[1280px]' : 'md:max-w-5xl'}`}>
+          {layoutAuthUser && !layoutAuthUser.chesscomUsername && !layoutAuthUser.lichessUsername && !layoutAuthUser.scoutUsername && location !== '/welcome' && (
+            // Using the app before linking: offer it, without getting in the way
+            <Link href="/welcome" className="mx-3 mt-3 mb-1 flex items-center gap-3 rounded-[14px] px-3.5 py-2.5 md:mx-0 md:mt-0 md:mb-3"
+              style={{ background: '#0D1516', border: '1px solid rgba(255,255,255,.08)' }}>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] font-extrabold" style={{ color: TEXT_LIGHT }}>Get your own games reviewed</span>
+                <span className="block text-[11.5px]" style={{ color: TEXT_MUTED }}>Link Chess.com or Lichess and every game you play gets graded, move by move.</span>
+              </span>
+              <span className="shrink-0 rounded-[10px] px-3 py-1.5 text-[12px] font-black" style={{ background: '#81B64C', color: '#06110A' }}>Link</span>
+            </Link>
+          )}
           {children}
         </div>
       </main>

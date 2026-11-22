@@ -30,6 +30,7 @@ import { AnalysisRedesign } from "@/pages/AnalysisRedesign";
 import { ImportStatusWatcher } from "@/components/ImportStatusWatcher";
 import { AutoPushPrompt } from "@/components/AutoPushPrompt";
 import { ReviewAlertsPrompt } from '@/components/GameAlerts';
+import { recordEntryIntent, takeEntryIntent, openBeforeLinking } from '@/lib/entryIntent';
 import { BoardLookReporter } from '@/components/BoardLookReporter';
 import { BoardSetupPrompt } from "@/components/BoardSetupPrompt";
 import { TrialPromo } from "@/components/TrialPromo";
@@ -263,6 +264,14 @@ const queryClient = new QueryClient({
 });
 
 // Protected Route Wrapper
+/** Signed out on a puzzle / traps landing page: remember it for after sign-up. */
+function EntryIntentRecorder() {
+  const [location] = useLocation();
+  const { isAuthenticated, isAuthLoading } = useUser();
+  useEffect(() => { if (!isAuthLoading && !isAuthenticated) recordEntryIntent(location); }, [location, isAuthenticated, isAuthLoading]);
+  return null;
+}
+
 function ProtectedRoute({ component: Component, fallbackNav, requireAdmin, skipWelcomeRedirect, fullscreen }: { component: React.ComponentType; fallbackNav?: string; requireAdmin?: boolean; skipWelcomeRedirect?: boolean; fullscreen?: boolean }) {
   const { username, isLoaded, isAuthenticated, isAuthLoading, authUser } = useUser();
   const [location, navigate] = useLocation();
@@ -295,9 +304,13 @@ function ProtectedRoute({ component: Component, fallbackNav, requireAdmin, skipW
       !authUser.chesscomUsername &&
       !authUser.lichessUsername &&
       !authUser.scoutUsername &&
-      location !== '/welcome'
+      location !== '/welcome' &&
+      // pages that don't need their games work before linking (they used to bounce back here)
+      !openBeforeLinking(location)
     ) {
-      navigate('/welcome', { replace: true } as never);
+      // came in from a puzzle / traps page: straight there, not the account-linking welcome
+      const to = takeEntryIntent();
+      navigate(to ?? '/welcome', { replace: true } as never);
     }
   }, [isLoaded, username, navigate, isAuthenticated, isAuthLoading, requireAdmin, authUser, skipWelcomeRedirect, location]);
 
@@ -776,6 +789,7 @@ function App() {
                     <TrialPromo />
                     <BoardSetupPrompt />
                     <BoardLookReporter />
+                    <EntryIntentRecorder />
                     <ReviewAlertsPrompt />
                     <AfterSignInRedirect />
                     <RealtimeBridge />
