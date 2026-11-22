@@ -24,7 +24,7 @@ export function NotifyPrompt({ reason, id, className = '' }: { reason: string; i
     const standalone = (navigator as unknown as { standalone?: boolean }).standalone === true || window.matchMedia?.('(display-mode: standalone)').matches;
     if (!ios || standalone || !id) return null;
     return (
-      <div className={`rounded-2xl px-3.5 py-3 ${className}`} style={{ background: PT.greenSoft, border: `1px solid ${PT.greenLine}` }}>
+      <div className={`rounded-2xl px-3.5 py-3 ${className}`} style={{ background: PT.cardSolid, border: `1px solid ${PT.border}` }}>
         <div className="flex items-center gap-3">
           <Bell size={18} className="shrink-0" style={{ color: PT.green }} />
           <p className="min-w-0 flex-1 text-[12.5px] leading-snug" style={{ color: PT.text }}>On iPhone, notifications need ChessScout on your Home Screen: tap Share, then <b>Add to Home Screen</b>, and open it from there.</p>
@@ -36,7 +36,7 @@ export function NotifyPrompt({ reason, id, className = '' }: { reason: string; i
   if (permission === 'denied') return null;
   if (permission === 'granted' && isSubscribed) return null;
   return (
-    <div className={`rounded-2xl px-3.5 py-3 ${className}`} style={{ background: PT.greenSoft, border: `1px solid ${PT.greenLine}` }}>
+    <div className={`rounded-2xl px-3.5 py-3 ${className}`} style={{ background: PT.cardSolid, border: `1px solid ${PT.border}` }}>
       <div className="flex items-center gap-3">
         <Bell size={18} className="shrink-0" style={{ color: PT.green }} />
         <p className="min-w-0 flex-1 text-[12.5px] leading-snug" style={{ color: PT.text }}>{reason}</p>
