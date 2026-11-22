@@ -141,8 +141,10 @@ app.use(
   }),
 );
 const corsOrigin = process.env.CORS_ORIGIN;
+// the live site, plus the preview site (preview branch) so it can try changes against this API
+const previewSite = (process.env.PREVIEW_SITE_URL || 'https://preview.chessscout.net').replace(/\/+$/, '');
 app.use(cors({
-  origin: corsOrigin ? [corsOrigin] : true,
+  origin: corsOrigin ? [corsOrigin, previewSite] : true,
   credentials: true,
 }));
 app.use(cookieParser());

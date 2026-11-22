@@ -1461,7 +1461,7 @@ export function attachLiveServer(server: HttpServer) {
     if (!t) return null;
     try { return t.includes('://') ? new URL(t).host : t.toLowerCase(); } catch { return null; }
   };
-  const allowedHosts = new Set<string>(['chessscout.net', 'www.chessscout.net']);
+  const allowedHosts = new Set<string>(['chessscout.net', 'www.chessscout.net', 'preview.chessscout.net']);
   for (const src of [process.env.LIVE_WS_ALLOWED_ORIGINS, process.env.CORS_ORIGIN]) {
     if (!src) continue;
     for (const part of src.split(',')) { const h = toHost(part); if (h) allowedHosts.add(h.toLowerCase()); }

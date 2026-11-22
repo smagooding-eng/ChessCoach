@@ -19,6 +19,12 @@ import {
 } from "../lib/auth";
 
 const FRONTEND_URL = process.env.CORS_ORIGIN || "";
+// The preview site (preview branch). Sign-ins started there return there instead of the live site.
+const PREVIEW_SITE = (process.env.PREVIEW_SITE_URL || "https://preview.chessscout.net").replace(/\/+$/, "");
+/** The sign-in was started from the preview site (the browser's Referer for this request). */
+function fromPreviewSite(req: Request): boolean {
+  try { return !!req.headers.referer && new URL(String(req.headers.referer)).origin === PREVIEW_SITE; } catch { return false; }
+}
 
 const router: IRouter = Router();
 
@@ -399,7 +405,7 @@ router.get("/auth/google", (req: Request, res: Response) => {
     access_type: "offline",
     prompt: "select_account",
     // ref:CODE and/or app (the Play app), so the return trip can say where it started.
-    state: [refCode ? `ref:${refCode}` : '', req.query.app === '1' ? 'app' : '', validHandoffCode(req.query.h) ? `h:${req.query.h}` : ''].filter(Boolean).join(';') || 'none',
+    state: [refCode ? `ref:${refCode}` : '', req.query.app === '1' ? 'app' : '', validHandoffCode(req.query.h) ? `h:${req.query.h}` : '', fromPreviewSite(req) ? 'site:preview' : ''].filter(Boolean).join(';') || 'none',
   });
 
   res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
@@ -534,7 +540,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const callbackOrigin = getOrigin(req);
-  const frontendOrigin = FRONTEND_URL || callbackOrigin;
+  const frontendOrigin = String(req.query.state ?? "").split(";").includes("site:preview") ? PREVIEW_SITE : (FRONTEND_URL || callbackOrigin);
 
   if (!code || !clientId || !clientSecret) {
     sendClientRedirect(res, frontendOrigin + "/?error=google_auth_failed");
@@ -607,7 +613,7 @@ router.get("/auth/google/callback", async (req: Request, res: Response) => {
 // Lichess's own sign-in (OAuth with PKCE; no app registration needed). Finds the
 // account by Lichess id, then by email (linking it), or creates one with the
 // Lichess username already linked, so their games are ready to import.
-const lichessPending = new Map<string, { verifier: string; ref: string; app: boolean; at: number; h: string | null }>();
+const lichessPending = new Map<string, { verifier: string; ref: string; app: boolean; at: number; h: string | null; preview?: boolean }>();
 let lichessColumn: Promise<void> | null = null;
 const ensureLichessColumn = () => (lichessColumn ??= db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS lichess_id varchar`).then(() => undefined).catch((err) => { lichessColumn = null; throw err; }));
 const b64url = (b: Buffer) => b.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -617,7 +623,7 @@ router.get("/auth/lichess", (req: Request, res: Response) => {
   const verifier = b64url(crypto.randomBytes(32));
   const challenge = b64url(crypto.createHash("sha256").update(verifier).digest());
   const state = b64url(crypto.randomBytes(16));
-  lichessPending.set(state, { verifier, ref: String(req.query.ref ?? "").slice(0, 40), app: req.query.app === "1", at: Date.now(), h: validHandoffCode(req.query.h) ? String(req.query.h) : null });
+  lichessPending.set(state, { verifier, ref: String(req.query.ref ?? "").slice(0, 40), app: req.query.app === "1", at: Date.now(), h: validHandoffCode(req.query.h) ? String(req.query.h) : null, preview: fromPreviewSite(req) });
   const params = new URLSearchParams({
     response_type: "code", client_id: "chessscout.net", redirect_uri: `${getOrigin(req)}/api/auth/lichess/callback`,
     // board:play too: signing in with Lichess also connects it for playing (no second step)
@@ -627,10 +633,10 @@ router.get("/auth/lichess", (req: Request, res: Response) => {
 });
 
 router.get("/auth/lichess/callback", async (req: Request, res: Response) => {
-  const frontendOrigin = FRONTEND_URL || getOrigin(req);
-  const fail = () => sendClientRedirect(res, frontendOrigin + "/?error=lichess_auth_failed");
   const state = String(req.query.state ?? ""); const code = String(req.query.code ?? "");
   const pending = lichessPending.get(state); lichessPending.delete(state);
+  const frontendOrigin = pending?.preview ? PREVIEW_SITE : (FRONTEND_URL || getOrigin(req));
+  const fail = () => sendClientRedirect(res, frontendOrigin + "/?error=lichess_auth_failed");
   if (!pending || !code) { fail(); return; }
   try {
     const tokenRes = await fetch("https://lichess.org/api/token", {
