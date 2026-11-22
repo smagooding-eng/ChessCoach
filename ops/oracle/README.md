@@ -16,10 +16,10 @@ Everything below runs from **Git Bash on your PC** with `bash ~/Desktop/ChessCoa
 
 1. Install the free **ntfy** app on your phone (Play Store / App Store).
 2. Make up a private topic name, e.g. `chessscout-alerts-` plus 12 random letters/numbers. In ntfy, tap **+** and subscribe to it.
-3. Cloudflare → Workers & Pages → **chesscoach1** → Settings → Variables and secrets → **Add** → type *Secret*:
+3. Cloudflare → Workers & Pages → **chesscoach** → Settings → Variables and secrets → **Add** → type *Secret*:
    - `NTFY_TOPIC` = your topic name
    - optional `ALERT_EMAIL` = your email (ntfy forwards each alert)
-4. Push anything (or redeploy) so the cron trigger is active. From then on, every minute Cloudflare checks the API **and its database**:
+4. chesscoach → Settings → **Trigger events** → Add → Cron trigger → **Every minute**. From then on, every minute Cloudflare checks the API **and its database**:
    - **"ChessScout is DOWN"** (urgent) after two failed checks 15 s apart
    - a reminder every 30 min while it stays down
    - **"ChessScout is back up"** when it recovers
@@ -34,15 +34,13 @@ Everything below runs from **Git Bash on your PC** with `bash ~/Desktop/ChessCoa
 
 ### Setting up `preview.chessscout.net` (once)
 
-Cloudflare → Workers & Pages → **Create** → Import a repository → `ChessCoach`:
+**Done (Nov 22).** For reference, the setup is:
 
-- **Project name:** `chesscoach-preview`
-- **Production branch:** `preview`
-- **Build command:** same as chesscoach1's
-- **Deploy command:** `npx wrangler deploy --name chesscoach-preview --var API_URL:https://api-preview.chessscout.net`
-- **Build variables:** `PREVIEW_API_URL=https://api-preview.chessscout.net` (add this once the Oracle preview server is running)
-- **Settings → Domains & Routes:** add the custom domain `preview.chessscout.net`
-- Don't give it the `NTFY_TOPIC` secret, so only the live Worker sends alerts.
+- Worker **chesscoachpreview**, production branch `preview`, builds for other branches off (same on **chesscoach**, so it only builds `main`)
+- Build command: same as chesscoach's. Deploy command: `npx wrangler deploy --name chesscoach-preview`
+- Build variable `SKIP_DEPENDENCY_INSTALL` (as on chesscoach); add `PREVIEW_API_URL=https://api-preview.chessscout.net` once the Oracle preview server is running
+- `preview.chessscout.net`: a route `preview.chessscout.net/*` on the chessscout.net zone, plus a proxied DNS record `AAAA preview → 100::`
+- No `NTFY_TOPIC` or cron on it, so only the live Worker sends alerts.
 
 Signing in on preview: in Google Cloud Console → Credentials → your OAuth client, add the redirect URI `https://api-preview.chessscout.net/api/auth/google/callback`.
 
@@ -74,7 +72,8 @@ Check any time with `pc.sh status` and `pc.sh logs prod`.
 ## D. Move day
 
 **A week before:**
-- Set the window in `artifacts/chess-coach/public/maintenance.json`, e.g. `"start": "2026-12-06T02:00:00-05:00"`, `"end": "2026-12-06T03:00:00-05:00"`, and push. Members see a banner in their own time zone for 7 days, and an "upgrading" screen during the window. It goes away by itself when the API answers again.
+- A general "sometime this week" banner is up until Nov 30 (`notice` / `until` in `artifacts/chess-coach/public/maintenance.json`).
+- Once the day is set, put the window in that file, e.g. `"start": "2026-12-06T02:00:00-05:00"`, `"end": "2026-12-06T03:00:00-05:00"`, and push. Members see a banner in their own time zone for 7 days, and an "upgrading" screen during the window. It goes away by itself when the API answers again.
 - In Google Cloud Console, add the redirect URI `https://api.chessscout.net/api/auth/google/callback` (keep the Render one until the end).
 - In Stripe, add a webhook endpoint `https://api.chessscout.net/api/stripe/webhook` with the same events as the Render one. Note its signing secret.
 
