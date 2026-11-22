@@ -80,7 +80,7 @@ export function trialOfferHtml(name: string | null, unsubUrl: string): string {
     subtitle: 'Get every Pro feature now and see if it helps your chess before you pay anything.',
     body: [
       emailFeatures(PRO_FEATURES),
-      emailP(`Add a card to start. You won't be charged during the ${TRIAL_DAYS} days. After that, Pro continues at your plan's normal price and your card is billed automatically, unless you cancel before the trial ends (one tap in <strong style="color:${EMAIL.text};">Profile &rsaquo; Manage subscription</strong>).`, { center: true, mb: 22 }),
+      emailP(`Add a card to start. You won't be charged during the ${TRIAL_DAYS} days. After that, Pro continues at your plan's normal price and your card is billed automatically, unless you cancel before the trial ends. Cancelling during the trial ends Pro right away.`, { center: true, mb: 22 }),
     ].join(''),
     cta: { label: `Start my ${TRIAL_DAYS} free days &rarr;`, href: `${EMAIL.site}/subscription?offer=trial&from=email` },
     footerNote: 'One free trial per account. We only send this email once.',

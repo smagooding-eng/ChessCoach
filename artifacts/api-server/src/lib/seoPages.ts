@@ -253,7 +253,7 @@ export const SEO_PAGES: SeoPage[] = [
     ],
     faq: [
       { q: "Can I cancel anytime?", a: "Yes, from your account settings, with no phone call and no retention flow." },
-      { q: "Is there a free trial?", a: "Yes: 3 days of Pro free. A card is needed to start it; you're not charged for 3 days, then it's $5 a month unless you cancel, which takes one tap." },
+      { q: "Is there a free trial?", a: "Yes: 3 days of Pro free. A card is needed to start it; you're not charged for 3 days, then it's $5 a month unless you cancel. Cancelling during the trial ends Pro right away." },
     ],
     cta: { label: "Get started free", href: SIGNUP },
     related: ["chess-game-analysis", "play-chess-online", "scout-chess-opponent"],

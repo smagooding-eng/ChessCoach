@@ -130,6 +130,25 @@ export function Subscription() {
   };
 
   const [portalError, setPortalError] = useState('');
+  // A trial on the "cancelling ends it" terms: confirm before Stripe's page, which can't say so
+  const [trialTerms, setTrialTerms] = useState<{ trialEnd: number } | null>(null);
+  const [trialAsk, setTrialAsk] = useState(false);
+  const [trialCancelBusy, setTrialCancelBusy] = useState(false);
+  useEffect(() => {
+    if (!isAuthenticated || !isPremium) { setTrialTerms(null); return; }
+    apiFetch('/api/stripe/trial-status', { credentials: 'include' }).then(r => r.json())
+      .then(d => setTrialTerms(d?.trialing && d.cancelEndsTrial ? { trialEnd: Number(d.trialEnd) } : null)).catch(() => {});
+  }, [isAuthenticated, isPremium]);
+  const cancelTrialNow = async () => {
+    setTrialCancelBusy(true); setPortalError('');
+    try {
+      const r = await apiFetch('/api/stripe/cancel-trial', { method: 'POST', credentials: 'include' });
+      const d = await r.json();
+      if (d.canceled) window.location.reload();
+      else setPortalError(d.error || 'Could not cancel the trial. Please try again.');
+    } catch { setPortalError('Connection error. Please try again.'); }
+    finally { setTrialCancelBusy(false); }
+  };
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [checkoutError, setCheckoutError] = useState('');
 
@@ -283,8 +302,19 @@ export function Subscription() {
               ))}
             </div>
 
+            {trialAsk && trialTerms ? (
+              <div className="mb-3 rounded-xl p-4 text-sm" style={{ background: '#302e2b', border: '1px solid rgba(255,255,255,.08)' }}>
+                <p className="font-bold">Cancel your free trial?</p>
+                <p className="mt-1 text-muted-foreground">Cancelling during the trial ends Pro right away. You won't be charged. Your trial otherwise runs until {new Date(trialTerms.trialEnd * 1000).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}.</p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button onClick={() => setTrialAsk(false)} className="rounded-lg bg-primary px-3 py-2.5 font-bold text-primary-foreground">Keep my trial</button>
+                  <button onClick={cancelTrialNow} disabled={trialCancelBusy} className="rounded-lg bg-secondary px-3 py-2.5 font-bold disabled:opacity-60">{trialCancelBusy ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : 'Cancel now'}</button>
+                </div>
+                <button onClick={handlePortal} disabled={portalLoading} className="mt-2 w-full text-center text-xs font-bold text-muted-foreground">Update card or billing details instead</button>
+              </div>
+            ) : null}
             <button
-              onClick={handlePortal}
+              onClick={trialTerms && !trialAsk ? () => setTrialAsk(true) : handlePortal}
               disabled={portalLoading}
               className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-secondary hover:bg-secondary/80 transition-colors font-bold text-sm"
             >
@@ -309,7 +339,7 @@ export function Subscription() {
               <p className="text-[11px] font-extrabold uppercase tracking-[0.16em]" style={{ color: '#E8B447' }}>Free trial</p>
               <h3 className="mt-1 text-xl font-black">Try Pro free for {trialOffer.days} days</h3>
               <p className="mt-1.5 text-sm text-muted-foreground">
-                Add a card to start. You won't be charged during the {trialOffer.days} days. After that, Pro continues at ${(monthlyPrice.unit_amount / 100).toFixed(0)}/month and your card is billed automatically, unless you cancel before the trial ends.
+                Add a card to start. You won't be charged during the {trialOffer.days} days. After that, Pro continues at ${(monthlyPrice.unit_amount / 100).toFixed(0)}/month and your card is billed automatically, unless you cancel before the trial ends. Cancelling during the trial ends Pro right away.
               </p>
               <button onClick={() => startTrial(monthlyPrice.id)} disabled={trialLoading}
                 className="mt-4 w-full sm:w-auto inline-flex items-center justify-center gap-2 btn-primary text-sm py-3 px-6 disabled:opacity-60">
