@@ -56,6 +56,16 @@ async function trackSubscriptionEventBestEffort(payload: Buffer, signature: stri
       return;
     }
 
+    // Trials on the newer terms end as soon as they're set to cancel (e.g. in Stripe's portal):
+    // the checkout says "Cancelling during the trial ends Pro right away". Older trials keep their days.
+    if (event.type === "customer.subscription.updated") {
+      const sub = event.data.object as any;
+      if (sub?.status === "trialing" && sub?.metadata?.cancel_ends_trial === "1" && (sub.cancel_at_period_end || sub.cancel_at)) {
+        await stripe.subscriptions.cancel(sub.id).catch((err: any) => console.error("Ending cancelled trial failed:", err?.message));
+      }
+      return;
+    }
+
     if (event.type === "customer.subscription.created") {
       const sub = event.data.object as any;
       const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;

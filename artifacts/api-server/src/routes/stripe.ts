@@ -418,8 +418,10 @@ router.post('/stripe/checkout-trial', async (req: Request, res: Response) => {
       subscription_data: {
         trial_period_days: TRIAL_DAYS,
         trial_settings: { end_behavior: { missing_payment_method: 'cancel' } },
-        metadata: { offer: 'free_trial' },
+        // trials started from here end as soon as they're cancelled (see cancelEndsTrial)
+        metadata: { offer: 'free_trial', cancel_ends_trial: '1' },
       },
+      custom_text: { submit: { message: `Free for ${TRIAL_DAYS} days, then billed automatically. Cancelling during the trial ends Pro right away.` } },
       success_url: `${origin}${basePath}/subscription?success=true&trial=1`,
       cancel_url: `${origin}${basePath}/subscription?offer=trial`,
     });
@@ -429,6 +431,40 @@ router.post('/stripe/checkout-trial', async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('Trial checkout error:', err?.message);
     res.status(500).json({ error: 'Could not start the free trial. Please try again.' });
+  }
+});
+
+// A trial on the "cancelling ends it" terms (new trials from Nov 22, 2026), for the in-app
+// confirmation before Manage Subscription.
+async function currentTrial(userId: string) {
+  const user = await storage.getUser(userId);
+  if (!user?.stripeCustomerId) return null;
+  const stripe = await getUncachableStripeClient();
+  const subs = await stripe.subscriptions.list({ customer: user.stripeCustomerId, status: 'trialing', limit: 5 });
+  return subs.data.find((x) => x.metadata?.cancel_ends_trial === '1') ?? null;
+}
+
+router.get('/stripe/trial-status', async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) { res.json({ trialing: false }); return; }
+  try {
+    const t = await currentTrial(req.user.id);
+    res.json(t ? { trialing: true, cancelEndsTrial: true, trialEnd: t.trial_end } : { trialing: false });
+  } catch {
+    res.json({ trialing: false });
+  }
+});
+
+router.post('/stripe/cancel-trial', async (req: Request, res: Response) => {
+  if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
+  try {
+    const t = await currentTrial(req.user.id);
+    if (!t) { res.status(400).json({ error: 'No free trial to cancel.' }); return; }
+    const stripe = await getUncachableStripeClient();
+    await stripe.subscriptions.cancel(t.id);
+    res.json({ canceled: true });
+  } catch (err: any) {
+    console.error('Cancel trial error:', err?.message);
+    res.status(500).json({ error: 'Could not cancel the trial. Please try again.' });
   }
 });
 

@@ -149,7 +149,7 @@ export function TrialPromo() {
           </button>
           {err && <p className="mt-2 text-[12.5px]" style={{ color: '#FF9DA2' }}>{err}</p>}
           <p className="tp-in mt-3 text-[12px] leading-snug" style={{ color: '#87918E', animationDelay: '.56s' }}>
-            Card required to start. You won’t be charged for {days} days, {after}. Cancel any time before then in one tap.
+            Card required to start. You won’t be charged for {days} days, {after}. Cancelling during the trial ends Pro right away.
           </p>
           <button onClick={close} className="tp-in mt-2 text-[13.5px] font-bold" style={{ color: '#AEB6B3', animationDelay: '.6s' }}>Maybe later</button>
         </div>
