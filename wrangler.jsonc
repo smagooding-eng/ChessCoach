@@ -26,7 +26,7 @@
     ]
   },
   "vars": { "API_URL": "https://chesscoach-api-kbf8.onrender.com" },
-  // Uptime alerts every minute (cloudflare/api/monitor.ts). Needs the NTFY_TOPIC secret to send anything.
-  "triggers": { "crons": ["* * * * *"] },
+  // Uptime alerts (cloudflare/api/monitor.ts) run on a cron trigger added in the Cloudflare
+  // dashboard (Settings → Trigger events), not here: with it in this file the build failed.
   "observability": { "enabled": true }
 }
