@@ -1,4 +1,5 @@
 import { SocialLinks } from '@/components/SocialLinks';
+import { MaintenanceBanner } from '@/components/MaintenanceNotice';
 import { NotifyPrompt } from '@/components/play/NotifyPrompt';
 import React, { useEffect, useRef, useState } from 'react';
 import { autoImportLinkedAccounts } from '@/lib/autoImport';
@@ -97,6 +98,7 @@ export function Dashboard() {
   return (
     <div className="space-y-4 md:space-y-5">
       <EmailVerifyBanner />
+      <MaintenanceBanner />
       <NotifyPrompt id="home" reason="Get a heads-up when your games are reviewed, a friend challenges you, or it's your move in a daily game." />
       <ChallengeInbox />
       <ActiveGamesCard />

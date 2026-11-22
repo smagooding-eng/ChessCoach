@@ -28,17 +28,11 @@ const timeOnly = (d: Date) => d.toLocaleTimeString(undefined, { hour: 'numeric',
 export function MaintenanceNotice() {
   const plan = useMaintenance();
   const [now, setNow] = useState(Date.now());
-  const [hidden, setHidden] = useState(false);
-  const noticeKey = plan?.notice ? `cs_notice_hidden:${plan.notice}` : '';
-  const [noticeHidden, setNoticeHidden] = useState(false);
-  useEffect(() => { try { setNoticeHidden(!!noticeKey && localStorage.getItem(noticeKey) === '1'); } catch { /* storage off */ } }, [noticeKey]);
-  const hideNotice = () => { setNoticeHidden(true); try { localStorage.setItem(noticeKey, '1'); } catch { /* storage off */ } };
   useEffect(() => { const t = window.setInterval(() => setNow(Date.now()), 30_000); return () => window.clearInterval(t); }, []);
   const start = plan ? new Date(plan.start) : null, end = plan ? new Date(plan.end) : null;
   const valid = !!start && !!end && !isNaN(+start) && !isNaN(+end);
   const inWindow = valid && now >= +start! && now < +end!;
   const overrun = valid && now >= +end! && now < +end! + 60 * 60_000; // up to an hour over, until the server is back
-  const before = valid && now < +start! && +start! - now < 7 * 86400_000;
 
   // After the planned end: is the server answering? (checked right away, then every 20 s)
   const [apiOk, setApiOk] = useState<boolean | null>(null);
@@ -56,18 +50,7 @@ export function MaintenanceNotice() {
   // the screen was up and the server is back: fresh app
   useEffect(() => { if (shown && !showScreen && apiOk) window.location.reload(); }, [shown, showScreen, apiOk]);
 
-  const untilT = plan?.until ? +new Date(plan.until) : NaN;
-  const noticeOn = !!plan?.notice && !noticeHidden && (isNaN(untilT) || now < untilT);
-  if (!valid) {
-    if (!noticeOn) return null;
-    return (
-      <div className="fixed inset-x-0 top-0 z-[120] flex items-center justify-center gap-3 px-3 py-2 text-[12.5px]" style={{ background: '#0D1516', borderBottom: '1px solid rgba(255,255,255,.08)', color: TEXT, paddingTop: 'max(8px, env(safe-area-inset-top))' }} role="status">
-        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: '#E8A23A' }} aria-hidden="true" />
-        <span className="min-w-0">{plan!.notice}</span>
-        <button type="button" onClick={hideNotice} className="shrink-0 rounded-md px-2 py-0.5 text-[12px] font-bold" style={{ color: MUTED }} aria-label="Hide">✕</button>
-      </div>
-    );
-  }
+  if (!valid) return null;
   if (showScreen) {
     return (
       <div className="fixed inset-0 z-[200] flex items-center justify-center p-6" style={{ background: '#050A0B', color: TEXT }} role="status">
@@ -84,16 +67,29 @@ export function MaintenanceNotice() {
       </div>
     );
   }
-  if (before && !hidden) {
-    return (
-      <div className="fixed inset-x-0 top-0 z-[120] flex items-center justify-center gap-3 px-3 py-2 text-[12.5px]" style={{ background: '#0D1516', borderBottom: '1px solid rgba(255,255,255,.08)', color: TEXT, paddingTop: 'max(8px, env(safe-area-inset-top))' }} role="status">
-        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: '#E8A23A' }} aria-hidden="true" />
-        <span className="min-w-0">
-          <b>Scheduled upgrade:</b> ChessScout will be offline {when(start!)} – {timeOnly(end!)} (your time). {plan!.message}
-        </span>
-        <button type="button" onClick={() => setHidden(true)} className="shrink-0 rounded-md px-2 py-0.5 text-[12px] font-bold" style={{ color: MUTED }} aria-label="Hide">✕</button>
-      </div>
-    );
-  }
   return null;
+}
+
+// The heads-up card, shown in the page (Home) rather than over it: a general notice ("sometime this
+// week") or, from 7 days before a set window, the exact time in the member's own time zone.
+export function MaintenanceBanner({ className = '' }: { className?: string }) {
+  const plan = useMaintenance();
+  const [now] = useState(Date.now());
+  const start = plan?.start ? new Date(plan.start) : null, end = plan?.end ? new Date(plan.end) : null;
+  const timed = !!start && !!end && !isNaN(+start) && !isNaN(+end) && now < +start && +start - now < 7 * 86400_000;
+  const untilT = plan?.until ? +new Date(plan.until) : NaN;
+  const general = !!plan?.notice && !(start && end) && (isNaN(untilT) || now < untilT);
+  const text = timed ? `ChessScout will be offline ${when(start!)} – ${timeOnly(end!)} (your time). ${plan!.message ?? ''}` : general ? plan!.notice! : '';
+  const key = text ? `cs_notice_hidden:${text}` : '';
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => { try { setHidden(!!key && localStorage.getItem(key) === '1'); } catch { /* storage off */ } }, [key]);
+  if (!text || hidden) return null;
+  const hide = () => { setHidden(true); try { localStorage.setItem(key, '1'); } catch { /* storage off */ } };
+  return (
+    <div className={`flex items-start gap-3 rounded-2xl px-3.5 py-3 ${className}`} style={{ background: '#302e2b', border: '1px solid rgba(255,255,255,.08)', color: TEXT }} role="status">
+      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: '#E8A23A' }} aria-hidden="true" />
+      <p className="min-w-0 flex-1 text-[12.5px] leading-snug">{timed && <b>Scheduled upgrade: </b>}{text}</p>
+      <button type="button" onClick={hide} className="shrink-0 rounded-md p-1 text-[12px] font-bold" style={{ color: MUTED }} aria-label="Hide">✕</button>
+    </div>
+  );
 }
