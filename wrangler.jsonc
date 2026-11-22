@@ -26,7 +26,7 @@
     ]
   },
   "vars": { "API_URL": "https://chesscoach-api-kbf8.onrender.com" },
-  // Uptime alerts (cloudflare/api/monitor.ts) run on a cron trigger added in the Cloudflare
-  // dashboard (Settings → Trigger events), not here: with it in this file the build failed.
+  // Uptime alerts (cloudflare/api/monitor.ts) run on the every-minute cron trigger set in the
+  // Cloudflare dashboard (chesscoach → Settings → Trigger events). The preview Worker has none.
   "observability": { "enabled": true }
 }
