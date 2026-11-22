@@ -418,7 +418,8 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
         </nav>
 
         <div className="p-2.5" style={{ borderTop: `1px solid ${BORDER_COLOR}` }}>
-          {freePlan && (
+          {/* not during setup: linking comes first */}
+          {freePlan && location !== '/welcome' && (
             <Link href="/subscription" className="mb-2 flex items-center gap-2 rounded-xl px-3 py-2.5 text-[12.5px] font-extrabold transition-transform active:scale-[.98]"
               style={{ background: 'linear-gradient(180deg,#F2C560,#D99A24)', color: '#1A1205' }}>
               <Crown className="w-4 h-4" /> Go Pro
@@ -632,7 +633,7 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
                 <button onClick={closeMore} aria-label="Close menu" className="grid h-8 w-8 place-items-center rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: TEXT_MUTED }}><X className="h-4 w-4" /></button>
               </div>
               <nav className="overflow-y-auto overscroll-contain px-3 pt-1 pb-[calc(1.5rem+env(safe-area-inset-bottom))]" onPointerDownCapture={(e) => e.stopPropagation()}>
-                {freePlan && (
+                {freePlan && location !== '/welcome' && (
                   <Link href="/subscription" replace className="mb-3 block">
                     <div className="flex items-center gap-3 rounded-xl px-3.5 py-3" style={{ background: '#0D1516', border: '1px solid rgba(255,255,255,.08)' }}>
                       <Crown className="w-5 h-5" style={{ color: '#E8B447' }} />

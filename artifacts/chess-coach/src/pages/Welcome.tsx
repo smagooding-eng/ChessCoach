@@ -131,6 +131,10 @@ export function Welcome() {
           <p className="text-sm" style={{ color: TEXT_MUTED }}>
             Link your Chess.com or Lichess account so your coach can start on your real games. You can also pick a ChessScout.net username.
           </p>
+          {/* "Is it free?" answered here, so nobody has to leave setup to find out */}
+          <p className="mx-auto max-w-sm rounded-xl px-3 py-2 text-[12px] leading-snug" style={{ background: '#0D1516', border: '1px solid rgba(255,255,255,.08)', color: TEXT_MUTED }}>
+            <b style={{ color: TEXT_LIGHT }}>Free to use:</b> game reviews, puzzles and live play. Pro ($5/mo) adds your coach’s explanations, courses and scouting reports.
+          </p>
         </div>
 
         {pendingCode && (
