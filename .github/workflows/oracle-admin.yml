@@ -1,0 +1,81 @@
+# Runs the Oracle server steps (ops/oracle) from GitHub, so no PC / Git Bash is needed.
+# GitHub → Actions → "Oracle server" → Run workflow → pick a step.
+# Secrets (Settings → Secrets and variables → Actions):
+#   ORACLE_HOST       the server's public IP
+#   ORACLE_ADMIN_KEY  the private key Oracle generated when the server was created (the whole file)
+#   RENDER_API_KEY    Render → Account settings → API keys (to copy settings and the Neon address)
+#   NTFY_TOPIC        your alert topic (for the server's disk / backup warnings)
+# The repo is public, so these steps never print settings or row counts, only summaries.
+name: Oracle server
+on:
+  workflow_dispatch:
+    inputs:
+      step:
+        description: Step to run
+        required: true
+        type: choice
+        options: [check, setup, settings, alerts, deploy-preview, deploy-prod, practice-migrate, refresh-preview, status]
+concurrency: { group: oracle-admin, cancel-in-progress: false }
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Connect
+        env:
+          HOST: ${{ secrets.ORACLE_HOST }}
+          KEY: ${{ secrets.ORACLE_ADMIN_KEY }}
+        run: |
+          [ -n "$HOST" ] && [ -n "$KEY" ] || { echo "::error::Add the ORACLE_HOST and ORACLE_ADMIN_KEY secrets first."; exit 1; }
+          mkdir -p ~/.ssh && printf '%s\n' "$KEY" | tr -d '\r' > ~/.ssh/k && chmod 600 ~/.ssh/k
+          echo "SSH=ssh -i $HOME/.ssh/k -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ConnectTimeout=20 ubuntu@$HOST" >> "$GITHUB_ENV"
+      - name: Render settings
+        if: inputs.step == 'settings' || inputs.step == 'practice-migrate'
+        env: { RK: "${{ secrets.RENDER_API_KEY }}" }
+        run: |
+          [ -n "$RK" ] || { echo "::error::Add the RENDER_API_KEY secret first."; exit 1; }
+          H=(-H "Authorization: Bearer $RK" -H "Accept: application/json")
+          SID=$(curl -fsS "${H[@]}" "https://api.render.com/v1/services?name=chesscoach-api&limit=1" | jq -r '.[0].service.id')
+          [ -n "$SID" ] && [ "$SID" != null ] || { echo "::error::Couldn't find the chesscoach-api service on Render."; exit 1; }
+          umask 077; : > /tmp/render.env; C=""
+          while :; do
+            J=$(curl -fsS "${H[@]}" "https://api.render.com/v1/services/$SID/env-vars?limit=100${C:+&cursor=$C}")
+            echo "$J" | jq -r '.[].envVar | "\(.key)=\(.value)"' >> /tmp/render.env
+            [ "$(echo "$J" | jq length)" -lt 100 ] && break; C=$(echo "$J" | jq -r '.[-1].cursor')
+          done
+          while IFS= read -r l; do v=${l#*=}; [ ${#v} -ge 6 ] && echo "::add-mask::$v"; done < /tmp/render.env
+          echo "Got $(wc -l < /tmp/render.env) settings from Render."
+          grep -q '^DATABASE_URL=' /tmp/render.env || echo "::warning::No DATABASE_URL among the service's own settings (it may be in an environment group)."
+      - name: Copy scripts
+        run: |
+          $SSH "sudo mkdir -p /opt/chessscout/ops && sudo chown -R ubuntu:ubuntu /opt/chessscout"
+          scp -q -i ~/.ssh/k -o StrictHostKeyChecking=accept-new ops/oracle/*.sh ops/oracle/server.conf "ubuntu@${{ secrets.ORACLE_HOST }}:/opt/chessscout/ops/"
+          $SSH "sed -i 's/\r\$//' /opt/chessscout/ops/*.sh /opt/chessscout/ops/server.conf && chmod +x /opt/chessscout/ops/*.sh"
+      - name: Run
+        env:
+          STEP: ${{ inputs.step }}
+          TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: |
+          case "$STEP" in
+            check) $SSH "uname -m; lsb_release -ds; nproc; free -g | awk '/Mem/{print \$2\" GB memory\"}'; df -h / | tail -1";;
+            setup) $SSH "sudo bash /opt/chessscout/ops/01-setup.sh";;
+            settings)
+              scp -q -i ~/.ssh/k /tmp/render.env "ubuntu@${{ secrets.ORACLE_HOST }}:/tmp/render.env"
+              $SSH "bash /opt/chessscout/ops/apply-env.sh /tmp/render.env; shred -u /tmp/render.env";;
+            alerts)
+              [ -n "$TOPIC" ] || { echo "::error::Add the NTFY_TOPIC secret first."; exit 1; }
+              printf 'NTFY_TOPIC=%s\n' "$TOPIC" | $SSH "umask 077; cat > /opt/chessscout/alerts.conf" && echo "Saved.";;
+            deploy-preview) $SSH "bash /opt/chessscout/ops/deploy.sh preview";;
+            deploy-prod) $SSH "bash /opt/chessscout/ops/deploy.sh prod";;
+            practice-migrate)
+              N=$(grep '^DATABASE_URL=' /tmp/render.env | head -1 | cut -d= -f2-)
+              [ -n "$N" ] || { echo "::error::No Neon address found in Render's settings."; exit 1; }
+              # summary only: the repo (and so this log) is public
+              printf '%s\n' "$N" | $SSH "bash /opt/chessscout/ops/migrate.sh" 2>&1 | grep -E '^==|All tables match|table\(s\) differ|differs|ERROR|error' | sed -E 's/^([a-z_]+) +[0-9?]+ +[0-9]+ +<- differs/\1: differs/';;
+            refresh-preview) $SSH "bash /opt/chessscout/ops/refresh-preview.sh" 2>&1 | tail -5;;
+            status) $SSH "docker ps --format '{{.Names}}  {{.Status}}'; df -h / | tail -1; ls -1t /var/backups/chessscout/hourly 2>/dev/null | head -1";;
+          esac
+      - name: Clean up
+        if: always()
+        run: rm -f ~/.ssh/k /tmp/render.env
