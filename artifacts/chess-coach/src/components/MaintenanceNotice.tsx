@@ -5,7 +5,8 @@
 import { useEffect, useState } from 'react';
 import { apiUrl } from '@/lib/api';
 
-type Plan = { start: string; end: string; message?: string };
+// notice (+ optional until, a date): a general heads-up banner with no set time, e.g. "sometime this week"
+type Plan = { start: string; end: string; message?: string; notice?: string; until?: string };
 const G = '#81B64C', TEXT = '#F5F7F6', MUTED = '#87918E';
 
 function useMaintenance(): Plan | null {
@@ -13,7 +14,7 @@ function useMaintenance(): Plan | null {
   useEffect(() => {
     let live = true;
     const load = () => fetch(`${import.meta.env.BASE_URL}maintenance.json?t=${Math.floor(Date.now() / 300_000)}`, { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null)).then((p: Plan | null) => { if (live) setPlan(p?.start && p?.end ? p : null); }).catch(() => {});
+      .then((r) => (r.ok ? r.json() : null)).then((p: Plan | null) => { if (live) setPlan((p?.start && p?.end) || p?.notice ? p : null); }).catch(() => {});
     void load();
     const t = window.setInterval(load, 10 * 60_000);
     return () => { live = false; window.clearInterval(t); };
@@ -28,6 +29,10 @@ export function MaintenanceNotice() {
   const plan = useMaintenance();
   const [now, setNow] = useState(Date.now());
   const [hidden, setHidden] = useState(false);
+  const noticeKey = plan?.notice ? `cs_notice_hidden:${plan.notice}` : '';
+  const [noticeHidden, setNoticeHidden] = useState(false);
+  useEffect(() => { try { setNoticeHidden(!!noticeKey && localStorage.getItem(noticeKey) === '1'); } catch { /* storage off */ } }, [noticeKey]);
+  const hideNotice = () => { setNoticeHidden(true); try { localStorage.setItem(noticeKey, '1'); } catch { /* storage off */ } };
   useEffect(() => { const t = window.setInterval(() => setNow(Date.now()), 30_000); return () => window.clearInterval(t); }, []);
   const start = plan ? new Date(plan.start) : null, end = plan ? new Date(plan.end) : null;
   const valid = !!start && !!end && !isNaN(+start) && !isNaN(+end);
@@ -51,7 +56,18 @@ export function MaintenanceNotice() {
   // the screen was up and the server is back: fresh app
   useEffect(() => { if (shown && !showScreen && apiOk) window.location.reload(); }, [shown, showScreen, apiOk]);
 
-  if (!valid) return null;
+  const untilT = plan?.until ? +new Date(plan.until) : NaN;
+  const noticeOn = !!plan?.notice && !noticeHidden && (isNaN(untilT) || now < untilT);
+  if (!valid) {
+    if (!noticeOn) return null;
+    return (
+      <div className="fixed inset-x-0 top-0 z-[120] flex items-center justify-center gap-3 px-3 py-2 text-[12.5px]" style={{ background: '#0D1516', borderBottom: '1px solid rgba(255,255,255,.08)', color: TEXT, paddingTop: 'max(8px, env(safe-area-inset-top))' }} role="status">
+        <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: '#E8A23A' }} aria-hidden="true" />
+        <span className="min-w-0">{plan!.notice}</span>
+        <button type="button" onClick={hideNotice} className="shrink-0 rounded-md px-2 py-0.5 text-[12px] font-bold" style={{ color: MUTED }} aria-label="Hide">✕</button>
+      </div>
+    );
+  }
   if (showScreen) {
     return (
       <div className="fixed inset-0 z-[200] flex items-center justify-center p-6" style={{ background: '#050A0B', color: TEXT }} role="status">
