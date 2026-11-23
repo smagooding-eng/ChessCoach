@@ -1,0 +1,14 @@
+# Sends a test alert to your phone through ntfy, using the NTFY_TOPIC secret.
+# GitHub → Actions → "Test phone alert" → Run workflow.
+name: Test phone alert
+on: { workflow_dispatch: {} }
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - env: { TOPIC: "${{ secrets.NTFY_TOPIC }}" }
+        run: |
+          [ -n "$TOPIC" ] || { echo "::error::The NTFY_TOPIC secret isn't set."; exit 1; }
+          echo "Topic: ${#TOPIC} characters$(printf '%s' "$TOPIC" | grep -q '[[:space:]]' && echo ', CONTAINS A SPACE (remove it)')"
+          code=$(curl -s -o /tmp/r -w '%{http_code}' -H "Title: ChessScout test alert" -H "Priority: high" -H "Tags: white_check_mark" -d "If you can read this, alerts reach your phone." "https://ntfy.sh/$TOPIC")
+          echo "ntfy answered $code"; [ "$code" = 200 ]
