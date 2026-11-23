@@ -10,6 +10,8 @@ The repo is public: never prints OCIDs, keys or the IP.
 """
 import os, sys, json, time, urllib.request
 import oci
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from pemfix import pem
 from cryptography.hazmat.primitives import serialization
 
 NAME = "ChessScout"
@@ -19,7 +21,7 @@ def config():
     os.makedirs(os.path.expanduser("~/.oci"), exist_ok=True)
     key = os.path.expanduser("~/.oci/key.pem")
     with open(key, "w") as f:
-        f.write(os.environ["OCI_API_KEY"].replace("\r", "").strip() + "\n")
+        f.write(pem(os.environ["OCI_API_KEY"]))
     os.chmod(key, 0o600)
     lines = [l.strip() for l in os.environ["OCI_CONFIG"].replace("\r", "").splitlines() if l.strip()]
     lines = [l for l in lines if not l.startswith("key_file")]
@@ -34,7 +36,7 @@ def config():
 
 
 def ssh_public_key():
-    k = serialization.load_ssh_private_key(os.environ["ORACLE_ADMIN_KEY"].replace("\r", "").strip().encode() + b"\n", None)
+    k = serialization.load_ssh_private_key(pem(os.environ["ORACLE_ADMIN_KEY"]).encode(), None)
     return k.public_key().public_bytes(serialization.Encoding.OpenSSH, serialization.PublicFormat.OpenSSH).decode() + " chessscout-oracle"
 
 

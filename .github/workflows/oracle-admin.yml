@@ -34,7 +34,7 @@ jobs:
           if [ -z "$HOST" ] && [ -n "$OCI_CONFIG" ]; then pip install -q oci cryptography; HOST=$(python3 ops/oracle/create_server.py ip); fi
           if [ -n "$HOST" ]; then echo "::add-mask::$HOST"; echo "HOST=$HOST" >> "$GITHUB_ENV"; fi
           [ -n "$HOST" ] && [ -n "$KEY" ] || { echo "::error::Add the ORACLE_HOST and ORACLE_ADMIN_KEY secrets first."; exit 1; }
-          mkdir -p ~/.ssh && printf '%s\n' "$KEY" | tr -d '\r' > ~/.ssh/k && chmod 600 ~/.ssh/k
+          mkdir -p ~/.ssh && printf '%s' "$KEY" | python3 ops/oracle/pemfix.py > ~/.ssh/k && chmod 600 ~/.ssh/k
           echo "SSH=ssh -i $HOME/.ssh/k -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ConnectTimeout=20 ubuntu@$HOST" >> "$GITHUB_ENV"
       - name: Render settings
         if: inputs.step == 'settings' || inputs.step == 'practice-migrate'
