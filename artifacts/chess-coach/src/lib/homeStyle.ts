@@ -1,4 +1,4 @@
-// Which Home a member sees: the new clean one (default) or the previous one. Saved on this device.
+// Which Home a member sees: Shann's Home (default) or the newer clean one to try. Saved on this device.
 import { useEffect, useState } from 'react';
 
 export type HomeStyle = 'clean' | 'classic';
@@ -6,10 +6,10 @@ const KEY = 'cs_home_style';
 const EVT = 'cs:home-style';
 
 export function getHomeStyle(): HomeStyle {
-  try { return localStorage.getItem(KEY) === 'classic' ? 'classic' : 'clean'; } catch { return 'clean'; }
+  try { return localStorage.getItem(`${KEY}_v2`) === 'clean' ? 'clean' : 'classic'; } catch { return 'classic'; }
 }
 export function setHomeStyle(v: HomeStyle) {
-  try { localStorage.setItem(KEY, v); } catch { /* storage off */ }
+  try { localStorage.setItem(`${KEY}_v2`, v); } catch { /* storage off */ }
   window.dispatchEvent(new Event(EVT));
   window.scrollTo({ top: 0 });
 }

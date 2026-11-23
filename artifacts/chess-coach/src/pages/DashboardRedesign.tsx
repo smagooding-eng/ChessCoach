@@ -480,7 +480,7 @@ export function DashboardRedesign() {
         {authUser && <div className="lg:col-span-2"><ReferralCard isPremium={isPremium} compact /></div>}
         <footer className="flex flex-col items-center justify-center gap-2 pb-2 pt-1 text-xs lg:col-span-2" style={{ color: '#87918E' }}>
           <SocialLinks size={18} label="Follow ChessScout.net" />
-          <button onClick={() => setHomeStyle('clean')} className="underline-offset-2 hover:underline">Try the new Home</button>
+          <button onClick={() => setHomeStyle('clean')} className="underline-offset-2 hover:underline">Try the other Home layout</button>
         </footer>
 
       </div>

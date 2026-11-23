@@ -232,7 +232,7 @@ export function HomeClean() {
         {authUser && <ReferralCard isPremium={isPremium} compact />}
         <footer className="flex flex-col items-center gap-2 pb-2 text-xs" style={{ color: MUTED }}>
           <SocialLinks size={18} label="Follow ChessScout.net" />
-          <button onClick={() => setHomeStyle('classic')} className="underline-offset-2 hover:underline">Use the previous Home</button>
+          <button onClick={() => setHomeStyle('classic')} className="underline-offset-2 hover:underline">Back to the usual Home</button>
         </footer>
 
 
