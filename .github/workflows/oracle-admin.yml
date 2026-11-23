@@ -1,7 +1,8 @@
 # Runs the Oracle server steps (ops/oracle) from GitHub, so no PC / Git Bash is needed.
 # GitHub → Actions → "Oracle server" → Run workflow → pick a step.
 # Secrets (Settings → Secrets and variables → Actions):
-#   ORACLE_HOST       the server's public IP
+#   ORACLE_HOST       the server's public IP (optional when OCI_CONFIG / OCI_API_KEY are set:
+#                     it's looked up from Oracle)
 #   ORACLE_ADMIN_KEY  the private key Oracle generated when the server was created (the whole file)
 #   RENDER_API_KEY    Render → Account settings → API keys (to copy settings and the Neon address)
 #   NTFY_TOPIC        your alert topic (for the server's disk / backup warnings)
@@ -26,7 +27,12 @@ jobs:
         env:
           HOST: ${{ secrets.ORACLE_HOST }}
           KEY: ${{ secrets.ORACLE_ADMIN_KEY }}
+          ORACLE_ADMIN_KEY: ${{ secrets.ORACLE_ADMIN_KEY }}
+          OCI_CONFIG: ${{ secrets.OCI_CONFIG }}
+          OCI_API_KEY: ${{ secrets.OCI_API_KEY }}
         run: |
+          if [ -z "$HOST" ] && [ -n "$OCI_CONFIG" ]; then pip install -q oci cryptography; HOST=$(python3 ops/oracle/create_server.py ip); fi
+          if [ -n "$HOST" ]; then echo "::add-mask::$HOST"; echo "HOST=$HOST" >> "$GITHUB_ENV"; fi
           [ -n "$HOST" ] && [ -n "$KEY" ] || { echo "::error::Add the ORACLE_HOST and ORACLE_ADMIN_KEY secrets first."; exit 1; }
           mkdir -p ~/.ssh && printf '%s\n' "$KEY" | tr -d '\r' > ~/.ssh/k && chmod 600 ~/.ssh/k
           echo "SSH=ssh -i $HOME/.ssh/k -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ConnectTimeout=20 ubuntu@$HOST" >> "$GITHUB_ENV"
@@ -50,7 +56,7 @@ jobs:
       - name: Copy scripts
         run: |
           $SSH "sudo mkdir -p /opt/chessscout/ops && sudo chown -R ubuntu:ubuntu /opt/chessscout"
-          scp -q -i ~/.ssh/k -o StrictHostKeyChecking=accept-new ops/oracle/*.sh ops/oracle/server.conf "ubuntu@${{ secrets.ORACLE_HOST }}:/opt/chessscout/ops/"
+          scp -q -i ~/.ssh/k -o StrictHostKeyChecking=accept-new ops/oracle/*.sh ops/oracle/server.conf "ubuntu@$HOST:/opt/chessscout/ops/"
           $SSH "sed -i 's/\r\$//' /opt/chessscout/ops/*.sh /opt/chessscout/ops/server.conf && chmod +x /opt/chessscout/ops/*.sh"
       - name: Run
         env:
@@ -61,7 +67,7 @@ jobs:
             check) $SSH "uname -m; lsb_release -ds; nproc; free -g | awk '/Mem/{print \$2\" GB memory\"}'; df -h / | tail -1";;
             setup) $SSH "sudo bash /opt/chessscout/ops/01-setup.sh";;
             settings)
-              scp -q -i ~/.ssh/k /tmp/render.env "ubuntu@${{ secrets.ORACLE_HOST }}:/tmp/render.env"
+              scp -q -i ~/.ssh/k /tmp/render.env "ubuntu@$HOST:/tmp/render.env"
               $SSH "bash /opt/chessscout/ops/apply-env.sh /tmp/render.env; shred -u /tmp/render.env";;
             alerts)
               [ -n "$TOPIC" ] || { echo "::error::Add the NTFY_TOPIC secret first."; exit 1; }
