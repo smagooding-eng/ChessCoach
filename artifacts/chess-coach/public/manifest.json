@@ -62,9 +62,9 @@
       ]
     },
     {
-      "name": "Scout Trail puzzles",
+      "name": "Puzzles",
       "short_name": "Puzzles",
-      "url": "/trail",
+      "url": "/puzzles",
       "icons": [
         {
           "src": "icons/icon-192.png?v=4",

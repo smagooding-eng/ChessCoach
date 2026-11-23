@@ -92,7 +92,6 @@ const MENU_GROUPS: { title: string; items: NavItem[] }[] = [
     { href: '/openings',  label: 'Openings',       icon: BookOpen },
     { href: '/tactics',   label: 'Tactics',        icon: Zap, badge: 'NEW' },
     { href: '/endgames',  label: 'Endgames',       icon: Trophy },
-    { href: '/trail',     label: 'Scout Trail',    icon: Puzzle, badge: 'NEW' },
     { href: '/puzzles',   label: 'Puzzles',        icon: Puzzle },
     { href: '/traps',     label: 'Chess Traps',    icon: Crosshair },
     { href: '/courses',   label: 'Courses',        icon: GraduationCap },
@@ -663,19 +662,19 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
                   </Link>
                 )}
                 {moreGroups.map((g) => (
-                  <section key={g.title} className="mb-4">
-                    <p className="mb-1 px-1 text-[13px] font-extrabold" style={{ color: TEXT_MUTED }}>{g.title}</p>
-                    <div className="grid grid-cols-1 sm:grid-cols-2">
+                  <section key={g.title} className="mb-3">
+                    <p className="mb-1.5 px-1 text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: TEXT_MUTED }}>{g.title}</p>
+                    <div className="grid grid-cols-3 gap-1.5">
                       {g.items.map((item) => {
                         const active = activeMore?.href === item.href;
                         return (
                           // replace: the menu's history step becomes the new page, so Back goes where you were.
                           <Link key={item.href} href={item.href} replace className="block" onClick={() => { if (item.href === location) setMoreOpen(false); }}>
-                            <div className="relative flex h-[46px] items-center gap-3.5 rounded-lg px-2 transition-colors active:bg-white/5"
-                              style={{ background: active ? 'rgba(255,255,255,0.07)' : 'transparent', color: TEXT_LIGHT }}>
-                              <NavGlyph href={item.href} fallback={item.icon} className="h-6 w-6 shrink-0" size={26} />
-                              <span className="text-[15px] font-bold">{item.label}</span>
-                              {item.badge && <span className="ml-auto rounded px-1.5 py-px text-[9px] font-black tracking-wider" style={{ background: '#C0392B', color: '#fff' }}>{item.badge}</span>}
+                            <div className="relative flex h-[78px] flex-col items-center justify-center gap-1.5 rounded-xl px-1 text-center transition-colors active:scale-[.97]"
+                              style={{ background: active ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.045)', border: `1px solid ${active ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.06)'}`, color: TEXT_LIGHT }}>
+                              <NavGlyph href={item.href} fallback={item.icon} className="h-7 w-7" size={28} />
+                              <span className="text-[11.5px] font-bold leading-tight">{item.label}</span>
+                              {item.badge && <span className="absolute right-1.5 top-1.5 rounded px-1 py-px text-[8px] font-black tracking-wider" style={{ background: '#C0392B', color: '#fff' }}>{item.badge}</span>}
                             </div>
                           </Link>
                         );

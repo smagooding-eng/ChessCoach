@@ -21,6 +21,7 @@ import { ActiveGamesCard } from '@/components/play/ActiveGamesCard';
 import { ReferralCard } from '@/pages/Profile';
 import { SocialLinks } from '@/components/SocialLinks';
 import { AppIcon } from '@/components/AppIcon';
+import { GameThumb } from '@/components/GameThumb';
 import { setHomeStyle } from '@/lib/homeStyle';
 import { useStreak } from '@/lib/activity';
 
@@ -90,7 +91,6 @@ export function HomeClean() {
   const games = gamesData?.games ?? [];
   const toReview = games.find((g) => !g.reviewed);
   const solved = puzzles?.solved ?? 0;
-  const atStop = solved % 20;
 
   const scoutSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,21 +135,18 @@ export function HomeClean() {
           </div>
         )}
 
+        <Link href="/play" className="cs-cta">Play</Link>
+
         <NotifyPrompt id="home" reason="Get told when your games are reviewed." />
 
-        {/* puzzles: the trail */}
-        <Link href="/trail" className="relative flex items-center gap-3 overflow-hidden rounded-[12px] p-3.5 active:scale-[.99]" style={{ background: '#2F6B3A' }}>
-          <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 300 100" preserveAspectRatio="none" aria-hidden="true">
-            <path d="M-10 90C60 80 70 30 140 40s120 40 170-20" fill="none" stroke="#C9A46A" strokeWidth="14" opacity=".45" strokeLinecap="round" />
-            <ellipse cx="250" cy="22" rx="40" ry="12" fill="#3B7D47" />
-          </svg>
-          <span className="relative grid h-12 w-12 shrink-0 place-items-center rounded-[10px]" style={{ background: 'rgba(0,0,0,.25)' }}><AppIcon name="trail" size={32} /></span>
-          <span className="relative min-w-0 flex-1">
-            <b className="block text-[18px] font-black">Puzzles</b>
-            <span className="text-[12.5px] font-semibold" style={{ color: '#DDE9D5' }}>Scout Trail · stop {atStop + 1} of 20</span>
-            <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full" style={{ background: 'rgba(0,0,0,.3)' }}><span className="block h-full rounded-full" style={{ width: `${(atStop / 20) * 100}%`, background: '#F2B53A' }} /></span>
+        {/* puzzles */}
+        <Link href="/puzzles" className="flex items-center gap-3 rounded-[12px] p-3.5 active:scale-[.99]" style={{ background: PANEL }}>
+          <AppIcon name="puzzles" size={40} />
+          <span className="min-w-0 flex-1">
+            <b className="block text-[17px] font-black">Puzzles</b>
+            <span className="text-[12.5px] font-semibold" style={{ color: MUTED }}>{solved ? `${solved.toLocaleString()} solved` : 'Many come from your own games'}</span>
           </span>
-          <span className="cs-cta relative !w-auto !min-h-[40px] !px-4 !text-[15px]">Solve</span>
+          <span className="cs-cta !w-auto !min-h-[40px] !px-4 !text-[15px]">Solve</span>
         </Link>
 
         {/* your turn: an unreviewed game */}
@@ -175,8 +172,8 @@ export function HomeClean() {
             {scout != null && <Tile href="/analysis" icon="leaderboard" value={scout} label="Scout" />}
             {multiElo?.chesscom?.hasData && <Tile href="/analysis" icon="live" value={multiElo.chesscom.currentRating} label="Chess.com" />}
             {multiElo?.lichess?.hasData && <Tile href="/analysis" icon="board" value={multiElo.lichess.currentRating} label="Lichess" />}
-            <Tile href="/trail" icon="puzzles" value={solved} label="Puzzles" />
-            {daily && <Tile href="/trail" icon="streak" value={daily.streak} label={daily.streak === 1 ? 'Day streak' : 'Days streak'} />}
+            <Tile href="/puzzles" icon="puzzles" value={solved} label="Puzzles" />
+            {daily && <Tile href="/puzzles" icon="streak" value={daily.streak} label={daily.streak === 1 ? 'Day streak' : 'Days streak'} />}
             <Tile href="/analysis" icon="analysis" label="All stats" />
           </div>
         </Section>
@@ -193,6 +190,7 @@ export function HomeClean() {
               const r = RESULT[g.result] ?? RESULT.draw;
               return (
                 <Link key={g.id} href={`/games/${g.id}`} className="flex items-center gap-3 px-3.5 py-2.5 active:bg-white/5" style={i ? { borderTop: '1px solid rgba(255,255,255,.05)' } : undefined}>
+                  <GameThumb pgn={g.pgn} userColor={white ? 'white' : 'black'} size={44} />
                   <span className="grid h-6 w-6 shrink-0 place-items-center rounded-[6px] text-[15px] font-black text-white" style={{ background: r.c }}>{r.t}</span>
                   <span className="min-w-0 flex-1 truncate text-[14px] font-bold">
                     {white ? g.blackUsername : g.whiteUsername} <span className="font-normal" style={{ color: MUTED }}>({white ? g.blackRating : g.whiteRating})</span>
@@ -237,9 +235,7 @@ export function HomeClean() {
           <button onClick={() => setHomeStyle('classic')} className="underline-offset-2 hover:underline">Use the previous Home</button>
         </footer>
 
-        <div className="cs-cta-dock">
-          <Link href="/play" className="cs-cta">Play</Link>
-        </div>
+
       </div>
     </div>
   );

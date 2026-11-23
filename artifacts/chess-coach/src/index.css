@@ -529,22 +529,17 @@ html.cs-redesign:not(.cs-photo) :is(.rounded-2xl, .rounded-\[14px\]) { border-ra
 html.cs-redesign:not(.cs-photo) :is(.shadow-xl, .shadow-2xl, .shadow-lg) { box-shadow: 0 2px 0 rgba(0,0,0,.25); }
 html.cs-redesign:not(.cs-photo) .backdrop-blur-xl:not(nav):not(header) { backdrop-filter: none; }
 
-/* The main action on a screen: a chunky green button with a pressed-in bottom edge. */
+/* The main action on a screen: ChessScout's own flat green button. */
 .cs-cta {
   display: flex; align-items: center; justify-content: center; gap: .5rem;
-  width: 100%; min-height: 52px; padding: 0 1rem; border-radius: 12px;
-  background: #81B64C; color: #fff; font-weight: 900; font-size: 18px; letter-spacing: -.01em;
-  box-shadow: 0 4px 0 #5A8A31; text-shadow: 0 1px 0 rgba(0,0,0,.18);
-  transition: transform .06s, box-shadow .06s, filter .15s;
+  width: 100%; min-height: 50px; padding: 0 1rem; border-radius: 14px;
+  background: #81B64C; color: #fff; font-weight: 800; font-size: 16px;
+  transition: transform .08s, filter .15s;
 }
-.cs-cta:hover { filter: brightness(1.06); }
-.cs-cta:active { transform: translateY(3px); box-shadow: 0 1px 0 #5A8A31; }
+.cs-cta:hover { filter: brightness(1.07); }
+.cs-cta:active { transform: scale(.98); }
 .cs-cta:disabled { opacity: .6; }
-.cs-cta-quiet { background: #2A3436; box-shadow: 0 4px 0 #1A2224; }
-.cs-cta-quiet:active { box-shadow: 0 1px 0 #1A2224; }
-/* Pinned just above the bottom tab bar on phones (inside the page flow on desktop). */
-.cs-cta-dock { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom)); z-index: 30; padding: 8px 0 6px; }
-@media (min-width: 768px) { .cs-cta-dock { bottom: 12px; } }
+.cs-cta-quiet { background: #2A3436; }
 html.cs-redesign .text-gradient {
   background-image: linear-gradient(135deg, #C5DFA6 0%, #81B64C 100%);
 }
