@@ -128,6 +128,21 @@ def main():
     image = ubuntu_image(compute, tenancy)
     ads = [a.name for a in oci.identity.IdentityClient(cfg).list_availability_domains(tenancy).data]
     key = ssh_public_key()
+    # "create 340": keep trying for up to 340 minutes, a round a minute (GitHub's schedule is unreliable)
+    minutes = float(sys.argv[2]) if len(sys.argv) > 2 else 0
+    end = time.time() + minutes * 60
+    rounds = 0
+    while True:
+        rounds += 1
+        if try_once(compute, tenancy, subnet, image, ads, key, quiet=rounds > 1):
+            return
+        if time.time() + 70 > end:
+            print(f"Oracle had no room in {rounds} round(s); the next run tries again.")
+            return
+        time.sleep(60)
+
+
+def try_once(compute, tenancy, subnet, image, ads, key, quiet=False):
     for ocpus, mem in ((2, 12), (1, 6)):
         for ad in ads:
             label = f"{ocpus} OCPU / {mem} GB in AD-{ad.split('-')[-1]}"
@@ -141,18 +156,19 @@ def main():
                     metadata={"ssh_authorized_keys": key}))
                 print(f"Created: {label}")
                 notify(f"Your ChessScout server ({ocpus} OCPU / {mem} GB) is being created. Tell Claude.")
-                return
+                return True
             except oci.exceptions.ServiceError as e:
                 msg = (e.message or "").lower()
                 if "capacity" in msg or e.status in (429, 500):
-                    print(f"No room: {label}")
+                    if not quiet:
+                        print(f"No room: {label}")
                     time.sleep(3)
                     continue
                 if "limit" in msg and ocpus == 2:
                     print(f"Over the free limit for {label}; trying smaller")
                     break
                 raise
-    print("Oracle had no room this time; the next run tries again.")
+    return False
 
 
 if __name__ == "__main__":
