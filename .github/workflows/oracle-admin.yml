@@ -51,7 +51,12 @@ jobs:
             echo "$J" | jq -r '.[].envVar | "\(.key)=\(.value)"' >> /tmp/render.env
             [ "$(echo "$J" | jq length)" -lt 100 ] && break; C=$(echo "$J" | jq -r '.[-1].cursor')
           done
+          # settings in environment groups linked to the service (the service's own win on a clash)
+          for G in $(curl -fsS "${H[@]}" "https://api.render.com/v1/env-groups?limit=100" | jq -r --arg s "$SID" '.[] | (.envGroup // .) | select([.serviceLinks[]?.id] | index($s)) | .id'); do
+            curl -fsS "${H[@]}" "https://api.render.com/v1/env-groups/$G" | jq -r '.envVars[]? | "\(.key)=\(.value)"' | while IFS= read -r l; do grep -q "^${l%%=*}=" /tmp/render.env || printf '%s\n' "$l" >> /tmp/render.env; done
+          done
           while IFS= read -r l; do v=${l#*=}; [ ${#v} -ge 6 ] && echo "::add-mask::$v"; done < /tmp/render.env
+          echo "Setting names: $(cut -d= -f1 /tmp/render.env | sort | tr '\n' ' ')"
           echo "Got $(wc -l < /tmp/render.env) settings from Render."
           grep -q '^DATABASE_URL=' /tmp/render.env || echo "::warning::No DATABASE_URL among the service's own settings (it may be in an environment group)."
       - name: Copy scripts
