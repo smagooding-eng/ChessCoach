@@ -467,39 +467,39 @@ main h2, [data-page] h2 {
    div, so portaled UI (dialogs, toasts, sheets) is themed too.
    ═══════════════════════════════════════════════════════════════════ */
 html.cs-redesign {
-  --background: 190 38% 3%;               /* #050A0B near-black */
+  --background: 188 20% 7%;               /* #0E1415 soft near-black */
   --foreground: 150 12% 96%;              /* #F5F7F6 */
-  --card: 187 26% 7%;                     /* #0D1516 */
+  --card: 189 19% 12%;                    /* #182123 solid panel */
   --card-foreground: 150 12% 96%;
-  --popover: 187 26% 8%;
+  --popover: 189 19% 13%;
   --popover-foreground: 150 12% 96%;
   --primary: 89 42% 51%;                  /* #81B64C brand green */
   --primary-foreground: 147 52% 4%;       /* dark text on green */
-  --secondary: 191 23% 9%;                /* #121B1D */
+  --secondary: 190 15% 15%;               /* #212B2D */
   --secondary-foreground: 150 12% 96%;
-  --muted: 191 23% 9%;
+  --muted: 190 15% 15%;
   --muted-foreground: 162 4% 55%;         /* #87918E */
   --accent: 89 42% 51%;
   --accent-foreground: 147 52% 4%;
   --destructive: 357 100% 66%;            /* #FF5058 */
   --destructive-foreground: 0 0% 100%;
   --border: 187 12% 14%;                  /* ~rgba(255,255,255,.08) on card */
-  --input: 191 23% 9%;
+  --input: 190 15% 15%;
   --ring: 89 42% 51%;
-  --radius: 1rem;
+  --radius: .75rem;
 
   /* Layout chrome palette (see the CSS-variable constants in Layout.tsx) */
-  --cs-bg-dark: #050A0B;
-  --cs-bg-sidebar: #070D0E;
-  --cs-bg-card: #0D1516;
+  --cs-bg-dark: #0E1415;
+  --cs-bg-sidebar: #0B1112;
+  --cs-bg-card: #182123;
   --cs-border: rgba(255, 255, 255, 0.08);
   --cs-green: #81B64C;
   --cs-text-light: #F5F7F6;
   --cs-text-muted: #87918E;
-  --cs-sidebar-a95: #070D0Ef5;
-  --cs-sidebar-a97: #070D0Ef8;
+  --cs-sidebar-a95: #0B1112f5;
+  --cs-sidebar-a97: #0B1112f8;
   --cs-avatar-border: #81B64C;
-  --cs-card-gradient: linear-gradient(160deg, #0F1819 0%, #0B1213 100%);
+  --cs-card-gradient: #182123;
 }
 /* Flat near-black page, no olive radial washes */
 html.cs-redesign body { background-image: none; }
@@ -512,18 +512,39 @@ html.cs-redesign .font-display {
 }
 /* Cards that hardcode their own warm-brown gradient */
 html.cs-redesign .glass-card {
-  background: linear-gradient(160deg, #0F1819 0%, #0B1213 100%);
-  border-color: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 18px 45px -24px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  background: #182123;
+  border-color: rgba(255, 255, 255, 0.05);
+  box-shadow: none;
+  backdrop-filter: none;
 }
-html.cs-redesign .glass-card:hover {
-  background: linear-gradient(160deg, #121D1F 0%, #0D1516 100%);
-  border-color: rgba(129, 182, 76, 0.28);
-}
+html.cs-redesign .glass-card:hover { background: #1C2628; border-color: rgba(255, 255, 255, 0.08); }
 html.cs-redesign .card-depth,
-html.cs-redesign .card-depth-lg {
-  box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 24px 60px -24px rgba(0,0,0,0.85), 0 0 60px rgba(129,182,76,0.05);
+html.cs-redesign .card-depth-lg { box-shadow: none; }
+
+/* ═══ Clean look (standard style): solid panels, modest corners, no glows ═══
+   Pages written with big rounded corners and soft shadows get the calmer
+   version here, so the whole app changes at once. The photo look keeps its own. */
+html.cs-redesign:not(.cs-photo) :is(.rounded-\[16px\], .rounded-\[18px\], .rounded-\[20px\], .rounded-\[22px\], .rounded-\[24px\], .rounded-3xl) { border-radius: 12px; }
+html.cs-redesign:not(.cs-photo) :is(.rounded-2xl, .rounded-\[14px\]) { border-radius: 10px; }
+html.cs-redesign:not(.cs-photo) :is(.shadow-xl, .shadow-2xl, .shadow-lg) { box-shadow: 0 2px 0 rgba(0,0,0,.25); }
+html.cs-redesign:not(.cs-photo) .backdrop-blur-xl:not(nav):not(header) { backdrop-filter: none; }
+
+/* The main action on a screen: a chunky green button with a pressed-in bottom edge. */
+.cs-cta {
+  display: flex; align-items: center; justify-content: center; gap: .5rem;
+  width: 100%; min-height: 52px; padding: 0 1rem; border-radius: 12px;
+  background: #81B64C; color: #fff; font-weight: 900; font-size: 18px; letter-spacing: -.01em;
+  box-shadow: 0 4px 0 #5A8A31; text-shadow: 0 1px 0 rgba(0,0,0,.18);
+  transition: transform .06s, box-shadow .06s, filter .15s;
 }
+.cs-cta:hover { filter: brightness(1.06); }
+.cs-cta:active { transform: translateY(3px); box-shadow: 0 1px 0 #5A8A31; }
+.cs-cta:disabled { opacity: .6; }
+.cs-cta-quiet { background: #2A3436; box-shadow: 0 4px 0 #1A2224; }
+.cs-cta-quiet:active { box-shadow: 0 1px 0 #1A2224; }
+/* Pinned just above the bottom tab bar on phones (inside the page flow on desktop). */
+.cs-cta-dock { position: sticky; bottom: calc(64px + env(safe-area-inset-bottom)); z-index: 30; padding: 8px 0 6px; }
+@media (min-width: 768px) { .cs-cta-dock { bottom: 12px; } }
 html.cs-redesign .text-gradient {
   background-image: linear-gradient(135deg, #C5DFA6 0%, #81B64C 100%);
 }

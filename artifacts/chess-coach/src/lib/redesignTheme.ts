@@ -7,10 +7,11 @@
 // "photo backdrop" look (html.cs-photo in index.css) can make every card
 // see-through at once.
 export const RD = {
-  bg: 'var(--rd-bg, #050A0B)',
-  card: 'var(--rd-card, linear-gradient(160deg, #0F1819 0%, #0B1213 100%))',
-  cardSolid: 'var(--rd-card-solid, #0D1516)',
-  cardLight: 'var(--rd-card-light, #121B1D)',
+  // Flat, solid surfaces (no gradients): a soft near-black page with clearly lighter panels
+  bg: 'var(--rd-bg, #0E1415)',
+  card: 'var(--rd-card, #182123)',
+  cardSolid: 'var(--rd-card-solid, #182123)',
+  cardLight: 'var(--rd-card-light, #212B2D)',
   border: 'rgba(255,255,255,.08)',
   green: '#81B64C',
   greenDark: '#5F8F36',

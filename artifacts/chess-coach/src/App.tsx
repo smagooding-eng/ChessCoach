@@ -21,6 +21,8 @@ import { STUDIO_FRAME } from "@/lib/studioFrame";
 // front rather than code-split: swiping between them must show the next
 // page straight away, never a loading screen first.
 import { DashboardRedesign } from "@/pages/DashboardRedesign";
+import { HomeClean } from "@/pages/HomeClean";
+import { useHomeStyle } from "@/lib/homeStyle";
 import { useKidMode, isKidsPath } from "@/lib/kids/kidMode";
 import { LearnSync } from "@/lib/learnSync";
 import { axonTrack } from "@/lib/axon";
@@ -181,7 +183,8 @@ const Dashboard = lazyRetry(() => import("@/pages/Dashboard").then(m => ({ defau
 // whichever account had flipped their own switch.
 function DashboardRouter() {
   const { enabled } = useDashboardRedesignFlag();
-  return enabled ? <DashboardRedesign /> : <Dashboard />;
+  const homeStyle = useHomeStyle();
+  return !enabled ? <Dashboard /> : homeStyle === 'classic' ? <DashboardRedesign /> : <HomeClean />;
 }
 const Import = lazyRetry(() => import("@/pages/Import").then(m => ({ default: m.Import })));
 const Games = lazyRetry(() => import("@/pages/Games").then(m => ({ default: m.Games })));
@@ -233,6 +236,7 @@ const Profile = lazyRetry(() => import("@/pages/Profile").then(m => ({ default: 
 const Puzzles = lazyRetry(() => import("@/pages/Puzzles").then(m => ({ default: m.Puzzles })));
 const ShopPage = lazyRetry(() => import("@/pages/Shop").then(m => ({ default: m.ShopPage })));
 const SolvedPuzzles = lazyRetry(() => import("@/pages/SolvedPuzzles"));
+const ScoutTrail = lazyRetry(() => import("@/pages/ScoutTrail"));
 const ScanPosition = lazyRetry(() => import("@/pages/ScanPosition").then(m => ({ default: m.ScanPosition })));
 const Explorer = lazyRetry(() => import("@/pages/Explorer").then(m => ({ default: m.Explorer })));
 const Admin = lazyRetry(() => import("@/pages/Admin").then(m => ({ default: m.Admin })));
@@ -409,6 +413,7 @@ const PProfile       = () => <ProtectedRoute component={Profile} />;
 const PPuzzles       = () => <ProtectedRoute component={Puzzles} />;
 const PShop          = () => <ProtectedRoute component={ShopPage} />;
 const PSolvedPuzzles = () => <ProtectedRoute component={SolvedPuzzles} />;
+const PScoutTrail = () => <ProtectedRoute component={ScoutTrail} />;
 const PScanPosition  = () => <ProtectedRoute component={ScanPosition} />;
 const PExplorer      = () => <ProtectedRoute component={Explorer} />;
 const PAdmin         = () => <ProtectedRoute component={Admin} />;
@@ -719,6 +724,7 @@ function Router() {
       <Route path="/puzzles"          component={PPuzzles} />
       <Route path="/shop"             component={PShop} />
       <Route path="/puzzles/solved"   component={PSolvedPuzzles} />
+      <Route path="/trail"            component={PScoutTrail} />
       <Route path="/scan"             component={PScanPosition} />
       <Route path="/explore"          component={PExplorer} />
       <Route path="/admin/studio"     component={PContentStudio} />

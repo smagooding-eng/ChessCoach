@@ -22,5 +22,5 @@ export function takeEntryIntent(): string | null {
 }
 
 /** App pages that work without a linked chess account (no welcome bounce). */
-const OPEN = /^\/(puzzles|tactics|traps|endgames|openings|learning|beginner|courses|practice|play-now|subscription|pricing|settings|kids)(\/|$|\?)/;
+const OPEN = /^\/(puzzles|trail|analysis-board|tactics|traps|endgames|openings|learning|beginner|courses|practice|play-now|subscription|pricing|settings|kids)(\/|$|\?)/;
 export const openBeforeLinking = (path: string) => OPEN.test(path);

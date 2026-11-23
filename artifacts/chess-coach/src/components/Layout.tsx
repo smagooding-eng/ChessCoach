@@ -1,3 +1,4 @@
+import { AppIcon, navIconName } from '@/components/AppIcon';
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
@@ -52,13 +53,27 @@ function BellIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
-// Bottom-nav icons the redesign mockup uses (house / target / swords / bars)
+// The colourful ChessScout icon for a page (components/AppIcon), else its line icon.
+function NavGlyph({ href, fallback: F, className, size }: { href: string; fallback: React.ElementType; className?: string; size: number }) {
+  const n = navIconName(href);
+  return n ? <AppIcon name={n} size={size} className={className} /> : <F className={className} />;
+}
+
+// Bottom-bar icons: solid shapes (easier to read at a glance than outlines)
+const fillIcon = (d: React.ReactNode) => function FilledIcon(props: React.SVGProps<SVGSVGElement>) {
+  return <svg viewBox="0 0 24 24" fill="currentColor" {...props}>{d}</svg>;
+};
+const TabHome = fillIcon(<path d="M11.3 2.6a1 1 0 0 1 1.4 0l8.6 7.9a1 1 0 0 1 .3.7V20a1.5 1.5 0 0 1-1.5 1.5H15v-6.5H9v6.5H4.4A1.5 1.5 0 0 1 3 20v-8.8a1 1 0 0 1 .3-.7z" />);
+const TabPlay = fillIcon(<path d="M7 3.7c0-1 1.1-1.6 2-1.1l12 7.8a1.3 1.3 0 0 1 0 2.2L9 20.4c-.9.5-2-.1-2-1.1z" />);
+const TabGames = fillIcon(<><path d="M9 4.5a3 3 0 1 1 6 0c0 1-.5 1.9-1.2 2.5H15l-1 4h-4L9 7h1.2A3.2 3.2 0 0 1 9 4.5z" /><path d="M9.6 12.5h4.8l1.3 5H8.3z" /><rect x="5.5" y="18.5" width="13" height="3" rx="1.2" /></>);
+const TabAnalysis = fillIcon(<><rect x="3" y="12" width="5" height="9" rx="1.2" /><rect x="9.5" y="7" width="5" height="14" rx="1.2" /><rect x="16" y="3" width="5" height="18" rx="1.2" /></>);
+const TabScout = fillIcon(<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 4a6 6 0 1 1 0 12 6 6 0 0 1 0-12zm0 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" fillRule="evenodd" />);
 const REDESIGN_NAV_ICON: Record<string, React.ElementType> = {
-  '/': HouseIcon,
-  '/opponents': Target,
-  '/play': Play,
-  '/games': Swords,
-  '/analysis': BarChart3,
+  '/': TabHome,
+  '/opponents': TabScout,
+  '/play': TabPlay,
+  '/games': TabGames,
+  '/analysis': TabAnalysis,
 };
 
 type NavItem = { href: string; label: string; icon: React.ElementType; badge?: string };
@@ -77,6 +92,7 @@ const MENU_GROUPS: { title: string; items: NavItem[] }[] = [
     { href: '/openings',  label: 'Openings',       icon: BookOpen },
     { href: '/tactics',   label: 'Tactics',        icon: Zap, badge: 'NEW' },
     { href: '/endgames',  label: 'Endgames',       icon: Trophy },
+    { href: '/trail',     label: 'Scout Trail',    icon: Puzzle, badge: 'NEW' },
     { href: '/puzzles',   label: 'Puzzles',        icon: Puzzle },
     { href: '/traps',     label: 'Chess Traps',    icon: Crosshair },
     { href: '/courses',   label: 'Courses',        icon: GraduationCap },
@@ -141,7 +157,7 @@ function SidebarLink({ item, isActive }: { item: typeof ALL_NAV[0]; isActive: bo
         {isActive && (
           <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full" style={{ background: CHESSCOM_GREEN }} />
         )}
-        <item.icon className="w-4 h-4 shrink-0" />
+        <NavGlyph href={item.href} fallback={item.icon} className="w-4 h-4 shrink-0" size={18} />
         {item.label}
         {badge && (
           <span className="ml-auto px-1.5 py-px rounded text-[8px] font-black tracking-wider" style={{ background: 'rgba(234,166,49,0.35)', color: '#ffffff' }}>
@@ -583,8 +599,8 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
                   {isActive && (
                     <span className="absolute top-0 left-1/2 -translate-x-1/2 h-[2px] w-8 rounded-full" style={{ background: CHESSCOM_GREEN }} />
                   )}
-                  <NavIcon className="w-5 h-5 transition-transform" style={{ color: isActive ? CHESSCOM_GREEN : TEXT_MUTED, transform: isActive ? 'scale(1.1)' : 'scale(1)' }} />
-                  <span className="text-[10px] leading-none font-bold" style={{ color: isActive ? CHESSCOM_GREEN : TEXT_MUTED, opacity: isActive ? 1 : 0.6 }}>{redesign && item.href === '/opponents' ? 'Scout' : item.label}</span>
+                  <NavIcon className="w-6 h-6 transition-transform" style={{ color: isActive ? TEXT_LIGHT : TEXT_MUTED }} />
+                  <span className="text-[10.5px] leading-none font-bold" style={{ color: isActive ? TEXT_LIGHT : TEXT_MUTED }}>{redesign && item.href === '/opponents' ? 'Scout' : item.label}</span>
                 </div>
               </Link>
             );
@@ -647,19 +663,19 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
                   </Link>
                 )}
                 {moreGroups.map((g) => (
-                  <section key={g.title} className="mb-3">
-                    <p className="mb-1.5 px-1 text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: TEXT_MUTED }}>{g.title}</p>
-                    <div className="grid grid-cols-3 gap-1.5">
+                  <section key={g.title} className="mb-4">
+                    <p className="mb-1 px-1 text-[13px] font-extrabold" style={{ color: TEXT_MUTED }}>{g.title}</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2">
                       {g.items.map((item) => {
                         const active = activeMore?.href === item.href;
                         return (
                           // replace: the menu's history step becomes the new page, so Back goes where you were.
                           <Link key={item.href} href={item.href} replace className="block" onClick={() => { if (item.href === location) setMoreOpen(false); }}>
-                            <div className="relative flex h-[74px] flex-col items-center justify-center gap-1.5 rounded-xl px-1 text-center transition-colors active:scale-[.97]"
-                              style={{ background: active ? 'rgba(129,182,76,0.16)' : 'rgba(255,255,255,0.045)', border: `1px solid ${active ? 'rgba(129,182,76,0.55)' : 'rgba(255,255,255,0.06)'}`, color: TEXT_LIGHT }}>
-                              <item.icon className="h-5 w-5" style={{ color: active ? CHESSCOM_GREEN : TEXT_LIGHT }} />
-                              <span className="text-[11.5px] font-bold leading-tight">{item.label}</span>
-                              {item.badge && <span className="absolute right-1.5 top-1.5 rounded px-1 py-px text-[8px] font-black tracking-wider" style={{ background: 'rgba(129,182,76,0.9)', color: '#fff' }}>{item.badge}</span>}
+                            <div className="relative flex h-[46px] items-center gap-3.5 rounded-lg px-2 transition-colors active:bg-white/5"
+                              style={{ background: active ? 'rgba(255,255,255,0.07)' : 'transparent', color: TEXT_LIGHT }}>
+                              <NavGlyph href={item.href} fallback={item.icon} className="h-6 w-6 shrink-0" size={26} />
+                              <span className="text-[15px] font-bold">{item.label}</span>
+                              {item.badge && <span className="ml-auto rounded px-1.5 py-px text-[9px] font-black tracking-wider" style={{ background: '#C0392B', color: '#fff' }}>{item.badge}</span>}
                             </div>
                           </Link>
                         );
