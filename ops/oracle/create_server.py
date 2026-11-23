@@ -31,6 +31,15 @@ def config():
     with open(path, "w") as f:
         f.write("\n".join(lines + [f"key_file={key}"]) + "\n")
     cfg = oci.config.from_file(path)
+    try:
+        serialization.load_pem_private_key(open(key, "rb").read(), None)
+    except Exception:
+        import re, base64
+        raw = os.environ["OCI_API_KEY"]
+        hdr = re.findall(r"-----(BEGIN|END) ([A-Z ]+)-----", raw)
+        body = re.sub(r"-----[A-Z ]+-----|\s", "", raw)
+        sys.exit(f"OCI_API_KEY isn't a readable private key: markers={hdr or 'none'}, {len(body)} key characters "
+                 f"(a full one has about 1620), {raw.count(chr(10))} line breaks. Paste all of OCI_API_KEY.txt again.")
     oci.config.validate_config(cfg)
     return cfg
 
