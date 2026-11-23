@@ -14,6 +14,7 @@ import { playedWhite, useMyNames } from '@/lib/gameSide';
 import { AppIcon } from '@/components/AppIcon';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import { setPageMeta } from '@/lib/pageMeta';
+import { useDailyScout } from '@/pages/Progress';
 
 const PANEL = 'var(--rd-card-solid, #182123)';
 const PANEL2 = 'var(--rd-card-light, #212B2D)';
@@ -262,10 +263,19 @@ export default function PuzzleHubPage() {
   const [tab, setTab] = useState(() => new URLSearchParams(search).get('tab') ?? 'cases');
   useEffect(() => { setPageMeta('Puzzles — ChessScout.net', 'Case Files from your own games, pattern cards and opponent prep.', '/puzzles/hub'); }, []);
   const set = (t: string) => { setTab(t); window.history.replaceState(null, '', `?tab=${t}`); };
+  const daily = useDailyScout();
   return (
     <div className="mx-auto w-full max-w-[640px] px-4 pb-28 pt-3" style={{ color: '#F5F7F6' }}>
       <RedesignHeader dense title="Puzzles" backHref="/"
         right={<Link href="/puzzles" className="rounded-[10px] px-3 py-1.5 text-[13px] font-extrabold text-white" style={{ background: GREEN }}>Quick play</Link>} />
+      {daily && (
+        <Link href={daily.mine ? '/progress' : `/puzzles?daily=${daily.number}&id=${daily.puzzleId}`} className="mb-3 flex items-center gap-3 rounded-[12px] p-3" style={{ background: PANEL }}>
+          <AppIcon name="opponents" size={32} />
+          <span className="min-w-0 flex-1"><b className="block text-[14.5px]">Daily Scout #{daily.number}</b>
+            <span className="text-[12px]" style={{ color: MUTED }}>{daily.mine ? (daily.mine.solved ? 'Solved today' : 'Missed today') : 'Today’s puzzle for everyone'}</span></span>
+          {!daily.mine && <span className="rounded-[10px] px-3 py-1.5 text-[13px] font-extrabold text-white" style={{ background: GREEN }}>Play</span>}
+        </Link>
+      )}
       <Tabs tab={tab} set={set} />
       <div className="mt-3">
         {!authUser ? <p className="py-10 text-center text-[14px]" style={{ color: MUTED }}>Sign in to see your Case Files.</p>

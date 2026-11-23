@@ -238,6 +238,14 @@ const ShopPage = lazyRetry(() => import("@/pages/Shop").then(m => ({ default: m.
 const SolvedPuzzles = lazyRetry(() => import("@/pages/SolvedPuzzles"));
 const LastGame = lazyRetry(() => import("@/pages/LastGame"));
 const PuzzleHub = lazyRetry(() => import("@/pages/PuzzleHub"));
+const ProgressPage = lazyRetry(() => import("@/pages/Progress"));
+const ReportCard = lazyRetry(() => import("@/pages/ReportCard"));
+const FieldNotes = lazyRetry(() => import("@/pages/FieldNotes"));
+const ScoutSprint = lazyRetry(() => import("@/pages/ScoutSprint"));
+const BotChallenge = lazyRetry(() => import("@/pages/BotChallenge"));
+const Legends = lazyRetry(() => import("@/pages/Legends"));
+const Coordinates = lazyRetry(() => import("@/pages/Coordinates"));
+const DailyScoutPage = lazyRetry(() => import("@/pages/DailyScout"));
 const ScanPosition = lazyRetry(() => import("@/pages/ScanPosition").then(m => ({ default: m.ScanPosition })));
 const Explorer = lazyRetry(() => import("@/pages/Explorer").then(m => ({ default: m.Explorer })));
 const Admin = lazyRetry(() => import("@/pages/Admin").then(m => ({ default: m.Admin })));
@@ -416,6 +424,11 @@ const PShop          = () => <ProtectedRoute component={ShopPage} />;
 const PSolvedPuzzles = () => <ProtectedRoute component={SolvedPuzzles} />;
 const PLastGame = () => <ProtectedRoute component={LastGame} />;
 const PPuzzleHub = () => <ProtectedRoute component={PuzzleHub} />;
+const PProgress = () => <ProtectedRoute component={ProgressPage} />;
+const PReportCard = () => <ProtectedRoute component={ReportCard} />;
+const PFieldNotes = () => <ProtectedRoute component={FieldNotes} />;
+const PScoutSprint = () => <ProtectedRoute component={ScoutSprint} />;
+const PBotChallenge = () => <ProtectedRoute component={BotChallenge} />;
 const PScanPosition  = () => <ProtectedRoute component={ScanPosition} />;
 const PExplorer      = () => <ProtectedRoute component={Explorer} />;
 const PAdmin         = () => <ProtectedRoute component={Admin} />;
@@ -655,6 +668,10 @@ function Router() {
       <Route path="/credits" component={CreditsPage} />
       {/* Free analysis board: Stockfish on the device, no account */}
       <Route path="/analysis-board" component={AnalysisBoardPage} />
+      {/* free, no account: guess-the-move with famous games, the coordinate drill, today's Daily Scout */}
+      <Route path="/legends" component={Legends} />
+      <Route path="/coordinates" component={Coordinates} />
+      <Route path="/daily" component={DailyScoutPage} />
       <Route path="/vs/aimchess" component={VsAimchessPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/review" component={FreeReviewPage} />
@@ -727,6 +744,11 @@ function Router() {
       <Route path="/shop"             component={PShop} />
       <Route path="/puzzles/solved"   component={PSolvedPuzzles} />
       <Route path="/puzzles/hub"      component={PPuzzleHub} />
+      <Route path="/progress"         component={PProgress} />
+      <Route path="/report-card"      component={PReportCard} />
+      <Route path="/field-notes"      component={PFieldNotes} />
+      <Route path="/sprint"           component={PScoutSprint} />
+      <Route path="/bot-challenge"    component={PBotChallenge} />
       <Route path="/last-game"        component={PLastGame} />
       <Route path="/scan"             component={PScanPosition} />
       <Route path="/explore"          component={PExplorer} />

@@ -15,7 +15,7 @@ export function recordActivity(kind: ActivityKind) {
     .catch(() => {});
 }
 
-export type Streak = { streak: number; best: number; doneToday: boolean; week: { day: string; done: boolean }[] };
+export type Streak = { streak: number; best: number; doneToday: boolean; week: { day: string; done: boolean }[]; restDays?: number; restUsed?: number; casesClosed?: number };
 export function useStreak(enabled = true) {
   const [s, setS] = useState<Streak | null>(null);
   useEffect(() => {

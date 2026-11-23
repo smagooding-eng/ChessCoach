@@ -695,6 +695,12 @@ router.post("/puzzles/:id/explain", requireAuth, requirePremium, async (req: Req
   }
 });
 
+const REOPEN_THEMES: Record<string, string> = {
+  fork: "a fork", pin: "a pin", skewer: "a skewer", discoveredAttack: "a discovered attack", hangingPiece: "a hanging piece",
+  backRankMate: "a back-rank mate", deflection: "a deflection", attraction: "an attraction", doubleCheck: "a double check",
+  mateIn1: "a mate in 1", mateIn2: "a mate in 2", promotion: "a promotion",
+};
+
 router.post("/puzzles/generate-from-games", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
@@ -722,6 +728,8 @@ router.post("/puzzles/generate-from-games", requireAuth, async (req: Request, re
       .limit(20);
 
     let generated = 0;
+
+    const newCases: { themes: string[]; gameId: number }[] = [];
 
     interface ReviewMove {
       color?: string;
@@ -800,8 +808,32 @@ router.post("/puzzles/generate-from-games", requireAuth, async (req: Request, re
           moveNumber: src.moveNumber ?? null,
         }).returning({ id: puzzlesTable.id });
         if (ins) await markSetupFixed(ins.id);
+        if (ins) newCases.push({ themes: themesCsv.split(","), gameId: game.id });
         generated++;
       }
+    }
+
+    // "Case reopened": a new mistake of a kind this member has already fixed once (a solved
+    // case from their own games) gets a push, because it's the most personal reminder we have.
+    if (newCases.length) {
+      try {
+        const solved = await db.execute(sql`SELECT DISTINCT unnest(string_to_array(p.themes, ',')) AS t FROM puzzle_attempts pa JOIN puzzles p ON p.id = pa.puzzle_id
+          WHERE pa.user_id = ${userId} AND pa.solved AND p.source = 'game'`);
+        const fixedBefore = new Set((solved.rows as { t: string }[]).map((r) => r.t));
+        const hit = newCases.flatMap((c) => c.themes.filter((t) => REOPEN_THEMES[t] && fixedBefore.has(t)).map((t) => ({ t, gameId: c.gameId })))[0];
+        if (hit) {
+          const [g] = await db.select({ w: gamesTable.whiteUsername, b: gamesTable.blackUsername }).from(gamesTable).where(eq(gamesTable.id, hit.gameId)).limit(1);
+          const me = primaryUsername.toLowerCase();
+          const opp = g ? ((g.w ?? "").toLowerCase() === me ? g.b : g.w) : null;
+          const { sendPushToUser } = await import("../lib/pushNotifications");
+          await sendPushToUser(userId, {
+            title: "Case reopened",
+            body: `You missed ${REOPEN_THEMES[hit.t]} again${opp ? ` vs ${opp}` : ""}. You've solved this one before: close it again.`,
+            url: "/puzzles/hub?tab=cases",
+            tag: "case-reopened",
+          });
+        }
+      } catch (err: any) { req.log.warn({ error: err.message }, "case reopened check failed"); }
     }
 
     res.json({ generated, message: `Generated ${generated} puzzles from your games` });

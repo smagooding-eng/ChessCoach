@@ -1,4 +1,5 @@
 import { recordActivity } from '@/lib/activity';
+import { DailyScoutShare } from '@/components/DailyScoutShare';
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { RatePlayCard } from '@/components/RatePlayCard';
 import { useBoardStyleTip } from '@/components/BoardStyleTip';
@@ -172,7 +173,16 @@ export function Puzzles() {
   const [lichessDaily, setLichessDaily] = useState<{ id: number; rating: number } | null>(null);
   // ?id=123 (a Case File from the puzzle hub): that puzzle first
   const wantPuzzle = useRef<number | null>(Number(new URLSearchParams(search).get('id')) || null);
+  // ?daily=12&id=…: today's Daily Scout (share card when it's done)
+  const dailyNo = Number(new URLSearchParams(search).get('daily')) || 0;
+  const dailyId = Number(new URLSearchParams(search).get('id')) || 0;
+  const [dailyDone, setDailyDone] = useState<{ solved: boolean; ms: number; good: number } | null>(null);
   useEffect(() => { if (state === 'correct') setSolvedHere((n) => n + 1); }, [state]);
+  useEffect(() => {
+    if (!dailyNo || dailyDone || !puzzle || puzzle.id !== dailyId || (state !== 'correct' && state !== 'wrong')) return;
+    const good = Math.floor(currentMoveIndex / 2) + (state === 'correct' ? 1 : 0);
+    setDailyDone({ solved: state === 'correct', ms: Date.now() - startTimeRef.current, good: Math.max(state === 'correct' ? 1 : 0, good) });
+  }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     let live = true;
@@ -916,6 +926,7 @@ export function Puzzles() {
                     </button>
                   )}
 
+                  {dailyDone && <DailyScoutShare number={dailyNo} solved={dailyDone.solved} ms={dailyDone.ms} goodMoves={dailyDone.good} />}
                   {(state === 'correct' || state === 'wrong') && (
                     <button
                       onClick={() => {
