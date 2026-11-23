@@ -1,3 +1,4 @@
+import { recordActivity } from '@/lib/activity';
 import { analyse, engineSupported } from '@/lib/deviceEngine';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import { BackLink, canGoBack } from '@/lib/navBack';
@@ -642,6 +643,7 @@ export function GameReplay() {
   const { username, authUser, isPremium, isSubscriptionLoaded } = useUser();
   const [, navigate] = useLocation();
   const { data: game, isLoading, error } = useGameViewer(parseInt(id || '0'));
+  useEffect(() => { if (game && authUser) recordActivity('review'); }, [game, authUser]);
   const { player: whitePlayer } = useChessPlayer(game?.whiteUsername);
   const { player: blackPlayer } = useChessPlayer(game?.blackUsername);
 

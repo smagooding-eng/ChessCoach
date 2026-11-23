@@ -1,3 +1,4 @@
+import { recordActivity } from '@/lib/activity';
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { RatePlayCard } from '@/components/RatePlayCard';
 import { useBoardStyleTip } from '@/components/BoardStyleTip';
@@ -286,6 +287,7 @@ export function Puzzles() {
       setLastMove({ from, to });
       setSelectedSquare(null);
 
+      recordActivity('puzzle');
       apiFetch(`/api/puzzles/${puzzle.id}/solve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

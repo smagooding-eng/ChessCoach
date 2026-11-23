@@ -84,6 +84,8 @@ async function runSchemaMigrations() {
     await db.execute(sql`ALTER TABLE lichess_cs_games ADD COLUMN IF NOT EXISTS source varchar(16)`);
     // "Where did you find us?": one answer per user, asked after a win or a streak.
     await db.execute(sql`CREATE TABLE IF NOT EXISTS user_board_looks (user_id varchar PRIMARY KEY, look jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`);
+    // The daily streak: one row per member per day they did something (played, solved, reviewed, learned).
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS user_activity_days (user_id varchar NOT NULL, day date NOT NULL, kinds text[] NOT NULL DEFAULT '{}', PRIMARY KEY (user_id, day))`);
     await db.execute(sql`CREATE TABLE IF NOT EXISTS user_heard_from (user_id varchar PRIMARY KEY, source varchar(32) NOT NULL, detail varchar(80), created_at timestamptz NOT NULL DEFAULT now())`);
     // Answer pages for Google and ChatGPT (free game review, stop blundering...). An article
     // that already exists is left as it is, so edits in the admin stay.

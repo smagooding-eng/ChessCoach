@@ -1,5 +1,6 @@
 // Free analysis board: paste a PGN or FEN (or just play moves) and Stockfish analyses every
 // position live, on the player's own device. No account needed.
+import { recordActivity } from '@/lib/activity';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Chess } from 'chess.js';
 import { ChevronLeft, ChevronRight, Copy, Check, FlipVertical2, RotateCcw, ClipboardPaste } from 'lucide-react';
@@ -58,6 +59,7 @@ export default function AnalysisBoardPage() {
   const over = useMemo(() => { try { return new Chess(step.fen).isGameOver(); } catch { return true; } }, [step.fen]);
 
   const play = useCallback((san: string) => {
+    recordActivity('analysis');
     try {
       const c = new Chess(steps[at].fen);
       const mv = c.move(san);

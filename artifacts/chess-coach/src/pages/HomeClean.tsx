@@ -22,6 +22,7 @@ import { ReferralCard } from '@/pages/Profile';
 import { SocialLinks } from '@/components/SocialLinks';
 import { AppIcon } from '@/components/AppIcon';
 import { setHomeStyle } from '@/lib/homeStyle';
+import { useStreak } from '@/lib/activity';
 
 const BG = 'var(--rd-bg, #0E1415)';
 const PANEL = 'var(--rd-card-solid, #182123)';
@@ -63,6 +64,7 @@ export function HomeClean() {
   const [, navigate] = useLocation();
   const [opponent, setOpponent] = useState('');
   const [puzzles, setPuzzles] = useState<{ solved: number; streak: number } | null>(null);
+  const daily = useStreak(!!authUser);
 
   // quietly fetch new games once per visit (as the previous Home does)
   const imported = useRef(false);
@@ -122,6 +124,17 @@ export function HomeClean() {
           )}
         </div>
 
+        {daily && (
+          <div className="flex items-center gap-3 rounded-[12px] px-3.5 py-2.5" style={{ background: PANEL }}>
+            <AppIcon name="streak" size={28} style={{ filter: daily.doneToday ? undefined : 'grayscale(1) opacity(.6)' }} />
+            <span className="min-w-0 flex-1">
+              <b className="block text-[15px] font-extrabold">{daily.streak} day{daily.streak === 1 ? '' : 's'} in a row</b>
+              <span className="text-[12px]" style={{ color: MUTED }}>{daily.doneToday ? 'Done for today' : 'Play, solve or review today to keep it'}</span>
+            </span>
+            <span className="flex gap-1">{daily.week.map((d) => <span key={d.day} className="h-2.5 w-2.5 rounded-full" style={{ background: d.done ? '#F08A3C' : 'rgba(255,255,255,.12)' }} />)}</span>
+          </div>
+        )}
+
         <NotifyPrompt id="home" reason="Get told when your games are reviewed." />
 
         {/* puzzles: the trail */}
@@ -163,7 +176,7 @@ export function HomeClean() {
             {multiElo?.chesscom?.hasData && <Tile href="/analysis" icon="live" value={multiElo.chesscom.currentRating} label="Chess.com" />}
             {multiElo?.lichess?.hasData && <Tile href="/analysis" icon="board" value={multiElo.lichess.currentRating} label="Lichess" />}
             <Tile href="/trail" icon="puzzles" value={solved} label="Puzzles" />
-            {(puzzles?.streak ?? 0) > 1 && <Tile href="/trail" icon="streak" value={puzzles!.streak} label="In a row" />}
+            {daily && <Tile href="/trail" icon="streak" value={daily.streak} label={daily.streak === 1 ? 'Day streak' : 'Days streak'} />}
             <Tile href="/analysis" icon="analysis" label="All stats" />
           </div>
         </Section>

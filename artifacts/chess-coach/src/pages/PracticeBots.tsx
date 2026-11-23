@@ -1,3 +1,4 @@
+import { recordActivity } from '@/lib/activity';
 import { markValueMoment } from '@/lib/valueMoment';
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useBoardSetupMoment } from '@/lib/setupMoment';
@@ -328,6 +329,7 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
     reportedRef.current = gameKeyRef.current;
     let pgn = '';
     try { pgn = chess.pgn(); } catch { /* result is still saved */ }
+    recordActivity('play');
     reportBotResult(bot.name, result, moves.length, gameKeyRef.current, pgn ? { pgn, color: playerColor, botRating: bot.rating } : undefined, takebackUsed);
   }, [result, signedIn, startFen, bot.name, moves.length, chess, playerColor, bot.rating, takebackUsed]);
   const [, navigate] = useLocation();
