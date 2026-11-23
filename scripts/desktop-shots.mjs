@@ -12,6 +12,7 @@ const PUBLIC = [
   ['openings-public', '/chess-openings'], ['traps-public', '/chess-traps'], ['learn', '/learn'], ['blog', '/blog'],
   ['download', '/download'], ['terms', '/terms'], ['vs-aimchess', '/vs/aimchess'], ['setup', '/setup'],
   ['tournaments', '/tournaments'], ['kids', '/kids'], ['beginner', '/beginner'], ['scan', '/scan'],
+  ['analysis-board', '/analysis-board'],
 ];
 const SIGNED_IN = [
   ['dashboard', '/'], ['games', '/games'], ['analysis', '/analysis'], ['play', '/play'], ['live', '/live'],
@@ -20,18 +21,20 @@ const SIGNED_IN = [
   ['notifications', '/notifications'], ['profile', '/profile'], ['settings', '/settings'], ['subscription', '/subscription'],
   ['import', '/import'], ['lookup', '/lookup'], ['shop', '/shop'], ['tournaments-in', '/tournaments'], ['learning', '/learning'],
   ['scan-in', '/scan'], ['affiliate', '/affiliate'], ['beginner-in', '/beginner'], ['kids-in', '/kids'],
+  ['trail', '/trail'], ['analysis-board-in', '/analysis-board'], ['more-credits', '/credits'],
 ];
-const SIZES = [
-  { id: '1280', viewport: { width: 1280, height: 720 } },
-  { id: '1920', viewport: { width: 1920, height: 1080 } },
-];
+// SHOT_SIZES="390x844,1280x720" picks the sizes (phones get a phone screen and touch)
+const SIZES = (process.env.SHOT_SIZES || '1280x720,1920x1080').split(',').map((v) => {
+  const [w, h] = v.trim().split('x').map(Number);
+  return { id: String(w), viewport: { width: w, height: h }, mobile: w < 600 };
+});
 const browser = await chromium.launch();
 const report = [];
 async function run(list0, signedIn) {
   let list = list0;
   for (const s of SIZES) {
     mkdirSync(`${OUT}/${s.id}`, { recursive: true });
-    const ctx = await browser.newContext({ viewport: s.viewport, deviceScaleFactor: 1, locale: 'en-US',
+    const ctx = await browser.newContext({ viewport: s.viewport, deviceScaleFactor: s.mobile ? 2 : 1, isMobile: !!s.mobile, hasTouch: !!s.mobile, locale: 'en-US',
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36 ChessScoutStoreShots' });
     await ctx.addInitScript((t) => { try { localStorage.setItem('cs_lang', 'en'); if (t) localStorage.setItem('chess_coach_token', t); } catch {} }, signedIn ? TOKEN : '');
     const page = await ctx.newPage();

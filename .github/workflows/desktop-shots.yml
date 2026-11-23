@@ -19,6 +19,18 @@ on:
         description: 'Comma-separated signed-in page names (blank = all)'
         required: false
         default: ''
+      site:
+        description: 'Site to shoot (blank = https://chessscout.net)'
+        required: false
+        default: ''
+      sizes:
+        description: 'Sizes, e.g. 390x844,1280x720 (blank = 1280 and 1920)'
+        required: false
+        default: ''
+      key:
+        description: 'Encrypt for: desktop-shots (default) or claude-shots'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -40,6 +52,8 @@ jobs:
           DESKTOP_SHOT_TOKEN: ${{ secrets.DESKTOP_SHOT_TOKEN }}
           SIGNED_IN_ONLY: ${{ github.event.inputs.signed_in_only }}
           ONLY_PAGES: ${{ github.event.inputs.only_pages }}
+          SITE: ${{ github.event.inputs.site || 'https://chessscout.net' }}
+          SHOT_SIZES: ${{ github.event.inputs.sizes }}
         run: |
           if [ -n "${{ github.event.inputs.audit_reviews }}" ]; then
             OUT=/tmp/shots FRESH_ID=none node scripts/review-audit.mjs
@@ -53,10 +67,10 @@ jobs:
           tar czf shots.tgz shots
           openssl rand -hex 32 > k.txt
           openssl enc -aes-256-cbc -pbkdf2 -salt -in shots.tgz -out shots.tgz.enc -pass file:k.txt
-          openssl pkeyutl -encrypt -pubin -inkey "$GITHUB_WORKSPACE/scripts/desktop-shots.pub.pem" -in k.txt -out k.enc
+          openssl pkeyutl -encrypt -pubin -inkey "$GITHUB_WORKSPACE/scripts/${{ github.event.inputs.key || 'desktop-shots' }}.pub.pem" -in k.txt -out k.enc
           rm k.txt
           mkdir out && cp shots.tgz.enc k.enc out/
           cd out && git init -q && git checkout -q -b desktop-shots
           git config user.name "desktop-shots-bot" && git config user.email "desktop-shots-bot@users.noreply.github.com"
           git add . && git commit -q -m "Desktop screenshots (encrypted)"
-          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" desktop-shots
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" "HEAD:${{ github.event.inputs.key == 'claude-shots' && 'claude-shots' || 'desktop-shots' }}"
