@@ -96,11 +96,13 @@ router.get("/auth/user", async (req: Request, res: Response) => {
   // The ChessScout username can be set from another device, so read it
   // fresh rather than trusting the copy stored in this session.
   try {
-    const [row] = await db.select({ scoutUsername: usersTable.scoutUsername, emailOptOut: usersTable.emailOptOut, profileImageUrl: usersTable.profileImageUrl }).from(usersTable).where(eq(usersTable.id, req.user!.id)).limit(1);
+    const [row] = await db.select({ scoutUsername: usersTable.scoutUsername, emailOptOut: usersTable.emailOptOut, profileImageUrl: usersTable.profileImageUrl, createdAt: usersTable.createdAt }).from(usersTable).where(eq(usersTable.id, req.user!.id)).limit(1);
     if (row) {
       (req.user as any).profileImageUrl = row.profileImageUrl ?? null;
       (req.user as any).scoutUsername = row.scoutUsername ?? null;
       (req.user as any).emailOptOut = !!row.emailOptOut;
+      // when they joined: the app keeps new members' first days free of popups
+      (req.user as any).joinedAt = row.createdAt ?? null;
     }
   } catch { /* fall back to the session copy */ }
   touchLastActive(req.user!.id);

@@ -37,6 +37,7 @@ export type LandingFunnelEvent =
   | 'ig_games_shown' | 'inapp_open_browser'
   | 'scroll_25' | 'scroll_50' | 'scroll_75' | 'scroll_100'
   | 'engaged_10s'
+  | `popup_${'shown' | 'closed'}_${'pro_offer' | 'board_setup' | 'review_alerts'}`
   | 'pro_checkout_stripe' | 'pro_checkout_card' | 'pro_checkout_google_pay' | 'pro_checkout_apple_pay'
   | 'pro_checkout_link' | 'pro_checkout_amazon_pay' | 'pro_checkout_paypal' | 'pro_checkout_other'
   | `viewed_${LandingSectionId}`

@@ -2,6 +2,7 @@
 // (the move that decided it). Asked for in the board set-up card, and again after every 5th
 // game review while they're still off. Without notifications we email instead (see
 // samedayNotify on the server: after the session, at most once a day).
+import { claimPopup, popupClosed } from '@/lib/popupGate';
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { usePushNotifications } from '@/hooks/use-push-notifications';
@@ -53,6 +54,8 @@ export function ReviewAlertsPrompt() {
   const state = useRef({ on: false, denied: false, supported: true });
   state.current = { on: p.permission === 'granted' && p.isSubscribed, denied: p.permission === 'denied', supported: p.permission !== 'unsupported' };
   const uid = authUser?.id;
+  const authUserRef = useRef(authUser); authUserRef.current = authUser;
+  const closeAsk = () => { popupClosed('review_alerts'); setOpen(false); };
   useEffect(() => {
     if (!uid || STUDIO_FRAME || window.self !== window.top) return undefined;
     const key = `cs_reviews_seen:${uid}`, due = `cs_alerts_ask_due:${uid}`;
@@ -75,6 +78,7 @@ export function ReviewAlertsPrompt() {
       t = window.setTimeout(() => {
         // not on top of the Pro offer: wait for the next review instead
         try { if (Date.now() - Number(localStorage.getItem('cs_promo_open_at') || 0) < 2 * 60_000) return; } catch { /* */ }
+        if (!claimPopup('review_alerts', authUserRef.current as never)) return; // stays due for the next review
         try { localStorage.removeItem(due); } catch { /* */ }
         setOpen(true);
       }, 2500);
@@ -85,17 +89,17 @@ export function ReviewAlertsPrompt() {
   useEffect(() => { if (open && p.permission === 'granted' && p.isSubscribed) { const t = setTimeout(() => setOpen(false), 1200); return () => clearTimeout(t); } return undefined; }, [open, p.permission, p.isSubscribed]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[94] flex items-end justify-center" style={{ background: 'rgba(3,6,7,.6)' }} onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
+    <div className="fixed inset-0 z-[94] flex items-end justify-center" style={{ background: 'rgba(3,6,7,.6)' }} onClick={(e) => { if (e.target === e.currentTarget) closeAsk(); }}
       role="dialog" aria-label="Turn on game alerts">
       <style>{'@keyframes csalert{from{transform:translateY(100%)}to{transform:none}}'}</style>
       <div className="relative w-full max-w-md rounded-t-[22px] p-4 pb-[calc(16px+env(safe-area-inset-bottom))]"
         style={{ background: '#0D1516', border: `1px solid ${LINE}`, color: TEXT, animation: 'csalert .3s cubic-bezier(.2,.8,.2,1)' }}>
-        <button onClick={() => setOpen(false)} aria-label="Close" className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full" style={{ background: 'rgba(255,255,255,.06)', color: MUTED }}><X size={16} /></button>
+        <button onClick={() => closeAsk()} aria-label="Close" className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full" style={{ background: 'rgba(255,255,255,.06)', color: MUTED }}><X size={16} /></button>
         <p className="text-[11px] font-black uppercase tracking-[.14em]" style={{ color: G }}>Reviews, the moment you finish</p>
         <h2 className="mt-1 pr-8 text-[20px] font-black leading-tight">Want this after every game?</h2>
         <p className="mt-1 text-[12.5px] leading-snug" style={{ color: MUTED }}>{GAME_ALERTS_WHY} No need to come and look.</p>
         <div className="mt-3"><GameAlertsRow compact /></div>
-        <button type="button" onClick={() => setOpen(false)} className="mt-2 w-full py-2 text-center text-[12.5px] font-bold" style={{ color: MUTED }}>Not now</button>
+        <button type="button" onClick={() => closeAsk()} className="mt-2 w-full py-2 text-center text-[12.5px] font-bold" style={{ color: MUTED }}>Not now</button>
       </div>
     </div>
   );

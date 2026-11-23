@@ -92,6 +92,9 @@ const VALID_EVENTS = new Set([
   "ig_games_shown", "inapp_open_browser",
   "scroll_25", "scroll_50", "scroll_75", "scroll_100",
   "engaged_10s",
+  // in-app popups: shown and closed, to see what they do to new members
+  "popup_shown_pro_offer", "popup_closed_pro_offer", "popup_shown_board_setup", "popup_closed_board_setup",
+  "popup_shown_review_alerts", "popup_closed_review_alerts",
   ...CHECKOUT_EVENTS,
   ...SECTION_IDS.map((s) => `viewed_${s}`),
   ...SECTION_IDS.map((s) => `exit_${s}`),

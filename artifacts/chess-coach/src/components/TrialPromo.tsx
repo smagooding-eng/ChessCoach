@@ -1,6 +1,7 @@
 // The 3-day Pro trial, offered at most once a day to members who can still take it: a pawn walks
 // across three "days" and promotes to a queen, then the offer. Not a paywall: it shows
 // once a day, closes with "Maybe later", and stops for good once they start the trial.
+import { claimPopup, isNewMember, popupClosed } from '@/lib/popupGate';
 import { VALUE_EVENT, type ValueMoment } from '@/lib/valueMoment';
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'wouter';
@@ -52,6 +53,7 @@ export function TrialPromo() {
     if (!moment) return;
     const path = pathRef.current;
     if (!authUser || !isSubscriptionLoaded || isPremium || open) return;
+    if (isNewMember(authUser as never)) return; // not in their first days
     if (STUDIO_FRAME || window.self !== window.top || SKIP.test(path)) return;
     let seen = false;
     try { const at = Number(localStorage.getItem(SEEN(authUser.id)) || 0); seen = !!at && Date.now() - at < EVERY_MS; } catch { /* storage off */ }
@@ -62,6 +64,7 @@ export function TrialPromo() {
         const r = await apiFetch('/api/stripe/trial-offer', { credentials: 'include' });
         const d = r.ok ? await r.json() : null;
         if (gone || !d?.eligible || document.visibilityState !== 'visible') return;
+        if (!claimPopup('pro_offer', authUser as never)) return;
         setDays(Number(d.days) || 3);
         try { localStorage.setItem(SEEN(authUser.id), String(Date.now())); localStorage.setItem(PROMO_OPEN_KEY, String(Date.now())); } catch { /* storage off */ }
         setOpen(true);
@@ -76,7 +79,7 @@ export function TrialPromo() {
 
   if (!open) return null;
 
-  const close = () => { track('dismiss'); setOpen(false); };
+  const close = () => { track('dismiss'); popupClosed('pro_offer'); setOpen(false); };
   const start = async () => {
     track('start');
     setBusy(true); setErr('');
