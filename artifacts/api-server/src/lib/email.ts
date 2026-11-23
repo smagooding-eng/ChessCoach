@@ -14,7 +14,7 @@ function getResend(): Resend {
   return _resend;
 }
 
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'ChessScout <hello@chessscout.net>';
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'ChessScout <chesscoach@chessscout.net>';
 
 // Free email providers can never be verified as a Resend sending domain —
 // you don't control their DNS. If RESEND_FROM_EMAIL is accidentally set to
