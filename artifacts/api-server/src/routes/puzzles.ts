@@ -449,6 +449,26 @@ router.get("/puzzles/solved", requireAuth, async (req: Request, res: Response) =
   }
 });
 
+// Pattern Collection: how many puzzles of each tactic the member has tried and solved.
+const PATTERN_THEMES = ["fork", "pin", "skewer", "discoveredAttack", "hangingPiece", "sacrifice", "backRankMate", "deflection", "attraction", "doubleCheck", "mateIn1", "mateIn2", "endgame", "promotion"];
+router.get("/puzzles/patterns", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const rows = await db.execute(sql`
+      WITH a AS (SELECT DISTINCT ON (pa.puzzle_id) pa.puzzle_id, pa.solved FROM puzzle_attempts pa WHERE pa.user_id = ${userId} ORDER BY pa.puzzle_id, pa.solved DESC)
+      SELECT t.theme, count(*)::int AS tried, count(*) FILTER (WHERE a.solved)::int AS solved
+      FROM a JOIN puzzles p ON p.id = a.puzzle_id
+      CROSS JOIN LATERAL unnest(string_to_array(coalesce(p.themes, ''), ',')) AS t(theme)
+      WHERE t.theme IN (${sql.join(PATTERN_THEMES.map((t) => sql`${t}`), sql`, `)})
+      GROUP BY t.theme`);
+    const by = new Map((rows.rows as { theme: string; tried: number; solved: number }[]).map((r) => [r.theme, r]));
+    res.json({ patterns: PATTERN_THEMES.map((t) => ({ theme: t, tried: by.get(t)?.tried ?? 0, solved: by.get(t)?.solved ?? 0 })) });
+  } catch (err: any) {
+    req.log.error({ error: err.message }, "Failed to get puzzle patterns");
+    res.status(500).json({ error: "Failed to get patterns" });
+  }
+});
+
 router.get("/puzzles/my-puzzles", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
@@ -462,10 +482,13 @@ router.get("/puzzles/my-puzzles", requireAuth, async (req: Request, res: Respons
     }
 
     const userGames = await db
-      .select({ id: gamesTable.id })
+      .select({ id: gamesTable.id, white: gamesTable.whiteUsername, black: gamesTable.blackUsername, playedAt: gamesTable.playedAt })
       .from(gamesTable)
       .where(eq(gamesTable.username, primaryUsername.toLowerCase()))
+      .orderBy(desc(gamesTable.playedAt))
       .limit(200);
+    const gameInfo = new Map(userGames.map((g) => [g.id, g]));
+    const me = primaryUsername.toLowerCase();
 
     const userGameIds = userGames.map(g => g.id);
 
@@ -501,6 +524,8 @@ router.get("/puzzles/my-puzzles", requireAuth, async (req: Request, res: Respons
         themes: p.themes?.split(",").filter(Boolean) ?? [],
         gameId: p.gameId,
         moveNumber: p.moveNumber,
+        opponent: (() => { const g = gameInfo.get(p.gameId ?? -1); return g ? ((g.white ?? "").toLowerCase() === me ? g.black : g.white) : null; })(),
+        playedAt: gameInfo.get(p.gameId ?? -1)?.playedAt ?? null,
         attempted: attemptMap.has(p.id),
         solved: attemptMap.get(p.id) ?? false,
       })),

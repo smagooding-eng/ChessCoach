@@ -142,7 +142,7 @@ export function Puzzles() {
 
   // "My Game Puzzles" tab removed -- Daily Puzzles is now the only mode,
   // with an added puzzle-type filter (mate in N, etc) below instead.
-  const [puzzleTheme, setPuzzleTheme] = useState<string>('');
+  const [puzzleTheme, setPuzzleTheme] = useState<string>(() => new URLSearchParams(search).get('puzzleTheme') ?? '');
   const [sacrificePiece, setSacrificePiece] = useState<string>('');
   const [pieceTypeMismatch, setPieceTypeMismatch] = useState(false);
   const [ratingBand, setRatingBand] = useState<string>('');
@@ -170,7 +170,8 @@ export function Puzzles() {
 
   // Lichess's puzzle of the day (added to ChessScout's puzzles), shown as a card at the top.
   const [lichessDaily, setLichessDaily] = useState<{ id: number; rating: number } | null>(null);
-  const wantPuzzle = useRef<number | null>(null);
+  // ?id=123 (a Case File from the puzzle hub): that puzzle first
+  const wantPuzzle = useRef<number | null>(Number(new URLSearchParams(search).get('id')) || null);
   useEffect(() => { if (state === 'correct') setSolvedHere((n) => n + 1); }, [state]);
 
   useEffect(() => {

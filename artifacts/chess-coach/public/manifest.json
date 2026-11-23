@@ -64,7 +64,7 @@
     {
       "name": "Puzzles",
       "short_name": "Puzzles",
-      "url": "/puzzles",
+      "url": "/puzzles/hub",
       "icons": [
         {
           "src": "icons/icon-192.png?v=4",

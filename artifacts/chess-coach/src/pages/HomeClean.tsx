@@ -140,11 +140,11 @@ export function HomeClean() {
         <NotifyPrompt id="home" reason="Get told when your games are reviewed." />
 
         {/* puzzles */}
-        <Link href="/puzzles" className="flex items-center gap-3 rounded-[12px] p-3.5 active:scale-[.99]" style={{ background: PANEL }}>
+        <Link href="/puzzles/hub" className="flex items-center gap-3 rounded-[12px] p-3.5 active:scale-[.99]" style={{ background: PANEL }}>
           <AppIcon name="puzzles" size={40} />
           <span className="min-w-0 flex-1">
             <b className="block text-[17px] font-black">Puzzles</b>
-            <span className="text-[12.5px] font-semibold" style={{ color: MUTED }}>{solved ? `${solved.toLocaleString()} solved` : 'Many come from your own games'}</span>
+            <span className="text-[12.5px] font-semibold" style={{ color: MUTED }}>{solved ? `${solved.toLocaleString()} solved · Case Files from your games` : 'Case Files from your own games'}</span>
           </span>
           <span className="cs-cta !w-auto !min-h-[40px] !px-4 !text-[15px]">Solve</span>
         </Link>

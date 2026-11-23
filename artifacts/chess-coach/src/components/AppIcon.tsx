@@ -60,7 +60,7 @@ export function AppIcon({ name, ...p }: P & { name: string }) {
 
 const BY_HREF: Record<string, string> = {
   '/': 'home', '/play': 'play', '/games': 'games', '/analysis': 'analysis', '/openings': 'openings', '/tactics': 'tactics',
-  '/endgames': 'endgames', '/puzzles': 'puzzles', '/traps': 'traps', '/courses': 'courses', '/practice': 'bots', '/learn': 'articles',
+  '/endgames': 'endgames', '/puzzles': 'rush', '/puzzles/hub': 'puzzles', '/traps': 'traps', '/courses': 'courses', '/practice': 'bots', '/learn': 'articles',
   '/live': 'live', '/watch': 'watch', '/friends': 'friends', '/tournaments': 'tournaments', '/streams': 'streams', '/studio': 'studio',
   '/kids': 'kids', '/import': 'import', '/lookup': 'lookup', '/opponents': 'opponents', '/scan': 'scan', '/analysis-board': 'board',
   '/subscription': 'subscription', '/settings': 'settings', '/admin': 'admin', '/admin/studio': 'studio', '/trail': 'trail',
