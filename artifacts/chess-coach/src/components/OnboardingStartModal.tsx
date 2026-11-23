@@ -44,7 +44,9 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
   const [linkError, setLinkError] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
   const [importErrorMessage, setImportErrorMessage] = useState<string | null>(null);
-  const [setupDone, setSetupDone] = useState(false);
+  // The board set-up card no longer comes first: it showed before a new member had seen
+  // anything of theirs. They get it later, when they open a game lobby ("Before you play").
+  const [setupDone, setSetupDone] = useState(true);
   const { authUser } = useUser();
 
   const submitUsername = async () => {

@@ -1,6 +1,7 @@
 // Everyone sees the board & play set-up once, with their own choices marked "Yours": it slides
 // up from the bottom when they open a game menu (before a game, never during one), not on
 // top of the Pro offer.
+import { claimPopup, popupClosed } from '@/lib/popupGate';
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
@@ -23,6 +24,7 @@ export function BoardSetupPrompt() {
       timer.current = window.setTimeout(() => {
         try { if (Date.now() - Number(localStorage.getItem(PROMO_OPEN_KEY) || 0) < 3 * 60_000) return; } catch { /* ignore */ }
         if (document.visibilityState !== 'visible' || setupSeen(authUser.id)) return;
+        if (!claimPopup('board_setup', authUser as never)) return;
         setOpen(true);
       }, 1500);
     };
@@ -30,7 +32,7 @@ export function BoardSetupPrompt() {
     return () => { window.removeEventListener(SETUP_MOMENT, onMoment); window.clearTimeout(timer.current); };
   }, [authUser, open]);
   if (!open || !authUser) return null;
-  const done = () => { markSetupSeen(authUser.id); setOpen(false); };
+  const done = () => { markSetupSeen(authUser.id); popupClosed('board_setup'); setOpen(false); };
   return (
     <div className="fixed inset-0 z-[95] flex items-end justify-center" style={{ background: 'rgba(3,6,7,.7)', backdropFilter: 'blur(4px)' }}
       role="dialog" aria-label="Your board and play set-up" onClick={(e) => { if (e.target === e.currentTarget) done(); }}>
