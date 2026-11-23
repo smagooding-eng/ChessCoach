@@ -20,13 +20,13 @@ jobs:
           WASM=$(find package -type f -name '*lite-single*.wasm' | head -1)
           [ -n "$JS" ] && [ -n "$WASM" ] || { echo "::error::No lite-single build found"; exit 1; }
           D=$GITHUB_WORKSPACE/artifacts/chess-coach/public/engine; mkdir -p "$D"; rm -f "$D"/*
-          cp "$JS" "$D/stockfish.js"; cp "$WASM" "$D/$(basename "$WASM")"
+          cp "$JS" "$WASM" "$D/"   # keep the names: the js loads the .wasm with its own name
           cp package/Copying.txt "$D/COPYING.txt" 2>/dev/null || cp package/LICENSE* "$D/" 2>/dev/null || true
           # the js finds its wasm next to itself by its original name
-          grep -o "$(basename "$WASM")" "$D/stockfish.js" | head -1 || echo "note: wasm name not referenced literally"
-          printf '{"version":"%s","js":"stockfish.js","wasm":"%s","source":"https://github.com/nmrugg/stockfish.js"}\n' "$(node -p "require('./package/package.json').version")" "$(basename "$WASM")" > "$D/engine.json"
+          grep -o "\.wasm[^\"]\{0,40\}" "$D/$(basename "$JS")" | head -3 || true
+          printf '{"version":"%s","js":"%s","wasm":"%s","source":"https://github.com/nmrugg/stockfish.js"}\n' "$(node -p "require('./package/package.json').version")" "$(basename "$JS")" "$(basename "$WASM")" > "$D/engine.json"
           ls -la "$D"
       - run: |
           git config user.name "Shann"; git config user.email "smagooding@gmail.com"
           git add artifacts/chess-coach/public/engine
-          git diff --cached --quiet && echo "No change" || { git commit -qm "Browser Stockfish build (public/engine)"; git push -q; }
+          git diff --cached --quiet && echo "No change" || { git commit -qm "Browser Stockfish build (public/engine)"; git pull -q --rebase origin "${GITHUB_REF_NAME}"; git push -q origin "HEAD:${GITHUB_REF_NAME}"; }
