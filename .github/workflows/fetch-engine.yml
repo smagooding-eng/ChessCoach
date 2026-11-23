@@ -1,0 +1,32 @@
+# Puts the browser build of Stockfish (single-threaded "lite" NNUE, from the stockfish npm package)
+# into artifacts/chess-coach/public/engine/ so the app can run the engine on the player's device.
+# Run once (or to update): GitHub → Actions → "Fetch browser engine" → Run workflow (on preview).
+name: Fetch browser engine
+on:
+  workflow_dispatch:
+    inputs:
+      version: { description: "stockfish npm version (blank = latest)", required: false, default: "" }
+permissions: { contents: write }
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          V="${{ inputs.version }}"; mkdir -p /tmp/sf && cd /tmp/sf
+          npm pack "stockfish${V:+@$V}" >/dev/null && tar xzf stockfish-*.tgz
+          echo "Package files:"; find package -maxdepth 2 -type f | sort | head -80
+          JS=$(find package -type f -name '*lite-single*.js' | grep -v -i asm | head -1)
+          WASM=$(find package -type f -name '*lite-single*.wasm' | head -1)
+          [ -n "$JS" ] && [ -n "$WASM" ] || { echo "::error::No lite-single build found"; exit 1; }
+          D=$GITHUB_WORKSPACE/artifacts/chess-coach/public/engine; mkdir -p "$D"; rm -f "$D"/*
+          cp "$JS" "$D/stockfish.js"; cp "$WASM" "$D/$(basename "$WASM")"
+          cp package/Copying.txt "$D/COPYING.txt" 2>/dev/null || cp package/LICENSE* "$D/" 2>/dev/null || true
+          # the js finds its wasm next to itself by its original name
+          grep -o "$(basename "$WASM")" "$D/stockfish.js" | head -1 || echo "note: wasm name not referenced literally"
+          printf '{"version":"%s","js":"stockfish.js","wasm":"%s","source":"https://github.com/nmrugg/stockfish.js"}\n' "$(node -p "require('./package/package.json').version")" "$(basename "$WASM")" > "$D/engine.json"
+          ls -la "$D"
+      - run: |
+          git config user.name "Shann"; git config user.email "smagooding@gmail.com"
+          git add artifacts/chess-coach/public/engine
+          git diff --cached --quiet && echo "No change" || { git commit -qm "Browser Stockfish build (public/engine)"; git push -q; }
