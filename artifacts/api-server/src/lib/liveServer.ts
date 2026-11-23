@@ -679,7 +679,8 @@ function tryMatchInQueue(key: string) {
     const aWin = matchWindowFor(a.joinedAt);
     for (let j = i + 1; j < sorted.length; j++) {
       const b = sorted[j];
-      if (userActiveGame.has(b.userId)) continue;
+      // Never pair someone with themselves (two searches from the same account)
+      if (b.userId === a.userId || userActiveGame.has(b.userId)) continue;
       const bWin = matchWindowFor(b.joinedAt);
       const window = Math.max(aWin, bWin);
       if (Math.abs(a.rating - b.rating) <= window) {
@@ -698,6 +699,13 @@ function tryMatchInQueue(key: string) {
 }
 
 async function startHumanMatch(a: WaitingPlayer, b: WaitingPlayer) {
+  if (a.userId === b.userId) {
+    // Same account twice (shouldn't happen any more): no game against themselves;
+    // the newest search gets a normal opponent instead of being left waiting.
+    const newer = a.joinedAt >= b.joinedAt ? a : b;
+    void spawnBotMatch(newer.ws, newer.userId, newer.username, newer.tc.id as TimeControlId).catch(() => {});
+    return;
+  }
   const whiteFirst = Math.random() < 0.5;
   const [aProfile, bProfile] = await Promise.all([
     resolveHumanProfile(a.userId, a.username),
@@ -767,6 +775,15 @@ async function joinQueue(ws: WebSocket, userId: string, username: string, tcIdIn
   // People here who could take the game: Lichess / the bot wait a little longer.
   const peopleHere = othersFreeHere(userId) > 0;
   const handoffMs = peopleHere ? HANDOFF_PEOPLE_HERE_MS : AUTO_BOT_MS;
+
+  // A second search from the same account may have started while we were looking up the
+  // rating (double tap, phone + computer, reconnect): only the newest one waits.
+  if (userActiveGame.has(userId)) {
+    const g = games.get(userActiveGame.get(userId)!);
+    if (g) { subscribeWs(ws, g.id); send(ws, { type: 'match_found', state: gamePublicState(g), color: g.white.userId === userId ? 'w' : 'b' }); }
+    return;
+  }
+  cancelQueue(userId);
 
   const key = flex ? flexKey(mode) : queueKey(tcId, mode);
   const queue = queues.get(key)!;
@@ -862,9 +879,9 @@ async function acceptSwitch(ws: WebSocket, userId: string, username: string) {
 }
 
 function cancelQueue(userId: string) {
+  // Remove every waiting entry for this account (there should only ever be one).
   for (const list of queues.values()) {
-    const idx = list.findIndex(w => w.userId === userId);
-    if (idx >= 0) list.splice(idx, 1);
+    for (let i = list.length - 1; i >= 0; i--) if (list[i].userId === userId) list.splice(i, 1);
   }
 }
 
