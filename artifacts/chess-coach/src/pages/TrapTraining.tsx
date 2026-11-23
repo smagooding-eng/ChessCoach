@@ -1,3 +1,4 @@
+import { pathEvent } from '@/lib/learnPath';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, Link } from 'wouter';
 import { Chess } from 'chess.js';
@@ -179,7 +180,7 @@ function TrainingBoard({ trap, mode, onExit, onComplete, onNoteChange }: {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode, success }),
     }).catch(() => {});
-    if (success) onComplete(mode);
+    if (success) { onComplete(mode); pathEvent('trap', String(trap.id)); }
   }, [trap.id, mode, onComplete]);
 
   const userColor = mode === 'commit' ? trap.trapSide : (trap.trapSide === 'white' ? 'black' : 'white');

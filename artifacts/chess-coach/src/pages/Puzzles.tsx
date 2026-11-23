@@ -1,3 +1,4 @@
+import { pathEvent } from '@/lib/learnPath';
 import { recordActivity } from '@/lib/activity';
 import { DailyScoutShare } from '@/components/DailyScoutShare';
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
@@ -146,7 +147,8 @@ export function Puzzles() {
   const [puzzleTheme, setPuzzleTheme] = useState<string>(() => new URLSearchParams(search).get('puzzleTheme') ?? '');
   const [sacrificePiece, setSacrificePiece] = useState<string>('');
   const [pieceTypeMismatch, setPieceTypeMismatch] = useState(false);
-  const [ratingBand, setRatingBand] = useState<string>('');
+  // ?minRating=…&maxRating=… (a Learn Path step): that band
+  const [ratingBand, setRatingBand] = useState<string>(() => { const q = new URLSearchParams(search); const a = q.get('minRating'), b = q.get('maxRating'); return a || b ? `${a ?? ''}-${b ?? ''}` : ''; });
   // Redesign only: Daily (no filters) / Themes (theme chips) / Custom (theme + rating).
   const { enabled: redesign } = useDashboardRedesignFlag();
   const siteImg = useSiteImg();
@@ -312,6 +314,7 @@ export function Puzzles() {
         if (data.solved) {
           setFeedback('correct');
           setState('correct');
+          pathEvent('puzzles');
           fetchStats();
           if (puzzle?.explanation) {
             setExplanation(puzzle.explanation);

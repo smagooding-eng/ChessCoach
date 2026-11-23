@@ -1,6 +1,7 @@
 // Beginner path -- progress and settings, kept on this device while the
 // section is an admin preview.
 
+import { pathEvent } from '@/lib/learnPath';
 import { useCallback, useEffect, useState } from 'react';
 import { UNITS, type Unit, type Lesson } from './beginner';
 
@@ -77,6 +78,7 @@ export function useLearn() {
   }, []);
   const update = useCallback((patch: Partial<LearnState>) => write({ ...current, ...patch }), []);
   const award = useCallback((lessonId: string, stars: number) => {
+    if (stars > 0) pathEvent('course');
     if (stars > (current.lessons[lessonId] ?? 0)) write({ ...current, lessons: { ...current.lessons, [lessonId]: stars } });
   }, []);
   const reset = useCallback(() => write({ ...DEFAULT, sound: current.sound }), []);

@@ -64,7 +64,7 @@ const BY_HREF: Record<string, string> = {
   '/live': 'live', '/watch': 'watch', '/friends': 'friends', '/tournaments': 'tournaments', '/streams': 'streams', '/studio': 'studio',
   '/kids': 'kids', '/import': 'import', '/lookup': 'lookup', '/opponents': 'opponents', '/scan': 'scan', '/analysis-board': 'board',
   '/subscription': 'subscription', '/settings': 'settings', '/admin': 'admin', '/admin/studio': 'studio', '/trail': 'trail',
-  '/leaderboard': 'leaderboard', '/progress': 'leaderboard', '/sprint': 'rush', '/legends': 'guess', '/bot-challenge': 'bots', '/report-card': 'analysis', '/field-notes': 'articles', '/daily': 'opponents', '/badges': 'badges', '/puzzle-rush': 'rush', '/coordinates': 'coords', '/guess-the-move': 'guess', '/classes': 'class',
+  '/leaderboard': 'leaderboard', '/progress': 'leaderboard', '/path': 'trail', '/sprint': 'rush', '/legends': 'guess', '/bot-challenge': 'bots', '/report-card': 'analysis', '/field-notes': 'articles', '/daily': 'opponents', '/badges': 'badges', '/puzzle-rush': 'rush', '/coordinates': 'coords', '/guess-the-move': 'guess', '/classes': 'class',
 };
 BY_HREF['/badges'] = 'badge';
 

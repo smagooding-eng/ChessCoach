@@ -36,6 +36,7 @@ import { recordEntryIntent, takeEntryIntent, openBeforeLinking } from '@/lib/ent
 import { MaintenanceNotice } from '@/components/MaintenanceNotice';
 import { BoardLookReporter } from '@/components/BoardLookReporter';
 import { BoardSetupPrompt } from "@/components/BoardSetupPrompt";
+import { PathStepToast } from "@/components/PathStepToast";
 import { TrialPromo } from "@/components/TrialPromo";
 import { useDashboardRedesignFlag } from "@/hooks/use-app-config";
 import { BackgroundJobsWatcher } from "@/components/BackgroundJobsWatcher";
@@ -246,6 +247,7 @@ const BotChallenge = lazyRetry(() => import("@/pages/BotChallenge"));
 const Legends = lazyRetry(() => import("@/pages/Legends"));
 const Coordinates = lazyRetry(() => import("@/pages/Coordinates"));
 const DailyScoutPage = lazyRetry(() => import("@/pages/DailyScout"));
+const LearnPath = lazyRetry(() => import("@/pages/LearnPath"));
 const ScanPosition = lazyRetry(() => import("@/pages/ScanPosition").then(m => ({ default: m.ScanPosition })));
 const Explorer = lazyRetry(() => import("@/pages/Explorer").then(m => ({ default: m.Explorer })));
 const Admin = lazyRetry(() => import("@/pages/Admin").then(m => ({ default: m.Admin })));
@@ -429,6 +431,7 @@ const PReportCard = () => <ProtectedRoute component={ReportCard} />;
 const PFieldNotes = () => <ProtectedRoute component={FieldNotes} />;
 const PScoutSprint = () => <ProtectedRoute component={ScoutSprint} />;
 const PBotChallenge = () => <ProtectedRoute component={BotChallenge} />;
+const PLearnPath = () => <ProtectedRoute component={LearnPath} />;
 const PScanPosition  = () => <ProtectedRoute component={ScanPosition} />;
 const PExplorer      = () => <ProtectedRoute component={Explorer} />;
 const PAdmin         = () => <ProtectedRoute component={Admin} />;
@@ -749,6 +752,7 @@ function Router() {
       <Route path="/field-notes"      component={PFieldNotes} />
       <Route path="/sprint"           component={PScoutSprint} />
       <Route path="/bot-challenge"    component={PBotChallenge} />
+      <Route path="/path"             component={PLearnPath} />
       <Route path="/last-game"        component={PLastGame} />
       <Route path="/scan"             component={PScanPosition} />
       <Route path="/explore"          component={PExplorer} />
@@ -824,6 +828,7 @@ function App() {
                     <TrialPromo />
                     <MaintenanceNotice />
                     <BoardSetupPrompt />
+                    <PathStepToast />
                     <BoardLookReporter />
                     <EntryIntentRecorder />
                     <ReviewAlertsPrompt />

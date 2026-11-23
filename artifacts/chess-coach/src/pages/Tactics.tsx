@@ -2,6 +2,7 @@
 // spot it on sight. Each motif: See it (demo) → Guided (3) → Drill (10, 8 right
 // masters it) → Speed round. Mastered motifs come back for review. "Missed in your
 // games", speed rounds and review are Pro. Endgame tactics show on /endgames.
+import { pathEvent } from '@/lib/learnPath';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useRoute } from 'wouter';
 import { Chess } from 'chess.js';
@@ -37,8 +38,10 @@ async function fetchPuzzles(m: Motif, n: number, diff?: Diff, exclude: number[] 
   if (diff && list.length < Math.min(n, 3)) list = [...list, ...(await fetchPuzzles(m, n - list.length, undefined, [...exclude, ...list.map((p) => p.id)]))];
   return list;
 }
-const record = (motif: string, puzzleId: number, solved: boolean, timeMs: number) =>
+const record = (motif: string, puzzleId: number, solved: boolean, timeMs: number) => {
+  if (solved) pathEvent('tactic', motif);
   void apiFetch('/api/tactics/result', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ motif, puzzleId, solved, timeMs }) }).catch(() => {});
+};
 
 // ── Cards ──
 function Ring({ value, done }: { value: number; done: boolean }) {

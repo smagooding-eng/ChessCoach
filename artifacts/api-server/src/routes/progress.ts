@@ -247,4 +247,20 @@ router.get("/me/bot-month", requireAuth, async (req: Request, res: Response) => 
   } catch (err) { logger.error({ err }, "[bot-month] failed"); res.json({ wins: 0, games: 0 }); }
 });
 
+// ── Learn Path ───────────────────────────────────────────────────────────────
+router.get("/me/learn-path", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const r = rows<{ step: string; at: string }>(await db.execute(sql`SELECT step, (extract(epoch FROM done_at) * 1000)::bigint AS at FROM learn_path_steps WHERE user_id = ${req.user!.id}`));
+    res.json({ done: Object.fromEntries(r.map((x) => [x.step, Number(x.at)])) });
+  } catch (err) { logger.error({ err }, "[learn-path] read failed"); res.json({ done: {} }); }
+});
+router.post("/me/learn-path", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const key = String(req.body?.key ?? "");
+    if (!/^L\d{1,2}-[a-z]{3,10}$/.test(key)) { res.status(400).json({ error: "Bad step" }); return; }
+    await db.execute(sql`INSERT INTO learn_path_steps (user_id, step) VALUES (${req.user!.id}, ${key}) ON CONFLICT DO NOTHING`);
+    res.json({ ok: true });
+  } catch (err) { logger.error({ err }, "[learn-path] save failed"); res.status(500).json({ error: "Failed" }); }
+});
+
 export default router;

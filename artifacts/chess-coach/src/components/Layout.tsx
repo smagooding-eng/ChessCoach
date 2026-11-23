@@ -92,6 +92,7 @@ const MENU_GROUPS: { title: string; items: NavItem[] }[] = [
     { href: '/openings',  label: 'Openings',       icon: BookOpen },
     { href: '/tactics',   label: 'Tactics',        icon: Zap, badge: 'NEW' },
     { href: '/endgames',  label: 'Endgames',       icon: Trophy },
+    { href: '/path',      label: 'Learn Path',     icon: Puzzle, badge: 'NEW' },
     { href: '/progress',  label: 'Progress',       icon: Puzzle, badge: 'NEW' },
     { href: '/puzzles/hub', label: 'Puzzles',      icon: Puzzle, badge: 'NEW' },
     { href: '/puzzles',   label: 'Quick Puzzles',  icon: Puzzle },

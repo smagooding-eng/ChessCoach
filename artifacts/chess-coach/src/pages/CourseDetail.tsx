@@ -1,3 +1,4 @@
+import { pathEvent } from '@/lib/learnPath';
 import { RD, REDESIGN_ON } from '@/lib/redesignTheme';
 import { BackLink } from '@/lib/navBack';
 import { LessonQuizScreen, LessonCompleteScreen, LessonIntroScreen, findQuizMoves, type QuizMoves, type IntroBullet } from '@/components/LessonFlow';
@@ -973,6 +974,7 @@ export function CourseDetail() {
   const handleMarkComplete = async (completed: boolean) => {
     if (!lesson) return;
     await markComplete(courseId, lesson.id, completed);
+    if (completed) pathEvent('course');
     if (completed && redesign) {
       const quiz = findQuizMoves(lesson.examplePgn, lesson.drillFen, lesson.drillExpectedMove);
       setPost({ idx: currentIdx, step: quiz ? 'quiz' : 'complete', quiz });

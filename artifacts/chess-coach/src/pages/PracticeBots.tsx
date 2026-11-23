@@ -1,3 +1,4 @@
+import { pathEvent } from '@/lib/learnPath';
 import { recordActivity } from '@/lib/activity';
 import { markValueMoment } from '@/lib/valueMoment';
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
@@ -330,6 +331,7 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
     let pgn = '';
     try { pgn = chess.pgn(); } catch { /* result is still saved */ }
     recordActivity('play');
+    if (result === 'win') pathEvent('bot', bot.name);
     reportBotResult(bot.name, result, moves.length, gameKeyRef.current, pgn ? { pgn, color: playerColor, botRating: bot.rating } : undefined, takebackUsed);
   }, [result, signedIn, startFen, bot.name, moves.length, chess, playerColor, bot.rating, takebackUsed]);
   const [, navigate] = useLocation();
@@ -1020,7 +1022,7 @@ function OpeningTrainerCore({ opening, onBack }: { opening: OpeningLine; onBack:
   const advanceBotMove = useCallback(() => {
     if (phase !== 'theory') return;
     if (stepIdx >= opening.moves.length) {
-      setPhase('completed');
+      setPhase('completed'); pathEvent('opening', opening.id);
       return;
     }
     if (chess.turn() === playerColor) return;
@@ -1039,7 +1041,7 @@ function OpeningTrainerCore({ opening, onBack }: { opening: OpeningLine; onBack:
       advanceBotMove();
     }
     if (phase === 'theory' && stepIdx >= opening.moves.length) {
-      setPhase('completed');
+      setPhase('completed'); pathEvent('opening', opening.id);
     }
   }, [phase, isPlayerTurn, stepIdx, opening.moves.length, advanceBotMove]);
 

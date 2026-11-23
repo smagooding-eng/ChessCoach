@@ -86,6 +86,7 @@ async function runSchemaMigrations() {
     await db.execute(sql`CREATE TABLE IF NOT EXISTS user_board_looks (user_id varchar PRIMARY KEY, look jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())`);
     // Daily Scout results (first try of the day counts) and Scout Sprint best scores.
     await db.execute(sql`CREATE TABLE IF NOT EXISTS daily_scout_results (user_id varchar NOT NULL, day date NOT NULL, solved boolean NOT NULL, ms integer NOT NULL DEFAULT 0, tries integer NOT NULL DEFAULT 1, created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (user_id, day))`);
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS learn_path_steps (user_id varchar NOT NULL, step varchar NOT NULL, done_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (user_id, step))`);
     await db.execute(sql`CREATE TABLE IF NOT EXISTS sprint_bests (user_id varchar PRIMARY KEY, best integer NOT NULL DEFAULT 0, updated_at timestamptz NOT NULL DEFAULT now())`);
     // The daily streak: one row per member per day they did something (played, solved, reviewed, learned).
     await db.execute(sql`CREATE TABLE IF NOT EXISTS user_activity_days (user_id varchar NOT NULL, day date NOT NULL, kinds text[] NOT NULL DEFAULT '{}', PRIMARY KEY (user_id, day))`);

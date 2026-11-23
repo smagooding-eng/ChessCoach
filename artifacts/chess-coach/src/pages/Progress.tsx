@@ -128,6 +128,7 @@ export default function ProgressPage() {
       {/* ways to train */}
       <div className="grid grid-cols-2 gap-2">
         {[
+          ['/path', 'trail', 'Learn Path', 'Pawn to king, level by level'],
           ['/report-card', 'analysis', 'Report card', 'Your week'],
           ['/field-notes', 'articles', 'Field Notes', 'Patterns you learned'],
           ['/sprint', 'rush', 'Scout Sprint', '3 minutes, beat your best'],
