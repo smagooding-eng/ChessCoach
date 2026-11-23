@@ -1,15 +1,15 @@
-# Creates the Oracle server (ops/oracle/create_server.py), retrying every 10 minutes until Oracle
-# has room. Quietly does nothing until the OCI_CONFIG / OCI_API_KEY / ORACLE_ADMIN_KEY secrets
+# Creates the Oracle server (ops/oracle/create_server.py). Each run keeps trying once a minute for
+# almost 6 hours; the schedule starts a new run every few hours (GitHub skips many scheduled runs). Quietly does nothing until the OCI_CONFIG / OCI_API_KEY / ORACLE_ADMIN_KEY secrets
 # exist, and once the server exists.
 name: Create Oracle server
 on:
-  schedule: [{ cron: "*/10 * * * *" }]
+  schedule: [{ cron: "17 */3 * * *" }]
   workflow_dispatch:
 concurrency: { group: oracle-create, cancel-in-progress: false }
 jobs:
   create:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 355
     steps:
       - uses: actions/checkout@v4
       - name: Try
@@ -21,4 +21,4 @@ jobs:
         run: |
           if [ -z "$OCI_CONFIG" ] || [ -z "$OCI_API_KEY" ] || [ -z "$ORACLE_ADMIN_KEY" ]; then echo "Secrets not set yet; skipping."; exit 0; fi
           pip install -q oci cryptography
-          python3 ops/oracle/create_server.py create
+          python3 ops/oracle/create_server.py create 340
