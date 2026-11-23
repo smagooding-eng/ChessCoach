@@ -1,3 +1,4 @@
+import { analyse, engineSupported } from '@/lib/deviceEngine';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import { BackLink, canGoBack } from '@/lib/navBack';
 import { useMyNames, mySide as sideOf } from '@/lib/gameSide';
@@ -1087,11 +1088,14 @@ export function GameReplay() {
     setFetchingBest(true);
     setBestMoveSan(null);
 
-    fetch(`https://lichess.org/api/cloud-eval?fen=${encodeURIComponent(fen)}&multiPv=1`)
-      .then(r => r.ok ? r.json() : null)
-      .then((data) => {
+    // Stockfish on the device; Lichess's cloud evaluation where the device can't run it
+    const lookup: Promise<string | undefined> = engineSupported()
+      ? analyse(normalizeFen(fen), { depth: 16 }).then((r) => r.bestmove ?? r.lines[0]?.pv[0])
+      : fetch(`https://lichess.org/api/cloud-eval?fen=${encodeURIComponent(fen)}&multiPv=1`)
+        .then(r => r.ok ? r.json() : null).then((data) => data?.pvs?.[0]?.moves?.split(' ')?.[0]);
+    lookup
+      .then((uci) => {
         if (cancelled) return;
-        const uci = data?.pvs?.[0]?.moves?.split(' ')?.[0];
         if (!uci || uci.length < 4) { setBestMoveSan(null); return; }
         try {
           const chess = new Chess(normalizeFen(fen));

@@ -4,7 +4,7 @@ name: Typecheck
 # (with the exact lines as annotations) instead of only as a failed deploy.
 on:
   push:
-    branches: [main]
+    branches: [main, preview]
   workflow_dispatch:
 
 jobs:

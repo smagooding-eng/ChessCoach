@@ -64,7 +64,7 @@ export default function CreditsPage() {
     : { bg: '#262421', card: '#302e2b', border: 'rgba(255,255,255,0.08)', text: '#e8e6e3', muted: '#9e9b98', accent: '#81b64c' };
 
   useEffect(() => {
-    setPageMeta('Photo Credits — ChessScout.net', 'The photographers whose work appears on ChessScout.net.', '/credits');
+    setPageMeta('Credits — ChessScout.net', 'The chess engine and the photographers whose work appears on ChessScout.net.', '/credits');
   }, []);
 
   return (
@@ -83,6 +83,18 @@ export default function CreditsPage() {
       </nav>
 
       <main className="mx-auto max-w-3xl px-4 pb-16 pt-8 sm:px-8">
+        <section className="mb-8 rounded-xl p-4 text-[14px] leading-relaxed" style={{ background: c.card, border: `1px solid ${c.border}` }}>
+          <h2 className="text-lg font-black">Chess engine</h2>
+          <p className="mt-1" style={{ color: c.muted }}>
+            The analysis that runs on your device uses <b style={{ color: c.text }}>Stockfish 19</b> (the &ldquo;lite&rdquo; WebAssembly build by{' '}
+            <a href="https://github.com/nmrugg/stockfish.js" target="_blank" rel="noopener noreferrer" className="underline">nmrugg/stockfish.js</a>),
+            free software under the{' '}
+            <a href="/engine/COPYING.txt" target="_blank" rel="noopener noreferrer" className="underline">GNU General Public License v3</a>.
+            Its source code: <a href="https://github.com/official-stockfish/Stockfish" target="_blank" rel="noopener noreferrer" className="underline">official-stockfish/Stockfish</a> and{' '}
+            <a href="https://github.com/nmrugg/stockfish.js" target="_blank" rel="noopener noreferrer" className="underline">stockfish.js</a>. Thank you to the Stockfish developers.
+          </p>
+        </section>
+
         <div className="mb-6 flex items-center gap-3">
           <span className="grid h-11 w-11 place-items-center rounded-xl" style={{ background: c.card, border: `1px solid ${c.border}` }}>
             <Camera className="h-5 w-5" style={{ color: c.accent }} />

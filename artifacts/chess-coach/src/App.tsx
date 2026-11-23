@@ -160,6 +160,7 @@ const BeginnerLessonPage = lazyRetry(() => import("@/pages/BeginnerLesson"));
 const TrapTrainingPage = lazyRetry(() => import("@/pages/TrapTraining"));
 const TermsPage = lazyRetry(() => import("@/pages/Terms"));
 const CreditsPage = lazyRetry(() => import("@/pages/Credits"));
+const AnalysisBoardPage = lazyRetry(() => import("@/pages/AnalysisBoard"));
 const VsAimchessPage = lazyRetry(() => import("@/pages/VsAimchess"));
 const PricingPage = lazyRetry(() => import("@/pages/Pricing"));
 const ChesscomGamePage = lazyRetry(() => import("@/pages/ChesscomGame"));
@@ -645,6 +646,8 @@ function Router() {
       <Route path="/affiliate" component={AffiliatePage} />
       <Route path="/terms" component={TermsPage} />
       <Route path="/credits" component={CreditsPage} />
+      {/* Free analysis board: Stockfish on the device, no account */}
+      <Route path="/analysis-board" component={AnalysisBoardPage} />
       <Route path="/vs/aimchess" component={VsAimchessPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/review" component={FreeReviewPage} />

@@ -11,6 +11,7 @@ import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
 import { GameOverOverlay, OverlayButton } from '@/components/GameOverOverlay';
 import { normalizeFen } from '@/lib/utils';
 import { BOTS, getBotMove, BotConfig, analyzeMoveQuality, type MoveAnalysisResult } from '@/lib/chess-bot';
+import { engineSupported, gradeMove } from '@/lib/deviceEngine';
 import { useBotAvatar, useBotName, useBotDescription, useBotTag } from '@/lib/botAvatars';
 import { OPENINGS, linesOf, type OpeningLine } from '@/lib/openings';
 import { MiniBoard } from '@/components/MiniBoard';
@@ -344,6 +345,8 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
   useEffect(() => {
     if (result === 'playing' || reanalyzedRef.current || moves.length === 0) return;
     reanalyzedRef.current = true;
+    // the device engine already graded every move with real Stockfish
+    if (engineSupported()) return;
 
     const payload = {
       startFen: moves[0]?.fenBefore,
@@ -426,6 +429,26 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
     const run = () => {
       const analysis = analyzeMoveQuality(fenBefore, san);
       setMoves(prev => prev.map((m, i) => i === idx ? { ...m, analysis } : m));
+      // then the real Stockfish grade from the device engine replaces the quick estimate
+      if (!engineSupported()) return;
+      void gradeMove(fenBefore, san).then((g) => {
+        if (!g) return;
+        setMoves(prev => prev.map((m, i) => {
+          if (i !== idx || !m.analysis || m.san !== san) return m;
+          const keepSpecial = (m.analysis.quality === 'brilliant' || m.analysis.quality === 'great' || m.analysis.quality === 'book')
+            && (g.quality === 'best' || g.quality === 'excellent');
+          const quality = keepSpecial ? m.analysis.quality : g.quality;
+          if (quality === m.analysis.quality) return { ...m, analysis: { ...m.analysis, cpLoss: g.cpLoss, bestMoveSan: g.bestMoveSan ?? m.analysis.bestMoveSan } };
+          // the grade changed: the quick estimate's notes no longer fit, so say what Stockfish found
+          const better = g.bestMoveSan && !g.isTopMove ? ` Stockfish preferred ${g.bestMoveSan}.` : '';
+          const summary = ({
+            best: 'The best move.', excellent: 'An excellent move, nearly the best.', good: 'A good move.' + better,
+            inaccuracy: 'An inaccuracy.' + better, mistake: 'A mistake.' + better, blunder: 'A blunder.' + better,
+            missed_win: 'This let a winning position slip.' + better, checkmate: 'Checkmate!',
+          } as Record<string, string>)[quality] ?? m.analysis.summary;
+          return { ...m, analysis: { ...m.analysis, quality, cpLoss: g.cpLoss, bestMoveSan: g.bestMoveSan ?? m.analysis.bestMoveSan, summary, pros: [], cons: [] } };
+        }));
+      });
     };
     if ('requestIdleCallback' in window) {
       (window as any).requestIdleCallback(run, { timeout: 500 });

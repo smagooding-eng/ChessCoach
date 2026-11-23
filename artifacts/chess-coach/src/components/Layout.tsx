@@ -11,7 +11,7 @@ import { GooglePlayBadge, PlayLogo } from '@/components/GooglePlayBadge';
 import { PLAY_STORE_URL, shouldShowPlayBadge } from '@/lib/playApp';
 import { runPageSwipe, pageCanSwipe, swipeAllowedFrom, swipeAllowedLoose } from '@/lib/swipeNav';
 import { useLiveRatings, bestLiveRating } from '@/hooks/use-live-ratings';
-import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard, Camera, Shield, Target, BarChart3, Zap, Crosshair, Radio, Users, Medal, Baby, Newspaper, Clapperboard, Video, X } from 'lucide-react';
+import { LayoutDashboard, Import, History, BrainCircuit, GraduationCap, Swords, BookOpen, LogOut, MoreHorizontal, ChevronRight, Bot, Crown, Trophy, Play, Search, Download, Puzzle, User, Settings, CreditCard, Camera, Shield, Target, BarChart3, Zap, Crosshair, Radio, Users, Medal, Baby, Newspaper, Clapperboard, Video, X, Cpu } from 'lucide-react';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 import { InstallGuide } from '@/components/InstallGuide';
 import { cn } from '@/lib/utils';
@@ -97,6 +97,7 @@ const MENU_GROUPS: { title: string; items: NavItem[] }[] = [
     { href: '/lookup',    label: 'Game Lookup',    icon: Search },
     { href: '/opponents', label: 'Opponent Scout', icon: Target },
     { href: '/scan',      label: 'Scan Position',  icon: Camera },
+    { href: '/analysis-board', label: 'Analysis Board', icon: Cpu },
   ] },
   { title: 'Account', items: [
     { href: '/subscription', label: 'Subscription', icon: Crown },

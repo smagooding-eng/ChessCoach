@@ -1,3 +1,4 @@
+import { EnginePanel, type BoardArrow } from '@/components/EnginePanel';
 import React, { useState, useRef, useCallback } from 'react';
 import { Link, useLocation } from 'wouter';
 import { PieceTile } from '@/components/DesignSystem';
@@ -170,6 +171,7 @@ export function ScanPosition() {
   const [croppedImage, setCroppedImage] = useState('');
   const [annotatedImage, setAnnotatedImage] = useState('');
   const [sandboxFen, setSandboxFen] = useState('');
+  const [engineArrows, setEngineArrows] = useState<BoardArrow[]>([]);
   const [sandboxChess, setSandboxChess] = useState<Chess | null>(null);
   const [moveHistory, setMoveHistory] = useState<string[]>([]);
   const [flipped, setFlipped] = useState(false);
@@ -662,6 +664,7 @@ export function ScanPosition() {
               flipped={flipped}
               practiceMode={!gameStatus}
               onMovePlayed={(san) => handleSandboxMove(san)}
+              arrows={engineArrows}
             />
             <button
               onClick={() => setFlipped(f => !f)}
@@ -678,6 +681,8 @@ export function ScanPosition() {
               </div>
             )}
           </div>
+
+          {sandboxFen && <EnginePanel fen={sandboxFen} onArrows={setEngineArrows} />}
 
           {moveHistory.length > 0 && (
             <div className="glass-card rounded-xl px-3 py-2 border border-white/10 flex items-center gap-2">
