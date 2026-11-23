@@ -15,7 +15,7 @@ on:
         description: Step to run
         required: true
         type: choice
-        options: [check, setup, settings, alerts, deploy-preview, deploy-prod, practice-migrate, refresh-preview, status]
+        options: [check-render, check, setup, settings, alerts, deploy-preview, deploy-prod, practice-migrate, refresh-preview, status]
 concurrency: { group: oracle-admin, cancel-in-progress: false }
 jobs:
   run:
@@ -24,6 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Connect
+        if: inputs.step != 'check-render'
         env:
           HOST: ${{ secrets.ORACLE_HOST }}
           KEY: ${{ secrets.ORACLE_ADMIN_KEY }}
@@ -37,7 +38,7 @@ jobs:
           mkdir -p ~/.ssh && printf '%s' "$KEY" | python3 ops/oracle/pemfix.py > ~/.ssh/k && chmod 600 ~/.ssh/k
           echo "SSH=ssh -i $HOME/.ssh/k -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=30 -o ConnectTimeout=20 ubuntu@$HOST" >> "$GITHUB_ENV"
       - name: Render settings
-        if: inputs.step == 'settings' || inputs.step == 'practice-migrate'
+        if: inputs.step == 'settings' || inputs.step == 'practice-migrate' || inputs.step == 'check-render'
         env: { RK: "${{ secrets.RENDER_API_KEY }}" }
         run: |
           [ -n "$RK" ] || { echo "::error::Add the RENDER_API_KEY secret first."; exit 1; }
@@ -54,11 +55,13 @@ jobs:
           echo "Got $(wc -l < /tmp/render.env) settings from Render."
           grep -q '^DATABASE_URL=' /tmp/render.env || echo "::warning::No DATABASE_URL among the service's own settings (it may be in an environment group)."
       - name: Copy scripts
+        if: inputs.step != 'check-render'
         run: |
           $SSH "sudo mkdir -p /opt/chessscout/ops && sudo chown -R ubuntu:ubuntu /opt/chessscout"
           scp -q -i ~/.ssh/k -o StrictHostKeyChecking=accept-new ops/oracle/*.sh ops/oracle/server.conf "ubuntu@$HOST:/opt/chessscout/ops/"
           $SSH "sed -i 's/\r\$//' /opt/chessscout/ops/*.sh /opt/chessscout/ops/server.conf && chmod +x /opt/chessscout/ops/*.sh"
       - name: Run
+        if: inputs.step != 'check-render'
         env:
           STEP: ${{ inputs.step }}
           TOPIC: ${{ secrets.NTFY_TOPIC }}
