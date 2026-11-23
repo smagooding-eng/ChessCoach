@@ -270,7 +270,7 @@ export default function PuzzleHubPage() {
         right={<Link href="/puzzles" className="rounded-[10px] px-3 py-1.5 text-[13px] font-extrabold text-white" style={{ background: GREEN }}>Quick play</Link>} />
       {daily && (
         <Link href={daily.mine ? '/progress' : `/puzzles?daily=${daily.number}&id=${daily.puzzleId}`} className="mb-3 flex items-center gap-3 rounded-[12px] p-3" style={{ background: PANEL }}>
-          <AppIcon name="opponents" size={32} />
+          <AppIcon name="daily-scout" size={32} />
           <span className="min-w-0 flex-1"><b className="block text-[14.5px]">Daily Scout #{daily.number}</b>
             <span className="text-[12px]" style={{ color: MUTED }}>{daily.mine ? (daily.mine.solved ? 'Solved today' : 'Missed today') : 'Today’s puzzle for everyone'}</span></span>
           {!daily.mine && <span className="rounded-[10px] px-3 py-1.5 text-[13px] font-extrabold text-white" style={{ background: GREEN }}>Play</span>}

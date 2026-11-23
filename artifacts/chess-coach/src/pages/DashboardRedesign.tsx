@@ -29,6 +29,9 @@ import { ChallengeInbox } from '@/components/play/OpenChallenges';
 import { NEUTRAL_CHIP } from '@/lib/redesignTheme';
 import { NotifyPrompt } from '@/components/play/NotifyPrompt';
 import { setHomeStyle } from '@/lib/homeStyle';
+import { ScoutIcon } from '@/components/ScoutIcons';
+
+const TILE_ICON: Record<string, string> = { '/tournaments': 'tournaments', '/puzzles': 'puzzles', '/openings': 'openings', '/traps': 'chess-traps', '/tactics': 'tactics', '/endgames': 'endgames', '/play': 'play-online' };
 
 // Dashboard shown when the global "dashboard redesign" flag is ON (see
 // DashboardRouter in App.tsx). The mobile header and bottom nav in the
@@ -236,9 +239,7 @@ export function DashboardRedesign() {
         {/* ── Play and Learn: a card each ── */}
         <div className="grid grid-cols-2 gap-3 lg:col-span-2">
           <Link href="/play" className="flex items-center gap-3 rounded-[18px] px-3.5 py-3.5 transition-transform active:scale-[.98]" style={{ background: CARD, border: `1px solid ${BORDER}`, boxShadow: '0 6px 18px rgba(0,0,0,.3)' }}>
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[13px]" style={{ background: `linear-gradient(180deg, ${GREEN}, ${GREEN_DARK})`, color: '#FFFFFF', boxShadow: '0 3px 0 rgba(0,0,0,.25)' }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ marginLeft: 2 }}><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.5-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z" /></svg>
-            </span>
+            <ScoutIcon name="play-online" size={44} className="shrink-0" />
             <span className="min-w-0 flex-1">
               <b className="block text-[17px] font-extrabold leading-tight">Play</b>
               <span className="block truncate text-[12px]" style={{ color: MUTED }}>Live, daily, bots</span>
@@ -246,9 +247,7 @@ export function DashboardRedesign() {
             <ChevronRight size={16} className="shrink-0" style={{ color: MUTED }} />
           </Link>
           <Link href="/learning" className="flex items-center gap-3 rounded-[18px] px-3.5 py-3.5 transition-transform active:scale-[.98]" style={{ background: CARD, border: `1px solid ${BORDER}`, boxShadow: '0 6px 18px rgba(0,0,0,.3)' }}>
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[13px]" style={{ background: `linear-gradient(180deg, ${GREEN}, ${GREEN_DARK})`, color: '#FFFFFF', boxShadow: '0 3px 0 rgba(0,0,0,.25)' }}>
-              <GraduationCap size={21} strokeWidth={2.25} style={{ color: '#FFFFFF' }} />
-            </span>
+            <ScoutIcon name="courses" size={44} className="shrink-0" />
             <span className="min-w-0 flex-1">
               <b className="block text-[17px] font-extrabold leading-tight">Learn</b>
               <span className="block truncate text-[12px]" style={{ color: MUTED }}>Courses and drills</span>
@@ -283,12 +282,11 @@ export function DashboardRedesign() {
             >
               {!photoLook && <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.78) 0%, rgba(5,10,11,.25) 62%, rgba(5,10,11,0) 100%), linear-gradient(0deg, rgba(5,10,11,.65) 0%, rgba(5,10,11,0) 55%)' }} />}
               <div className={`relative z-10 flex h-full ${photoLook ? 'items-center gap-3 p-3' : 'min-h-[128px] flex-col justify-between p-3.5'}`}>
-                <span
-                  className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px]"
-                  style={{ background: `linear-gradient(160deg, ${t.c2}, ${t.c1})`, boxShadow: '0 2px 8px rgba(0,0,0,.45)', border: '1px solid rgba(255,255,255,.18)' }}
-                >
-                  <t.icon size={21} color="#fff" fill={t.label === 'Play' ? '#fff' : 'none'} />
-                </span>
+                {TILE_ICON[t.href]
+                  ? <ScoutIcon name={TILE_ICON[t.href]} size={42} className="shrink-0" />
+                  : <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px]" style={{ background: `linear-gradient(160deg, ${t.c2}, ${t.c1})`, boxShadow: '0 2px 8px rgba(0,0,0,.45)', border: '1px solid rgba(255,255,255,.18)' }}>
+                      <t.icon size={21} color="#fff" fill={t.label === 'Play' ? '#fff' : 'none'} />
+                    </span>}
                 <div className={`flex justify-between gap-2 ${photoLook ? 'min-w-0 flex-1 items-center' : 'items-end'}`}>
                   <div className="min-w-0">
                     <b className={`block truncate font-extrabold leading-tight ${photoLook ? 'text-[16px]' : 'text-[19px]'}`}>{t.label}</b>

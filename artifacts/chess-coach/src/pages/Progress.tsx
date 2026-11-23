@@ -66,7 +66,7 @@ export default function ProgressPage() {
 
       {/* Daily Scout */}
       <div className="flex items-center gap-3 rounded-[14px] p-3.5" style={card}>
-        <AppIcon name="opponents" size={40} />
+        <AppIcon name="daily-scout" size={40} />
         <div className="min-w-0 flex-1">
           <b className="block text-[16px] font-black">Daily Scout{daily ? ` #${daily.number}` : ''}</b>
           <span className="text-[12.5px]" style={{ color: MUTED }}>
@@ -97,7 +97,7 @@ export default function ProgressPage() {
 
       {/* Skill Map */}
       <div className="rounded-[14px] p-3.5" style={card}>
-        <div className="flex items-baseline justify-between"><b className="text-[16px] font-black">Skill Map</b><span className="text-[11.5px]" style={{ color: MUTED }}>from your reviewed games</span></div>
+        <div className="flex items-center justify-between"><b className="inline-flex items-center gap-2 text-[16px] font-black"><AppIcon name="skill-map" size={24} />Skill Map</b><span className="text-[11.5px]" style={{ color: MUTED }}>from your reviewed games</span></div>
         {!skills ? <div className="grid place-items-center py-10"><Loader2 className="animate-spin" style={{ color: MUTED }} /></div>
           : !skills.now ? <p className="py-6 text-center text-[13px]" style={{ color: MUTED }}>Get 3 games reviewed and your map appears here.</p>
           : <>
@@ -111,7 +111,7 @@ export default function ProgressPage() {
 
       {/* Badges */}
       <div className="rounded-[14px] p-3.5" style={card}>
-        <b className="mb-2 block text-[16px] font-black">Badges</b>
+        <b className="mb-2 flex items-center gap-2 text-[16px] font-black"><AppIcon name="badges" size={24} />Badges</b>
         {!badges ? <div className="grid place-items-center py-8"><Loader2 className="animate-spin" style={{ color: MUTED }} /></div> : (
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
             {badges.map((b) => (

@@ -16,7 +16,7 @@ export default function DailyScoutPage() {
   return (
     <div className="mx-auto grid min-h-[70vh] w-full max-w-[460px] place-items-center px-4" style={{ color: '#F5F7F6' }}>
       <div className="w-full rounded-[14px] p-6 text-center" style={{ background: 'var(--rd-card-solid, #182123)' }}>
-        <AppIcon name="opponents" size={56} />
+        <AppIcon name="daily-scout" size={56} />
         <b className="mt-2 block text-[22px] font-black">Daily Scout{d ? ` #${d.number}` : ''}</b>
         {!d || isAuthLoading ? <Loader2 className="mx-auto mt-4 animate-spin" /> : (
           <>

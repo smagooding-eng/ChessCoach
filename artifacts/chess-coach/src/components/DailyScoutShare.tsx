@@ -29,7 +29,7 @@ export function DailyScoutShare({ number, solved, ms, goodMoves }: { number: num
   };
   return (
     <div className="w-full rounded-[14px] p-4 text-center" style={{ background: 'var(--rd-card-solid, #182123)', border: '1px solid rgba(255,255,255,.08)' }}>
-      <div className="flex items-center justify-center gap-2"><AppIcon name="opponents" size={22} /><b className="text-[15px]">Daily Scout #{number}</b></div>
+      <div className="flex items-center justify-center gap-2"><AppIcon name="daily-scout" size={22} /><b className="text-[15px]">Daily Scout #{number}</b></div>
       <p className="mt-2 text-[26px] leading-none tracking-[2px]">{squares || '·'}</p>
       <p className="mt-2 text-[13px]" style={{ color: '#8F9997' }}>
         {solved ? `Found in ${clock(ms)}.` : 'Not this time. Tomorrow is a new one.'}

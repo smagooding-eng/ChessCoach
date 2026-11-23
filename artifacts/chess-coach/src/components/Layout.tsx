@@ -1,4 +1,5 @@
 import { AppIcon, navIconName } from '@/components/AppIcon';
+import { ScoutIcon } from '@/components/ScoutIcons';
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useUser } from '@/hooks/use-user';
@@ -68,12 +69,16 @@ const TabPlay = fillIcon(<path d="M7 3.7c0-1 1.1-1.6 2-1.1l12 7.8a1.3 1.3 0 0 1 
 const TabGames = fillIcon(<><path d="M9 4.5a3 3 0 1 1 6 0c0 1-.5 1.9-1.2 2.5H15l-1 4h-4L9 7h1.2A3.2 3.2 0 0 1 9 4.5z" /><path d="M9.6 12.5h4.8l1.3 5H8.3z" /><rect x="5.5" y="18.5" width="13" height="3" rx="1.2" /></>);
 const TabAnalysis = fillIcon(<><rect x="3" y="12" width="5" height="9" rx="1.2" /><rect x="9.5" y="7" width="5" height="14" rx="1.2" /><rect x="16" y="3" width="5" height="18" rx="1.2" /></>);
 const TabScout = fillIcon(<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 4a6 6 0 1 1 0 12 6 6 0 0 1 0-12zm0 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" fillRule="evenodd" />);
+const scoutTab = (name: string) => function ScoutTab({ style }: { className?: string; style?: React.CSSProperties }) {
+  const on = style?.color === TEXT_LIGHT;
+  return <ScoutIcon name={name} size={26} style={{ opacity: on ? 1 : 0.55, filter: on ? undefined : 'saturate(.6)' }} />;
+};
 const REDESIGN_NAV_ICON: Record<string, React.ElementType> = {
-  '/': TabHome,
-  '/opponents': TabScout,
-  '/play': TabPlay,
-  '/games': TabGames,
-  '/analysis': TabAnalysis,
+  '/': scoutTab('home'),
+  '/opponents': scoutTab('opponent-scout'),
+  '/play': scoutTab('play'),
+  '/games': scoutTab('games'),
+  '/analysis': scoutTab('analysis'),
 };
 
 type NavItem = { href: string; label: string; icon: React.ElementType; badge?: string };
@@ -610,10 +615,8 @@ export function Layout({ children, fullscreen }: { children: React.ReactNode; fu
           <button onClick={() => (moreOpen ? closeMore() : setMoreOpen(true))} className="flex-1">
             <div className="relative flex flex-col items-center justify-center gap-0.5 pt-2 pb-1.5 min-h-[52px] transition-all active:scale-95">
               {isMoreActive && <span className="absolute top-0 left-1/2 -translate-x-1/2 h-[2px] w-8 rounded-full" style={{ background: CHESSCOM_GREEN }} />}
-              {React.createElement(activeMore?.icon ?? MoreHorizontal, {
-                className: "w-5 h-5",
-                style: { color: isMoreActive ? CHESSCOM_GREEN : TEXT_MUTED, transform: isMoreActive ? 'scale(1.1)' : 'scale(1)' }
-              })}
+              {activeMore ? <NavGlyph href={activeMore.href} fallback={activeMore.icon} className="h-[26px] w-[26px]" size={26} />
+                : <ScoutIcon name="more" size={26} style={{ opacity: isMoreActive ? 1 : 0.55 }} />}
               <span className="text-[10px] leading-none font-bold" style={{ color: isMoreActive ? CHESSCOM_GREEN : TEXT_MUTED, opacity: isMoreActive ? 1 : 0.6 }}>
                 {activeMore?.label ?? 'More'}
               </span>

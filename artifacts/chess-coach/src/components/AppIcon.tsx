@@ -2,6 +2,7 @@
 // with two or three colours each, instead of the same grey line icons everywhere.
 // AppIcon picks one by name; navIcon(href) maps a page to its icon.
 import React from 'react';
+import { ScoutIcon, SCOUT_ICON_NAMES } from '@/components/ScoutIcons';
 
 type P = { size?: number; className?: string; style?: React.CSSProperties };
 const S = ({ size = 24, className, style, children }: P & { children: React.ReactNode }) => (
@@ -53,18 +54,28 @@ const ICONS: Record<string, (p: P) => React.ReactElement> = {
 
 export type AppIconName = keyof typeof ICONS;
 
+// Old names → the new metal-and-ivory set (components/ScoutIcons)
+const TO_SCOUT: Record<string, string> = {
+  play: 'play-online', games: 'recent-games', analysis: 'progress', traps: 'chess-traps', bots: 'practice-bots', live: 'play-online',
+  watch: 'watch-live', streams: 'live-streams', studio: 'streamer-studio', kids: 'chess-for-kids', import: 'import-games', lookup: 'game-lookup',
+  opponents: 'opponent-scout', scan: 'scan-position', board: 'analysis-board', leaderboard: 'progress', badge: 'badges', rush: 'scout-sprint',
+  coords: 'spot-the-square', guess: 'scout-a-legend',
+};
+
 export function AppIcon({ name, ...p }: P & { name: string }) {
+  const scout = SCOUT_ICON_NAMES.includes(name) ? name : TO_SCOUT[name];
+  if (scout) return <ScoutIcon name={scout} {...p} />;
   const I = ICONS[name];
   return I ? I(p) : null;
 }
 
 const BY_HREF: Record<string, string> = {
   '/': 'home', '/play': 'play', '/games': 'games', '/analysis': 'analysis', '/openings': 'openings', '/tactics': 'tactics',
-  '/endgames': 'endgames', '/puzzles': 'rush', '/puzzles/hub': 'puzzles', '/traps': 'traps', '/courses': 'courses', '/practice': 'bots', '/learn': 'articles',
+  '/endgames': 'endgames', '/puzzles': 'quick-puzzles', '/puzzles/hub': 'puzzles', '/traps': 'traps', '/courses': 'courses', '/practice': 'bots', '/learn': 'articles',
   '/live': 'live', '/watch': 'watch', '/friends': 'friends', '/tournaments': 'tournaments', '/streams': 'streams', '/studio': 'studio',
-  '/kids': 'kids', '/import': 'import', '/lookup': 'lookup', '/opponents': 'opponents', '/scan': 'scan', '/analysis-board': 'board',
-  '/subscription': 'subscription', '/settings': 'settings', '/admin': 'admin', '/admin/studio': 'studio', '/trail': 'trail',
-  '/leaderboard': 'leaderboard', '/progress': 'leaderboard', '/path': 'trail', '/sprint': 'rush', '/legends': 'guess', '/bot-challenge': 'bots', '/report-card': 'analysis', '/field-notes': 'articles', '/daily': 'opponents', '/badges': 'badges', '/puzzle-rush': 'rush', '/coordinates': 'coords', '/guess-the-move': 'guess', '/classes': 'class',
+  '/kids': 'kids', '/import': 'import', '/lookup': 'lookup', '/opponents': 'opponent-scout', '/scan': 'scan', '/analysis-board': 'board',
+  '/subscription': 'subscription', '/settings': 'settings', '/admin': 'admin', '/admin/studio': 'content-studio', '/trail': 'trail',
+  '/leaderboard': 'leaderboard', '/progress': 'progress', '/path': 'trail', '/sprint': 'rush', '/legends': 'guess', '/bot-challenge': 'bot-of-month', '/report-card': 'report-card', '/field-notes': 'field-notes', '/daily': 'daily-scout', '/badges': 'badges', '/puzzle-rush': 'rush', '/coordinates': 'coords', '/guess-the-move': 'guess', '/classes': 'class',
 };
 BY_HREF['/badges'] = 'badge';
 
