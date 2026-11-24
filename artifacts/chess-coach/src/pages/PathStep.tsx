@@ -105,7 +105,7 @@ const BAD = new Set(['blunder', 'mistake', 'missed_win', 'inaccuracy']);
 const LABEL: Record<string, string> = { blunder: 'Blunder', mistake: 'Mistake', missed_win: 'Missed win', inaccuracy: 'Inaccuracy' };
 
 /** Grade your moves on this device and walk through the biggest moments. */
-function GameReview({ pgn, color, title, fullHref, onDone }: { pgn: string; color: 'w' | 'b'; title: string; fullHref?: string; onDone: () => void }) {
+function GameReview({ pgn, color, title, fullHref, onDone, doneLabel = 'Done' }: { pgn: string; color: 'w' | 'b'; title: string; fullHref?: string; onDone: () => void; doneLabel?: string }) {
   const positions = useMemo(() => {
     const out: { fen: string; san: string; ply: number }[] = [];
     try {
@@ -165,7 +165,7 @@ function GameReview({ pgn, color, title, fullHref, onDone }: { pgn: string; colo
       <div className="flex gap-2">
         {m && at > 0 && <button onClick={() => setAt(at - 1)} className="rounded-xl px-3 py-2 text-[13px] font-bold" style={{ background: CARD2 }}>Back</button>}
         {m && at < moments.length - 1 ? <button onClick={() => setAt(at + 1)} className="cs-cta flex-1">Next moment</button>
-          : <button onClick={onDone} className="cs-cta flex-1">Done</button>}
+          : <button onClick={onDone} className="cs-cta flex-1">{doneLabel}</button>}
       </div>
       {fullHref && <Link href={fullHref} className="block text-center text-[13px] font-bold underline" style={{ color: MUTED }}>Open the full review</Link>}
     </div>
@@ -196,6 +196,7 @@ function RecentReview({ onDone }: { onDone: () => void }) {
 
 function Body({ level, step, finish }: { level: Level; step: Step; finish: () => void }) {
   const c = level.content;
+  const [, navigate] = useLocation();
   switch (step.kind) {
     case 'lesson': {
       const d = level.motif.demo;
@@ -217,7 +218,12 @@ function Body({ level, step, finish }: { level: Level; step: Step; finish: () =>
     case 'review': {
       const g = lastBotGame(level.bot.name);
       if (!g) return <div className="space-y-3"><Note>Play {level.bot.name} from the path first: this reviews that game (bot games played elsewhere aren't reviewed here).</Note><Link href={`/practice?bot=${encodeURIComponent(level.bot.name)}`} onClick={() => { const b = level.steps.find((x) => x.kind === 'bot'); if (b) startStep(b); }} className="cs-cta block text-center">Play {level.bot.name}</Link></div>;
-      return <GameReview pgn={g.pgn} color={g.color} title={`your game vs ${level.bot.name}`} onDone={finish} />;
+      // a loss can be reviewed too, but the step only counts once the bot is beaten
+      const beaten = !!readPath().done[`L${level.n}-bot`];
+      return (<div className="space-y-3">
+        {!beaten && <Note tone="warn">You haven't beaten {level.bot.name} yet. Look at what went wrong, then try again.</Note>}
+        <GameReview pgn={g.pgn} color={g.color} title={`your game vs ${level.bot.name}`} onDone={beaten ? finish : () => { const b = level.steps.find((x) => x.kind === 'bot'); if (b) { startStep(b); navigate(b.href); } }} doneLabel={beaten ? 'Done' : `Play ${level.bot.name} again`} />
+      </div>);
     }
     case 'recent': return <RecentReview onDone={finish} />;
     default: return null;

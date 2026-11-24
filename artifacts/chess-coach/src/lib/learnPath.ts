@@ -95,6 +95,7 @@ export function startStep(step: Step) {
   if (step.kind === 'bot') { try { localStorage.setItem(PATH_BOT, JSON.stringify({ bot: step.target, at: Date.now() })); } catch { /* */ } }
 }
 const PATH_BOT = 'cs_path_bot_started';
+export function clearPathBotGame() { try { localStorage.removeItem(PATH_BOT); } catch { /* */ } }
 /** True when this bot game was started from the Learn Path (within the last day). */
 export function pathBotGame(bot: string) { try { const v = JSON.parse(localStorage.getItem(PATH_BOT) || 'null'); return !!v && v.bot === bot && Date.now() - v.at < 86_400_000; } catch { return false; } }
 const STARTED = 'cs_learn_path_started';

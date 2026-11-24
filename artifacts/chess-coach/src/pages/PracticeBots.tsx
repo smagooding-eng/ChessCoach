@@ -1,4 +1,4 @@
-import { pathEvent, saveBotGame, pathBotGame } from '@/lib/learnPath';
+import { pathEvent, saveBotGame, pathBotGame, clearPathBotGame, LEVELS } from '@/lib/learnPath';
 import { recordActivity } from '@/lib/activity';
 import { markValueMoment } from '@/lib/valueMoment';
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
@@ -693,9 +693,9 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
           </p>
         </div>
       ) : (
-        <button onClick={onBack}
+        <button onClick={pathBotGame(bot.name) ? () => navigate('/path') : onBack}
           className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors text-sm">
-          <ArrowLeft className="w-4 h-4" /> All Bots
+          <ArrowLeft className="w-4 h-4" /> {pathBotGame(bot.name) ? 'Learn Path' : 'All Bots'}
         </button>
       )}
 
@@ -749,7 +749,15 @@ function GameView({ bot, onBack, startFen, startColor, isOnboarding }: { bot: Bo
                   : chess.isDraw() ? 'by the 50-move rule' : result === 'loss' ? 'You resigned' : undefined}
                 checkmate={chess.isCheckmate()}
                 delayMs={chess.isCheckmate() ? 1000 : 250}
-                actions={isOnboarding ? undefined : <>
+                actions={isOnboarding ? undefined : pathBotGame(bot.name) ? (() => {
+                  // started from the Learn Path: the way forward is always on screen
+                  const lv = LEVELS.find((l) => l.bot.name === bot.name);
+                  return <>
+                    {lv && <OverlayButton primary onClick={() => navigate(`/path/step/L${lv.n}-review`)}>Review this game</OverlayButton>}
+                    {result !== 'win' && <OverlayButton onClick={() => handleNewGame(playerColor === 'w' ? 'b' : 'w')}><RotateCcw className="w-4 h-4" /> Try again</OverlayButton>}
+                    <OverlayButton onClick={() => navigate('/path')}>Back to the path</OverlayButton>
+                  </>;
+                })() : <>
                   <OverlayButton primary onClick={() => handleNewGame(playerColor === 'w' ? 'b' : 'w')}>
                     <RotateCcw className="w-4 h-4" /> Rematch
                   </OverlayButton>
@@ -1531,6 +1539,9 @@ export function PracticeBots() {
     strippedUrlRef.current = true;
     if (jumpIn || isOnboarding) window.history.replaceState({}, '', window.location.pathname);
   }, [jumpIn, isOnboarding]);
+
+  // Opened without ?bot= (the bot list, not the Learn Path): games here don't count for the path.
+  useEffect(() => { if (!new URLSearchParams(window.location.search).get('bot')) clearPathBotGame(); }, []);
 
   // Swipe between the Bots / Openings tabs (not while a game is open).
   useSwipeTabs(['bots', 'openings'] as const, tab, setTab, !selectedBot && !selectedOpening);

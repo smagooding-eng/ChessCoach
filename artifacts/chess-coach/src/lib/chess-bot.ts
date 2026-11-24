@@ -259,11 +259,11 @@ export const BOTS: BotConfig[] = [
     name: 'Tommy',
     rating: 400,
     depth: 1,
-    blunderRate: 0.5,
-    // A real 400 misses most free pieces and even some mates in one.
-    captureSight: 0.4,
-    mateSight: 0.45,
-    evalNoise: 60,
+    blunderRate: 0.7,
+    // A real 400: mostly aimless, misses most free pieces and most mates in one.
+    captureSight: 0.25,
+    mateSight: 0.3,
+    evalNoise: 180,
     description: 'Just learned the rules last week. Makes lots of random moves.',
     avatar: botMedallion(0),
     personality: 'Beginner',
