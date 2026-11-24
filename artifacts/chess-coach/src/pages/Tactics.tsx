@@ -4,6 +4,7 @@
 // games", speed rounds and review are Pro. Endgame tactics show on /endgames.
 import { pathEvent } from '@/lib/learnPath';
 import { ScoutIcon } from '@/components/ScoutIcons';
+import { K, CoachTake, ActionRow, Ring as KRing } from '@/components/analytics/Kit';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useRoute } from 'wouter';
 import { Chess } from 'chess.js';
@@ -77,9 +78,9 @@ function MotifCard({ m, p }: { m: Motif; p?: TacticProgress }) {
   const done = !!p?.masteredAt;
   const due = isDue(p);
   return (
-    <Link href={`/tactics/${m.id}`} className="flex items-center gap-3 rounded-[16px] p-3 transition-transform active:scale-[.99]" style={card}>
-      {sample?.fen ? <span className="shrink-0"><MiniBoard fen={sample.fen} lastMove={sample.last} size={56} flipped={sample.side === 'b'} /></span>
-        : <span className="h-14 w-14 shrink-0 animate-pulse rounded-lg" style={{ background: 'rgba(255,255,255,.05)' }} />}
+    <Link href={`/tactics/${m.id}`} className="flex items-center gap-3.5 rounded-[16px] p-3 transition-transform active:scale-[.99]" style={{ background: K.card2, border: `1px solid ${K.line}` }}>
+      {sample?.fen ? <span className="shrink-0 overflow-hidden rounded-[8px]"><MiniBoard fen={sample.fen} lastMove={sample.last} size={72} flipped={sample.side === 'b'} /></span>
+        : <span className="h-[72px] w-[72px] shrink-0 animate-pulse rounded-lg" style={{ background: 'rgba(255,255,255,.05)' }} />}
       <span className="min-w-0 flex-1">
         <b className="flex items-center gap-1.5 truncate text-[15px] font-extrabold" style={{ color: RD.text }}>{m.name}{due && <span className="rounded-full px-1.5 py-0.5 text-[9.5px] font-black" style={{ background: RD.gold, color: '#1A1A19' }}>REVIEW</span>}</b>
         <span className="mt-0.5 block text-[12px] leading-snug line-clamp-2" style={{ color: RD.muted }}>{m.blurb}</span>
@@ -96,15 +97,15 @@ export function TacticsGroupCards({ group, title }: { group: TacticGroup; title?
   const list = motifsIn(group);
   const mastered = list.filter((m) => progress[m.id]?.masteredAt).length;
   return (
-    <section className="space-y-2">
-      <div className="flex items-end justify-between gap-2">
-        <div>
+    <section className="rounded-[20px] p-4" style={{ background: K.card, border: `1px solid ${K.line}` }}>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="text-[17px] font-extrabold" style={{ color: RD.text }}>{title ?? g.title}</h2>
           <p className="text-[12.5px]" style={{ color: RD.muted }}>{g.sub}</p>
         </div>
-        <span className="shrink-0 text-[12px] font-bold" style={{ color: RD.muted }}>{mastered}/{list.length} mastered</span>
+        <KRing pct={(mastered / Math.max(1, list.length)) * 100} size={46} stroke={5} label={`${mastered}/${list.length}`} color={K.gold} />
       </div>
-      <div className="grid gap-2 md:grid-cols-2">{list.map((m) => <MotifCard key={m.id} m={m} p={progress[m.id]} />)}</div>
+      <div className="grid gap-2.5 md:grid-cols-2">{list.map((m) => <MotifCard key={m.id} m={m} p={progress[m.id]} />)}</div>
     </section>
   );
 }
@@ -117,45 +118,37 @@ export function Tactics() {
   const mastered = total.filter((m) => progress[m.id]?.masteredAt).length;
   return (
     <div className="min-h-screen px-3 pb-[calc(7.5rem+env(safe-area-inset-bottom))] pt-3 md:px-6 md:pt-6" style={{ background: RD.bg, color: RD.text }}>
-      <div className="mx-auto max-w-[900px] space-y-5">
+      <div className="mx-auto max-w-[900px] space-y-4">
         <div>
           <h1 className="flex items-center gap-2 text-[26px] font-black"><ScoutIcon name="tactics" size={32} />Tactics</h1>
-          <p className="text-[13.5px]" style={{ color: RD.muted }}>The middlegame: learn each pattern, then drill it until you see it instantly. {loaded && `${mastered} of ${total.length} mastered.`}</p>
-          <p className="mt-1 text-[12px]" style={{ color: RD.muted }}>
-            <Link href="/openings" className="font-bold underline" style={{ color: RD.green }}>Openings</Link> → <b style={{ color: RD.text }}>Tactics</b> → <Link href="/endgames" className="font-bold underline" style={{ color: RD.green }}>Endgames</Link>
-          </p>
+          <p className="text-[13.5px]" style={{ color: RD.muted }}>Learn each pattern, then drill it until you see it instantly.</p>
         </div>
 
-        {/* Review (Pro) */}
-        {due.length > 0 && (pro ? (
-          <div className="rounded-[16px] p-3" style={{ background: '#0D1516', border: '1px solid rgba(255,255,255,.08)' }}>
-            <p className="text-[13.5px] font-extrabold" style={{ color: RD.gold }}>Time to review: {due.length} pattern{due.length === 1 ? '' : 's'}</p>
-            <div className="mt-2 flex flex-wrap gap-1.5">{due.map((m) => <Link key={m.id} href={`/tactics/${m.id}?tab=drill`} className="rounded-full px-3 py-1 text-[12.5px] font-bold" style={{ background: 'rgba(255,255,255,.08)', color: RD.text }}>{m.name}</Link>)}</div>
-          </div>
-        ) : (
-          <ProUpsell compact title={`${due.length} mastered pattern${due.length === 1 ? '' : 's'} due for review`} text="Pro brings mastered patterns back after a few days so they stick." />
-        ))}
+        {(() => {
+          // the coach's pick: a pattern due for review, else the next one not mastered yet
+          const next = (pro ? due[0] : undefined) ?? total.find((m) => !progress[m.id]?.masteredAt);
+          if (!loaded) return <div className="h-[180px] animate-pulse rounded-[22px]" style={{ background: K.card }} />;
+          if (!next) return <CoachTake icon="badges" headline="Every middlegame pattern mastered." detail="Keep them sharp with a drill now and then, or move on to mating patterns." action="Mating patterns" href="/endgames" board={<KRing pct={100} size={96} stroke={8} label={`${mastered}/${total.length}`} color={K.gold} />} />;
+          const isReview = pro && due[0]?.id === next.id;
+          const started = (progress[next.id]?.bestSession ?? 0) > 0;
+          return <CoachTake icon="tactics" eyebrow={isReview ? 'Time to review' : "Coach's pick"} headline={isReview ? `Keep ${next.name} sharp.` : started ? `Finish mastering: ${next.name}.` : `Next up: ${next.name}.`}
+            detail={next.blurb} action={isReview ? 'Review it' : started ? 'Drill it' : 'Learn it'} href={`/tactics/${next.id}${isReview || started ? '?tab=drill' : ''}`}
+            board={<KRing pct={(mastered / Math.max(1, total.length)) * 100} size={96} stroke={8} label={`${mastered}/${total.length}`} color={K.gold} />} />;
+        })()}
 
-        {/* Missed in your games */}
-        <Link href="/tactics/missed" className="flex items-center gap-3 rounded-[18px] p-4" style={{ ...card, border: '1px solid rgba(129,182,76,.4)' }}>
-          <ScoutIcon name="opponent-scout" size={44} className="shrink-0" />
-          <span className="min-w-0 flex-1">
-            <b className="flex items-center gap-1.5 text-[15.5px] font-extrabold">Missed in your games {!pro && <Crown size={14} style={{ color: RD.gold }} />}</b>
-            <span className="block text-[12.5px]" style={{ color: RD.muted }}>The tactics you missed in your own reviewed games, sorted by pattern.</span>
-          </span>
-          <ChevronRight size={18} style={{ color: RD.muted }} />
-        </Link>
+        {due.length > 1 && pro && (
+          <div className="rounded-[18px] p-3.5" style={{ background: K.card, border: `1px solid ${K.line}` }}>
+            <p className="text-[13.5px] font-extrabold" style={{ color: RD.gold }}>Also due for review</p>
+            <div className="mt-2 flex flex-wrap gap-1.5">{due.slice(1).map((m) => <Link key={m.id} href={`/tactics/${m.id}?tab=drill`} className="rounded-full px-3 py-1 text-[12.5px] font-bold" style={{ background: K.card2, color: RD.text }}>{m.name}</Link>)}</div>
+          </div>
+        )}
+        {due.length > 0 && !pro && <ProUpsell compact title={`${due.length} mastered pattern${due.length === 1 ? '' : 's'} due for review`} text="Pro brings mastered patterns back after a few days so they stick." />}
+
+        <ActionRow icon="opponent-scout" title={pro ? 'Missed in your games' : 'Missed in your games (Pro)'} sub="The tactics you missed in your own reviewed games, by pattern." action="Open" href="/tactics/missed" />
 
         {(['basics', 'next'] as TacticGroup[]).map((g) => <TacticsGroupCards key={g} group={g} />)}
 
-        <Link href="/endgames" className="flex items-center gap-3 rounded-[18px] p-4" style={card}>
-          <span className="text-2xl">♙</span>
-          <span className="min-w-0 flex-1">
-            <b className="block text-[15px] font-extrabold">Mating patterns & endgame tactics</b>
-            <span className="block text-[12.5px]" style={{ color: RD.muted }}>Back-rank, smothered and other mates, plus promotion, breakthroughs and zugzwang, in Endgames.</span>
-          </span>
-          <ChevronRight size={18} style={{ color: RD.muted }} />
-        </Link>
+        <ActionRow icon="endgames" title="Mating patterns & endgame tactics" sub="Back-rank and smothered mates, promotion, breakthroughs and zugzwang." action="Go" href="/endgames" />
       </div>
     </div>
   );

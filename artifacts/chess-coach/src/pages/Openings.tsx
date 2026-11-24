@@ -1,3 +1,5 @@
+import { K, CoachTake, ActionRow, Ring as KRing } from '@/components/analytics/Kit';
+import { ScoutIcon } from '@/components/ScoutIcons';
 import React, { useState, useMemo } from 'react';
 import { PageHero } from '@/components/DesignSystem';
 import { Link, useLocation } from 'wouter';
@@ -120,79 +122,75 @@ export function Openings() {
       { id: 'popular', label: 'Popular' },
       { id: 'repertoire', label: 'My Repertoire' },
     ];
-    const thumbs = openingThumbList(list.map((o) => o.opening), photoImgs);
+    void photoImgs; void photoLook;
+    const weak = [...rated].filter((o) => o.winRate < 50).sort((a, b) => a.winRate - b.winRate || b.totalGames - a.totalGames)[0];
+    const best = [...rated].filter((o) => o.winRate >= 50).sort((a, b) => b.winRate - a.winRate || b.totalGames - a.totalGames)[0];
+    const drill = (o: (typeof openings)[number]) => (o.eco ? `/practice?tab=openings&eco=${encodeURIComponent(o.eco)}` : '/practice?tab=openings');
+    const split = (name: string): [string, string] => { const i = name.indexOf(':'); return i > 0 ? [name.slice(0, i), name.slice(i + 1).replace(/^[\s,]+/, '')] : [name, '']; };
+    const TAB_NOTE: Record<typeof tab, string> = { foryou: 'Lowest win rate first: the openings worth drilling.', popular: 'The openings you play most.', repertoire: 'Everything you play, best results first.' };
 
     return (
       <div className="min-h-screen px-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
-        <div className="mx-auto w-full max-w-[640px] lg:max-w-[1200px]">
-          <RedesignHeader title="Openings Trainer" icon={<BookOpen size={24} />} />
-
-          <div className="flex items-center gap-3 rounded-[16px] px-4" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
-            <Search size={19} className="shrink-0" style={{ color: RD.text }} />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search openings (e.g. Sicilian)"
-              aria-label="Search openings"
-              className="h-[52px] min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[#87918E]"
-              style={{ color: RD.text }}
-            />
+        <div className="mx-auto grid w-full max-w-[640px] gap-4 lg:max-w-[1000px]">
+          <div>
+            <RedesignHeader title="Openings" icon={<ScoutIcon name="openings" size={32} />} />
+            <p className="-mt-2 px-1 text-[13.5px]" style={{ color: RD.muted }}>How you do in every opening you play, and which to drill.</p>
           </div>
 
-          <div data-swipe-tabs className="mt-3 grid grid-cols-3 gap-1 rounded-[16px] p-1" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
-            {TABS.map((t) => {
-              const active = tab === t.id;
-              return (
-                <button key={t.id} onClick={() => setTab(t.id)} className="rounded-[12px] py-2.5 text-[13.5px] font-bold transition-colors"
-                  style={active ? { background: 'rgba(255,255,255,.08)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
+          {openings.length === 0 ? (
+            <CoachTake icon="openings" headline="Import your games and your coach will rate every opening you play." action="Import games" href="/import" />
+          ) : weak ? (
+            <CoachTake icon="openings" headline={`${split(weak.opening)[0]} is costing you games`} detail={`You win ${weak.winRate}% of your ${weak.totalGames} games with it. Drill the main line against the trainer bot.`} action="Drill this opening" href={drill(weak)} board={<KRing pct={weak.winRate} size={96} stroke={8} color={K.red} />} />
+          ) : best ? (
+            <CoachTake icon="openings" headline={`Your best weapon: ${split(best.opening)[0]}`} detail={`You win ${best.winRate}% of your ${best.totalGames} games with it. Keep it sharp.`} action="Practise it" href={drill(best)} board={<KRing pct={best.winRate} size={96} stroke={8} />} />
+          ) : (
+            <CoachTake icon="openings" headline="Play an opening a few times and your coach will rate it." detail="An opening is rated once you've played it 3 times." action="Practise openings" href="/practice?tab=openings" />
+          )}
 
-          <div className="mt-3 grid gap-3 lg:grid-cols-2">
-            {openings.length === 0 ? (
-              <div className="rounded-[20px] px-6 py-12 text-center" style={{ background: RD.card, border: `1px solid ${RD.border}`, color: RD.muted }}>
-                <p className="text-[15px] font-bold" style={{ color: RD.text }}>No games imported yet</p>
-                <p className="mt-1 text-[13px]">Import your games to see how you do in each opening.</p>
-                <Link href="/import" className="mt-4 inline-block rounded-xl px-4 py-2.5 text-[13px] font-extrabold" style={{ background: RD.green, color: '#FFFFFF' }}>Import games</Link>
+          {openings.length > 0 && (
+            <section className="rounded-[20px] p-4" style={{ background: K.card, border: `1px solid ${K.line}` }}>
+              <div className="flex items-center gap-3 rounded-[14px] px-3.5" style={{ background: K.card2, border: `1px solid ${K.line}` }}>
+                <Search size={18} className="shrink-0" style={{ color: K.muted }} />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search your openings" aria-label="Search openings"
+                  className="h-[46px] min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-[#87918E]" style={{ color: RD.text }} />
               </div>
-            ) : list.length === 0 ? (
-              <div className="rounded-[20px] px-6 py-10 text-center text-[13px]" style={{ background: RD.card, border: `1px solid ${RD.border}`, color: RD.muted }}>
-                {tab === 'foryou' ? 'Nothing to work on yet — an opening needs at least 3 games to be ranked.' : 'No openings match your search.'}
+              <div data-swipe-tabs className="mt-3 grid grid-cols-3 gap-1 rounded-[14px] p-1" style={{ background: K.card2 }}>
+                {TABS.map((t) => {
+                  const active = tab === t.id;
+                  return (
+                    <button key={t.id} onClick={() => setTab(t.id)} className="rounded-[11px] py-2.5 text-[13.5px] font-bold transition-colors"
+                      style={active ? { background: '#1E3A1C', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { color: RD.muted }}>
+                      {t.label}
+                    </button>
+                  );
+                })}
               </div>
-            ) : list.map((o, oi) => {
-              const linkParam = encodeURIComponent(o.eco ?? o.opening);
-              return (
-                <Link key={o.opening} href={`/openings/${linkParam}`} className="flex items-stretch overflow-hidden rounded-[18px] transition-transform active:scale-[.99]" style={{ background: RD.card, border: `1px solid ${RD.border}` }}>
-                  {!photoLook && (
-                  <span className="relative w-[104px] shrink-0 overflow-hidden">
-                    <img src={thumbs[oi]} alt="" loading="lazy" className="absolute inset-0 h-full w-full scale-[1.08] object-cover" />
-                  </span>
-                  )}
-                  <span className="min-w-0 flex-1 px-4 py-3.5">
-                    <b className="block truncate text-[16px] font-extrabold">{o.opening}</b>
-                    <span className="block truncate text-[13px]" style={{ color: RD.muted }}>{o.wins}W {o.draws}D {o.losses}L · {o.totalGames} game{o.totalGames === 1 ? '' : 's'}</span>
-                    <span className="mt-2.5 flex items-center gap-3">
-                      <span className="h-2 flex-1 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.10)' }}>
-                        <span className="block h-full rounded-full" style={{ width: `${Math.max(o.winRate, 4)}%`, background: `linear-gradient(90deg, ${RD.greenDark}, ${RD.green})` }} />
-                      </span>
-                      <b className="w-10 text-right text-[13.5px]">{o.winRate}%</b>
-                    </span>
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
+              <p className="mt-2.5 px-1 text-[12.5px]" style={{ color: K.muted }}>{TAB_NOTE[tab]}</p>
+              <div className="mt-2.5 grid gap-2.5 lg:grid-cols-2">
+                {list.length === 0 ? (
+                  <p className="py-8 text-center text-[13px] lg:col-span-2" style={{ color: K.muted }}>{tab === 'foryou' ? 'Nothing to work on yet: an opening needs at least 3 games to be rated.' : 'No openings match your search.'}</p>
+                ) : list.map((o) => {
+                  const [family, variation] = split(o.opening);
+                  const rated3 = o.totalGames >= 3;
+                  return (
+                    <div key={o.opening} className="flex items-center gap-3 rounded-[16px] p-3" style={{ background: K.card2, border: `1px solid ${K.line}` }}>
+                      <Link href={`/openings/${encodeURIComponent(o.eco ?? o.opening)}`} className="flex min-w-0 flex-1 items-center gap-3">
+                        <KRing pct={rated3 ? o.winRate : null} size={50} stroke={5} color={o.winRate >= 50 ? K.green : K.red} />
+                        <span className="min-w-0 flex-1">
+                          <b className="block truncate text-[15px] font-extrabold">{family}</b>
+                          {variation && <span className="block truncate text-[12.5px]" style={{ color: 'rgba(245,247,246,.75)' }}>{variation}</span>}
+                          <span className="text-[12px]" style={{ color: K.muted }}>{o.totalGames} game{o.totalGames === 1 ? '' : 's'} · {o.wins}W {o.draws}D {o.losses}L</span>
+                        </span>
+                      </Link>
+                      <Link href={drill(o)} className="shrink-0 rounded-[11px] px-3 py-1.5 text-[12.5px] font-extrabold text-white" style={{ background: K.green }}>Drill</Link>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
 
-          <button
-            onClick={() => navigate('/practice?tab=openings')}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-[16px] py-3.5 text-[14.5px] font-extrabold"
-            style={{ background: `linear-gradient(180deg, ${RD.green}, ${RD.greenDark})`, color: '#FFFFFF', boxShadow: '0 12px 28px -12px rgba(129,182,76,.55)' }}
-          >
-            <BookOpen className="h-4 w-4" /> Practice against the Trainer Bot
-          </button>
+          <ActionRow icon="practice-bots" title="Practise against the trainer bot" sub="Play any opening's main line until it's automatic." action="Start" href="/practice?tab=openings" />
         </div>
       </div>
     );
