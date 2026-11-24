@@ -4,6 +4,8 @@ import { Link } from 'wouter';
 import { ChevronRight, ChevronDown, Target, BarChart3, Trophy, BookOpen, Lightbulb, Swords, Crosshair, Gamepad2, GraduationCap, Calendar, TrendingUp, TrendingDown, ArrowUp, ArrowDown, Gauge, CheckCircle2 } from 'lucide-react';
 import { useMyCourses } from '@/hooks/use-courses';
 import { ProUpsell } from '@/components/ProUpsell';
+import { MiniBoard } from '@/components/MiniBoard';
+import { K, CoachTake, Panel, ActionRow, BigStat, Ring, Medal, firstSentence } from '@/components/analytics/Kit';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 import { useMyAnalysisSummary, useMyWeaknesses } from '@/hooks/use-analysis';
 import { useMyOpenings } from '@/hooks/use-openings';
@@ -105,7 +107,7 @@ const monthLabel = (ym: string, long = false) => {
 // "Queens Pawn Opening Mikenas Defense" -> ["Queens Pawn Opening", "Mikenas Defense"]
 function splitOpening(name: string): [string, string] {
   const m = name.match(/^(.*?\b(?:Opening|Game|Defense|Defence|Gambit|Attack|System))\b\s*(.*)$/);
-  if (m && m[2]) return [m[1], m[2]];
+  if (m && m[2]) return [m[1], m[2].replace(/^[:\s,–—-]+/, '')];
   return [name, ''];
 }
 
@@ -424,295 +426,188 @@ export function AnalysisRedesign() {
           })}
         </div>
 
-        {tab === 'overview' && (
-          <div className="grid gap-3 lg:grid-cols-2 lg:items-start lg:gap-4">
-            {/* Headline numbers */}
-            <section className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:col-span-2">
-              {[
-                { label: 'Rating', icon: 'progress', value: rating != null ? String(rating) : '—', delta: rating != null && ratingDelta ? ratingDelta : null },
-                { label: 'Total Games', icon: 'recent-games', value: summary.totalGames?.toLocaleString() || '0' },
-                { label: 'Reviewed', icon: 'report-card', value: (summary.reviewedCount ?? 0).toLocaleString() },
-                { label: 'Key Weaknesses', icon: 'opponent-scout', value: String(weaknesses.length), onClick: () => setTab('weaknesses'), accent: weaknesses.length > 0 },
-              ].map((st) => {
-                const Tag = st.onClick ? 'button' : 'div';
-                return (
-                  <Tag key={st.label} onClick={st.onClick} className="flex items-center gap-3 rounded-[16px] px-3.5 py-3 text-left" style={CARD_STYLE}>
-                    <ScoutIcon name={st.icon} size={34} className="shrink-0" />
-                    <span className="min-w-0">
-                      <span className="block truncate text-[12px] font-semibold" style={{ color: RD.muted }}>{st.label}</span>
-                      <span className="flex items-baseline gap-1.5">
-                        <b className="text-[22px] font-extrabold leading-tight" style={st.accent ? { color: RD.green } : undefined}>{st.value}</b>
-                        {st.delta ? <span className="text-[12px] font-extrabold" style={{ color: st.delta > 0 ? RD.green : RD.red }}>{st.delta > 0 ? '▲' : '▼'}{st.delta > 0 ? '+' : ''}{st.delta}</span> : null}
-                      </span>
-                    </span>
-                  </Tag>
-                );
-              })}
-            </section>
+        {tab === 'overview' && (() => {
+          const top = weaknesses[0];
+          const accNow = accuracyAll.length ? accuracyAll[accuracyAll.length - 1].accuracy : null;
+          const weakest = measured.length >= 2 ? [...measured].sort((a, b) => a.accuracy - b.accuracy)[0] : null;
+          const PHASE_DRILL: Record<string, { href: string; icon: string }> = { Opening: { href: '/openings', icon: 'openings' }, Middlegame: { href: '/tactics', icon: 'tactics' }, Endgame: { href: '/endgames', icon: 'endgames' } };
+          const doing = courses.filter((c) => coursePct(c) < 100).sort((a, b) => coursePct(b) - coursePct(a))[0];
+          const worstOpening = openingsData?.openings ? [...openingsData.openings].filter((o) => o.totalGames >= 5 && o.winRate < 50).sort((a, b) => a.winRate - b.winRate)[0] : undefined;
+          const steps: { icon: string; title: string; sub: string; action: string; href: string }[] = [];
+          if (doing) steps.push({ icon: 'courses', title: doing.title, sub: `${doing.completedLessons} of ${doing.totalLessons} lessons done`, action: 'Continue', href: `/courses/${doing.id}` });
+          if (weakest && PHASE_DRILL[weakest.label]) steps.push({ icon: PHASE_DRILL[weakest.label].icon, title: `Sharpen your ${weakest.label.toLowerCase()}`, sub: `Your weakest phase at ${weakest.accuracy}% accuracy`, action: 'Practice', href: PHASE_DRILL[weakest.label].href });
+          if (worstOpening) steps.push({ icon: 'openings', title: splitOpening(worstOpening.opening)[0], sub: `You win ${worstOpening.winRate}% of ${worstOpening.totalGames} games with it`, action: 'Drill', href: worstOpening.eco ? `/practice?tab=openings&eco=${encodeURIComponent(worstOpening.eco)}` : '/openings' });
+          if (weaknesses[1]) steps.push({ icon: 'opponent-scout', title: weaknesses[1].category, sub: firstSentence(weaknesses[1].description), action: 'Train', href: `/analysis/${weaknesses[1].id}` });
+          return (
+            <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+              <div className="lg:col-span-2">
+                {top ? (
+                  <CoachTake icon="opponent-scout" headline={`Your biggest leak: ${top.category}`} detail={firstSentence(weaknessView(top, openingWinRate).summary)}
+                    action="Train it" href={`/analysis/${top.id}`} board={top.previewFen ? <MiniBoard fen={top.previewFen} size={132} /> : undefined} />
+                ) : keyInsight ? (
+                  <CoachTake icon="skill-map" headline={keyInsight} action="See your weaknesses" onAction={() => setTab('weaknesses')} />
+                ) : (
+                  <CoachTake icon="report-card" headline="Review a few of your games and your coach will find your patterns." action="Go to your games" href="/games" />
+                )}
+              </div>
 
-            <Card>
-              <div className="mb-2 flex items-start justify-between gap-2">
-                <div>
-                  <h2 className="text-[17px] font-extrabold">Rating Trend</h2>
-                  {ratingSince && <p className="text-[12px]" style={{ color: RD.muted }}>{ratingSince}</p>}
+              <Panel title="At a glance">
+                <div className="grid grid-cols-3 gap-2">
+                  <BigStat value={rating != null ? String(rating) : '—'} label="Rating" delta={rating != null ? ratingDelta : null} />
+                  <BigStat value={decided > 0 ? `${Math.round(winRate)}%` : '—'} label="Win rate" delta={winDelta} suffix="%" />
+                  <BigStat value={accNow != null ? `${accNow}%` : '—'} label="Accuracy" delta={accPair ? accDelta : null} suffix="%" />
                 </div>
-                {ratingDelta !== 0 && <span className="rounded-[10px] px-2.5 py-1 text-[13px] font-extrabold" style={{ background: '#0D1516', border: `1px solid ${ratingDelta > 0 ? RD.green : RD.red}`, color: ratingDelta > 0 ? RD.green : RD.red }}>{ratingDelta > 0 ? '▲ +' : '▼ '}{ratingDelta}</span>}
-              </div>
-              <RatingTrendChart values={ratingSpark} since={ratingSince} />
-            </Card>
+                <p className="mt-3 text-center text-[12px]" style={{ color: K.muted }}>{(summary.totalGames ?? 0).toLocaleString()} games · {(summary.reviewedCount ?? 0).toLocaleString()} reviewed</p>
+              </Panel>
 
-            <Card>
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <h2 className="text-[17px] font-extrabold">Win Rate</h2>
-                  <p className="text-[12px]" style={{ color: RD.muted }}>Last 6 months</p>
-                </div>
-                <Trophy size={18} style={{ color: RD.gold }} />
-              </div>
-              <div className="mt-2 flex items-baseline gap-2">
-                <b className="text-[36px] font-extrabold leading-none">{decided > 0 ? `${winRate.toFixed(1)}%` : '—'}</b>
-                {winDelta !== 0 && <span className="text-[14px] font-extrabold" style={{ color: winDelta > 0 ? RD.green : RD.red }}>{winDelta > 0 ? '▲ +' : '▼ '}{winDelta}%</span>}
-              </div>
-              <div className="mt-3"><AreaLine values={monthlyAll.map((m) => m.winPct)} /></div>
-            </Card>
-
-            <Card>
-              <div className="mb-3 flex items-baseline justify-between">
-                <h2 className="text-[17px] font-extrabold">Results Breakdown</h2>
-                <span className="text-[12px]" style={{ color: RD.muted }}>{decided.toLocaleString()} games</span>
-              </div>
-              <div className="grid gap-3.5">
-                {legend.map((l) => (
-                  <div key={l.label} className="flex items-center gap-3">
-                    <span className="w-14 shrink-0 text-[14px]" style={{ color: 'rgba(245,247,246,.9)' }}>{l.label}</span>
-                    <div className="h-2.5 flex-1 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.08)' }}>
-                      <div className="h-full rounded-full" style={{ width: `${Math.max(pct(l.n), l.n ? 2 : 0)}%`, background: l.color }} />
-                    </div>
-                    <b className="w-11 shrink-0 text-right text-[14px]">{pct(l.n).toFixed(0)}%</b>
-                    <span className="w-12 shrink-0 text-right text-[12px]" style={{ color: RD.muted }}>{l.n.toLocaleString()}</span>
+              {phases.length > 0 && (
+                <Panel title="Accuracy by phase">
+                  <div className="grid grid-cols-3 gap-2">
+                    {phases.map((ph) => {
+                      const isWeak = weakest?.label === ph.label;
+                      return (
+                        <div key={ph.label} className="flex flex-col items-center gap-1.5 text-center">
+                          <Ring pct={ph.moves > 0 ? ph.accuracy : null} size={70} color={isWeak ? K.gold : K.green} />
+                          <b className="text-[13.5px]" style={{ color: K.text }}>{ph.label}</b>
+                          <span className="text-[11.5px] font-bold" style={{ color: isWeak ? K.gold : K.muted }}>{isWeak ? 'Weakest' : ' '}</span>
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
-              </div>
-            </Card>
-
-            {phases.length > 0 && (
-              <Card>
-                <div className="mb-3 flex items-baseline justify-between">
-                  <h2 className="text-[17px] font-extrabold">Accuracy by Phase</h2>
-                  <span className="text-[11.5px]" style={{ color: RD.muted }}>{summary.phaseAccuracy!.gamesAnalyzed} reviewed game{summary.phaseAccuracy!.gamesAnalyzed === 1 ? '' : 's'}</span>
-                </div>
-                <div className="grid gap-3.5">
-                  {phases.map((ph) => (
-                    <div key={ph.label} className="flex items-center gap-3">
-                      <span className="grid h-9 w-9 shrink-0 place-items-center">{PHASE_ICON[ph.label]}</span>
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-1.5 flex items-center justify-between">
-                          <span className="text-[14px] font-semibold">{ph.label}</span>
-                          <b className="text-[14px]" style={{ color: RD.green }}>{ph.moves > 0 ? `${ph.accuracy}%` : '—'}</b>
-                        </div>
-                        <div className="h-2.5 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.08)' }}>
-                          <div className="h-full rounded-full" style={{ width: `${ph.moves > 0 ? ph.accuracy : 0}%`, background: `linear-gradient(90deg, ${RD.greenDark}, ${RD.green})` }} />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            )}
-
-            {keyInsight && (
-              <div className="lg:col-span-2"><InsightCard icon={<Lightbulb size={30} style={{ color: RD.gold }} />} title="Key Insight" text={keyInsight} onClick={() => setTab('weaknesses')} /></div>
-            )}
-
-            {/* What to work on: top weaknesses + course progress */}
-            <Card>
-              <SectionHead title="Top Weaknesses" onMore={weaknesses.length ? () => setTab('weaknesses') : undefined} />
-              {weaknesses.length ? (
-                <div className="grid gap-2">
-                  {weaknesses.slice(0, 3).map((w) => {
-                    const sev = SEV_STYLE[w.severity] ?? SEV_STYLE.Low;
-                    return (
-                      <Link key={w.id} href={`/analysis/${w.id}`} className="flex items-center gap-3 rounded-[14px] px-3 py-3" style={{ background: 'rgba(255,255,255,.025)', border: `1px solid ${RD.border}` }}>
-                        <span className="shrink-0 rounded-[7px] px-2 py-1 text-[11px] font-extrabold" style={NEUTRAL_CHIP}><span className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full align-middle" style={{ background: sev.fg }} />{w.severity}</span>
-                        <span className="min-w-0 flex-1">
-                          <b className="block truncate text-[14px] font-bold">{w.category}</b>
-                          <span className="line-clamp-1 block text-[12px]" style={{ color: RD.muted }}>{w.description}</span>
-                        </span>
-                        <ChevronRight size={15} className="shrink-0" style={{ color: RD.muted }} />
-                      </Link>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="py-6 text-center text-[13px]" style={{ color: RD.muted }}>No weaknesses found yet. They appear once your games are reviewed.</p>
+                  <p className="mt-2 text-center text-[12px]" style={{ color: K.muted }}>From {summary.phaseAccuracy!.gamesAnalyzed} reviewed game{summary.phaseAccuracy!.gamesAnalyzed === 1 ? '' : 's'}</p>
+                </Panel>
               )}
-            </Card>
 
-            <Card>
-              <SectionHead title="Your Courses" onMore={() => setTab('courses')} more={courses.length ? 'See all' : 'Learn more'} />
-              {courses.length ? (
-                <div className="grid gap-2">{courses.slice(0, 3).map(courseRow)}</div>
-              ) : freePlan ? (
-                <ProUpsell compact title="Courses from your own games" text="Pro turns the mistakes in your games into short lessons and drills." />
-              ) : (
-                <p className="py-6 text-center text-[13px]" style={{ color: RD.muted }}>No courses yet. Open a weakness and build a course from it.</p>
-              )}
-            </Card>
-          </div>
-        )}
+              <Panel title="Rating trend">
+                {ratingSince && <p className="-mt-2 mb-2 text-[12px]" style={{ color: K.muted }}>{ratingSince}</p>}
+                <RatingTrendChart values={ratingSpark} since={ratingSince} />
+              </Panel>
 
-        {tab === 'courses' && (
-          <>
-            <div className="flex items-baseline justify-between px-1 pt-1">
-              <h2 className="text-[17px] font-extrabold">Your Courses</h2>
-              <Link href="/courses" className="flex items-center gap-0.5 text-[12.5px] font-bold" style={{ color: RD.green }}>Course library <ChevronRight size={14} /></Link>
+              <Panel title="Your next steps">
+                {steps.length ? <div className="grid gap-2.5">{steps.slice(0, 3).map((st) => <ActionRow key={st.title} {...st} />)}</div>
+                  : <p className="py-4 text-center text-[13px]" style={{ color: K.muted }}>Your next steps show up once a few games are reviewed.</p>}
+              </Panel>
             </div>
-            {freePlan && (
-              <ProUpsell
-                title="Get courses built from your own games"
-                text="Your coach turns the mistakes Stockfish finds in your games into short lessons and drills."
-                perks={['Lessons from your real positions', 'Your coach on every game you review', 'Coach scouting reports on your opponents']}
-              />
-            )}
-            {courses.length ? (
-              <>
-                {courses.some((c) => coursePct(c) < 100) && (
-                  <Card className="!p-2.5">
-                    <p className="px-1.5 pb-2 pt-1 text-[12px] font-black uppercase tracking-[.14em]" style={{ color: RD.muted }}>In progress</p>
-                    <div className="grid gap-2 lg:grid-cols-2">{courses.filter((c) => coursePct(c) < 100).map(courseRow)}</div>
-                  </Card>
-                )}
-                {courses.some((c) => coursePct(c) >= 100) && (
-                  <Card className="!p-2.5">
-                    <p className="px-1.5 pb-2 pt-1 text-[12px] font-black uppercase tracking-[.14em]" style={{ color: RD.muted }}>Completed</p>
-                    <div className="grid gap-2 lg:grid-cols-2">{courses.filter((c) => coursePct(c) >= 100).map(courseRow)}</div>
-                  </Card>
-                )}
-              </>
-            ) : !freePlan && (
-              <Card>
-                <div className="py-8 text-center" style={{ color: RD.muted }}>
-                  <GraduationCap size={28} className="mx-auto mb-2 opacity-50" />
-                  <p className="text-[13px]">No courses yet.</p>
-                  <p className="mt-0.5 text-[12px]">Open one of your weaknesses and build a course from it.</p>
-                  <button onClick={() => setTab('weaknesses')} className="mt-3 rounded-[11px] px-4 py-2 text-[13px] font-extrabold" style={{ color: RD.green, border: `1.5px solid ${RD.green}` }}>See weaknesses</button>
-                </div>
-              </Card>
-            )}
-          </>
-        )}
+          );
+        })()}
 
-        {tab === 'openings' && (
-          <>
-            <Card className="!p-2.5">
-              <div className="flex items-center justify-between px-1.5 pb-2.5 pt-1.5">
-                <h2 className="text-[16px] font-extrabold">Top Openings by Win Rate</h2>
-                <Link href="/openings" className="flex items-center gap-0.5 text-[12.5px] font-bold" style={{ color: RD.green }}>All Openings <ChevronRight size={14} /></Link>
+        {tab === 'courses' && (() => {
+          const going = courses.filter((c) => coursePct(c) < 100).sort((a, b) => coursePct(b) - coursePct(a));
+          const done = courses.filter((c) => coursePct(c) >= 100);
+          const row = (c: (typeof courses)[number]) => (
+            <Link key={c.id} href={`/courses/${c.id}`} className="flex items-center gap-3 rounded-[16px] p-3 transition-transform active:scale-[.99]" style={{ background: K.card2, border: `1px solid ${K.line}` }}>
+              <Ring pct={coursePct(c)} size={50} stroke={5} />
+              <span className="min-w-0 flex-1">
+                <b className="line-clamp-2 block text-[14.5px] font-extrabold leading-snug" style={{ color: K.text }}>{c.title}</b>
+                <span className="text-[12px]" style={{ color: K.muted }}>{c.completedLessons} of {c.totalLessons} lessons</span>
+              </span>
+              <ChevronRight size={17} className="shrink-0" style={{ color: K.muted }} />
+            </Link>
+          );
+          return (
+            <div className="grid gap-4">
+              {going[0] ? (
+                <CoachTake icon="courses" headline={`Pick up where you left off: ${going[0].title}`} detail={`${going[0].completedLessons} of ${going[0].totalLessons} lessons done. Each lesson takes a few minutes.`} action="Continue" href={`/courses/${going[0].id}`} board={<Ring pct={coursePct(going[0])} size={96} stroke={8} />} />
+              ) : courses.length ? (
+                <CoachTake icon="badges" headline="Every course finished. Nice work." detail="Build a new one from a weakness to keep improving." action="See weaknesses" onAction={() => setTab('weaknesses')} />
+              ) : !freePlan ? (
+                <CoachTake icon="courses" headline="Turn a weakness into a course." detail="Open one of your weaknesses and build short lessons from the positions where you went wrong." action="See weaknesses" onAction={() => setTab('weaknesses')} />
+              ) : null}
+              {freePlan && <ProUpsell title="Get courses built from your own games" text="Your coach turns the mistakes Stockfish finds in your games into short lessons and drills." perks={['Lessons from your real positions', 'Your coach on every game you review', 'Coach scouting reports on your opponents']} />}
+              {going.length > 1 && <Panel title="In progress"><div className="grid gap-2.5 lg:grid-cols-2">{going.slice(1).map(row)}</div></Panel>}
+              {done.length > 0 && <Panel title="Completed" more="Course library" href="/courses"><div className="grid gap-2.5 lg:grid-cols-2">{done.map(row)}</div></Panel>}
+              {!done.length && <Link href="/courses" className="text-center text-[13.5px] font-bold" style={{ color: K.green }}>Browse the course library</Link>}
+            </div>
+          );
+        })()}
+
+        {tab === 'openings' && (() => {
+          const all = openingsData?.openings ? [...openingsData.openings].filter((o) => o.totalGames >= 3) : [];
+          const strong = [...all].filter((o) => o.winRate >= 50).sort((a, b) => b.winRate - a.winRate || b.totalGames - a.totalGames).slice(0, 4);
+          const weak = [...all].filter((o) => o.winRate < 50).sort((a, b) => a.winRate - b.winRate || b.totalGames - a.totalGames).slice(0, 4);
+          const drill = (o: (typeof all)[number]) => (o.eco ? `/practice?tab=openings&eco=${encodeURIComponent(o.eco)}` : '/openings');
+          const row = (o: (typeof all)[number], bad: boolean) => {
+            const [family, variation] = splitOpening(o.opening);
+            return (
+              <Link key={o.opening} href={`/openings/${encodeURIComponent(o.eco ?? o.opening)}`} className="flex items-center gap-3 rounded-[16px] p-3 transition-transform active:scale-[.99]" style={{ background: K.card2, border: `1px solid ${K.line}` }}>
+                <Ring pct={o.winRate} size={50} stroke={5} color={bad ? K.red : K.green} />
+                <span className="min-w-0 flex-1">
+                  <b className="block truncate text-[14.5px] font-extrabold" style={{ color: K.text }}>{family}</b>
+                  {variation && <span className="block truncate text-[12.5px]" style={{ color: 'rgba(245,247,246,.75)' }}>{variation}</span>}
+                  <span className="text-[12px]" style={{ color: K.muted }}>{o.totalGames} games · {o.wins}W {o.draws}D {o.losses}L</span>
+                </span>
+                <ChevronRight size={17} className="shrink-0" style={{ color: K.muted }} />
+              </Link>
+            );
+          };
+          if (openingsLoading) return <div className="grid gap-3">{[0, 1, 2].map((k) => <div key={k} className="h-[90px] animate-pulse rounded-[20px]" style={{ background: K.card }} />)}</div>;
+          if (openingsError) return <Panel><p className="py-6 text-center text-[13px]" style={{ color: K.muted }}>Couldn’t load your openings. <button onClick={() => void refetchOpenings()} className="font-bold underline" style={{ color: K.green }}>Try again</button></p></Panel>;
+          if (!all.length) return <CoachTake icon="openings" headline="Play an opening a few times and your coach will rate it." detail="Openings show up here once you've played one at least 3 times." action="Explore openings" href="/openings" />;
+          return (
+            <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+              <div className="lg:col-span-2">
+                {weak[0] ? (
+                  <CoachTake icon="openings" headline={`${splitOpening(weak[0].opening)[0]} is costing you games`} detail={`You win ${weak[0].winRate}% of your ${weak[0].totalGames} games with it. A few minutes drilling the main line pays off quickly.`} action="Drill this opening" href={drill(weak[0])} board={<Ring pct={weak[0].winRate} size={96} stroke={8} color={K.red} />} />
+                ) : (
+                  strong[0] && <CoachTake icon="openings" headline={`Your best weapon: ${splitOpening(strong[0].opening)[0]}`} detail={`You win ${strong[0].winRate}% of your ${strong[0].totalGames} games with it. Keep playing it.`} action="Practise it" href={drill(strong[0])} board={<Ring pct={strong[0].winRate} size={96} stroke={8} />} />
+                )}
               </div>
-              {openings.length ? (
-                <div className="grid gap-2 lg:grid-cols-2">
-                  {openings.map((o, i) => {
-                    const [family, variation] = splitOpening(o.opening);
-                    return (
-                      <Link key={o.opening} href={`/openings/${encodeURIComponent(o.eco ?? o.opening)}`}
-                        className="flex items-center gap-3 rounded-[14px] px-2.5 py-2.5 transition-transform active:scale-[.99]"
-                        style={{ background: 'rgba(255,255,255,.025)', border: `1px solid ${RD.border}` }}>
-                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] text-[15px] font-extrabold" style={{ background: '#81B64C', color: '#FFFFFF' }}>{i + 1}</span>
-                        <span className="min-w-0 flex-1">
-                          <b className="block truncate text-[14px] font-bold">{family}</b>
-                          {variation && <span className="block truncate text-[13px]" style={{ color: 'rgba(245,247,246,.85)' }}>{variation}</span>}
-                          <span className="block text-[11px]" style={{ color: RD.muted }}>{o.totalGames} games</span>
-                          <span className="mt-1.5 flex items-center gap-2.5">
-                            <span className="h-2 flex-1 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.08)' }}>
-                              <span className="block h-full rounded-full" style={{ width: `${Math.max(o.winRate, 3)}%`, background: o.winRate >= 50 ? `linear-gradient(90deg, ${RD.greenDark}, ${RD.green})` : RD.red }} />
-                            </span>
-                            <b className="w-11 text-right text-[13.5px]">{o.winRate}%</b>
-                          </span>
-                        </span>
-                        <ChevronRight size={16} className="shrink-0" style={{ color: RD.muted }} />
-                      </Link>
-                    );
-                  })}
-                </div>
-              ) : openingsLoading ? (
-                <div className="space-y-2.5 py-1" aria-label="Loading your openings">
-                  {[0, 1, 2].map((k) => <div key={k} className="h-[74px] animate-pulse rounded-[14px]" style={{ background: 'rgba(255,255,255,.04)', border: `1px solid ${RD.border}` }} />)}
-                </div>
-              ) : openingsError ? (
-                <div className="py-8 text-center text-[13px]" style={{ color: RD.muted }}>
-                  Couldn’t load your openings. <button onClick={() => void refetchOpenings()} className="font-bold underline" style={{ color: RD.green }}>Try again</button>
-                </div>
-              ) : (
-                <p className="py-8 text-center text-[13px]" style={{ color: RD.muted }}>Play an opening at least 3 times to see its win rate here.</p>
-              )}
-            </Card>
-            {openings.length > 0 && (
-              <Card className="flex items-center gap-3 !py-3.5">
-                <BarChart3 size={26} className="shrink-0" style={{ color: RD.muted }} />
-                <p className="text-[12.5px] leading-snug" style={{ color: RD.muted }}>Openings played fewer than 3 times aren't shown — their win rate isn't reliable yet.</p>
-              </Card>
-            )}
-          </>
-        )}
+              {strong.length > 0 && <Panel title="Your strongest" more="All openings" href="/openings"><div className="grid gap-2.5">{strong.map((o) => row(o, false))}</div></Panel>}
+              {weak.length > 0 && <Panel title="Needs work"><div className="grid gap-2.5">{weak.map((o) => row(o, true))}</div></Panel>}
+              <p className="text-center text-[12px] lg:col-span-2" style={{ color: K.muted }}>Openings played fewer than 3 times aren't rated yet.</p>
+            </div>
+          );
+        })()}
 
         {tab === 'weaknesses' && (
-          <>
-            <div className="flex items-baseline justify-between px-1 pt-1">
-              <h2 className="text-[17px] font-extrabold">Identified Weaknesses</h2>
-              {weaknesses.length > 0 && <span className="text-[12px]" style={{ color: RD.muted }}>{weaknesses.length} found</span>}
-            </div>
+          <div className="grid gap-4">
             {weaknesses.length ? (
-              <div className="grid gap-3 lg:grid-cols-2 lg:gap-4">
+              <CoachTake icon="opponent-scout" headline={`Start with ${weaknesses[0].category}.`} detail={`It's your ${weaknesses[0].severity.toLowerCase()} priority and shows up most in your games. Fix one at a time.`} action="Train it" href={`/analysis/${weaknesses[0].id}`} />
+            ) : (
+              <CoachTake icon="opponent-scout" headline="No weaknesses found yet." detail="Your coach finds your patterns once your games are reviewed." action="Go to your games" href="/games" />
+            )}
+            {weaknesses.length > 0 && (
+              <div className="grid gap-3 lg:grid-cols-2">
                 {weaknesses.map((w) => {
                   const sev = SEV_STYLE[w.severity] ?? SEV_STYLE.Low;
                   const v = weaknessView(w, openingWinRate);
                   return (
-                    <Card key={w.id} className="!p-0 overflow-hidden">
-                      <Link href={`/analysis/${w.id}`} className="flex items-start gap-3 p-3.5">
-                        <span className="shrink-0 rounded-[8px] px-2.5 py-1.5 text-[12px] font-extrabold" style={NEUTRAL_CHIP}><span className="mr-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full align-middle" style={{ background: sev.fg }} />{w.severity}</span>
-                        <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center" style={{ color: RD.text }}>{v.icon}</span>
-                        <span className="min-w-0 flex-1">
-                          <b className="block text-[15px] font-extrabold">{w.category}</b>
-                          <span className="mt-0.5 block text-[12.5px] leading-snug line-clamp-2" style={{ color: 'rgba(245,247,246,.78)' }}>{v.summary}</span>
+                    <Link key={w.id} href={`/analysis/${w.id}`} className="flex gap-3.5 rounded-[20px] p-3.5 transition-transform active:scale-[.99]" style={{ background: K.card, border: `1px solid ${K.line}` }}>
+                      <div className="shrink-0">{w.previewFen ? <div className="overflow-hidden rounded-[10px]"><MiniBoard fen={w.previewFen} size={96} /></div> : <Medal icon="opponent-scout" size={60} />}</div>
+                      <div className="min-w-0 flex-1">
+                        <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-extrabold" style={{ background: K.card2, color: sev.fg }}><span className="h-1.5 w-1.5 rounded-full" style={{ background: sev.fg }} />{w.severity}</span>
+                        <b className="mt-1 block text-[16px] font-extrabold leading-tight" style={{ color: K.text }}>{w.category}</b>
+                        <span className="mt-1 line-clamp-2 block text-[12.5px] leading-snug" style={{ color: 'rgba(245,247,246,.75)' }}>{v.summary}</span>
+                        <span className="mt-2 flex items-center justify-between gap-2">
+                          <span className="truncate text-[12px]" style={{ color: K.muted }}>{v.stats.map((st) => `${st.value} ${st.label.toLowerCase()}`).join(' · ')}</span>
+                          <span className="shrink-0 rounded-[11px] px-3 py-1.5 text-[12.5px] font-extrabold text-white" style={{ background: K.green }}>{v.cta}</span>
                         </span>
-                        <ChevronRight size={16} className="mt-1 shrink-0" style={{ color: RD.muted }} />
-                      </Link>
-                      <div className="flex items-center gap-3 px-3.5 pb-3.5 pt-3" style={{ borderTop: `1px solid ${RD.border}` }}>
-                        {v.stats.map((st, i) => (
-                          <div key={st.label} className="flex min-w-0 items-center gap-2" style={i ? { borderLeft: `1px solid ${RD.border}`, paddingLeft: 12 } : undefined}>
-                            {i === 0 ? <Target size={18} className="shrink-0" style={{ color: RD.red }} /> : <Gamepad2 size={18} className="shrink-0" style={{ color: RD.muted }} />}
-                            <span className="min-w-0">
-                              <b className="block text-[15px] font-extrabold leading-tight">{st.value}</b>
-                              <span className="block truncate text-[10.5px]" style={{ color: RD.muted }}>{st.label}</span>
-                            </span>
-                          </div>
-                        ))}
-                        <Link href={`/analysis/${w.id}`} className="ml-auto shrink-0 rounded-[11px] px-4 py-2 text-[13px] font-extrabold" style={{ color: RD.green, border: `1.5px solid ${RD.green}` }}>
-                          {v.cta}
-                        </Link>
                       </div>
-                    </Card>
+                    </Link>
                   );
                 })}
-                <div className="lg:col-span-2"><InsightCard icon={<GraduationCap size={30} style={{ color: RD.green }} />} title="Where to start" text="Work on your High priority areas first — they show up most often in your games." /></div>
-                {freePlan && <div className="lg:col-span-2"><ProUpsell compact title="Turn these into a course" text="Pro builds lessons from the exact positions where you went wrong." /></div>}
               </div>
-            ) : (
-              <Card>
-                <div className="py-8 text-center" style={{ color: RD.muted }}>
-                  <Target size={28} className="mx-auto mb-2 opacity-50" />
-                  <p className="text-[13px]">No weaknesses found yet.</p>
-                  <p className="mt-0.5 text-[12px]">Run Deep Analysis to discover your patterns.</p>
-                </div>
-              </Card>
             )}
-          </>
+            {freePlan && weaknesses.length > 0 && <ProUpsell compact title="Turn these into a course" text="Pro builds lessons from the exact positions where you went wrong." />}
+          </div>
         )}
 
         {tab === 'endgames' && <EndgamesTab />}
 
         {tab === 'trends' && (
-          <div className="grid gap-3 lg:grid-cols-2 lg:items-start lg:gap-4">
+          <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+            <Panel title="Results" className="lg:col-span-2">
+              <div className="grid gap-3">
+                {legend.map((l) => (
+                  <div key={l.label} className="flex items-center gap-3">
+                    <span className="w-14 shrink-0 text-[14px]" style={{ color: K.text }}>{l.label}</span>
+                    <div className="h-2.5 flex-1 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.08)' }}><div className="h-full rounded-full" style={{ width: `${Math.max(pct(l.n), l.n ? 2 : 0)}%`, background: l.color }} /></div>
+                    <b className="w-11 shrink-0 text-right text-[14px]">{pct(l.n).toFixed(0)}%</b>
+                    <span className="w-12 shrink-0 text-right text-[12px]" style={{ color: K.muted }}>{l.n.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </Panel>
             {monthlyAll.length > 0 && (
               <Card>
                 <div className="mb-1 flex items-center justify-between gap-2">
@@ -829,77 +724,59 @@ function EndgamesTab() {
 
   const c = data.conversion;
   const diff = data.overall.score - data.allScore;
+  const kinds = data.byKind.filter((k) => k.games >= 3);
+  const worstKind = [...kinds].sort((a, b) => a.winRate - b.winRate)[0];
+  const take = c.ahead.games >= 3 && c.ahead.pct < 75
+    ? { headline: 'You let winning endgames slip.', detail: `When you're up 2 or more pawns, you only win ${c.ahead.pct}% of the time (${c.ahead.games} games). Converting is the fastest rating gain there is.` }
+    : worstKind && worstKind.winRate < 45
+      ? { headline: `${worstKind.label} endgames are your weak spot.`, detail: `You win ${worstKind.winRate}% of them (${worstKind.games} games). A little technique goes a long way.` }
+      : diff >= 0
+        ? { headline: 'Endgames are a strength of yours.', detail: `You score ${data.overall.score}% once the board empties, ${diff} points better than your games overall.` }
+        : { headline: 'Your results dip in the endgame.', detail: `You score ${data.overall.score}% in endgames, ${Math.abs(diff)} points below your games overall.` };
   return (
-    <div className="grid gap-3 lg:grid-cols-2 lg:items-start lg:gap-4">
-      <Card>
-        <h2 className="mb-3 text-[16px] font-extrabold">Your Endgames</h2>
-        <div className="flex gap-2">
-          <StatTile icon={<Swords size={18} />} value={String(data.endgameGames)} label={`${data.reachedPct}% of your games`} />
-          <StatTile icon={<Trophy size={18} />} value={`${data.overall.winRate}%`} label="Endgame win rate" />
-          <StatTile icon={diff >= 0 ? <ArrowUp size={18} /> : <ArrowDown size={18} />} color={diff >= 0 ? RD.green : RD.red}
-            value={`${data.overall.score}%`} label={`Score (${diff >= 0 ? '+' : ''}${diff} vs all games)`} />
-        </div>
-        {data.pending > 0 && <p className="mt-2 text-[11.5px]" style={{ color: RD.muted }}>Still adding {data.pending} older games…</p>}
-      </Card>
+    <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+      <div className="lg:col-span-2"><CoachTake icon="endgames" headline={take.headline} detail={take.detail} action="Practise endgames" href="/endgames" /></div>
 
-      <Card>
-        <h2 className="mb-3 text-[16px] font-extrabold">Turning Endgames Into Results</h2>
-        <div className="space-y-2.5">
+      <Panel title="Turning endgames into results">
+        <div className="grid grid-cols-3 gap-2">
           {[
-            { label: 'Winning endgames won', sub: 'Up 2+ pawns of material', pct: c.ahead.pct, games: c.ahead.games, good: true },
-            { label: 'Losing endgames saved', sub: 'Down 2+ pawns, drawn or won', pct: c.behind.pct, games: c.behind.games, good: true },
-            { label: 'Equal endgames scored', sub: 'Level material (win = 1, draw = ½)', pct: c.equal.score, games: c.equal.games, good: true },
-          ].map((row) => (
-            <div key={row.label} className="rounded-[14px] px-3 py-2.5" style={{ background: 'rgba(255,255,255,.025)', border: `1px solid ${RD.border}` }}>
-              <div className="flex items-baseline justify-between gap-2">
-                <b className="text-[13.5px] font-bold">{row.label}</b>
-                <b className="text-[15px] font-extrabold" style={{ color: row.games ? RD.text : RD.muted }}>{row.games ? `${row.pct}%` : '—'}</b>
-              </div>
-              <div className="mt-1 flex items-center gap-2.5">
-                <span className="h-2 flex-1 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.08)' }}>
-                  <span className="block h-full rounded-full" style={{ width: `${row.games ? Math.max(row.pct, 3) : 0}%`, background: row.pct >= 50 ? RD.green : RD.red }} />
-                </span>
-                <span className="w-[86px] shrink-0 text-right text-[11px]" style={{ color: RD.muted }}>{row.games} game{row.games === 1 ? '' : 's'}</span>
-              </div>
-              <span className="mt-0.5 block text-[11px]" style={{ color: RD.muted }}>{row.sub}</span>
+            { label: 'Won when ahead', pct: c.ahead.pct, games: c.ahead.games },
+            { label: 'Saved when behind', pct: c.behind.pct, games: c.behind.games },
+            { label: 'Score when equal', pct: c.equal.score, games: c.equal.games },
+          ].map((r) => (
+            <div key={r.label} className="flex flex-col items-center gap-1.5 text-center">
+              <Ring pct={r.games ? r.pct : null} size={70} color={r.pct >= 50 ? K.green : K.gold} />
+              <b className="text-[12.5px] leading-tight" style={{ color: K.text }}>{r.label}</b>
+              <span className="text-[11.5px]" style={{ color: K.muted }}>{r.games} game{r.games === 1 ? '' : 's'}</span>
             </div>
           ))}
         </div>
-      </Card>
+        <p className="mt-3 text-center text-[12px]" style={{ color: K.muted }}>{data.endgameGames} endgames · {data.reachedPct}% of your games{data.pending > 0 ? ` · adding ${data.pending} more…` : ''}</p>
+      </Panel>
 
-      <Card className="lg:col-span-2">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <h2 className="text-[16px] font-extrabold">By Endgame Type</h2>
-          <Link href="/endgames" className="flex items-center gap-1 text-[13.5px] font-bold" style={{ color: RD.green }}>Practice <ChevronRight size={15} /></Link>
-        </div>
-        <div className="space-y-2">
+      <Panel title="By endgame type" more="Practise" href="/endgames">
+        <div className="grid gap-2.5">
           {data.byKind.map((k) => {
             const isOpen = open === k.kind;
             return (
-              <div key={k.kind} className="rounded-[14px]" style={{ background: 'rgba(255,255,255,.025)', border: `1px solid ${RD.border}` }}>
-                <button onClick={() => setOpen(isOpen ? null : k.kind)} className="flex w-full items-center gap-3 px-2.5 py-2.5 text-left">
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px]" style={{ background: 'rgba(255,255,255,.06)' }}>
-                    <img src={sprite(KIND_ICON[k.kind] ?? 'wK')} alt="" className="h-7 w-7" />
-                  </span>
+              <div key={k.kind} className="rounded-[16px]" style={{ background: K.card2, border: `1px solid ${K.line}` }}>
+                <button onClick={() => setOpen(isOpen ? null : k.kind)} className="flex w-full items-center gap-3 p-3 text-left">
+                  <Ring pct={k.winRate} size={46} stroke={5} color={k.winRate >= 50 ? K.green : K.gold} />
                   <span className="min-w-0 flex-1">
-                    <span className="flex items-baseline justify-between gap-2">
-                      <b className="truncate text-[14px] font-bold">{k.label}</b>
-                      <b className="text-[13.5px]">{k.winRate}%</b>
-                    </span>
-                    <span className="mt-1.5 flex items-center gap-2.5"><ResultBar wins={k.wins} draws={k.draws} losses={k.losses} /></span>
-                    <span className="mt-1 block text-[11px]" style={{ color: RD.muted }}>{k.games} games · {k.wins}W {k.draws}D {k.losses}L</span>
+                    <b className="block truncate text-[14.5px] font-extrabold" style={{ color: K.text }}>{k.label}</b>
+                    <span className="text-[12px]" style={{ color: K.muted }}>{k.games} games · {k.wins}W {k.draws}D {k.losses}L</span>
                   </span>
-                  <ChevronDown size={16} className="shrink-0 transition-transform" style={{ color: RD.muted, transform: isOpen ? 'rotate(180deg)' : undefined }} />
+                  <ChevronDown size={17} className="shrink-0 transition-transform" style={{ color: K.muted, transform: isOpen ? 'rotate(180deg)' : undefined }} />
                 </button>
                 {isOpen && (
-                  <div className="space-y-1 px-2.5 pb-2.5">
+                  <div className="space-y-1 px-3 pb-3">
                     {k.recent.map((g) => (
                       <Link key={g.id} href={`/games/${g.id}`} className="flex items-center justify-between gap-2 rounded-[10px] px-2.5 py-2 text-[12.5px]" style={{ background: 'rgba(255,255,255,.03)' }}>
                         <span className="min-w-0 truncate">vs {g.opponent}</span>
                         <span className="flex shrink-0 items-center gap-2">
-                          <b style={{ color: g.result === 'win' ? RD.green : g.result === 'loss' ? RD.red : RD.muted }}>{g.result === 'win' ? 'Won' : g.result === 'loss' ? 'Lost' : 'Draw'}</b>
-                          <span style={{ color: RD.muted }}>{new Date(g.playedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-                          <ChevronRight size={14} style={{ color: RD.muted }} />
+                          <b style={{ color: g.result === 'win' ? K.green : g.result === 'loss' ? K.red : K.muted }}>{g.result === 'win' ? 'Won' : g.result === 'loss' ? 'Lost' : 'Draw'}</b>
+                          <span style={{ color: K.muted }}>{new Date(g.playedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                          <ChevronRight size={14} style={{ color: K.muted }} />
                         </span>
                       </Link>
                     ))}
@@ -909,8 +786,8 @@ function EndgamesTab() {
             );
           })}
         </div>
-        <p className="mt-3 text-[11px]" style={{ color: RD.muted }}>An endgame starts once each side is down to a rook and a minor piece, or less, besides pawns.</p>
-      </Card>
+        <p className="mt-3 text-[11.5px]" style={{ color: K.muted }}>An endgame starts once each side has a rook and a minor piece or less, besides pawns.</p>
+      </Panel>
     </div>
   );
 }
