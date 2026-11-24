@@ -23,11 +23,10 @@ const PORTRAIT: Record<string, string> = {
 export function useBotAvatar() {
   const { enabled } = useDashboardRedesignFlag();
   const photo = usePhotoImagesFlag();
-  return (bot: { name: string; avatar: string }): string => {
-    const slug = PORTRAIT[bot.name];
-    if (photo && slug) return `${import.meta.env.BASE_URL}photo/assets/bots/${slug}.webp`;
-    return enabled && slug ? `${import.meta.env.BASE_URL}assets/bots/${slug}.webp` : bot.avatar;
-  };
+  // The metal medallions (lib/botMedallion) are every bot's picture now; the illustrated and
+  // photographed portraits stay in public/ and come back by returning them here.
+  void enabled; void photo; void PORTRAIT;
+  return (bot: { name: string; avatar: string }): string => bot.avatar;
 }
 
 // With the photo toggle on, a bot is called by its rank (Beginner ... Master)

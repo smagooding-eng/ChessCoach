@@ -1,3 +1,4 @@
+import { botMedallion } from '@/lib/botMedallion';
 // Beginner path finale: a real game against the easiest bot, with a visual
 // coach after every move -- a mini board with arrows showing what your move
 // did, what it left unprotected and (when there was one) the better move,
@@ -345,7 +346,7 @@ export function FirstGame({ onFinish }: { onFinish: (stars: number) => void }) {
     // the coach panel below scrolls on its own if it runs long.
     <div className="flex flex-col" style={{ height: 'calc(100dvh - 72px - env(safe-area-inset-top) - env(safe-area-inset-bottom))', minHeight: 520 }}>
       <div className="flex items-center gap-3 mb-2 shrink-0">
-        <img src={`${import.meta.env.BASE_URL ?? '/'}assets/bots/tommy.webp`} alt="" className="w-10 h-10 rounded-full object-cover" style={{ background: L.card, border: `2px solid ${L.line}` }} />
+        <img src={botMedallion(0)} alt="" className="w-10 h-10 rounded-full object-cover" style={{ background: L.card, border: `2px solid ${L.line}` }} />
         <div className="flex-1 min-w-0">
           <p className="font-black leading-tight">{bot.name} <span className="text-xs font-bold" style={{ color: L.muted }}>· {bot.rating}</span></p>
           <p className="text-xs" style={{ color: L.muted }}>{thinking ? 'Thinking…' : over ? 'Game over' : g.current.turn() === 'w' ? 'Your move (White)' : ''}</p>

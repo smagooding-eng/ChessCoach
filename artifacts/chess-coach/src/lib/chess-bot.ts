@@ -1,3 +1,4 @@
+import { botMedallion } from '@/lib/botMedallion';
 import { Chess } from 'chess.js';
 import { isBookPosition } from './openingBook';
 import { apiFetch } from './api';
@@ -264,7 +265,7 @@ export const BOTS: BotConfig[] = [
     mateSight: 0.45,
     evalNoise: 60,
     description: 'Just learned the rules last week. Makes lots of random moves.',
-    avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Tommy&backgroundColor=b6e3f4',
+    avatar: botMedallion(0),
     personality: 'Beginner',
   },
   {
@@ -276,7 +277,7 @@ export const BOTS: BotConfig[] = [
     mateSight: 0.8,
     evalNoise: 30,
     description: 'Plays at the park on weekends. Knows the basics but misses tactics.',
-    avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Rosa&backgroundColor=ffd5dc',
+    avatar: botMedallion(1),
     personality: 'Casual',
   },
   {
@@ -287,7 +288,7 @@ export const BOTS: BotConfig[] = [
     captureSight: 0.9,
     mateSight: 0.95,
     description: 'School chess club regular. Captures free pieces and controls the center.',
-    avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Derek&backgroundColor=c0aede',
+    avatar: botMedallion(2),
     personality: 'Improving',
   },
   {
@@ -296,7 +297,7 @@ export const BOTS: BotConfig[] = [
     depth: 2,
     blunderRate: 0.1,
     description: 'Local club champion. Solid fundamentals — rarely hangs pieces.',
-    avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Mia&backgroundColor=ffdfbf',
+    avatar: botMedallion(3),
     personality: 'Club Player',
   },
   {
@@ -305,7 +306,7 @@ export const BOTS: BotConfig[] = [
     depth: 3,
     blunderRate: 0.08,
     description: 'Plays tournaments every month. Sees tactics 2-3 moves deep.',
-    avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Viktor&backgroundColor=d1d4f9',
+    avatar: botMedallion(4),
     personality: 'Tournament',
   },
   {
@@ -314,7 +315,7 @@ export const BOTS: BotConfig[] = [
     depth: 3,
     blunderRate: 0.04,
     description: 'National-level competitor. Strong positional play and endgames.',
-    avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Nadia&backgroundColor=b6e3f4',
+    avatar: botMedallion(5),
     personality: 'Advanced',
   },
   {
@@ -323,7 +324,7 @@ export const BOTS: BotConfig[] = [
     depth: 4,
     blunderRate: 0.02,
     description: 'Former state champion. Deep calculation and relentless pressure.',
-    avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Chen&backgroundColor=c9a15c',
+    avatar: botMedallion(6),
     personality: 'Expert',
   },
   {
@@ -332,7 +333,7 @@ export const BOTS: BotConfig[] = [
     depth: 4,
     blunderRate: 0.01,
     description: 'Near-master strength. Punishes the slightest inaccuracy.',
-    avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Fischer&backgroundColor=c9a15c',
+    avatar: botMedallion(7),
     personality: 'Master',
   },
   {
@@ -341,7 +342,7 @@ export const BOTS: BotConfig[] = [
     depth: 4,
     blunderRate: 0,
     description: 'International Master. Precise, patient and very hard to trick.',
-    avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Sato&backgroundColor=c9a15c',
+    avatar: botMedallion(8),
     personality: 'International Master',
   },
   {
@@ -350,7 +351,7 @@ export const BOTS: BotConfig[] = [
     depth: 4,
     blunderRate: 0,
     description: 'Grandmaster. Turns the smallest edge into a win.',
-    avatar: 'https://api.dicebear.com/9.x/personas/svg?seed=Ivanova&backgroundColor=c9a15c',
+    avatar: botMedallion(9),
     personality: 'Grandmaster',
   },
 ];
