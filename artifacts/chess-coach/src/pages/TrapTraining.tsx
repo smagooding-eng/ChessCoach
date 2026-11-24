@@ -72,7 +72,7 @@ export default function TrapTrainingPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3" style={{ background: BG, color: TEXT }}>
         <p className="text-sm" style={{ color: MUTED }}>Trap not found.</p>
-        <Link href="/admin/traps" className="text-sm font-bold" style={{ color: ACCENT }}>Back to Traps</Link>
+        <Link href="/traps" className="text-sm font-bold" style={{ color: ACCENT }}>Back to Traps</Link>
       </div>
     );
   }
@@ -80,7 +80,7 @@ export default function TrapTrainingPage() {
   return (
     <div className="min-h-screen" style={{ background: BG, color: TEXT }}>
       <div className="max-w-2xl mx-auto px-4 sm:px-8 py-8">
-        <Link href="/admin/traps" className="inline-flex items-center gap-1.5 text-sm mb-6" style={{ color: MUTED }}>
+        <Link href="/traps" className="inline-flex items-center gap-1.5 text-sm mb-6" style={{ color: MUTED }}>
           <ArrowLeft className="w-4 h-4" /> Back
         </Link>
 
