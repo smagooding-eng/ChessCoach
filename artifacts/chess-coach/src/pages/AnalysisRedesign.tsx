@@ -180,6 +180,47 @@ function TrendChart({ data, color, id }: { data: TrendPoint[]; color: string; id
   );
 }
 
+/** Rating over time: an area chart with a few gridlines, the start date and today. */
+function RatingTrendChart({ values, since }: { values: number[]; since: string | null }) {
+  if (values.length < 2) return <div className="grid h-[150px] place-items-center text-[12.5px]" style={{ color: RD.muted }}>Not enough games yet</div>;
+  const W = 320, H = 150, L = 34, R = 8, T = 8, B = 20;
+  const lo = Math.min(...values), hi = Math.max(...values);
+  const step = Math.max(10, Math.ceil((hi - lo) / 4 / 10) * 10 || 50);
+  const y0 = Math.floor(lo / step) * step, y1 = Math.max(y0 + step, Math.ceil(hi / step) * step);
+  const ticks: number[] = []; for (let v = y0; v <= y1; v += step) ticks.push(v);
+  const x = (i: number) => L + (i / (values.length - 1)) * (W - L - R);
+  const y = (v: number) => T + (1 - (v - y0) / (y1 - y0)) * (H - T - B);
+  const line = values.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full" aria-hidden="true">
+      <defs><linearGradient id="rtArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={RD.green} stopOpacity=".45" /><stop offset="1" stopColor={RD.green} stopOpacity="0" /></linearGradient></defs>
+      {ticks.map((v) => <g key={v}><line x1={L} x2={W - R} y1={y(v)} y2={y(v)} stroke="rgba(255,255,255,.07)" /><text x={L - 5} y={y(v) + 3} textAnchor="end" fontSize="9" fill={RD.muted}>{v.toLocaleString()}</text></g>)}
+      <path d={`${line} L${x(values.length - 1)} ${H - B} L${L} ${H - B} Z`} fill="url(#rtArea)" />
+      <path d={line} fill="none" stroke={RD.green} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={x(values.length - 1)} cy={y(values[values.length - 1])} r="4" fill={RD.green} stroke="#0B1213" strokeWidth="1.5" />
+      <text x={L} y={H - 5} fontSize="9" fill={RD.muted}>{since?.replace('Since ', '') ?? ''}</text>
+      <text x={W - R} y={H - 5} textAnchor="end" fontSize="9" fill={RD.muted}>Now</text>
+    </svg>
+  );
+}
+
+/** A soft area line (win rate by month). */
+function AreaLine({ values }: { values: number[] }) {
+  if (values.length < 2) return null;
+  const W = 300, H = 70, lo = Math.min(...values) - 5, hi = Math.max(...values) + 5;
+  const pts = values.map((v, i) => [(i / (values.length - 1)) * W, H - 4 - ((v - lo) / Math.max(1, hi - lo)) * (H - 10)] as const);
+  // smooth curve through the points
+  let d = `M${pts[0][0]} ${pts[0][1]}`;
+  for (let i = 1; i < pts.length; i++) { const [px, py] = pts[i - 1], [cx, cy] = pts[i], mx = (px + cx) / 2; d += ` C${mx} ${py} ${mx} ${cy} ${cx} ${cy}`; }
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="block h-[70px] w-full" aria-hidden="true">
+      <defs><linearGradient id="wrArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={RD.green} stopOpacity=".4" /><stop offset="1" stopColor={RD.green} stopOpacity="0" /></linearGradient></defs>
+      <path d={`${d} L${W} ${H} L0 ${H} Z`} fill="url(#wrArea)" />
+      <path d={d} fill="none" stroke={RD.green} strokeWidth="2.5" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
 function RangePicker({ value, options, onChange }: { value: number; options: number[]; onChange: (n: number) => void }) {
   if (options.length < 2) return null;
   return (
@@ -210,7 +251,7 @@ function InsightCard({ icon, title, text, onClick }: { icon: React.ReactNode; ti
   const Tag = onClick ? 'button' : 'div';
   return (
     <Tag onClick={onClick} className="flex w-full items-center gap-3 rounded-[18px] p-4 text-left"
-      style={{ background: '#0D1516', border: '1px solid rgba(255,255,255,.08)' }}>
+      style={{ background: '#0D1516', border: '1.5px solid rgba(129,182,76,.55)' }}>
       <span className="shrink-0">{icon}</span>
       <span className="min-w-0 flex-1">
         <b className="block text-[15px] font-extrabold" style={{ color: RD.green }}>{title}</b>
@@ -294,12 +335,11 @@ export function AnalysisRedesign() {
     { label: 'Draws', n: summary.draws, color: '#8A949B' },
     { label: 'Losses', n: summary.losses, color: RD.red },
   ];
-  const donut = `conic-gradient(${RD.green} 0 ${pct(summary.wins)}%, #8A949B ${pct(summary.wins)}% ${pct(summary.wins) + pct(summary.draws)}%, ${RD.red} ${pct(summary.wins) + pct(summary.draws)}% 100%)`;
 
   const PHASE_ICON: Record<string, React.ReactNode> = {
-    Opening: <BookOpen size={24} style={{ color: RD.text }} />,
-    Middlegame: <img src={sprite('wN')} alt="" className="h-7 w-7" />,
-    Endgame: <img src={sprite('wK')} alt="" className="h-7 w-7" />,
+    Opening: <ScoutIcon name="openings" size={32} />,
+    Middlegame: <ScoutIcon name="recent-games" size={32} />,
+    Endgame: <ScoutIcon name="endgames" size={32} />,
   };
   const phases = summary.phaseAccuracy && summary.phaseAccuracy.gamesAnalyzed > 0
     ? ([['Opening', 'opening'], ['Middlegame', 'middlegame'], ['Endgame', 'endgame']] as const).map(([label, key]) => ({ label, ...summary.phaseAccuracy![key] }))
@@ -370,13 +410,14 @@ export function AnalysisRedesign() {
     <div className="min-h-screen px-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
       <div className="mx-auto grid grid-cols-1 w-full max-w-[760px] gap-3 lg:max-w-[1200px]">
         <RedesignHeader title="My Analytics" icon={<ScoutIcon name="progress" size={32} />} />
+        <p className="-mt-2 px-1 text-[13.5px]" style={{ color: RD.muted }}>Understand your game. Train what matters.</p>
 
         <div data-swipe-tabs className="flex gap-0.5 overflow-x-auto rounded-[16px] p-1 [scrollbar-width:none] lg:max-w-[820px] [&::-webkit-scrollbar]:hidden" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
           {TABS.map((t) => {
             const active = tab === t.id;
             return (
               <button key={t.id} ref={active ? (el) => el?.scrollIntoView({ block: 'nearest', inline: 'nearest' }) : undefined} onClick={() => setTab(t.id)} className="shrink-0 grow whitespace-nowrap rounded-[12px] px-3 py-2.5 text-[12.5px] font-bold transition-colors md:text-[13px]"
-                style={active ? { background: 'rgba(255,255,255,.08)', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
+                style={active ? { background: '#1E3A1C', color: RD.text, boxShadow: `inset 0 0 0 1.5px ${RD.green}` } : { background: 'transparent', color: RD.muted }}>
                 {t.label}
               </button>
             );
@@ -385,74 +426,72 @@ export function AnalysisRedesign() {
 
         {tab === 'overview' && (
           <div className="grid gap-3 lg:grid-cols-2 lg:items-start lg:gap-4">
-            {/* Totals (moved here from the home screen) */}
-            <section className="grid grid-cols-2 overflow-hidden rounded-[20px] sm:grid-cols-4 lg:col-span-2" style={CARD_STYLE}>
+            {/* Headline numbers */}
+            <section className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:col-span-2">
               {[
-                { label: 'Total Games', value: summary.totalGames?.toLocaleString() || '0' },
-                { label: 'Reviewed', value: (summary.reviewedCount ?? 0).toLocaleString() },
-                { label: 'Avg Rating', value: String(Math.round(summary.avgRating || 0) || '—') },
-                { label: 'Weaknesses', value: String(weaknesses.length), onClick: () => setTab('weaknesses') },
-              ].map((st, i) => {
+                { label: 'Rating', icon: 'progress', value: rating != null ? String(rating) : '—', delta: rating != null && ratingDelta ? ratingDelta : null },
+                { label: 'Total Games', icon: 'recent-games', value: summary.totalGames?.toLocaleString() || '0' },
+                { label: 'Reviewed', icon: 'report-card', value: (summary.reviewedCount ?? 0).toLocaleString() },
+                { label: 'Key Weaknesses', icon: 'opponent-scout', value: String(weaknesses.length), onClick: () => setTab('weaknesses'), accent: weaknesses.length > 0 },
+              ].map((st) => {
                 const Tag = st.onClick ? 'button' : 'div';
                 return (
-                  <Tag key={st.label} onClick={st.onClick} className="px-4 py-3.5 text-left"
-                    style={{ borderRight: `1px solid ${RD.border}`, borderBottom: i < 2 ? `1px solid ${RD.border}` : undefined }}>
-                    <p className="text-[10.5px] font-bold uppercase tracking-[.14em]" style={{ color: RD.muted }}>{st.label}</p>
-                    <b className="mt-0.5 block text-[22px] font-extrabold leading-tight" style={st.onClick && weaknesses.length ? { color: RD.green } : undefined}>{st.value}</b>
+                  <Tag key={st.label} onClick={st.onClick} className="flex items-center gap-3 rounded-[16px] px-3.5 py-3 text-left" style={CARD_STYLE}>
+                    <ScoutIcon name={st.icon} size={34} className="shrink-0" />
+                    <span className="min-w-0">
+                      <span className="block truncate text-[12px] font-semibold" style={{ color: RD.muted }}>{st.label}</span>
+                      <span className="flex items-baseline gap-1.5">
+                        <b className="text-[22px] font-extrabold leading-tight" style={st.accent ? { color: RD.green } : undefined}>{st.value}</b>
+                        {st.delta ? <span className="text-[12px] font-extrabold" style={{ color: st.delta > 0 ? RD.green : RD.red }}>{st.delta > 0 ? '▲' : '▼'}{st.delta > 0 ? '+' : ''}{st.delta}</span> : null}
+                      </span>
+                    </span>
                   </Tag>
                 );
               })}
             </section>
 
-            <div className="grid grid-cols-2 gap-3 lg:col-span-2 lg:gap-4">
-              <Card className="!p-3.5">
-                <div className="flex items-center justify-between">
-                  <p className="text-[13px]" style={{ color: RD.muted }}>Rating</p>
-                  <BarChart3 size={18} style={{ color: RD.green }} />
+            <Card>
+              <div className="mb-2 flex items-start justify-between gap-2">
+                <div>
+                  <h2 className="text-[17px] font-extrabold">Rating Trend</h2>
+                  {ratingSince && <p className="text-[12px]" style={{ color: RD.muted }}>{ratingSince}</p>}
                 </div>
-                <b className="block text-[30px] font-extrabold leading-tight">{rating ?? '—'}</b>
-                <Delta value={ratingDelta} />
-                <div className="mt-1 h-[46px]"><Sparkline id="rdRatingSpark" values={ratingSpark} color={RD.green} /></div>
-                {ratingSince && <p className="mt-1 text-[11px]" style={{ color: RD.muted }}>{ratingSince}</p>}
-              </Card>
-              <Card className="!p-3.5">
-                <div className="flex items-center justify-between">
-                  <p className="text-[13px]" style={{ color: RD.muted }}>Win Rate</p>
-                  <Trophy size={18} style={{ color: RD.green }} />
+                {ratingDelta !== 0 && <span className="rounded-[10px] px-2.5 py-1 text-[13px] font-extrabold" style={{ background: '#0D1516', border: `1px solid ${ratingDelta > 0 ? RD.green : RD.red}`, color: ratingDelta > 0 ? RD.green : RD.red }}>{ratingDelta > 0 ? '▲ +' : '▼ '}{ratingDelta}</span>}
+              </div>
+              <RatingTrendChart values={ratingSpark} since={ratingSince} />
+            </Card>
+
+            <Card>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h2 className="text-[17px] font-extrabold">Win Rate</h2>
+                  <p className="text-[12px]" style={{ color: RD.muted }}>Last 6 months</p>
                 </div>
-                <b className="block text-[30px] font-extrabold leading-tight">{decided > 0 ? `${winRate.toFixed(1)}%` : '—'}</b>
-                <Delta value={winDelta} suffix="%" />
-                <div className="mt-1 h-[46px]"><Sparkline id="rdWinSpark" values={monthlyAll.map((m) => m.winPct)} color={RD.green} /></div>
-                <p className="mt-1 text-[11px]" style={{ color: RD.muted }}>Last 6 months</p>
-              </Card>
-            </div>
+                <Trophy size={18} style={{ color: RD.gold }} />
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <b className="text-[36px] font-extrabold leading-none">{decided > 0 ? `${winRate.toFixed(1)}%` : '—'}</b>
+                {winDelta !== 0 && <span className="text-[14px] font-extrabold" style={{ color: winDelta > 0 ? RD.green : RD.red }}>{winDelta > 0 ? '▲ +' : '▼ '}{winDelta}%</span>}
+              </div>
+              <div className="mt-3"><AreaLine values={monthlyAll.map((m) => m.winPct)} /></div>
+            </Card>
 
             <Card>
               <div className="mb-3 flex items-baseline justify-between">
                 <h2 className="text-[17px] font-extrabold">Results Breakdown</h2>
                 <span className="text-[12px]" style={{ color: RD.muted }}>{decided.toLocaleString()} games</span>
               </div>
-              <div className="flex items-center gap-4">
-                <div className="grid h-[140px] w-[140px] shrink-0 place-items-center rounded-full" style={{ background: decided > 0 ? donut : RD.cardLight }}>
-                  <div className="grid h-[92px] w-[92px] place-items-center rounded-full text-center" style={{ background: 'var(--rd-card-solid, #0B1213)' }}>
-                    <div>
-                      <b className="block text-[24px] font-extrabold leading-none">{decided.toLocaleString()}</b>
-                      <span className="text-[11px]" style={{ color: RD.muted }}>Total Games</span>
+              <div className="grid gap-3.5">
+                {legend.map((l) => (
+                  <div key={l.label} className="flex items-center gap-3">
+                    <span className="w-14 shrink-0 text-[14px]" style={{ color: 'rgba(245,247,246,.9)' }}>{l.label}</span>
+                    <div className="h-2.5 flex-1 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.08)' }}>
+                      <div className="h-full rounded-full" style={{ width: `${Math.max(pct(l.n), l.n ? 2 : 0)}%`, background: l.color }} />
                     </div>
+                    <b className="w-11 shrink-0 text-right text-[14px]">{pct(l.n).toFixed(0)}%</b>
+                    <span className="w-12 shrink-0 text-right text-[12px]" style={{ color: RD.muted }}>{l.n.toLocaleString()}</span>
                   </div>
-                </div>
-                <div className="grid flex-1 gap-3">
-                  {legend.map((l) => (
-                    <div key={l.label} className="flex items-start gap-2.5">
-                      <span className="mt-1.5 h-3 w-3 shrink-0 rounded-full" style={{ background: l.color }} />
-                      <span className="flex-1 text-[14px]" style={{ color: 'rgba(245,247,246,.9)' }}>{l.label}</span>
-                      <span className="text-right">
-                        <b className="block text-[15px] leading-tight">{pct(l.n).toFixed(0)}%</b>
-                        <span className="text-[11px]" style={{ color: RD.muted }}>{l.n.toLocaleString()}</span>
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                ))}
               </div>
             </Card>
 
