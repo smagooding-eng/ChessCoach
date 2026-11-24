@@ -1,0 +1,29 @@
+# Is the app slow? Times the site and the API from GitHub, and reads the API server's memory,
+# CPU, recent deploys and restarts from Render. Prints timings and summaries only (public repo).
+name: Speed check
+on: workflow_dispatch
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Response times
+        run: |
+          B=https://chesscoach-api-kbf8.onrender.com
+          for u in https://chessscout.net/ "$B/api/healthz" "$B/api/healthz/deep" "$B/api/puzzles/daily" "$B/api/stats/public"; do
+            for i in 1 2 3; do curl -s -o /dev/null -m 30 -w "%{http_code} %{time_total}s  $u\n" "$u"; done
+          done
+      - name: Render server
+        env: { RK: "${{ secrets.RENDER_API_KEY }}" }
+        run: |
+          H=(-H "Authorization: Bearer $RK" -H "Accept: application/json")
+          SID=$(curl -fsS "${H[@]}" "https://api.render.com/v1/services?name=chesscoach-api&limit=1" | jq -r '.[0].service.id')
+          echo "Plan: $(curl -fsS "${H[@]}" "https://api.render.com/v1/services/$SID" | jq -r '.serviceDetails.plan // "?"')"
+          echo "== Last deploys"; curl -fsS "${H[@]}" "https://api.render.com/v1/services/$SID/deploys?limit=6" | jq -r '.[].deploy | "\(.createdAt)  \(.status)  \(.commit.message // "" | split("\n")[0] | .[0:70])"'
+          echo "== Recent events (restarts, crashes, memory)"; curl -fsS "${H[@]}" "https://api.render.com/v1/services/$SID/events?limit=30" | jq -r '.[].event | "\(.timestamp)  \(.type)  \(.details.reason // .details.message // "" | tostring | .[0:90])"' | head -30
+          S=$(date -u -d '-6 hours' +%Y-%m-%dT%H:%M:%SZ); E=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          for m in memory cpu http-latency; do
+            echo "== $m (last 6 h, hourly avg)"
+            curl -fsS "${H[@]}" "https://api.render.com/v1/metrics/$m?resource=$SID&startTime=$S&endTime=$E&resolutionSeconds=3600" \
+              | jq -r '.[]? | (.labels | map("\(.field)=\(.value)") | join(",")) as $l | .values[]? | "\(.timestamp)  \(.value)  \($l)"' | tail -14 || echo "(not available)"
+          done
