@@ -36,6 +36,7 @@ import { ProUpsell } from '@/components/ProUpsell';
 import { MistakeFixView } from '@/components/MistakeFixView';
 import { GuidedReview } from '@/components/review/GuidedReview';
 import { PathReviewBar } from '@/components/PathReviewBar';
+import { pathReviewFor } from '@/lib/learnPath';
 import { ProAnalysis } from '@/components/review/ProAnalysis';
 import { AnimatePresence, motion } from 'framer-motion';
 import { NEUTRAL_CHIP } from '@/lib/redesignTheme';
@@ -944,7 +945,10 @@ export function GameReplay() {
     }
 
     try {
-      const url = force ? `/api/games/${game.id}/review?force=true` : `/api/games/${game.id}/review`;
+      // Learn Path reviews are the engine review only (never the Pro coach)
+      const engineOnly = pathReviewFor(game.id) ? 'engine=1' : '';
+      const q = [force ? 'force=true' : '', engineOnly].filter(Boolean).join('&');
+      const url = `/api/games/${game.id}/review${q ? `?${q}` : ''}`;
       const res = await apiFetch(url, { method: 'POST' });
       if (!res.ok) throw new Error('Failed to start review');
       const data = await res.json() as { status: string; jobId?: string; reviewData?: { moves: ReviewMove[]; gameSummary?: GameSummary; whiteAccuracy?: number | null; blackAccuracy?: number | null } };
@@ -986,6 +990,7 @@ export function GameReplay() {
     // In both views: Pro reviews always come with the AI coach. The engine-only
     // review stays on screen while the AI version is made.
     if (!game || !canFullAnalysis || reviewing || loadingSavedReview || reviewAi !== false) return;
+    if (pathReviewFor(game.id)) return; // Learn Path reviews stay engine-only
     if (aiUpgradeFor.current === game.id) return;
     aiUpgradeFor.current = game.id;
     void handleReview(true, true);

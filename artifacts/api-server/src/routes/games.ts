@@ -2138,7 +2138,7 @@ router.get("/games/review-all-status/:jobId", requireAuth, async (req, res): Pro
   res.json({ status: job.status, error: job.error, ...(job.result as object ?? {}) });
 });
 
-async function runReviewJob(gameId: number, jobId: string, log: Logger): Promise<void> {
+async function runReviewJob(gameId: number, jobId: string, log: Logger, engineOnly = false): Promise<void> {
   try {
     const [game] = await db.select().from(gamesTable).where(eq(gamesTable.id, gameId));
     if (!game) {
@@ -2187,7 +2187,8 @@ async function runReviewJob(gameId: number, jobId: string, log: Logger): Promise
         writeInterim(engineBasic.map((m, i) => (covered.has(i) && merged[i] ? merged[i] : m)), covered.size);
       },
       userId: game.userId ?? undefined,
-      aiCoach: await aiCoachForOwner(game.userId),
+      // bot games and Learn Path reviews: engine only
+      aiCoach: engineOnly || game.platform === "bot" ? false : await aiCoachForOwner(game.userId),
       coachSide: await coachSideFor(game),
     });
 
@@ -2416,7 +2417,8 @@ router.post("/games/:id/review", async (req, res): Promise<void> => {
   });
 
   res.json({ status: "pending", jobId });
-  runReviewJob(params.data.id, jobId, req.log).catch(() => {});
+  // ?engine=1 (Learn Path reviews): the engine review only, no AI coach
+  runReviewJob(params.data.id, jobId, req.log, req.query.engine === "1").catch(() => {});
 });
 
 // ── One free AI game review (the Instagram link: chessscout.net/review) ─────────
