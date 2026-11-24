@@ -35,7 +35,7 @@ type Hosted = { code: string; url: string; label: string };
 // Nobody on ChessScout: the clocks Lichess lets apps play (10 minutes and up), and
 // how long to look here first before handing over to a real Lichess game.
 const LICHESS_CLOCK: Record<string, string> = { rapid_10_0: '10+0', rapid_15_0: '15+0', any: '10+0' };
-// 7 s on ChessScout, then 7 s on Lichess; a bot game starts at 14 s. When other ChessScout players
+// 30 s on ChessScout, then 20 s on Lichess; a bot game starts after that. When other ChessScout players
 // are on Live play the server makes the first wait 15 s (live.handoffMs).
 
 type OnlineTab = 'live' | 'daily';
