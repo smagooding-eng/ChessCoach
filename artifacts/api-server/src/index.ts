@@ -274,6 +274,9 @@ async function runSchemaMigrations() {
     // Older games against bots were saved before bots had their own tab: file them under Bots.
     await db.execute(sql`UPDATE games SET platform = 'bot' WHERE platform IS DISTINCT FROM 'bot'
       AND (white_username ILIKE 'ChessScout Bot%' OR black_username ILIKE 'ChessScout Bot%' OR white_username ILIKE '% (Bot)' OR black_username ILIKE '% (Bot)')`);
+    // Bot games only belong in the Bots tab: give them a name of their own so the stats, analytics,
+    // courses and puzzles (all read by username) leave them out.
+    await db.execute(sql`UPDATE games SET username = username || ' (bot games)' WHERE platform = 'bot' AND username NOT LIKE '% (bot games)'`);
     await db.execute(sql`CREATE TABLE IF NOT EXISTS correspondence_queue (
       id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
       user_id VARCHAR NOT NULL,
@@ -497,6 +500,7 @@ async function runSchemaMigrations() {
         WHERE g.platform = 'chessscout' AND g.played_at = lg.started_at
           AND (lg.white_persona_id IS NOT NULL OR lg.black_persona_id IS NOT NULL)
           AND (LOWER(g.username) = LOWER(lg.white_username) OR LOWER(g.username) = LOWER(lg.black_username))`);
+      await db.execute(sql`UPDATE games SET username = username || ' (bot games)' WHERE platform = 'bot' AND username NOT LIKE '% (bot games)'`);
     } catch (err) {
       logger.warn({ err }, 'ChessScout games owner backfill failed');
     }

@@ -637,7 +637,7 @@ async function persistFinishedGame(g: LiveGame) {
     try {
       const inserted = await db.insert(gamesTable).values({
         userId: p.userId,
-        username: p.username.toLowerCase(),
+        username: (side === 'white' ? g.black : g.white).kind === 'bot' ? `${p.username.toLowerCase()} (bot games)` : p.username.toLowerCase(),
         pgn,
         whiteUsername: g.white.username,
         blackUsername: g.black.username,
@@ -1735,8 +1735,8 @@ export async function getUserLiveHistory(userId: string, limit: number) {
     LEFT JOIN games g ON g.platform IN ('chessscout', 'bot')
       AND g.played_at = lg.started_at
       AND (
-        (lg.white_user_id = ${userId} AND LOWER(g.username) = LOWER(lg.white_username))
-        OR (lg.black_user_id = ${userId} AND LOWER(g.username) = LOWER(lg.black_username))
+        (lg.white_user_id = ${userId} AND LOWER(REPLACE(g.username, ' (bot games)', '')) = LOWER(lg.white_username))
+        OR (lg.black_user_id = ${userId} AND LOWER(REPLACE(g.username, ' (bot games)', '')) = LOWER(lg.black_username))
       )
     WHERE lg.white_user_id = ${userId} OR lg.black_user_id = ${userId}
     ORDER BY lg.finished_at DESC

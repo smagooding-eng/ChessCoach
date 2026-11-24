@@ -63,7 +63,7 @@ async function saveBotGame(req: Request, g: { bot: string; result: string; pgn: 
   chess.header("Event", "ChessScout practice bot", "Site", "ChessScout.net", "Date", now.toISOString().slice(0, 10).replace(/-/g, "."),
     "White", white, "Black", black, "Result", tag);
   await db.insert(gamesTable).values({
-    userId: u.id, username: me.toLowerCase(), pgn: chess.pgn(),
+    userId: u.id, username: `${me.toLowerCase()} (bot games)`, pgn: chess.pgn(),
     whiteUsername: white, blackUsername: black,
     whiteRating: g.color === "w" ? 0 : Math.round(g.botRating), blackRating: g.color === "b" ? 0 : Math.round(g.botRating),
     result: g.result, timeControl: "untimed", opening: null, eco: null, playedAt: now, url: null, platform: "bot",

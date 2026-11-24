@@ -12,7 +12,7 @@ export async function ownerNames(userId: string | null | undefined): Promise<str
 
 // Which side the member played: their own names first, then the account the game was saved under.
 export function sideFromNames(game: { username?: string | null; whiteUsername: string; blackUsername: string }, names: string[]): "white" | "black" | undefined {
-  const all = game.username ? [...names, game.username.toLowerCase()] : names;
+  const all = game.username ? [...names, game.username.toLowerCase().replace(/ \(bot games\)$/, '')] : names;
   const w = game.whiteUsername.toLowerCase(), b = game.blackUsername.toLowerCase();
   for (const n of all) { if (n === w) return "white"; if (n === b) return "black"; }
   return undefined;

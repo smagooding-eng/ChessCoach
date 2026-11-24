@@ -89,7 +89,14 @@ export function stepOpen(s: PathState, l: Level, i: number) {
 }
 
 /** Kept for the pages that call it; the path now always works on the step you're on. */
-export function startStep(_step: Step) { markPathStarted(); }
+export function startStep(step: Step) {
+  markPathStarted();
+  // a bot game counts for the path (and gets reviewed) only when it was started from the path
+  if (step.kind === 'bot') { try { localStorage.setItem(PATH_BOT, JSON.stringify({ bot: step.target, at: Date.now() })); } catch { /* */ } }
+}
+const PATH_BOT = 'cs_path_bot_started';
+/** True when this bot game was started from the Learn Path (within the last day). */
+export function pathBotGame(bot: string) { try { const v = JSON.parse(localStorage.getItem(PATH_BOT) || 'null'); return !!v && v.bot === bot && Date.now() - v.at < 86_400_000; } catch { return false; } }
 const STARTED = 'cs_learn_path_started';
 export function markPathStarted() { try { localStorage.setItem(STARTED, '1'); } catch { /* */ } }
 function pathStarted() { try { return localStorage.getItem(STARTED) === '1' || Object.keys(readPath().done).length > 0; } catch { return false; } }
@@ -99,7 +106,7 @@ export function nextStep(s: PathState) { const l = currentLevel(s); return l.ste
 
 /** Pages call this when the member does something; it counts toward the step they're on. */
 export function pathEvent(kind: StepKind, target?: string) {
-  if (!pathStarted() || kind !== 'bot') return; // every other step runs on its own screen (/path/step)
+  if (!pathStarted() || kind !== 'bot' || !target || !pathBotGame(target)) return; // every other step runs on its own screen (/path/step)
   const s = readPath();
   const step = nextStep(s);
   if (!step || step.kind !== kind) return;

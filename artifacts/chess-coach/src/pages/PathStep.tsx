@@ -11,7 +11,7 @@ import { TacticPuzzle, type TacticPuzzleData } from '@/components/tactics/Tactic
 import { ScoutIcon } from '@/components/ScoutIcons';
 import { apiFetch } from '@/lib/api';
 import { gradeMove, type DeviceGrade } from '@/lib/deviceEngine';
-import { stepByKey, completeStep, readPath, lastBotGame, setHasGames, type Level, type Step } from '@/lib/learnPath';
+import { stepByKey, completeStep, startStep, readPath, lastBotGame, setHasGames, type Level, type Step } from '@/lib/learnPath';
 
 const MUTED = '#8F9997', GREEN = '#81B64C', GOLD = '#E8B447', CARD = '#182123', CARD2 = '#212B2D', BORDER = 'rgba(255,255,255,.07)';
 const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
@@ -216,7 +216,7 @@ function Body({ level, step, finish }: { level: Level; step: Step; finish: () =>
       <LinePlayer moves={c.trap.trapLineSan} notes={c.trap.moveNotes} userColor={c.trap.trapSide === 'white' ? 'w' : 'b'} onDone={finish} /></div>);
     case 'review': {
       const g = lastBotGame(level.bot.name);
-      if (!g) return <div className="space-y-3"><Note>Play {level.bot.name} first: this reviews that game.</Note><Link href={`/practice?bot=${encodeURIComponent(level.bot.name)}`} className="cs-cta block text-center">Play {level.bot.name}</Link></div>;
+      if (!g) return <div className="space-y-3"><Note>Play {level.bot.name} from the path first: this reviews that game (bot games played elsewhere aren't reviewed here).</Note><Link href={`/practice?bot=${encodeURIComponent(level.bot.name)}`} onClick={() => { const b = level.steps.find((x) => x.kind === 'bot'); if (b) startStep(b); }} className="cs-cta block text-center">Play {level.bot.name}</Link></div>;
       return <GameReview pgn={g.pgn} color={g.color} title={`your game vs ${level.bot.name}`} onDone={finish} />;
     }
     case 'recent': return <RecentReview onDone={finish} />;
@@ -249,7 +249,7 @@ export default function PathStepPage() {
         <div className="space-y-3 pt-4 text-center">
           <div className="mx-auto grid h-16 w-16 place-items-center rounded-full" style={{ background: GREEN }}><Check size={34} strokeWidth={4} color="#fff" /></div>
           <b className="block text-[20px] font-black">Step complete</b>
-          {next ? <button onClick={() => { setDone(false); navigate(next.href); }} className="cs-cta">Next: {next.title}</button> : null}
+          {next ? <button onClick={() => { setDone(false); startStep(next); navigate(next.href); }} className="cs-cta">Next: {next.title}</button> : null}
           <Link href="/path" className="block text-[14px] font-bold underline" style={{ color: MUTED }}>Back to the path</Link>
         </div>
       ) : <Body key={step.key} level={level} step={step} finish={finish} />}

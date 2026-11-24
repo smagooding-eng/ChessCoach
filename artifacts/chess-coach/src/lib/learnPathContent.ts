@@ -1650,7 +1650,7 @@ export const LEVEL_CONTENT: LevelContent[] = [
 }
 },
 {
-"motif": "smothered",
+"motif": "promotion",
 "puzzles": [
 {
 "id": 801,
@@ -1769,57 +1769,77 @@ export const LEVEL_CONTENT: LevelContent[] = [
 "tactic": [
 {
 "id": 811,
-"fen": "4r1Qk/6pp/7N/8/2pP1P2/6P1/1p4KP/8 b - - 6 40",
+"fen": "8/6P1/3kb2R/3p4/3P4/1r6/4pK1p/8 b - - 1 43",
 "moves": [
-"e8g8",
-"h6f7"
+"b3h3",
+"h6e6",
+"d6e6",
+"g7g8q",
+"e6f6",
+"g8d8"
 ],
-"rating": 886,
+"rating": 2443,
 "themes": [
+"advancedPawn",
+"attraction",
+"crushing",
 "endgame",
-"mate",
-"mateIn1",
-"oneMove",
-"smotheredMate"
+"long",
+"promotion"
 ],
 "setup": true,
-"lichess": "NpLGM"
+"lichess": "yDdp9"
 },
 {
 "id": 812,
-"fen": "r3r1Qk/1p4pp/p1nq1n2/2b3N1/P7/7b/BPP2pP1/RN3R1K b - - 1 18",
+"fen": "8/8/6p1/3K4/4P1k1/5p2/5P2/8 b - - 0 62",
 "moves": [
-"e8g8",
-"g5f7"
+"g4f4",
+"e4e5",
+"g6g5",
+"e5e6",
+"g5g4",
+"e6e7",
+"g4g3",
+"e7e8q"
 ],
-"rating": 774,
+"rating": 2497,
 "themes": [
-"mate",
-"mateIn1",
-"middlegame",
-"oneMove",
-"smotheredMate"
+"advancedPawn",
+"crushing",
+"endgame",
+"pawnEndgame",
+"promotion",
+"quietMove",
+"veryLong"
 ],
 "setup": true,
-"lichess": "BTyZe"
+"lichess": "mFlao"
 },
 {
 "id": 813,
-"fen": "r1bqkb1r/pp2npp1/3p1n1p/1NpPp2P/2P1P3/3B1N2/PP3PP1/R1BQK2R b KQkq - 2 10",
+"fen": "8/4k2p/p3p2p/PR4K1/3p4/8/8/8 w - - 0 35",
 "moves": [
-"c8d7",
-"b5d6"
+"g5h6",
+"a6b5",
+"a5a6",
+"d4d3",
+"a6a7",
+"d3d2",
+"a7a8q",
+"d2d1q"
 ],
-"rating": 897,
+"rating": 2260,
 "themes": [
-"mate",
-"mateIn1",
-"middlegame",
-"oneMove",
-"smotheredMate"
+"advancedPawn",
+"crushing",
+"endgame",
+"hangingPiece",
+"promotion",
+"veryLong"
 ],
 "setup": true,
-"lichess": "cWbwK"
+"lichess": "uHFmZ"
 }
 ],
 "trap": {
