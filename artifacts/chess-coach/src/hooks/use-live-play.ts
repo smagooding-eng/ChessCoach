@@ -86,7 +86,7 @@ export function useLivePlay() {
   const [queuedAt, setQueuedAt] = useState<number | null>(null);
   const [botOfferMs, setBotOfferMs] = useState<number>(20000);
   /** How long to look on ChessScout before Lichess / a bot (longer when other players are here). */
-  const [handoffMs, setHandoffMs] = useState<number>(7000);
+  const [handoffMs, setHandoffMs] = useState<number>(30000);
   /** Why the player you tried to join couldn't be joined (lichess, declined, game, gone, noanswer). */
   const [seekGoneReason, setSeekGoneReason] = useState<string | null>(null);
   /** Joining someone who's in a bot game: we've asked them to switch. */
@@ -227,7 +227,7 @@ export function useLivePlay() {
           setQueuedMode(msg.mode);
           setQueuedAt(Date.now());
           if (typeof msg.botOfferMs === 'number') setBotOfferMs(msg.botOfferMs);
-          setHandoffMs(typeof msg.handoffMs === 'number' ? msg.handoffMs : 7000);
+          setHandoffMs(typeof msg.handoffMs === 'number' ? msg.handoffMs : 30000);
           setStatus('queued');
           break;
         case 'challenge_waiting':

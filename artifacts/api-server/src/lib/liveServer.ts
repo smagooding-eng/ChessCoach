@@ -41,13 +41,13 @@ const TIME_CONTROLS: Record<TimeControlId, TimeControlSpec> = {
 const BOT_OFFER_MS = 20 * 1000;
 // Until there are enough real players around, a search with no one to play
 // starts a bot game on its own after this long.
-// 7 s looking for a ChessScout opponent, then (Lichess connected) 7 s on Lichess, then a
-// bot: the bot comes at 7 s, or at 14 s when the app is also looking on Lichess.
-const AUTO_BOT_MS = parseInt(process.env.LIVE_AUTO_BOT_MS || "") || 7 * 1000;
-const LICHESS_FIRST_BOT_MS = 14 * 1000;
+// Real people first: 30 s looking for a ChessScout opponent (members with notifications get
+// told someone's looking), then (Lichess connected) 20 s more on Lichess, then a bot.
+const AUTO_BOT_MS = Math.max(30 * 1000, parseInt(process.env.LIVE_AUTO_BOT_MS || "") || 0);
+const LICHESS_EXTRA_MS = 20 * 1000;
 // Other ChessScout players are on Live play right now (free, not in a game): give them a
-// chance to take the game before Lichess or a bot does.
-const HANDOFF_PEOPLE_HERE_MS = 15 * 1000;
+// good chance to take the game before Lichess or a bot does.
+const HANDOFF_PEOPLE_HERE_MS = 45 * 1000;
 function othersFreeHere(userId: string): number {
   let n = 0;
   for (const u of userSockets.keys()) if (u !== userId && !userActiveGame.has(u)) n++;
@@ -798,7 +798,7 @@ async function joinQueue(ws: WebSocket, userId: string, username: string, tcIdIn
     const still = (queues.get(key) ?? []).find((w) => w.userId === userId && w.joinedAt === joinedAt);
     if (!still || still.ws.readyState !== WebSocket.OPEN) return;
     void spawnBotMatch(still.ws, userId, username, flex ? 'any' : tcId).catch(() => {});
-  }, noAutoBot ? handoffMs + (LICHESS_FIRST_BOT_MS - AUTO_BOT_MS) : handoffMs);
+  }, noAutoBot ? handoffMs + LICHESS_EXTRA_MS : handoffMs);
   // Try immediate match (same clock first, then anyone flexible)
   tryMatchInQueue(key);
   if (queue.some(w => w.userId === userId)) tryMatchFlex(mode);
