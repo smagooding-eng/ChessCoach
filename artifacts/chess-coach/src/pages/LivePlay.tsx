@@ -211,9 +211,9 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
           <div className="fixed inset-x-0 top-0 z-[130] flex justify-center p-3 pt-[max(.75rem,env(safe-area-inset-top))]" role="dialog" aria-label="A real player wants to play you">
             <div className="w-full max-w-md rounded-2xl p-4" style={{ background: '#0D1516', border: '1px solid rgba(129,182,76,.6)', boxShadow: '0 18px 40px -12px rgba(0,0,0,.85)' }}>
               <p className="text-[15px] font-black" style={{ color: '#F5F7F6' }}>{live.switchOffer} wants to play you</p>
-              <p className="mt-0.5 text-[12.5px]" style={{ color: '#87918E' }}>A real ChessScout player. Switch and this bot game ends (it's casual, so no rating change).</p>
+              <p className="mt-0.5 text-[12.5px]" style={{ color: '#87918E' }}>A real person wants to play you! Your bot game is saved, position and clocks, so you can finish it later from your active games.</p>
               <div className="mt-3 flex gap-2">
-                <button onClick={live.acceptSwitch} className="flex-1 rounded-xl py-2.5 text-[14px] font-extrabold" style={greenBtn}>Play {live.switchOffer}</button>
+                <button onClick={live.acceptSwitch} className="flex-1 rounded-xl py-2.5 text-[14px] font-extrabold" style={greenBtn}>Save and play {live.switchOffer}</button>
                 <button onClick={live.declineSwitch} className="rounded-xl px-4 py-2.5 text-[13.5px] font-bold" style={ghostBtn}>Keep playing</button>
               </div>
             </div>
@@ -517,6 +517,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
           </section>
           <OpenLinksCard links={inbox.links} kind="live" onChanged={() => { void inbox.reload(); }} />
           <OpenLinksCard links={inbox.links} kind="daily" onChanged={() => { void inbox.reload(); }} />
+          <PausedBotGames onResume={live.resumePaused} busy={!!live.game} />
           <div ref={dailyRef} className="space-y-3 empty:hidden"><DailyGames embedded listOnly /></div>
 
           <TournamentsCard />
@@ -533,5 +534,34 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
       {live.status === 'disconnected' && <p className="text-xs" style={{ color: '#ea9733' }}>Reconnecting…</p>}
 
     </div>
+  );
+}
+
+// Bot games put aside when a real player wanted a game: saved with both clocks, finished here.
+type PausedGame = { id: string; opponent: string; opponentRating: number; color: 'w' | 'b'; label: string; moves: number; yourMove: boolean; yourTimeMs: number; theirTimeMs: number };
+function PausedBotGames({ onResume, busy }: { onResume: (id: string) => void; busy: boolean }) {
+  const [list, setList] = useState<PausedGame[]>([]);
+  useEffect(() => {
+    if (busy) return;
+    let alive = true;
+    apiFetch('/api/live/paused', { credentials: 'include' }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (alive && d?.games) setList(d.games); }).catch(() => {});
+    return () => { alive = false; };
+  }, [busy]);
+  if (!list.length) return null;
+  const clock = (ms: number) => { const t = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
+  return (
+    <section className="overflow-hidden rounded-[20px]" style={{ background: '#151D1F', border: '1px solid rgba(255,255,255,.07)' }}>
+      <p className="px-4 pb-2 pt-3.5 text-[13px] font-extrabold uppercase tracking-wide" style={{ color: '#8F9997' }}>Paused bot games · {list.length}</p>
+      {list.map((g) => (
+        <div key={g.id} className="flex items-center gap-3 border-t px-4 py-3" style={{ borderColor: 'rgba(255,255,255,.06)' }}>
+          <span className="h-3.5 w-3.5 shrink-0 rounded-full" style={{ background: g.color === 'w' ? '#F5F7F6' : '#1A1F20', border: '1.5px solid #8F9997' }} />
+          <span className="min-w-0 flex-1">
+            <b className="block truncate text-[15px] font-extrabold" style={{ color: '#F5F7F6' }}>vs {g.opponent} <span className="text-[12px] font-bold" style={{ color: '#8F9997' }}>(bot)</span></b>
+            <span className="block truncate text-[12.5px]" style={{ color: '#8F9997' }}>{g.label} · move {Math.max(1, g.moves)} · {g.yourMove ? 'your move' : 'their move'} · you {clock(g.yourTimeMs)}, them {clock(g.theirTimeMs)}</span>
+          </span>
+          <button onClick={() => onResume(g.id)} disabled={busy} className="shrink-0 rounded-[11px] px-3.5 py-2 text-[13px] font-extrabold text-white disabled:opacity-40" style={{ background: '#81B64C' }}>Resume</button>
+        </div>
+      ))}
+    </section>
   );
 }
