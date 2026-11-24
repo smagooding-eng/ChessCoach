@@ -5,9 +5,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'wouter';
 import { Chess } from 'chess.js';
-import { ArrowLeft, Check, ChevronRight, Lightbulb, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Check, ChevronRight, Lightbulb, RotateCcw, X } from 'lucide-react';
 import { ChessBoard } from '@/components/ChessBoard';
-import { TacticPuzzle, type TacticPuzzleData } from '@/components/tactics/TacticPuzzle';
+import { type TacticPuzzleData } from '@/components/tactics/TacticPuzzle';
 import { ScoutIcon } from '@/components/ScoutIcons';
 import { apiFetch } from '@/lib/api';
 import { gradeMove, type DeviceGrade } from '@/lib/deviceEngine';
@@ -21,17 +21,32 @@ function Note({ children, tone = 'plain' }: { children: React.ReactNode; tone?: 
   return <div className="rounded-[14px] px-3.5 py-3 text-[14px] leading-snug" style={{ background: CARD, border: `1px solid ${tone === 'plain' ? BORDER : c + '55'}`, color: c }}>{children}</div>;
 }
 
-/** Play your side of a line; the other side answers by itself. Notes follow each move. */
-function LinePlayer({ startFen = START, moves, userColor, notes, intro, onDone }: {
-  startFen?: string; moves: string[]; userColor: 'w' | 'b'; notes?: string[]; intro?: string; onDone: () => void;
+function Banner({ kind, children }: { kind: 'good' | 'bad' | 'info'; children: React.ReactNode }) {
+  const c = kind === 'good' ? GREEN : kind === 'bad' ? '#E8524A' : '#C9D1D3';
+  return (
+    <div className="flex items-center gap-2 rounded-[14px] px-3.5 py-2.5 text-[15px] font-extrabold" style={{ background: kind === 'info' ? CARD : `${c}22`, border: `1.5px solid ${c}`, color: kind === 'info' ? '#F5F7F6' : c }}>
+      {kind === 'good' ? <Check size={18} strokeWidth={3.5} /> : kind === 'bad' ? <X size={18} strokeWidth={3.5} /> : null}<span className="min-w-0">{children}</span>
+    </div>
+  );
+}
+
+/** Play your side of a line; the other side answers by itself. Notes follow each move.
+ *  drill: the line has to be played with no wrong moves and no help to count; after the third
+ *  try a Skip shows (skipping gives no credit). */
+function LinePlayer({ startFen = START, moves, userColor, notes, intro, drill = false, onDone, onSkip }: {
+  startFen?: string; moves: string[]; userColor: 'w' | 'b'; notes?: string[]; intro?: string; drill?: boolean; onDone: () => void; onSkip?: () => void;
 }) {
   const chess = useMemo(() => new Chess(startFen), [startFen]);
   const [fen, setFen] = useState(startFen);
   const [idx, setIdx] = useState(0);
   const [last, setLast] = useState<{ from: string; to: string } | null>(null);
-  const [wrong, setWrong] = useState(0);
+  const [wrongHere, setWrongHere] = useState(0);
+  const [slips, setSlips] = useState(0); // wrong moves or help this run
+  const [tries, setTries] = useState(1);
+  const [show, setShow] = useState(false);
   const [nonce, setNonce] = useState(0);
   const [note, setNote] = useState<string | null>(intro ?? null);
+  const [flash, setFlash] = useState<{ kind: 'good' | 'bad'; text: string } | null>(null);
   const done = idx >= moves.length;
   const turn = new Chess(fen).turn();
   const mine = !done && turn === userColor;
@@ -41,9 +56,8 @@ function LinePlayer({ startFen = START, moves, userColor, notes, intro, onDone }
     const m = chess.move(san); if (!m) return;
     setFen(chess.fen()); setLast({ from: m.from, to: m.to });
     if (notes?.[idx]) setNote(notes[idx]);
-    setIdx((i) => i + 1); setWrong(0);
+    setIdx((i) => i + 1); setWrongHere(0); setShow(false);
   };
-  // their moves
   useEffect(() => {
     if (done || mine || !expected) return;
     const t = setTimeout(() => play(expected.san), 650);
@@ -51,51 +65,140 @@ function LinePlayer({ startFen = START, moves, userColor, notes, intro, onDone }
   }, [idx, mine, done]); // eslint-disable-line react-hooks/exhaustive-deps
   const onMove = (san: string) => {
     if (!expected) return;
-    if (san === expected.san) { play(san); return; }
-    setNonce((n) => n + 1); setWrong((w) => w + 1);
+    if (san === expected.san) { setFlash({ kind: 'good', text: `${san}: correct` }); play(san); return; }
+    setFlash({ kind: 'bad', text: `${san} isn't the move. Try again.` });
+    setNonce((n) => n + 1); setWrongHere((w) => w + 1); setSlips((x) => x + 1);
+    if (wrongHere + 1 >= 2) setShow(true);
   };
-  const restart = () => { chess.load(startFen); setFen(startFen); setIdx(0); setLast(null); setWrong(0); setNote(intro ?? null); setNonce((n) => n + 1); };
+  const restart = (newTry: boolean) => {
+    chess.load(startFen); setFen(startFen); setIdx(0); setLast(null); setWrongHere(0); setSlips(0); setShow(false); setNote(intro ?? null); setFlash(null); setNonce((n) => n + 1);
+    if (newTry) setTries((t) => t + 1);
+  };
+  const perfect = slips === 0;
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between text-[13px] font-bold">
-        <span style={{ color: done ? GREEN : wrong ? GOLD : '#F5F7F6' }}>
-          {done ? 'Line complete!' : !mine ? 'Their move…' : wrong >= 2 ? 'Follow the green arrow' : wrong ? 'Not that one. Try again' : `Your move (${userColor === 'w' ? 'White' : 'Black'})`}
-        </span>
+        <span style={{ color: MUTED }}>{drill ? `Try ${tries} · ${perfect ? 'no mistakes so far' : `${slips} mistake${slips === 1 ? '' : 's'}`}` : ''}</span>
         <span style={{ color: MUTED }}>Move {Math.min(idx + 1, moves.length)} of {moves.length}</span>
       </div>
+      {done ? (drill && !perfect
+          ? <Banner kind="bad">Line finished with {slips} mistake{slips === 1 ? '' : 's'}. Play it once with no mistakes to complete it.</Banner>
+          : <Banner kind="good">{drill ? 'Perfect run! Line learned.' : 'Line complete!'}</Banner>)
+        : flash ? <Banner kind={flash.kind}>{flash.text}</Banner>
+        : <Banner kind="info">{mine ? `Your move (${userColor === 'w' ? 'White' : 'Black'})` : 'Their move…'}</Banner>}
       <ChessBoard key={nonce} fen={fen} flipped={userColor === 'b'} practiceMode={mine} expectedMoveSan={expected?.san ?? null} onMovePlayed={onMove}
-        lastMove={last} arrows={mine && expected && wrong >= 2 ? [{ from: expected.from, to: expected.to, color: 'rgba(129,182,76,0.85)' }] : undefined} maxWidthOverride="100%" suppressConfirmMoves />
+        lastMove={last} arrows={mine && expected && show ? [{ from: expected.from, to: expected.to, color: 'rgba(129,182,76,0.85)' }] : undefined} maxWidthOverride="100%" suppressConfirmMoves />
       {note && <Note>{note}</Note>}
-      <div className="flex gap-2">
-        {mine && wrong < 2 && <button onClick={() => setWrong(2)} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[13px] font-bold" style={{ background: CARD2 }}><Lightbulb size={15} /> Show me</button>}
-        {idx > 0 && <button onClick={restart} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[13px] font-bold" style={{ background: CARD2 }}><RotateCcw size={15} /> Start again</button>}
-        {done && <button onClick={onDone} className="cs-cta flex-1">Done <ChevronRight size={16} className="inline" /></button>}
-      </div>
+      {!done && (
+        <div className="flex gap-2">
+          {mine && !show && <button onClick={() => { setShow(true); setSlips((x) => x + 1); }} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-[13.5px] font-bold" style={{ background: CARD2 }}><Lightbulb size={15} /> Show me{drill ? ' (counts as a mistake)' : ''}</button>}
+          {idx > 0 && <button onClick={() => restart(drill && !perfect)} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-[13.5px] font-bold" style={{ background: CARD2 }}><RotateCcw size={15} /> Start again</button>}
+        </div>
+      )}
+      {done && (drill && !perfect ? (
+        <div className="space-y-2">
+          <button onClick={() => restart(true)} className="cs-cta"><RotateCcw size={17} /> Play it again</button>
+          {tries >= 3 && onSkip && <button onClick={onSkip} className="w-full rounded-[14px] py-3 text-[14px] font-bold" style={{ background: CARD2, color: '#F5F7F6' }}>Skip for now (doesn't count)</button>}
+        </div>
+      ) : (
+        <div className="flex gap-2">
+          <button onClick={() => restart(false)} className="inline-flex items-center gap-1.5 rounded-[14px] px-3.5 text-[13.5px] font-bold" style={{ background: CARD2 }}><RotateCcw size={15} /> Again</button>
+          <button onClick={onDone} className="cs-cta flex-1">Done <ChevronRight size={17} /></button>
+        </div>
+      ))}
     </div>
   );
 }
 
-/** A fixed set of puzzles; a missed one comes back at the end until it's solved. */
+const uci = (c: Chess, u: string) => { try { return c.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: (u[4] as 'q' | 'r' | 'b' | 'n' | undefined) }); } catch { return null; } };
+
+/** One puzzle with clear feedback: right or wrong after every move, a hint, the answer after 3
+ *  tries, and a big Next button. clean = solved with no wrong move and no help. */
+function PathPuzzle({ p, last, onNext }: { p: TacticPuzzleData; last: boolean; onNext: (clean: boolean) => void }) {
+  const chess = useMemo(() => new Chess(p.fen), [p.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const solution = p.setup ? p.moves.slice(1) : p.moves;
+  const me = useMemo(() => { const t = new Chess(p.fen).turn(); return p.setup ? (t === 'w' ? 'b' : 'w') : t; }, [p]);
+  const [fen, setFen] = useState(p.fen);
+  const [idx, setIdx] = useState(0);
+  const [ready, setReady] = useState(!p.setup);
+  const [lastMv, setLastMv] = useState<{ from: string; to: string } | null>(null);
+  const [wrong, setWrong] = useState(0);
+  const [helped, setHelped] = useState(false);
+  const [hint, setHint] = useState(false);
+  const [state, setState] = useState<'play' | 'solved' | 'shown'>('play');
+  const [flash, setFlash] = useState<{ kind: 'good' | 'bad'; text: string } | null>(null);
+  const [nonce, setNonce] = useState(0);
+  useEffect(() => {
+    if (!p.setup) return;
+    const t = setTimeout(() => { const m = uci(chess, p.moves[0]); if (m) { setFen(chess.fen()); setLastMv({ from: m.from, to: m.to }); } setReady(true); }, 700);
+    return () => clearTimeout(t);
+  }, [p.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const expected = useMemo(() => { if (!ready || state !== 'play' || idx >= solution.length) return null; const m = uci(new Chess(fen), solution[idx]); return m ? { san: m.san, from: m.from, to: m.to } : null; }, [fen, idx, ready, state, solution]);
+  const reply = (next: number) => {
+    if (next >= solution.length) { setIdx(next); setState('solved'); return; }
+    setTimeout(() => { const m = uci(chess, solution[next]); if (m) { setFen(chess.fen()); setLastMv({ from: m.from, to: m.to }); } setIdx(next + 1); if (next + 1 >= solution.length) setState('solved'); }, 500);
+  };
+  const onMove = (san: string) => {
+    if (!expected) return;
+    const probe = new Chess(fen); const pm = probe.move(san);
+    if (san === expected.san || probe.isCheckmate()) {
+      chess.move(san); setFen(chess.fen()); setLastMv({ from: pm.from, to: pm.to }); setHint(false);
+      setFlash({ kind: 'good', text: `${san}: correct!` });
+      if (probe.isCheckmate()) { setIdx(solution.length); setState('solved'); return; }
+      reply(idx + 1); return;
+    }
+    setNonce((n) => n + 1); setWrong((w) => w + 1);
+    setFlash({ kind: 'bad', text: `${san} isn't it. Try again.` });
+  };
+  const showAnswer = () => {
+    setHelped(true); setState('shown');
+    let i = idx; const step = () => { if (i >= solution.length) return; const m = uci(chess, solution[i]); if (m) { setFen(chess.fen()); setLastMv({ from: m.from, to: m.to }); } i++; setIdx(i); if (i < solution.length) setTimeout(step, 600); };
+    step();
+  };
+  const clean = state === 'solved' && wrong === 0 && !helped;
+  const toMove = new Chess(fen).turn();
+  return (
+    <div className="space-y-3">
+      {state === 'solved' ? <Banner kind="good">{clean ? 'Solved!' : 'Solved, with help. This one comes back at the end.'}</Banner>
+        : state === 'shown' ? <Banner kind="bad">Here's the answer. This one comes back at the end.</Banner>
+        : flash ? <Banner kind={flash.kind}>{flash.text}</Banner>
+        : <Banner kind="info">{!ready ? 'Watch their move…' : `${me === 'w' ? 'White' : 'Black'} to move: find the best move`}</Banner>}
+      <ChessBoard key={`${p.id}-${nonce}`} fen={fen} flipped={me === 'b'} practiceMode={ready && state === 'play' && toMove === me}
+        expectedMoveSan={expected?.san ?? null} onMovePlayed={onMove} lastMove={lastMv}
+        arrows={hint && expected ? [{ from: expected.from, to: expected.to, color: 'rgba(129,182,76,0.85)' }] : undefined} maxWidthOverride="100%" suppressConfirmMoves />
+      {state === 'play' ? (
+        <div className="flex gap-2">
+          {ready && !hint && <button onClick={() => { setHint(true); setHelped(true); }} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-[13.5px] font-bold" style={{ background: CARD2 }}><Lightbulb size={15} /> Hint</button>}
+          {wrong >= 3 && <button onClick={showAnswer} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-[13.5px] font-bold" style={{ background: CARD2 }}>Show the answer</button>}
+          <span className="ml-auto self-center text-[12.5px]" style={{ color: MUTED }}>Rated {p.rating}</span>
+        </div>
+      ) : (
+        <button onClick={() => onNext(clean)} className="cs-cta">{last && clean ? 'Finish' : 'Next puzzle'} <ChevronRight size={17} /></button>
+      )}
+    </div>
+  );
+}
+
+/** A fixed set of puzzles; one missed (or solved with help) comes back at the end. */
 function PuzzleSet({ puzzles, onDone }: { puzzles: TacticPuzzleData[]; onDone: () => void }) {
   const [queue, setQueue] = useState(puzzles);
   const [solved, setSolved] = useState(0);
-  const [result, setResult] = useState<boolean | null>(null);
+  const [round, setRound] = useState(0);
   const p = queue[0];
-  const next = () => {
-    const ok = result;
-    setResult(null);
-    if (ok) { const left = queue.slice(1); setQueue(left); if (!left.length) onDone(); }
-    else setQueue([...queue.slice(1), queue[0]]);
-  };
-  if (!p) return <Note tone="good">All solved!</Note>;
+  if (!p) return <Banner kind="good">All solved!</Banner>;
   return (
     <div className="space-y-3">
-      <div className="flex gap-1.5">{puzzles.map((x, i) => <span key={x.id} className="h-2 flex-1 rounded-full" style={{ background: i < solved ? GREEN : 'rgba(255,255,255,.1)' }} />)}</div>
-      <TacticPuzzle key={`${p.id}-${queue.length}`} puzzle={p} mode="drill"
-        onDone={(ok) => { setResult(ok); if (ok) setSolved((n) => n + 1); }}
-        onNext={next} nextLabel={result ? (queue.length > 1 ? 'Next puzzle' : 'Finish') : 'Try it again later'} />
-      {result === false && <Note tone="warn">This one comes back at the end.</Note>}
+      <div className="flex items-center gap-2">
+        <div className="flex flex-1 gap-1.5">{puzzles.map((x, i) => <span key={x.id} className="h-2 flex-1 rounded-full" style={{ background: i < solved ? GREEN : 'rgba(255,255,255,.1)' }} />)}</div>
+        <span className="text-[12.5px] font-extrabold">{solved}/{puzzles.length}</span>
+      </div>
+      <PathPuzzle key={`${p.id}-${round}`} p={p} last={queue.length === 1}
+        onNext={(clean) => {
+          setRound((r) => r + 1);
+          if (clean) { const left = queue.slice(1); setSolved((n) => n + 1); setQueue(left); if (!left.length) onDone(); }
+          else setQueue([...queue.slice(1), queue[0]]);
+        }} />
     </div>
   );
 }
@@ -237,10 +340,10 @@ function Body({ level, step, finish }: { level: Level; step: Step; finish: () =>
       const o = step.key.endsWith('white') ? level.white : level.black;
       if (!o) return null;
       return (<div className="space-y-3">{o.ideas?.length ? <Note><b>The ideas:</b> {o.ideas.join(' · ')}</Note> : null}
-        <LinePlayer moves={o.moves} userColor={o.userColor} onDone={finish} /></div>);
+        <LinePlayer moves={o.moves} userColor={o.userColor} drill onDone={finish} onSkip={() => navigate('/path')} /></div>);
     }
     case 'trap': return (<div className="space-y-3"><Note>{c.trap.summary}</Note>
-      <LinePlayer moves={c.trap.trapLineSan} notes={c.trap.moveNotes} userColor={c.trap.trapSide === 'white' ? 'w' : 'b'} onDone={finish} /></div>);
+      <LinePlayer moves={c.trap.trapLineSan} notes={c.trap.moveNotes} userColor={c.trap.trapSide === 'white' ? 'w' : 'b'} drill onDone={finish} onSkip={() => navigate('/path')} /></div>);
     case 'review': {
       const beaten = !!readPath().done[`L${level.n}-bot`];
       if (!lastBotGame(level.bot.name)) return <div className="space-y-3"><Note>Play {level.bot.name} from the path first: this reviews that game (bot games played elsewhere aren't reviewed here).</Note><Link href={`/practice?bot=${encodeURIComponent(level.bot.name)}`} onClick={() => { const b = level.steps.find((x) => x.kind === 'bot'); if (b) startStep(b); }} className="cs-cta block text-center">Play {level.bot.name}</Link></div>;
@@ -263,7 +366,7 @@ export default function PathStepPage() {
   const next = level.steps.find((x) => !s.done[x.key] && x.key !== step.key);
 
   return (
-    <div className="mx-auto w-full max-w-[560px] px-4 pb-32 pt-3" style={{ color: '#F5F7F6' }}>
+    <div className="relative z-10 mx-auto w-full max-w-[560px] px-4 pb-32 pt-3" style={{ color: '#F5F7F6' }}>
       <div className="mb-3 flex items-center gap-3">
         <Link href="/path" aria-label="Back to the path" className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ color: GREEN }}><ArrowLeft size={22} /></Link>
         <ScoutIcon name={step.icon} size={34} />
