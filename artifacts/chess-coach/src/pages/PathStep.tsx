@@ -11,7 +11,7 @@ import { TacticPuzzle, type TacticPuzzleData } from '@/components/tactics/Tactic
 import { ScoutIcon } from '@/components/ScoutIcons';
 import { apiFetch } from '@/lib/api';
 import { gradeMove, type DeviceGrade } from '@/lib/deviceEngine';
-import { stepByKey, completeStep, startStep, readPath, lastBotGame, setHasGames, type Level, type Step } from '@/lib/learnPath';
+import { stepByKey, completeStep, startStep, setPathReview, readPath, lastBotGame, setHasGames, type Level, type Step } from '@/lib/learnPath';
 
 const MUTED = '#8F9997', GREEN = '#81B64C', GOLD = '#E8B447', CARD = '#182123', CARD2 = '#212B2D', BORDER = 'rgba(255,255,255,.07)';
 const START = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
@@ -172,6 +172,32 @@ function GameReview({ pgn, color, title, fullHref, onDone, doneLabel = 'Done' }:
   );
 }
 
+/** Finds the game (your latest game against this bot, or your latest imported game) and opens
+ *  the full Game Review for it. */
+function OpenFullReview({ find, bot, at, stepKey, onNone }: { find: 'bot' | 'recent'; bot?: string; at?: number; stepKey: string | null; onNone?: () => void }) {
+  const [, navigate] = useLocation();
+  const [none, setNone] = useState(false);
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await apiFetch(find === 'bot' ? '/api/games?source=bots&limit=10' : '/api/games?limit=1', { credentials: 'include' });
+        const d = r.ok ? await r.json() : null;
+        const list = (d?.games ?? d ?? []) as { id: number; whiteUsername?: string; blackUsername?: string; playedAt?: string }[];
+        // the path game: against this bot, saved when that game ended (not a later game from the bot list)
+        const vsBot = list.filter((x) => [x.whiteUsername, x.blackUsername].some((n) => (n ?? '').toLowerCase().startsWith(`${(bot ?? '').toLowerCase()} (bot)`)));
+        const g = find === 'bot' ? (at ? vsBot.find((x) => x.playedAt && Math.abs(Date.parse(x.playedAt) - at) < 10 * 60_000) : vsBot[0]) : list[0];
+        if (!g) { if (find === 'recent') setHasGames(false); setNone(true); return; }
+        setPathReview(g.id, stepKey);
+        navigate(`/games/${g.id}`);
+      } catch { setNone(true); }
+    })();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  if (none) return find === 'recent'
+    ? <div className="space-y-3"><Note>No imported games yet, so this step is skipped.</Note><button onClick={onNone} className="cs-cta">Continue</button></div>
+    : <Note tone="warn">That game hasn't been saved yet. Give it a moment and try again.</Note>;
+  return <Note>Opening the full review…</Note>;
+}
+
 /** Your most recent imported game, loaded for the review step. */
 function RecentReview({ onDone }: { onDone: () => void }) {
   const [g, setG] = useState<{ id: number; pgn: string; color: 'w' | 'b'; title: string } | null | 'none'>(null);
@@ -216,16 +242,11 @@ function Body({ level, step, finish }: { level: Level; step: Step; finish: () =>
     case 'trap': return (<div className="space-y-3"><Note>{c.trap.summary}</Note>
       <LinePlayer moves={c.trap.trapLineSan} notes={c.trap.moveNotes} userColor={c.trap.trapSide === 'white' ? 'w' : 'b'} onDone={finish} /></div>);
     case 'review': {
-      const g = lastBotGame(level.bot.name);
-      if (!g) return <div className="space-y-3"><Note>Play {level.bot.name} from the path first: this reviews that game (bot games played elsewhere aren't reviewed here).</Note><Link href={`/practice?bot=${encodeURIComponent(level.bot.name)}`} onClick={() => { const b = level.steps.find((x) => x.kind === 'bot'); if (b) startStep(b); }} className="cs-cta block text-center">Play {level.bot.name}</Link></div>;
-      // a loss can be reviewed too, but the step only counts once the bot is beaten
       const beaten = !!readPath().done[`L${level.n}-bot`];
-      return (<div className="space-y-3">
-        {!beaten && <Note tone="warn">You haven't beaten {level.bot.name} yet. Look at what went wrong, then try again.</Note>}
-        <GameReview pgn={g.pgn} color={g.color} title={`your game vs ${level.bot.name}`} onDone={beaten ? finish : () => { const b = level.steps.find((x) => x.kind === 'bot'); if (b) { startStep(b); navigate(b.href); } }} doneLabel={beaten ? 'Done' : `Play ${level.bot.name} again`} />
-      </div>);
+      if (!lastBotGame(level.bot.name)) return <div className="space-y-3"><Note>Play {level.bot.name} from the path first: this reviews that game (bot games played elsewhere aren't reviewed here).</Note><Link href={`/practice?bot=${encodeURIComponent(level.bot.name)}`} onClick={() => { const b = level.steps.find((x) => x.kind === 'bot'); if (b) startStep(b); }} className="cs-cta block text-center">Play {level.bot.name}</Link></div>;
+      return <OpenFullReview find="bot" bot={level.bot.name} at={lastBotGame(level.bot.name)?.at} stepKey={beaten ? step.key : null} />;
     }
-    case 'recent': return <RecentReview onDone={finish} />;
+    case 'recent': return <OpenFullReview find="recent" stepKey={step.key} onNone={finish} />;
     default: return null;
   }
 }

@@ -35,6 +35,7 @@ import { AICoachCard, type AICoachTone } from '@/components/AICoachCard';
 import { ProUpsell } from '@/components/ProUpsell';
 import { MistakeFixView } from '@/components/MistakeFixView';
 import { GuidedReview } from '@/components/review/GuidedReview';
+import { PathReviewBar } from '@/components/PathReviewBar';
 import { ProAnalysis } from '@/components/review/ProAnalysis';
 import { AnimatePresence, motion } from 'framer-motion';
 import { NEUTRAL_CHIP } from '@/lib/redesignTheme';
@@ -1253,6 +1254,7 @@ export function GameReplay() {
   return (
     <div className={`gap-2 md:gap-3 px-3 ${redesign ? 'pt-0' : 'pt-3'} md:px-0 md:pt-0 pb-2 md:pb-0 ${redesign ? 'h-[calc(100dvh-5.75rem)]' : 'h-[calc(100dvh-8rem)]'} md:h-[calc(100vh-3.5rem)] xl:h-[calc(100vh-3rem)] flex flex-col overflow-hidden`}>
       {shareFab}
+      {game && <PathReviewBar gameId={game.id} ready={reviewMoves.length > 0} />}
       {redesign && (
         <div className="shrink-0">
           <RedesignHeader

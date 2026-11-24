@@ -139,3 +139,11 @@ const BOT_GAME = 'cs_path_bot_game';
 export type SavedBotGame = { bot: string; pgn: string; color: 'w' | 'b'; result: string; at: number };
 export function saveBotGame(g: SavedBotGame) { try { const all = JSON.parse(localStorage.getItem(BOT_GAME) || '{}'); all[g.bot] = g; localStorage.setItem(BOT_GAME, JSON.stringify(all)); } catch { /* */ } }
 export function lastBotGame(bot: string): SavedBotGame | null { try { return JSON.parse(localStorage.getItem(BOT_GAME) || '{}')[bot] ?? null; } catch { return null; } }
+
+// A review step opens the full Game Review for one game; this remembers which step that game is
+// for, so the review page can finish the step and show the way back.
+const PATH_REVIEW = 'cs_path_review';
+export function setPathReview(gameId: number, key: string | null) { try { localStorage.setItem(PATH_REVIEW, JSON.stringify({ gameId, key, at: Date.now() })); } catch { /* */ } }
+export function pathReviewFor(gameId: number): { key: string | null } | null {
+  try { const v = JSON.parse(localStorage.getItem(PATH_REVIEW) || 'null'); return v && v.gameId === gameId && Date.now() - v.at < 86_400_000 ? { key: v.key } : null; } catch { return null; }
+}
