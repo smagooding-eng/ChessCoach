@@ -818,7 +818,7 @@ async function joinSeek(ws: WebSocket, userId: string, username: string, seekerI
     const g = games.get(userActiveGame.get(userId)!);
     const opp = g ? (g.white.userId === userId ? g.black : g.white) : undefined;
     // Your own bot game gives way to a real player (bot games are casual).
-    if (g && g.status === 'active' && opp?.kind === 'bot') finishGame(g, g.white.userId === userId ? 'black' : 'white', 'abandoned');
+    if (g && g.status === 'active' && opp?.kind === 'bot') await pauseBotGame(g, userId);
     else if (g) { subscribeWs(ws, g.id); send(ws, { type: 'match_found', state: gamePublicState(g), color: g.white.userId === userId ? 'w' : 'b' }); return; }
   }
   let seeker: WaitingPlayer | undefined;
@@ -861,7 +861,7 @@ async function joinSeek(ws: WebSocket, userId: string, username: string, seekerI
 }
 
 // The player in a bot game said yes to the ChessScout player who wants a game: the bot game
-// ends (bot games are casual, so no rating changes) and the real one starts for both.
+// is paused and saved (position and both clocks) to finish later, and the real one starts.
 async function acceptSwitch(ws: WebSocket, userId: string, username: string) {
   const a = switchAsks.get(userId);
   if (!a) { send(ws, { type: 'switch_offer_gone' }); return; }
@@ -869,13 +869,86 @@ async function acceptSwitch(ws: WebSocket, userId: string, username: string) {
   if (a.joinerWs.readyState !== WebSocket.OPEN || userActiveGame.has(a.joinerId)) { send(ws, { type: 'switch_offer_gone' }); return; }
   const g = games.get(a.gameId);
   const tc = g?.tc ?? TIME_CONTROLS[FLEX_DEFAULT_TC];
-  if (g && g.status === 'active') finishGame(g, g.white.userId === userId ? 'black' : 'white', 'abandoned');
+  if (g && g.status === 'active') await pauseBotGame(g, userId);
   const [seedMe, seedThem] = await Promise.all([seedRatingFromImports(userId, tc.id), seedRatingFromImports(a.joinerId, tc.id)]);
   if (a.joinerWs.readyState !== WebSocket.OPEN) { send(ws, { type: 'switch_offer_gone' }); return; }
   await startHumanMatch(
     { userId, username, rating: seedMe.rating, ws, tc, mode: 'casual', joinedAt: Date.now() },
     { userId: a.joinerId, username: a.joinerName, rating: seedThem.rating, ws: a.joinerWs, tc, mode: 'casual', joinedAt: Date.now() },
   );
+}
+
+// ── Paused bot games ────────────────────────────────────────────────────────
+// A bot game put aside because a real player wanted a game. Saved exactly (moves, both clocks,
+// the bot) and shown in the player's active games until they finish it. The only way a bot
+// game ever shows up there.
+let pausedTableReady: Promise<void> | null = null;
+function ensurePausedTable(): Promise<void> {
+  pausedTableReady ??= db.execute(sql`CREATE TABLE IF NOT EXISTS live_paused_bot_games (id VARCHAR PRIMARY KEY, user_id VARCHAR NOT NULL, data JSONB NOT NULL, paused_at TIMESTAMPTZ NOT NULL DEFAULT now())`).then(() => undefined).catch(() => { pausedTableReady = null; });
+  return pausedTableReady;
+}
+type PausedData = { tc: TimeControlId; white: Player; black: Player; sanMoves: string[]; whiteTimeMs: number; blackTimeMs: number; startedAt: number; takebackUsed?: boolean };
+
+async function pauseBotGame(g: LiveGame, userId: string) {
+  if (g.status !== 'active') return;
+  const elapsed = Date.now() - g.lastTickAt;
+  const turn = g.chess.turn();
+  const data: PausedData = {
+    tc: g.tc.id as TimeControlId, white: g.white, black: g.black, sanMoves: [...g.sanMoves],
+    whiteTimeMs: turn === 'w' ? Math.max(1000, g.whiteTimeMs - elapsed) : g.whiteTimeMs,
+    blackTimeMs: turn === 'b' ? Math.max(1000, g.blackTimeMs - elapsed) : g.blackTimeMs,
+    startedAt: g.startedAt, takebackUsed: g.takebackUsed,
+  };
+  // stop it here without finishing it (nothing is scored or saved to game history)
+  g.status = 'finished';
+  if (g.expireTimer) { clearTimeout(g.expireTimer); g.expireTimer = undefined; }
+  if (g.botTimer) { clearTimeout(g.botTimer); g.botTimer = undefined; }
+  if (g.disconnectTimers.w) { clearTimeout(g.disconnectTimers.w); g.disconnectTimers.w = undefined; }
+  if (g.disconnectTimers.b) { clearTimeout(g.disconnectTimers.b); g.disconnectTimers.b = undefined; }
+  userActiveGame.delete(userId);
+  games.delete(g.id); subscribers.delete(g.id);
+  try {
+    await ensurePausedTable();
+    await db.execute(sql`INSERT INTO live_paused_bot_games (id, user_id, data) VALUES (${g.id}, ${userId}, ${JSON.stringify(data)}::jsonb) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, paused_at = now()`);
+  } catch (err) { logger.warn({ err, gameId: g.id }, 'pause bot game failed'); }
+}
+
+/** The player's paused bot games, for their active games list. */
+export async function listPausedBotGames(userId: string) {
+  await ensurePausedTable();
+  const r: any = await db.execute(sql`SELECT id, data, paused_at FROM live_paused_bot_games WHERE user_id = ${userId} ORDER BY paused_at DESC`);
+  return (r.rows ?? r).map((row: any) => {
+    const d: PausedData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+    const meWhite = d.white.userId === userId;
+    const bot = meWhite ? d.black : d.white;
+    const turn = d.sanMoves.length % 2 === 0 ? 'w' : 'b';
+    return {
+      id: row.id, opponent: bot.username, opponentRating: bot.rating, color: meWhite ? 'w' : 'b', label: TIME_CONTROLS[d.tc]?.label ?? '',
+      moves: Math.ceil(d.sanMoves.length / 2), yourMove: turn === (meWhite ? 'w' : 'b'),
+      yourTimeMs: meWhite ? d.whiteTimeMs : d.blackTimeMs, theirTimeMs: meWhite ? d.blackTimeMs : d.whiteTimeMs, pausedAt: row.paused_at,
+    };
+  });
+}
+
+async function resumePausedBotGame(ws: WebSocket, userId: string, id: string) {
+  if (userActiveGame.has(userId)) { send(ws, { type: 'error', message: 'Finish your current game first.' }); return; }
+  await ensurePausedTable();
+  const r: any = await db.execute(sql`DELETE FROM live_paused_bot_games WHERE id = ${id} AND user_id = ${userId} RETURNING data`);
+  const row = (r.rows ?? r)[0];
+  if (!row) { send(ws, { type: 'error', message: 'That game is no longer saved.' }); return; }
+  const d: PausedData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+  const tc = TIME_CONTROLS[d.tc] ?? TIME_CONTROLS[FLEX_DEFAULT_TC];
+  cancelQueue(userId);
+  const game = await createGame(d.white, d.black, tc, 'casual');
+  if (game.botTimer) { clearTimeout(game.botTimer); game.botTimer = undefined; }
+  for (const san of d.sanMoves) { try { game.chess.move(san); } catch { break; } }
+  game.sanMoves = [...d.sanMoves];
+  game.whiteTimeMs = d.whiteTimeMs; game.blackTimeMs = d.blackTimeMs;
+  game.lastTickAt = Date.now(); game.startedAt = d.startedAt; game.takebackUsed = d.takebackUsed;
+  scheduleExpire(game);
+  scheduleBotIfNeeded(game);
+  subscribeWs(ws, game.id);
+  send(ws, { type: 'match_found', state: gamePublicState(game), color: d.white.userId === userId ? 'w' : 'b' });
 }
 
 function cancelQueue(userId: string) {
@@ -1567,6 +1640,9 @@ export function attachLiveServer(server: HttpServer) {
           case 'on_lichess':
             onLichessSince.set(info.userId, Date.now());
             cancelQueue(info.userId);
+            break;
+          case 'resume_paused':
+            if (typeof msg.id === 'string') await resumePausedBotGame(ws, info.userId, msg.id);
             break;
           case 'switch_accept':
             await acceptSwitch(ws, info.userId, info.username);

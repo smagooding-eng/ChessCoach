@@ -433,6 +433,8 @@ export function useLivePlay() {
     }, 9000);
   }, []);
   const clearSeekGone = useCallback(() => { setSeekGone(null); setSeekGoneReason(null); setSeekWaiting(null); }, []);
+  // Pick a paused bot game back up (saved when a real player came along).
+  const resumePaused = useCallback((id: string) => { const ws = wsRef.current; if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'resume_paused', id })); }, []);
   const acceptSwitch = useCallback(() => { setSwitchOffer(null); const ws = wsRef.current; if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'switch_accept' })); }, []);
   const declineSwitch = useCallback(() => { setSwitchOffer(null); const ws = wsRef.current; if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'switch_decline' })); }, []);
   /** Off to play on Lichess: tells anyone who taps your "looking for a game" alert where you went. */
@@ -521,7 +523,7 @@ export function useLivePlay() {
 
   return {
     status, error, game, color, queuedTc, queuedMode, opponentDisconnect, premove, setPremove,
-    queuedAt, botOfferMs, waitingFor, waitingKind, serverOffset, notice, approveRequest, connected, joinSeek, seekGone, clearSeekGone, seekGoneReason, seekWaiting, switchOffer, acceptSwitch, declineSwitch, noteOnLichess, handoffMs,
+    queuedAt, botOfferMs, waitingFor, waitingKind, serverOffset, notice, approveRequest, connected, joinSeek, seekGone, clearSeekGone, seekGoneReason, seekWaiting, switchOffer, acceptSwitch, declineSwitch, noteOnLichess, handoffMs, resumePaused,
     enterQueue, offerRematch, declineRematch, cancel, playBot, acceptChallenge, move, resign, takeback, offerDraw, acceptDraw, declineDraw,
     reset, tournamentWaiting, tournamentOver, tournamentReady, tournamentPause,
     minimized, restore: () => setMinimized(false), chat, sendChat,

@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from 'express';
 import { requireAuth } from '../middlewares/authMiddleware';
-import { getUserRatings, listTimeControls, getActiveGameForUser, getUserLiveHistory, seedRatingFromOnboardingGame, liveActivity } from '../lib/liveServer';
+import { getUserRatings, listTimeControls, getActiveGameForUser, getUserLiveHistory, seedRatingFromOnboardingGame, liveActivity, listPausedBotGames } from '../lib/liveServer';
 import { listOpenApps } from '../lib/notify';
 import { nextLiveHour } from '../lib/officialTournaments';
 import { getDailyRating } from '../lib/correspondence';
@@ -51,6 +51,12 @@ router.get('/live/ratings', requireAuth, async (req: Request, res: Response) => 
   } catch (err) {
     res.status(500).json({ error: 'Failed to load ratings' });
   }
+});
+
+// Bot games put aside for a real player, to finish later.
+router.get('/live/paused', requireAuth, async (req: Request, res: Response) => {
+  try { res.json({ games: await listPausedBotGames(req.user!.id) }); }
+  catch { res.status(500).json({ error: 'Failed to load paused games' }); }
 });
 
 router.get('/live/history', requireAuth, async (req: Request, res: Response) => {
