@@ -36,8 +36,9 @@ type Hosted = { code: string; url: string; label: string };
 // Nobody on ChessScout: the clocks Lichess lets apps play (10 minutes and up), and
 // how long to look here first before handing over to a real Lichess game.
 const LICHESS_CLOCK: Record<string, string> = { rapid_10_0: '10+0', rapid_15_0: '15+0', any: '10+0' };
-// 30 s on ChessScout, then 20 s on Lichess; a bot game starts after that. When other ChessScout players
-// are on Live play the server makes the first wait 15 s (live.handoffMs).
+// With Lichess connected (10 and 15 min only: Lichess doesn't allow outside apps to play blitz) the
+// app searches ChessScout and Lichess together from the start; a bot comes only after 90 s.
+// Without Lichess, a bot comes after 30 s (45 s when other ChessScout players are on Play).
 
 type OnlineTab = 'live' | 'daily';
 const readTab = (): OnlineTab | null => {
@@ -145,7 +146,8 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
   const waitedSoFar = live.queuedAt ? now - live.queuedAt : 0;
   useEffect(() => {
     if (live.status !== 'queued') { handedOff.current = false; stopLichessSearch(); return; }
-    if (handedOff.current || !lichess || !lichessClock || waitedSoFar < live.handoffMs) return;
+    // Lichess is searched from the start, alongside ChessScout (a ChessScout match cancels it)
+    if (handedOff.current || !lichess || !lichessClock) return;
     handedOff.current = true;
     trackPlay('lichess_search');
     const ac = new AbortController(); liSearch.current = ac; setLiSearching(true);
@@ -321,7 +323,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
                 {queuedLabel} · {live.queuedMode === 'ranked' ? 'Ranked' : 'Casual'} · {Math.floor(waitedMs / 1000)}s
               </p>
               <p className="text-[12px] mt-1" style={{ color: PT.muted }}>
-                {liSearching || (lichess && lichessClock) ? 'Your game opens the moment someone is found.' : "We've let players with notifications on know you're looking."}
+                {liSearching ? 'Searching ChessScout and Lichess. Your game opens the moment someone is found.' : lichess && !lichessClock ? "Lichess doesn't allow blitz from other apps, so this searches ChessScout only." : "We've let players with notifications on know you're looking."}
               </p>
             </div>
             <button onClick={() => { trackPlay('cancelled'); live.cancel(); }} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm" style={ghostBtn}>
