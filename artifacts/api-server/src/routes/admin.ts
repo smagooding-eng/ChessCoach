@@ -248,14 +248,14 @@ router.get("/admin/game-stats", requireAdmin, async (_req: Request, res: Respons
       count(*) FILTER (WHERE ${col} >= now() - interval '30 days')::int AS d30,
       count(*) FILTER (WHERE ${col} >= now() - interval '90 days')::int AS d90,
       count(*)::int AS "all"`);
-    // The owner's own accounts are left out (lib/analyticsExclusions.ts).
-    const notOwner = sql`COALESCE(white_user_id, '') NOT IN (SELECT id FROM analytics_excluded_users) AND COALESCE(black_user_id, '') NOT IN (SELECT id FROM analytics_excluded_users)`;
+    // Games played count everyone, the owner's own accounts included (unlike the traffic metrics).
+    const notOwner = sql`true`;
     const live = await db.execute(sql`SELECT ${windows("finished_at")} FROM live_games WHERE ${notOwner}`);
     const people = await db.execute(sql`SELECT ${windows("finished_at")} FROM live_games WHERE white_persona_id IS NULL AND black_persona_id IS NULL AND ${notOwner}`);
     const daily = await db.execute(sql`SELECT ${windows("finished_at")} FROM correspondence_games WHERE status = 'finished' AND finished_at IS NOT NULL AND ${notOwner}`);
     const row = (r: { rows: unknown[] }) => (r.rows[0] ?? {}) as Record<string, number>;
     // Started on ChessScout and played on Lichess (counted when the game started).
-    const liNotOwner = sql`user_id NOT IN (SELECT id FROM analytics_excluded_users)`;
+    const liNotOwner = sql`true`;
     const empty = { rows: [{}] } as { rows: unknown[] };
     const liLive = await db.execute(sql`SELECT ${windows("created_at")} FROM lichess_cs_games WHERE COALESCE(source, 'lichess') <> 'daily' AND ${liNotOwner}`).catch(() => empty) as { rows: unknown[] };
     const liMoved = await db.execute(sql`SELECT ${windows("created_at")} FROM lichess_cs_games WHERE source = 'handoff' AND ${liNotOwner}`).catch(() => empty) as { rows: unknown[] };
@@ -280,7 +280,8 @@ router.get("/admin/live-games", requireAdmin, async (req: Request, res: Response
       d90: `finished_at >= now() - interval '90 days'`,
       all: `true`,
     };
-    const where = sql`${sql.raw(cond[w] ?? cond.week)} AND COALESCE(white_user_id, '') NOT IN (SELECT id FROM analytics_excluded_users) AND COALESCE(black_user_id, '') NOT IN (SELECT id FROM analytics_excluded_users)`;
+    // everyone's games, the owner's own included
+    const where = sql`${sql.raw(cond[w] ?? cond.week)}`;
     const players = await db.execute(sql`
       SELECT username, user_id,
              count(*)::int AS games,
