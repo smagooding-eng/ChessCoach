@@ -44,7 +44,8 @@ const BOT_OFFER_MS = 20 * 1000;
 // Real people first: 30 s looking for a ChessScout opponent (members with notifications get
 // told someone's looking), then (Lichess connected) 20 s more on Lichess, then a bot.
 const AUTO_BOT_MS = Math.max(30 * 1000, parseInt(process.env.LIVE_AUTO_BOT_MS || "") || 0);
-const LICHESS_EXTRA_MS = 20 * 1000;
+// also searching Lichess (from the start): Lichess lobby games take a while, so wait well past that
+const LICHESS_BOT_MS = 90 * 1000;
 // Other ChessScout players are on Live play right now (free, not in a game): give them a
 // good chance to take the game before Lichess or a bot does.
 const HANDOFF_PEOPLE_HERE_MS = 45 * 1000;
@@ -798,7 +799,7 @@ async function joinQueue(ws: WebSocket, userId: string, username: string, tcIdIn
     const still = (queues.get(key) ?? []).find((w) => w.userId === userId && w.joinedAt === joinedAt);
     if (!still || still.ws.readyState !== WebSocket.OPEN) return;
     void spawnBotMatch(still.ws, userId, username, flex ? 'any' : tcId).catch(() => {});
-  }, noAutoBot ? handoffMs + LICHESS_EXTRA_MS : handoffMs);
+  }, noAutoBot ? Math.max(LICHESS_BOT_MS, handoffMs) : handoffMs);
   // Try immediate match (same clock first, then anyone flexible)
   tryMatchInQueue(key);
   if (queue.some(w => w.userId === userId)) tryMatchFlex(mode);
