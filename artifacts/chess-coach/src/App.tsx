@@ -248,6 +248,7 @@ const Legends = lazyRetry(() => import("@/pages/Legends"));
 const Coordinates = lazyRetry(() => import("@/pages/Coordinates"));
 const DailyScoutPage = lazyRetry(() => import("@/pages/DailyScout"));
 const LearnPath = lazyRetry(() => import("@/pages/LearnPath"));
+const PathStep = lazyRetry(() => import("@/pages/PathStep"));
 const ScanPosition = lazyRetry(() => import("@/pages/ScanPosition").then(m => ({ default: m.ScanPosition })));
 const Explorer = lazyRetry(() => import("@/pages/Explorer").then(m => ({ default: m.Explorer })));
 const Admin = lazyRetry(() => import("@/pages/Admin").then(m => ({ default: m.Admin })));
@@ -432,6 +433,7 @@ const PFieldNotes = () => <ProtectedRoute component={FieldNotes} />;
 const PScoutSprint = () => <ProtectedRoute component={ScoutSprint} />;
 const PBotChallenge = () => <ProtectedRoute component={BotChallenge} />;
 const PLearnPath = () => <ProtectedRoute component={LearnPath} />;
+const PPathStep = () => <ProtectedRoute component={PathStep} />;
 const PScanPosition  = () => <ProtectedRoute component={ScanPosition} />;
 const PExplorer      = () => <ProtectedRoute component={Explorer} />;
 const PAdmin         = () => <ProtectedRoute component={Admin} />;
@@ -752,6 +754,7 @@ function Router() {
       <Route path="/field-notes"      component={PFieldNotes} />
       <Route path="/sprint"           component={PScoutSprint} />
       <Route path="/bot-challenge"    component={PBotChallenge} />
+      <Route path="/path/step/:key"   component={PPathStep} />
       <Route path="/path"             component={PLearnPath} />
       <Route path="/last-game"        component={PLastGame} />
       <Route path="/scan"             component={PScanPosition} />

@@ -6,13 +6,14 @@
 // A step is started from the path (startStep); the page it opens reports what you did
 // (pathEvent) and the step completes when the goal is reached.
 import { BOTS, type BotConfig } from '@/lib/chess-bot';
-import { MOTIFS } from '@/lib/tactics';
-import { OPENINGS } from '@/lib/openings';
+import { MOTIFS, type Motif } from '@/lib/tactics';
+import { LEVEL_CONTENT, type LevelContent } from '@/lib/learnPathContent';
+import { OPENINGS, type OpeningLine } from '@/lib/openings';
 import { apiFetch } from '@/lib/api';
 
-export type StepKind = 'puzzles' | 'tactic' | 'course' | 'opening' | 'trap' | 'bot';
-export type Step = { key: string; kind: StepKind; title: string; sub: string; href: string; need: number; target?: string; icon: string };
-export type Level = { n: number; bot: BotConfig; piece: string; pieceName: string; ring?: string; steps: Step[] };
+export type StepKind = 'lesson' | 'puzzles' | 'tactic' | 'opening' | 'trap' | 'bot' | 'review' | 'recent' | 'course';
+export type Step = { key: string; kind: StepKind; title: string; sub: string; href: string; need: number; target?: string; icon: string; optional?: 'games' };
+export type Level = { n: number; bot: BotConfig; piece: string; pieceName: string; ring?: string; steps: Step[]; all: Step[]; content: LevelContent; motif: Motif; white?: OpeningLine; black?: OpeningLine };
 
 // the token for each level (then the king, in bronze, silver, gold and emerald)
 const TOKENS: { piece: string; name: string; ring?: string }[] = [
@@ -21,30 +22,38 @@ const TOKENS: { piece: string; name: string; ring?: string }[] = [
   { piece: 'K', name: 'Silver King', ring: '#C9D1D3' }, { piece: 'K', name: 'Gold King', ring: '#F2B53A' }, { piece: 'K', name: 'Emerald King', ring: '#3CC3B0' },
 ];
 
-// tactics from the basics outwards; openings alternate so each level has a new one per side
-const TACTIC_ORDER = ['hanging', 'fork', 'mate-in-1', 'pin', 'skewer', 'back-rank', 'discovered', 'removing-defender', 'mate-in-2', 'deflection', 'sacrifice', 'double-check'];
+// openings alternate so each level has a new one per side
 const WHITE = OPENINGS.filter((o) => o.userColor === 'w');
 const BLACK = OPENINGS.filter((o) => o.userColor === 'b');
+const HAS_GAMES = 'cs_path_has_games';
+/** Whether the member has imported games (the recent-game review step only shows then). */
+export function hasGames() { try { return localStorage.getItem(HAS_GAMES) === '1'; } catch { return false; } }
+export function setHasGames(v: boolean) { try { localStorage.setItem(HAS_GAMES, v ? '1' : '0'); } catch { /* */ } window.dispatchEvent(new Event(EVT)); }
 
 export const LEVELS: Level[] = BOTS.map((bot, i) => {
   const n = i + 1;
   const tk = TOKENS[Math.min(i, TOKENS.length - 1)];
-  const lo = Math.max(400, bot.rating - 200), hi = bot.rating + 150;
-  const motif = MOTIFS.find((m) => m.id === TACTIC_ORDER[i % TACTIC_ORDER.length]) ?? MOTIFS[i % MOTIFS.length];
+  const content = LEVEL_CONTENT[Math.min(i, LEVEL_CONTENT.length - 1)];
+  const motif = MOTIFS.find((m) => m.id === content.motif) ?? MOTIFS[0];
   const w = WHITE[i % Math.max(1, WHITE.length)], b = BLACK[i % Math.max(1, BLACK.length)];
-  const trapLevel = bot.rating < 1000 ? 'beginner' : bot.rating < 1800 ? 'intermediate' : 'advanced';
   const k = (s: string) => `L${n}-${s}`;
-  const steps: Step[] = [
-    { key: k('puzzles'), kind: 'puzzles', title: 'Puzzles', sub: `Solve 5 rated ${lo}–${hi}`, href: `/puzzles?minRating=${lo}&maxRating=${hi}`, need: 5, icon: 'puzzles' },
-    { key: k('tactic'), kind: 'tactic', title: motif?.name ?? 'Tactic', sub: 'Solve 3 of this tactic', href: `/tactics/${motif?.id ?? ''}`, need: 3, target: motif?.id, icon: 'tactics' },
-    { key: k('course'), kind: 'course', title: 'Lesson', sub: bot.rating <= 1000 ? 'The next lesson in Learn to Play' : 'A lesson from your courses', href: bot.rating <= 1000 ? '/beginner' : '/courses', need: 1, icon: 'courses' },
-    ...(w ? [{ key: k('white'), kind: 'opening' as const, title: w.name.split(' (')[0], sub: 'Opening as White: play the line', href: `/practice?tab=openings&opening=${encodeURIComponent(w.id)}&eco=${encodeURIComponent(w.eco)}`, need: 1, target: w.id, icon: 'openings' }] : []),
-    ...(b ? [{ key: k('black'), kind: 'opening' as const, title: b.name.split(' — ')[0], sub: 'Opening as Black: play the line', href: `/practice?tab=openings&opening=${encodeURIComponent(b.id)}&eco=${encodeURIComponent(b.eco)}`, need: 1, target: b.id, icon: 'openings' }] : []),
-    { key: k('trap'), kind: 'trap', title: 'A trap', sub: `Learn a ${trapLevel} trap`, href: `/traps?level=${trapLevel}`, need: 1, icon: 'traps' },
-    { key: k('bot'), kind: 'bot', title: `Beat ${bot.name}`, sub: `Rated about ${bot.rating}`, href: `/practice?bot=${encodeURIComponent(bot.name)}`, need: 1, target: bot.name, icon: 'bots' },
+  const run = (s: string) => `/path/step/${k(s)}`;
+  const all: Step[] = [
+    { key: k('lesson'), kind: 'lesson', title: `Learn: ${motif.name}`, sub: 'A short walk-through', href: run('lesson'), need: 1, icon: 'courses' },
+    { key: k('tactic'), kind: 'tactic', title: `Practice: ${motif.name}`, sub: `${content.tactic.length} puzzles`, href: run('tactic'), need: 1, icon: 'tactics' },
+    { key: k('puzzles'), kind: 'puzzles', title: 'Puzzles', sub: `${content.puzzles.length} puzzles at about ${bot.rating}`, href: run('puzzles'), need: 1, icon: 'puzzles' },
+    ...(w ? [{ key: k('white'), kind: 'opening' as const, title: w.name.split(' (')[0], sub: 'Opening as White: play the line', href: run('white'), need: 1, icon: 'openings' }] : []),
+    ...(b ? [{ key: k('black'), kind: 'opening' as const, title: b.name.split(' — ')[0].split(' (')[0], sub: 'Opening as Black: play the line', href: run('black'), need: 1, icon: 'openings' }] : []),
+    { key: k('trap'), kind: 'trap', title: content.trap.name, sub: `Trap: play it as ${content.trap.trapSide === 'white' ? 'White' : 'Black'}`, href: run('trap'), need: 1, icon: 'chess-traps' },
+    { key: k('bot'), kind: 'bot', title: `Beat ${bot.name}`, sub: `Rated about ${bot.rating}`, href: `/practice?bot=${encodeURIComponent(bot.name)}`, need: 1, target: bot.name, icon: 'practice-bots' },
+    { key: k('review'), kind: 'review', title: 'Review that game', sub: `Your biggest moments against ${bot.name}`, href: run('review'), need: 1, icon: 'analysis' },
+    { key: k('recent'), kind: 'recent', title: 'Review a recent game', sub: 'One of your own games', href: run('recent'), need: 1, icon: 'recent-games', optional: 'games' },
   ];
-  return { n, bot, piece: tk.piece, pieceName: tk.name, ring: tk.ring, steps };
+  const level = { n, bot, piece: tk.piece, pieceName: tk.name, ring: tk.ring, all, content, motif, white: w, black: b } as Level;
+  Object.defineProperty(level, 'steps', { get: () => all.filter((x) => !x.optional || hasGames()), enumerable: true });
+  return level;
 });
+export const stepByKey = (key: string) => { for (const l of LEVELS) { const st = l.all.find((x) => x.key === key); if (st) return { level: l, step: st }; } return null; };
 
 // ── progress ─────────────────────────────────────────────────────────────────
 const KEY = 'cs_learn_path_v1';
@@ -90,7 +99,7 @@ export function nextStep(s: PathState) { const l = currentLevel(s); return l.ste
 
 /** Pages call this when the member does something; it counts toward the step they're on. */
 export function pathEvent(kind: StepKind, target?: string) {
-  if (!pathStarted()) return;
+  if (!pathStarted() || kind !== 'bot') return; // every other step runs on its own screen (/path/step)
   const s = readPath();
   const step = nextStep(s);
   if (!step || step.kind !== kind) return;
@@ -108,3 +117,17 @@ export function pathEvent(kind: StepKind, target?: string) {
   saveStep(step.key);
   window.dispatchEvent(new CustomEvent('cs:path-step-done', { detail }));
 }
+
+/** The step screens call this when a step is finished. */
+export function completeStep(key: string) {
+  const s = readPath();
+  if (s.done[key]) return;
+  writePath({ ...s, done: { ...s.done, [key]: Date.now() } });
+  saveStep(key);
+}
+
+// The member's last game against each bot (for the review step), kept on this device.
+const BOT_GAME = 'cs_path_bot_game';
+export type SavedBotGame = { bot: string; pgn: string; color: 'w' | 'b'; result: string; at: number };
+export function saveBotGame(g: SavedBotGame) { try { const all = JSON.parse(localStorage.getItem(BOT_GAME) || '{}'); all[g.bot] = g; localStorage.setItem(BOT_GAME, JSON.stringify(all)); } catch { /* */ } }
+export function lastBotGame(bot: string): SavedBotGame | null { try { return JSON.parse(localStorage.getItem(BOT_GAME) || '{}')[bot] ?? null; } catch { return null; } }

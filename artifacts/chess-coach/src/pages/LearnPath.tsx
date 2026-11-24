@@ -10,14 +10,14 @@ import { useBoardTheme } from '@/components/MiniBoard';
 import { ScoutIcon } from '@/components/ScoutIcons';
 import { RedesignHeader } from '@/components/RedesignHeader';
 import { LearnPathBoard } from '@/pages/LearnPathBoard';
-import { LEVELS, readPath, onPathChange, syncPath, currentLevel, stepOpen, levelDone, startStep, markPathStarted, type Level, type Step, type PathState } from '@/lib/learnPath';
+import { apiFetch } from '@/lib/api';
+import { LEVELS, setHasGames, readPath, onPathChange, syncPath, currentLevel, stepOpen, levelDone, startStep, markPathStarted, type Level, type Step, type PathState } from '@/lib/learnPath';
 import { setPageMeta } from '@/lib/pageMeta';
 
 const MUTED = '#8F9997', GREEN = '#81B64C', GOLD = '#E8B447', CARD = '#182123', CARD2 = '#212B2D', BORDER = 'rgba(255,255,255,.07)';
 const VIEW_KEY = 'cs_learn_path_view';
-const ICON: Record<string, string> = { puzzles: 'puzzles', tactic: 'tactics', course: 'courses', trap: 'chess-traps' };
-const iconFor = (st: Step, _i: number) => st.kind === 'opening' ? 'openings' : ICON[st.kind] ?? 'puzzles';
-const X = [26, 70, 30, 72, 28, 66, 50]; // trail positions across the column (%)
+const iconFor = (st: Step, _i: number) => st.icon;
+const X = [26, 70, 30, 72, 28, 66, 34, 70, 30]; // trail positions across the column (%)
 const ROW = 104;
 
 function Ring({ pct, size = 64 }: { pct: number; size?: number }) {
@@ -121,7 +121,12 @@ function TrailPage({ onBoard }: { onBoard: () => void }) {
   const [, navigate] = useLocation();
   const [s, setS] = useState<PathState>(readPath);
   useEffect(() => { markPathStarted(); return onPathChange(() => setS(readPath())); }, []);
-  useEffect(() => { if (authUser) void syncPath(); }, [authUser]);
+  useEffect(() => {
+    if (!authUser) return;
+    void syncPath();
+    // the recent-game review step only shows for members with imported games
+    apiFetch('/api/games?limit=1', { credentials: 'include' }).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d) setHasGames(((d.games ?? d) as unknown[]).length > 0); }).catch(() => {});
+  }, [authUser]);
   const cur = currentLevel(s);
   const [viewN, setViewN] = useState(cur.n);
   useEffect(() => setViewN(cur.n), [cur.n]);
