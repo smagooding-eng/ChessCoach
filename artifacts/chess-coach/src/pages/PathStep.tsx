@@ -275,6 +275,83 @@ function GameReview({ pgn, color, title, fullHref, onDone, doneLabel = 'Done' }:
   );
 }
 
+const QCOL: Record<string, string> = { checkmate: '#81B64C', best: '#81B64C', excellent: '#97C46A', good: '#B5C9A0', inaccuracy: '#F0C95A', mistake: '#F08A4B', blunder: '#E8524A', missed_win: '#E8524A' };
+const QNAME: Record<string, string> = { checkmate: 'Checkmate', best: 'Best move', excellent: 'Excellent', good: 'Good', inaccuracy: 'Inaccuracy', mistake: 'Mistake', blunder: 'Blunder', missed_win: 'Missed win' };
+
+/** The whole game, every one of your moves graded by the engine on this device (no coach):
+ *  step through it move by move, jump to the next mistake, best move shown in green. */
+function FullEngineReview({ pgn, color, title, onDone, doneLabel = 'Done' }: { pgn: string; color: 'w' | 'b'; title: string; onDone: () => void; doneLabel?: string }) {
+  const plies = useMemo(() => {
+    const out: { fen: string; san: string; from: string; to: string; side: 'w' | 'b'; ply: number }[] = [];
+    try {
+      const g = new Chess(); g.loadPgn(pgn);
+      const c = new Chess();
+      try { const h = g.header(); if (h.FEN) c.load(h.FEN); } catch { /* */ }
+      g.history().forEach((san, ply) => { const fen = c.fen(); const m = c.move(san); out.push({ fen, san: m.san, from: m.from, to: m.to, side: m.color, ply }); });
+    } catch { /* bad pgn */ }
+    return out;
+  }, [pgn]);
+  const mine = useMemo(() => plies.filter((p) => p.side === color), [plies, color]);
+  const [grades, setGrades] = useState<Record<number, DeviceGrade>>({});
+  const [checked, setChecked] = useState(0);
+  const [cur, setCur] = useState(-1); // -1 = summary
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      for (const p of mine) {
+        if (!alive) return;
+        const g = await gradeMove(p.fen, p.san, 12);
+        if (!alive) return;
+        if (g) setGrades((x) => ({ ...x, [p.ply]: g }));
+        setChecked((n) => n + 1);
+      }
+    })();
+    return () => { alive = false; };
+  }, [mine]);
+  if (!plies.length) return <Note tone="warn">This game couldn't be read.</Note>;
+  const doneGrading = checked >= mine.length;
+  const count = (qs: string[]) => mine.filter((p) => grades[p.ply] && qs.includes(grades[p.ply].quality)).length;
+  const bad = (i: number) => { const g = grades[plies[i].ply]; return plies[i].side === color && g && ['inaccuracy', 'mistake', 'blunder', 'missed_win'].includes(g.quality); };
+  const nextBad = (() => { for (let i = cur + 1; i < plies.length; i++) if (bad(i)) return i; return -1; })();
+  const p = cur >= 0 ? plies[cur] : null;
+  const g = p ? grades[p.ply] : undefined;
+  const best = p && g?.bestMoveSan && !g.isTopMove ? (() => { try { const x = new Chess(p.fen).move(g.bestMoveSan!); return x ? { from: x.from, to: x.to } : null; } catch { return null; } })() : null;
+  const arrows = p ? [{ from: p.from, to: p.to, color: p.side === color && g ? `${QCOL[g.quality]}dd` : 'rgba(201,209,211,.7)' }, ...(best ? [{ from: best.from, to: best.to, color: 'rgba(129,182,76,0.95)' }] : [])] : undefined;
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-4 gap-2 text-center">
+        {([['Good', count(['best', 'excellent', 'good', 'checkmate']), GREEN], ['Inaccuracies', count(['inaccuracy']), '#F0C95A'], ['Mistakes', count(['mistake']), '#F08A4B'], ['Blunders', count(['blunder', 'missed_win']), '#E8524A']] as const).map(([l, n, c]) => (
+          <div key={l} className="rounded-[12px] py-2" style={{ background: CARD, border: `1px solid ${BORDER}` }}><b className="block text-[18px] font-black" style={{ color: c }}>{n}</b><span className="text-[11px]" style={{ color: MUTED }}>{l}</span></div>
+        ))}
+      </div>
+      {!doneGrading && <div className="space-y-1"><span className="text-[12.5px] font-bold" style={{ color: MUTED }}>The engine is checking {title}… {checked}/{mine.length}</span>
+        <div className="h-1.5 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.08)' }}><div className="h-full rounded-full" style={{ width: `${(checked / Math.max(1, mine.length)) * 100}%`, background: GREEN }} /></div></div>}
+      <ChessBoard fen={p ? p.fen : plies[0].fen} flipped={color === 'b'} arrows={arrows} maxWidthOverride="100%" />
+      {p ? (
+        <div className="rounded-[14px] px-3.5 py-3 text-[14px] leading-snug" style={{ background: CARD, border: `1.5px solid ${p.side === color && g ? QCOL[g.quality] : BORDER}` }}>
+          <b>{Math.floor(p.ply / 2) + 1}{p.side === 'w' ? '.' : '…'} {p.san}</b>
+          {p.side !== color ? <span style={{ color: MUTED }}> · their move</span>
+            : g ? <> · <b style={{ color: QCOL[g.quality] }}>{QNAME[g.quality]}</b>{best && g.bestMoveSan && <> · better was <b style={{ color: GREEN }}>{g.bestMoveSan}</b> (green)</>}</>
+            : <span style={{ color: MUTED }}> · checking…</span>}
+        </div>
+      ) : <Note>Tap a move, use the arrows, or jump to your next mistake.</Note>}
+      <div className="flex gap-2">
+        <button onClick={() => setCur((c) => Math.max(-1, c - 1))} disabled={cur < 0} className="rounded-xl px-4 py-2.5 text-[15px] font-black disabled:opacity-40" style={{ background: CARD2 }}>‹</button>
+        <button onClick={() => setCur((c) => Math.min(plies.length - 1, c + 1))} disabled={cur >= plies.length - 1} className="rounded-xl px-4 py-2.5 text-[15px] font-black disabled:opacity-40" style={{ background: CARD2 }}>›</button>
+        <button onClick={() => nextBad >= 0 && setCur(nextBad)} disabled={nextBad < 0} className="flex-1 rounded-xl px-3 py-2.5 text-[13.5px] font-bold disabled:opacity-40" style={{ background: CARD2 }}>Next mistake</button>
+      </div>
+      <div className="flex max-h-[160px] flex-wrap gap-1 overflow-y-auto rounded-[14px] p-2" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+        {plies.map((x, i) => {
+          const q = x.side === color ? grades[x.ply]?.quality : undefined;
+          return <button key={i} onClick={() => setCur(i)} className="rounded-[8px] px-1.5 py-0.5 text-[12.5px] font-bold"
+            style={{ background: i === cur ? '#3A4446' : 'transparent', color: q ? QCOL[q] : x.side === color ? '#F5F7F6' : MUTED }}>{x.side === 'w' ? `${Math.floor(x.ply / 2) + 1}.` : ''}{x.san}</button>;
+        })}
+      </div>
+      <button onClick={onDone} disabled={!doneGrading} className="cs-cta">{doneGrading ? <>{doneLabel} <ChevronRight size={17} /></> : 'Checking the game…'}</button>
+    </div>
+  );
+}
+
 /** Finds the game (your latest game against this bot, or your latest imported game) and opens
  *  the full Game Review for it. */
 function OpenFullReview({ find, bot, at, stepKey, onNone }: { find: 'bot' | 'recent'; bot?: string; at?: number; stepKey: string | null; onNone?: () => void }) {
@@ -320,7 +397,7 @@ function RecentReview({ onDone }: { onDone: () => void }) {
   }, []);
   if (g === null) return <Note>Finding your latest game…</Note>;
   if (g === 'none') return <div className="space-y-3"><Note>No imported games yet, so this step is skipped.</Note><button onClick={onDone} className="cs-cta">Back to the path</button></div>;
-  return <GameReview pgn={g.pgn} color={g.color} title={g.title} fullHref={`/games/${g.id}`} onDone={onDone} />;
+  return <FullEngineReview pgn={g.pgn} color={g.color} title={g.title} onDone={onDone} doneLabel="Next" />;
 }
 
 function Body({ level, step, finish }: { level: Level; step: Step; finish: () => void }) {
@@ -345,11 +422,16 @@ function Body({ level, step, finish }: { level: Level; step: Step; finish: () =>
     case 'trap': return (<div className="space-y-3"><Note>{c.trap.summary}</Note>
       <LinePlayer moves={c.trap.trapLineSan} notes={c.trap.moveNotes} userColor={c.trap.trapSide === 'white' ? 'w' : 'b'} drill onDone={finish} onSkip={() => navigate('/path')} /></div>);
     case 'review': {
+      const g = lastBotGame(level.bot.name);
+      if (!g) return <div className="space-y-3"><Note>Play {level.bot.name} from the path first: this reviews that game (bot games played elsewhere aren't reviewed here).</Note><Link href={`/practice?bot=${encodeURIComponent(level.bot.name)}`} onClick={() => { const b = level.steps.find((x) => x.kind === 'bot'); if (b) startStep(b); }} className="cs-cta block text-center">Play {level.bot.name}</Link></div>;
+      // a lost game can be reviewed too, but the step only counts once the bot is beaten
       const beaten = !!readPath().done[`L${level.n}-bot`];
-      if (!lastBotGame(level.bot.name)) return <div className="space-y-3"><Note>Play {level.bot.name} from the path first: this reviews that game (bot games played elsewhere aren't reviewed here).</Note><Link href={`/practice?bot=${encodeURIComponent(level.bot.name)}`} onClick={() => { const b = level.steps.find((x) => x.kind === 'bot'); if (b) startStep(b); }} className="cs-cta block text-center">Play {level.bot.name}</Link></div>;
-      return <OpenFullReview find="bot" bot={level.bot.name} at={lastBotGame(level.bot.name)?.at} stepKey={beaten ? step.key : null} />;
+      return (<div className="space-y-3">
+        {!beaten && <Note tone="warn">You haven't beaten {level.bot.name} yet. Look at what went wrong, then try again.</Note>}
+        <FullEngineReview pgn={g.pgn} color={g.color} title={`your game vs ${level.bot.name}`} onDone={beaten ? finish : () => { const b = level.steps.find((x) => x.kind === 'bot'); if (b) { startStep(b); navigate(b.href); } }} doneLabel={beaten ? 'Next' : `Play ${level.bot.name} again`} />
+      </div>);
     }
-    case 'recent': return <OpenFullReview find="recent" stepKey={step.key} onNone={finish} />;
+    case 'recent': return <RecentReview onDone={finish} />;
     default: return null;
   }
 }
@@ -361,7 +443,15 @@ export default function PathStepPage() {
   const [done, setDone] = useState(false);
   if (!found) return <div className="p-6"><Note>That step isn't on the path. <Link href="/path" className="underline">Back to the path</Link></Note></div>;
   const { level, step } = found;
-  const finish = () => { completeStep(step.key); setDone(true); };
+  const finish = () => {
+    completeStep(step.key);
+    if (step.kind === 'review' || step.kind === 'recent') {
+      const after = level.steps.find((x) => !readPath().done[x.key]);
+      if (after && (after.kind === 'recent' || after.kind === 'review')) { navigate(after.href); return; }
+      navigate('/path'); return;
+    }
+    setDone(true);
+  };
   const s = readPath();
   const next = level.steps.find((x) => !s.done[x.key] && x.key !== step.key);
 
