@@ -1,11 +1,13 @@
 # Creates the Oracle server (ops/oracle/create_server.py). Each run keeps trying once a minute for
-# almost 6 hours; the schedule starts a new run every few hours (GitHub skips many scheduled runs). Quietly does nothing until the OCI_CONFIG / OCI_API_KEY / ORACLE_ADMIN_KEY secrets
+# almost 6 hours; when Oracle still had no room, the run starts the next one itself, so the tries
+# go on around the clock (the schedule is only a backup: GitHub skips many scheduled runs). Quietly does nothing until the OCI_CONFIG / OCI_API_KEY / ORACLE_ADMIN_KEY secrets
 # exist, and once the server exists.
 name: Create Oracle server
 on:
   schedule: [{ cron: "17 */3 * * *" }]
   workflow_dispatch:
 concurrency: { group: oracle-create, cancel-in-progress: false }
+permissions: { contents: read, actions: write }
 jobs:
   create:
     runs-on: ubuntu-latest
@@ -21,4 +23,9 @@ jobs:
         run: |
           if [ -z "$OCI_CONFIG" ] || [ -z "$OCI_API_KEY" ] || [ -z "$ORACLE_ADMIN_KEY" ]; then echo "Secrets not set yet; skipping."; exit 0; fi
           pip install -q oci cryptography
-          python3 ops/oracle/create_server.py create 340
+          set -o pipefail; python3 ops/oracle/create_server.py create 340 2>&1 | tee try.log
+      - name: Keep going
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          # still no room: start the next run straight away (nothing to do once the server exists)
+          if grep -q "had no room" try.log 2>/dev/null; then gh workflow run oracle-create.yml --ref main -R "${{ github.repository }}"; echo "Next run started."; fi
