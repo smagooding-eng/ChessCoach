@@ -142,7 +142,7 @@ const CHIP: Record<string, { bg: string; fg: string; bd: string }> = {
 };
 
 function TrapsRedesign({ traps, loading }: { traps: TrapSummary[]; loading: boolean }) {
-  const [tab, setTab] = useState<'all' | 'category' | 'level'>('all');
+  const [tab, setTab] = useState<'all' | 'category' | 'level'>(() => (new URLSearchParams(window.location.search).get('level') ? 'level' : 'all'));
   useSwipeTabs(['all', 'category', 'level'] as const, tab, setTab);
 
   const groupBy = (key: (t: TrapSummary) => string) =>

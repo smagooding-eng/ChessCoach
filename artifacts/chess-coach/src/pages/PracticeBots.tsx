@@ -1461,6 +1461,8 @@ function readBotParam(): BotConfig | null {
  *  falling back to the same ECO code, then the nearest code in the same family. */
 function readInitialOpeningPick(): { opening: OpeningLine; line: number } | null {
   const p = new URLSearchParams(window.location.search);
+  const byId = p.get('opening') ? OPENINGS.find((o) => o.id === p.get('opening')) : null;
+  if (byId) return { opening: byId, line: 0 };
   const eco = p.get('eco');
   const played = (p.get('moves') ?? '').split(' ').filter(Boolean);
   if (!eco && !played.length) return null;

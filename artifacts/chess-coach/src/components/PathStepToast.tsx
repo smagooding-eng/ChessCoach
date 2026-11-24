@@ -8,8 +8,8 @@ export function PathStepToast() {
   useEffect(() => {
     let t: number | undefined;
     const show = (m: { text: string; done: boolean }) => { setMsg(m); window.clearTimeout(t); t = window.setTimeout(() => setMsg(null), m.done ? 7000 : 2500); };
-    const onProg = (e: Event) => { const a = (e as CustomEvent<{ count: number; need: number }>).detail; show({ text: `Learn Path: ${a.count} of ${a.need}`, done: false }); };
-    const onDone = () => show({ text: 'Learn Path step done', done: true });
+    const onProg = (e: Event) => { const a = (e as CustomEvent<{ count: number; need: number; title: string }>).detail; show({ text: `Learn Path · ${a.title}: ${a.count} of ${a.need}`, done: false }); };
+    const onDone = (e: Event) => show({ text: `${(e as CustomEvent<{ title: string }>).detail.title}: done`, done: true });
     window.addEventListener('cs:path-progress', onProg); window.addEventListener('cs:path-step-done', onDone);
     return () => { window.removeEventListener('cs:path-progress', onProg); window.removeEventListener('cs:path-step-done', onDone); window.clearTimeout(t); };
   }, []);

@@ -1,4 +1,5 @@
 import { trackPlay, newPlaySearch } from '@/lib/playFunnel';
+import { ScoutIcon } from '@/components/ScoutIcons';
 import { useGameBusy } from '@/lib/gameBusy';
 import { useBoardSetupMoment } from '@/lib/setupMoment';
 import React, { useEffect, useRef, useState } from 'react';
@@ -468,7 +469,7 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
           {/* Play a friend: closed until you want it. */}
           <section className="overflow-hidden" style={cardStyle}>
             <button onClick={() => setFriendOpen(o => !o)} aria-expanded={friendOpen} className="flex w-full items-center gap-2.5 px-3.5 py-3 text-left">
-              <Users size={17} className="shrink-0" style={{ color: PT.green }} />
+              <ScoutIcon name="friends" size={28} className="shrink-0" />
               <span className="min-w-0 flex-1">
                 <b className="block text-[14px] font-extrabold" style={{ color: PT.text }}>Play a friend</b>
                 <span className="block truncate text-[11.5px]" style={{ color: PT.muted }}>Send a link, or challenge a friend from Friends</span>

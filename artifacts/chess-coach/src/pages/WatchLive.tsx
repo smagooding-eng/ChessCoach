@@ -1,6 +1,7 @@
 // Watch live: the top over-the-board and online events Lichess is broadcasting
 // right now, with every game on its own board, updating as the moves come in.
 import React, { useEffect, useMemo, useState } from 'react';
+import { ScoutIcon } from '@/components/ScoutIcons';
 import { Link } from 'wouter';
 import { Loader2, ExternalLink, Radio, ArrowLeft, Video } from 'lucide-react';
 import { useUser } from '@/hooks/use-user';
@@ -161,7 +162,7 @@ export function WatchLive() {
   return (
     <div className="mx-auto max-w-[760px] space-y-4 p-4 pb-24">
       <div>
-        <h1 className="flex items-center gap-2 text-2xl font-black" style={{ color: PT.text }}><Radio size={22} style={{ color: '#FF5058' }} />Watch live</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-black" style={{ color: PT.text }}><ScoutIcon name="watch-live" size={30} />Watch live</h1>
         <p className="text-[13px]" style={{ color: PT.muted }}>Top events and streamers playing now, move by move. Broadcast by Lichess.</p>
       </div>
       {streamers && streamers.length > 0 && (<>

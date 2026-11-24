@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { ScoutIcon } from '@/components/ScoutIcons';
 import { Link } from 'wouter';
 import { Trophy, Plus, Search, Users, Clock, ChevronRight, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
@@ -101,7 +102,7 @@ export function TournamentsIndex() {
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <h1 className="flex items-center gap-2 text-2xl font-black md:text-3xl" style={{ color: PT.text, letterSpacing: '-0.02em' }}>
-            <Trophy size={24} style={{ color: PT.gold }} /> {tr('Tournaments')}
+            <ScoutIcon name="tournaments" size={32} /> {tr('Tournaments')}
           </h1>
           <p className="text-[13px]" style={{ color: PT.muted }}>{tr('Arenas and knockouts, live or daily. Tap one for standings, bracket and games.')}</p>
         </div>

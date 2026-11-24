@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ScoutIcon } from '@/components/ScoutIcons';
 import { SocialLinks } from '@/components/SocialLinks';
 import { PieceTile } from '@/components/DesignSystem';
 import { useUser } from '@/hooks/use-user';
@@ -1534,13 +1535,13 @@ export function ReferralCard({ isPremium, compact = false }: { isPremium: boolea
       >
         {(!isPremium || !data?.isPaid) && !data?.isAffiliate ? (
           <Link href="/subscription" className="flex items-center gap-3 px-4 py-3 group">
-            <Gift className="w-4 h-4 text-primary shrink-0" />
+            <ScoutIcon name="gift" size={24} className="shrink-0" />
             <p className="flex-1 text-xs font-bold text-foreground">Go Pro to unlock referrals</p>
             <ChevronRight className="w-3.5 h-3.5 text-primary opacity-60 group-hover:opacity-100 transition-opacity" />
           </Link>
         ) : (
           <div className="flex items-center gap-2 px-4 py-3">
-            <Gift className="w-4 h-4 text-primary shrink-0" />
+            <ScoutIcon name="gift" size={24} className="shrink-0" />
             <p className="flex-1 text-xs font-bold text-foreground truncate">
               {data?.totalReferred ?? 0} referred &middot; {data?.totalConverted ?? 0} went Pro
             </p>
@@ -1566,7 +1567,7 @@ export function ReferralCard({ isPremium, compact = false }: { isPremium: boolea
     >
       <div className="px-4 py-3 border-b border-border/30">
         <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
-          <Gift className="w-4 h-4 text-primary" /> Refer a Friend
+          <ScoutIcon name="gift" size={24} /> Refer a Friend
         </h2>
       </div>
       <div className="p-4">

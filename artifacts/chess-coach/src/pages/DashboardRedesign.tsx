@@ -305,9 +305,7 @@ export function DashboardRedesign() {
 
         {/* ── Position Explorer ── */}
         <Link href="/explore" className="flex items-center gap-3 rounded-[18px] p-3.5 transition-transform active:scale-[.98]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px]" style={{ background: `linear-gradient(160deg, ${GREEN}, #5f8f36)`, border: '1px solid rgba(255,255,255,.18)' }}>
-            <Compass size={21} color="#fff" />
-          </span>
+          <ScoutIcon name="explorer" size={42} className="shrink-0" />
           <span className="min-w-0 flex-1">
             <b className="block truncate text-[16px] font-extrabold">Position Explorer</b>
             <span className="block truncate text-[12.5px]" style={{ color: '#C4CCC9' }}>Stockfish rates every move: green good, red bad</span>
@@ -331,7 +329,7 @@ export function DashboardRedesign() {
           {!photoLook && <div className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.94) 0%, rgba(5,10,11,.72) 46%, rgba(5,10,11,0) 78%)' }} />}
           <div className={`relative z-10 flex flex-col p-5 ${photoLook ? '' : 'min-h-[340px]'}`}>
             <p className="flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[.22em]" style={{ color: GREEN }}>
-              <Target size={18} /> Know your opponent.
+              <ScoutIcon name="opponent-scout" size={22} /> Know your opponent.
             </p>
             <h2 className="mt-3 text-[26px] font-black leading-[1.04] tracking-tight min-[400px]:text-[28px] sm:text-[36px]" style={{ textShadow: '0 2px 14px rgba(0,0,0,.85)' }}>
               Scout Any<br />
@@ -375,9 +373,7 @@ export function DashboardRedesign() {
         <section className="rounded-[20px]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
           <div className="flex items-center justify-between px-5 pb-3.5 pt-5">
             <div className="flex items-center gap-3">
-              <span className="grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: 'rgba(129,182,76,.10)', border: `1px solid ${BORDER}` }}>
-                <RookIcon size={19} />
-              </span>
+              <ScoutIcon name="recent-games" size={36} />
               <h2 className="text-[17px] font-extrabold">Recent Games</h2>
             </div>
             <Link href="/games" className="flex items-center gap-1 text-[12px] font-extrabold uppercase tracking-wider" style={{ color: GREEN }}>
@@ -428,7 +424,7 @@ export function DashboardRedesign() {
 
         {/* ── My Analytics: stats, weaknesses and courses now live there ── */}
         <Link href="/analysis" className="flex items-center gap-3.5 rounded-[20px] p-5 transition-transform active:scale-[.99]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px]" style={{ background: '#81B64C', color: '#FFFFFF' }}><BarChart3 size={21} /></span>
+          <ScoutIcon name="progress" size={44} className="shrink-0" />
           <span className="min-w-0 flex-1">
             <b className="block text-[16px] font-extrabold">My Analytics</b>
             <span className="block truncate text-[12.5px]" style={{ color: MUTED }}>
@@ -459,14 +455,14 @@ export function DashboardRedesign() {
         {/* ── Everything else from the classic home ── */}
         <div className="grid grid-cols-3 gap-4">
           {[
-            { label: 'Practice Bots', sub: `${BOTS.length} opponents`, href: '/practice', icon: Bot, img: scene('quick-bots') },
-            { label: 'Courses', sub: 'Lessons & drills', href: '/courses', icon: GraduationCap, img: `${import.meta.env.BASE_URL}assets/courses/course-library.webp` },
-            { label: 'Shop', sub: 'Boards & gear', href: '/shop', icon: ShoppingBag, img: scene('quick-shop') },
+            { label: 'Practice Bots', sub: `${BOTS.length} opponents`, href: '/practice', scout: 'practice-bots', icon: Bot, img: scene('quick-bots') },
+            { label: 'Courses', sub: 'Lessons & drills', href: '/courses', scout: 'courses', icon: GraduationCap, img: `${import.meta.env.BASE_URL}assets/courses/course-library.webp` },
+            { label: 'Shop', sub: 'Boards & gear', href: '/shop', scout: 'shop', icon: ShoppingBag, img: scene('quick-shop') },
           ].map((q) => (
             <Link key={q.label} href={q.href} className={`relative flex flex-col items-start justify-between gap-2 overflow-hidden rounded-[18px] p-3.5 transition-transform active:scale-[.98] ${photoLook ? 'min-h-[96px]' : 'min-h-[124px]'}`} style={{ background: CARD, border: `1px solid ${BORDER}` }}>
               {!photoLook && <img src={siteImg(q.img)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />}
               {!photoLook && <span className="absolute inset-0" style={{ background: 'linear-gradient(0deg, rgba(5,10,11,.92) 0%, rgba(5,10,11,.55) 50%, rgba(5,10,11,.15) 100%)' }} />}
-              <span className="relative grid h-9 w-9 place-items-center rounded-[10px]" style={{ background: 'rgba(5,10,11,.6)', color: GREEN, border: '1px solid rgba(129,182,76,.3)' }}><q.icon size={18} /></span>
+              <ScoutIcon name={q.scout} size={38} className="relative" />
               <span className="relative min-w-0 max-w-full">
                 <b className="block truncate text-[13.5px] font-extrabold">{q.label}</b>
                 <span className="block truncate text-[11.5px]" style={{ color: '#C4CCC9' }}>{q.sub}</span>

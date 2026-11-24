@@ -38,8 +38,8 @@ export const LEVELS: Level[] = BOTS.map((bot, i) => {
     { key: k('puzzles'), kind: 'puzzles', title: 'Puzzles', sub: `Solve 5 rated ${lo}–${hi}`, href: `/puzzles?minRating=${lo}&maxRating=${hi}`, need: 5, icon: 'puzzles' },
     { key: k('tactic'), kind: 'tactic', title: motif?.name ?? 'Tactic', sub: 'Solve 3 of this tactic', href: `/tactics/${motif?.id ?? ''}`, need: 3, target: motif?.id, icon: 'tactics' },
     { key: k('course'), kind: 'course', title: 'Lesson', sub: bot.rating <= 1000 ? 'The next lesson in Learn to Play' : 'A lesson from your courses', href: bot.rating <= 1000 ? '/beginner' : '/courses', need: 1, icon: 'courses' },
-    ...(w ? [{ key: k('white'), kind: 'opening' as const, title: w.name.split(' (')[0], sub: 'Opening as White: play the line', href: `/practice?tab=openings&eco=${encodeURIComponent(w.eco)}`, need: 1, target: w.id, icon: 'openings' }] : []),
-    ...(b ? [{ key: k('black'), kind: 'opening' as const, title: b.name.split(' — ')[0], sub: 'Opening as Black: play the line', href: `/practice?tab=openings&eco=${encodeURIComponent(b.eco)}`, need: 1, target: b.id, icon: 'openings' }] : []),
+    ...(w ? [{ key: k('white'), kind: 'opening' as const, title: w.name.split(' (')[0], sub: 'Opening as White: play the line', href: `/practice?tab=openings&opening=${encodeURIComponent(w.id)}&eco=${encodeURIComponent(w.eco)}`, need: 1, target: w.id, icon: 'openings' }] : []),
+    ...(b ? [{ key: k('black'), kind: 'opening' as const, title: b.name.split(' — ')[0], sub: 'Opening as Black: play the line', href: `/practice?tab=openings&opening=${encodeURIComponent(b.id)}&eco=${encodeURIComponent(b.eco)}`, need: 1, target: b.id, icon: 'openings' }] : []),
     { key: k('trap'), kind: 'trap', title: 'A trap', sub: `Learn a ${trapLevel} trap`, href: `/traps?level=${trapLevel}`, need: 1, icon: 'traps' },
     { key: k('bot'), kind: 'bot', title: `Beat ${bot.name}`, sub: `Rated about ${bot.rating}`, href: `/practice?bot=${encodeURIComponent(bot.name)}`, need: 1, target: bot.name, icon: 'bots' },
   ];
@@ -48,9 +48,8 @@ export const LEVELS: Level[] = BOTS.map((bot, i) => {
 
 // ── progress ─────────────────────────────────────────────────────────────────
 const KEY = 'cs_learn_path_v1';
-const ACTIVE = 'cs_path_active';
 const EVT = 'cs:learn-path';
-export type PathState = { done: Record<string, number> };
+export type PathState = { done: Record<string, number>; count?: Record<string, number> };
 export function readPath(): PathState { try { return { done: {}, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch { return { done: {} }; } }
 function writePath(s: PathState) { try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* */ } window.dispatchEvent(new Event(EVT)); }
 export const onPathChange = (h: () => void) => { window.addEventListener(EVT, h); return () => window.removeEventListener(EVT, h); };
@@ -80,21 +79,32 @@ export function stepOpen(s: PathState, l: Level, i: number) {
   return l.steps.slice(0, i).every((x) => s.done[x.key]);
 }
 
-type Active = { key: string; kind: StepKind; target?: string; need: number; count: number };
-export function startStep(step: Step) {
-  try { sessionStorage.setItem(ACTIVE, JSON.stringify({ key: step.key, kind: step.kind, target: step.target, need: step.need, count: 0 } satisfies Active)); } catch { /* */ }
-}
-export function activeStep(): Active | null { try { return JSON.parse(sessionStorage.getItem(ACTIVE) || 'null'); } catch { return null; } }
+/** Kept for the pages that call it; the path now always works on the step you're on. */
+export function startStep(_step: Step) { markPathStarted(); }
+const STARTED = 'cs_learn_path_started';
+export function markPathStarted() { try { localStorage.setItem(STARTED, '1'); } catch { /* */ } }
+function pathStarted() { try { return localStorage.getItem(STARTED) === '1' || Object.keys(readPath().done).length > 0; } catch { return false; } }
 
-/** Pages call this when the member does something a path step may be waiting for. */
+/** The step the member is on: the first one not done in the level they're on. */
+export function nextStep(s: PathState) { const l = currentLevel(s); return l.steps.find((x) => !s.done[x.key]) ?? null; }
+
+/** Pages call this when the member does something; it counts toward the step they're on. */
 export function pathEvent(kind: StepKind, target?: string) {
-  const a = activeStep();
-  if (!a || a.kind !== kind) return;
-  if (a.target && target && a.target !== target) return;
-  a.count++;
-  if (a.count < a.need) { try { sessionStorage.setItem(ACTIVE, JSON.stringify(a)); } catch { /* */ } window.dispatchEvent(new CustomEvent('cs:path-progress', { detail: a })); return; }
-  try { sessionStorage.removeItem(ACTIVE); } catch { /* */ }
+  if (!pathStarted()) return;
   const s = readPath();
-  if (!s.done[a.key]) { s.done[a.key] = Date.now(); writePath(s); saveStep(a.key); }
-  window.dispatchEvent(new CustomEvent('cs:path-step-done', { detail: a }));
+  const step = nextStep(s);
+  if (!step || step.kind !== kind) return;
+  if (step.target && target && step.target !== target) return;
+  const counts = { ...(s.count ?? {}) };
+  const count = (counts[step.key] ?? 0) + 1;
+  const detail = { key: step.key, kind, count, need: step.need, title: step.title };
+  if (count < step.need) {
+    counts[step.key] = count; writePath({ ...s, count: counts });
+    window.dispatchEvent(new CustomEvent('cs:path-progress', { detail }));
+    return;
+  }
+  delete counts[step.key];
+  writePath({ ...s, count: counts, done: { ...s.done, [step.key]: Date.now() } });
+  saveStep(step.key);
+  window.dispatchEvent(new CustomEvent('cs:path-step-done', { detail }));
 }

@@ -9,7 +9,7 @@ import { useSettings } from '@/context/SettingsContext';
 import { useBoardTheme } from '@/components/MiniBoard';
 import { AppIcon } from '@/components/AppIcon';
 import { RedesignHeader } from '@/components/RedesignHeader';
-import { LEVELS, readPath, onPathChange, syncPath, currentLevel, stepOpen, levelDone, startStep, type Level, type Step, type PathState } from '@/lib/learnPath';
+import { LEVELS, readPath, onPathChange, syncPath, currentLevel, stepOpen, levelDone, startStep, markPathStarted, type Level, type Step, type PathState } from '@/lib/learnPath';
 import { setPageMeta } from '@/lib/pageMeta';
 
 const MUTED = '#8F9997', GREEN = '#81B64C', GREEN_D = '#4F7A2A';
@@ -54,7 +54,7 @@ export default function LearnPathPage() {
   const [s, setS] = useState<PathState>(readPath);
   const hereRef = useRef<HTMLDivElement>(null);
   useEffect(() => { setPageMeta('Learn Path — ChessScout.net', 'Level up from pawn to king: puzzles, tactics, lessons, openings, traps and a bot to beat at every level.', '/path'); }, []);
-  useEffect(() => onPathChange(() => setS(readPath())), []);
+  useEffect(() => { markPathStarted(); return onPathChange(() => setS(readPath())); }, []);
   useEffect(() => { if (authUser) void syncPath(); }, [authUser]);
   useEffect(() => { const t = setTimeout(() => hereRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 300); return () => clearTimeout(t); }, []);
 
@@ -110,6 +110,7 @@ export default function LearnPathPage() {
                     <div className="pointer-events-none absolute max-w-[42%] text-[12.5px] leading-tight" style={left >= 50 ? { right: `${100 - left + 22}%`, textAlign: 'right' } : { left: `${left + 22}%` }}>
                       <b className={boss ? 'text-[14px]' : ''} style={{ color: can ? '#F5F7F6' : MUTED }}>{st.title}</b>
                       <span className="block" style={{ color: MUTED }}>{st.sub}</span>
+                      {!isDone && (s.count?.[st.key] ?? 0) > 0 && <span className="block font-extrabold" style={{ color: GREEN }}>{s.count?.[st.key]} of {st.need} done</span>}
                     </div>
                   </div>
                 );

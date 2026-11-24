@@ -284,6 +284,26 @@ const D: Record<string, (g: G, id: string) => React.ReactNode> = {
     {[30, 21, 12].map((y, i) => <g key={y}><ellipse cx="24" cy={y + 6} rx="16" ry="5" fill={g('gold')} stroke={E} strokeWidth=".7" /><rect x="8" y={y} width="32" height="6" fill={g('gold')} /><ellipse cx="24" cy={y} rx="16" ry="5" fill={i === 2 ? g('ivory') : g('gold')} stroke={E} strokeWidth=".7" /></g>)}
     <path d="M12 16v4M12 25v4M12 34v4" stroke={HL} strokeWidth="1.5" strokeLinecap="round" />
   </>,
+  shop: (g) => <>
+    <path d="M9 16h30l-2.5 26h-25z" fill={g('gold')} stroke={E} strokeWidth=".9" strokeLinejoin="round" />
+    <path d="M17 19v-6a7 7 0 0 1 14 0v6" stroke={g('silver')} strokeWidth="3" fill="none" strokeLinecap="round" />
+    <path d="M13 20l-1.6 18" stroke={HL} strokeWidth="1.6" strokeLinecap="round" />
+    <circle cx="24" cy="30" r="4" fill={g('green')} />
+  </>,
+  gift: (g) => <>
+    <rect x="6" y="20" width="36" height="22" rx="3" fill={g('green')} stroke={E} strokeWidth=".9" />
+    <rect x="4" y="14" width="40" height="8" rx="2.5" fill={g('green')} stroke={E} strokeWidth=".9" />
+    <rect x="21" y="14" width="6" height="28" fill={g('gold')} />
+    <path d="M24 14c-3-7-12-9-12-3 0 3 6 3 12 3zM24 14c3-7 12-9 12-3 0 3-6 3-12 3z" fill={g('gold')} stroke={E} strokeWidth=".7" />
+    <path d="M9 24v14" stroke={HL} strokeWidth="1.5" strokeLinecap="round" />
+  </>,
+  explorer: (g) => <>
+    <circle cx="24" cy="24" r="19" fill={g('gold')} stroke={E} strokeWidth=".9" />
+    <circle cx="24" cy="24" r="14.5" fill={g('dark')} />
+    <path d="M24 11l4.5 13H19.5z" fill={g('red')} /><path d="M24 37l-4.5-13h9z" fill={g('ivory')} />
+    <circle cx="24" cy="24" r="2.4" fill={g('gold')} />
+    <path d="M12 16c2-4 6-7 10-7.5" stroke={HL} strokeWidth="1.6" fill="none" strokeLinecap="round" />
+  </>,
   'google-play': () => <>
     <path d="M9 5l21 19L9 43c-1-.5-1.5-1.5-1.5-3V8c0-1.5.5-2.5 1.5-3z" fill="#2196F3" />
     <path d="M9 5l21 19 6.5-6.5L12.5 4C11.2 3.3 10 3.6 9 5z" fill="#4CAF50" />

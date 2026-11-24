@@ -1,4 +1,5 @@
 import { pathEvent } from '@/lib/learnPath';
+import { ScoutIcon } from '@/components/ScoutIcons';
 import { recordActivity } from '@/lib/activity';
 import { DailyScoutShare } from '@/components/DailyScoutShare';
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
@@ -644,7 +645,7 @@ export function Puzzles() {
           <div className="flex items-center gap-3">
             <PieceTile piece="♛" size={44} />
             <h1 className="text-2xl md:text-3xl font-black flex items-center gap-2" style={{ color: TEXT_LIGHT, letterSpacing: '-0.02em' }}>
-              Puzzles
+              <ScoutIcon name="quick-puzzles" size={32} />Puzzles
             </h1>
           </div>
           {stats && (

@@ -1,4 +1,5 @@
 import React from 'react';
+import { ScoutIcon } from '@/components/ScoutIcons';
 import { Link } from 'wouter';
 import { ChevronRight, Bot, Play, Swords, Trophy } from 'lucide-react';
 import { BOTS } from '@/lib/chess-bot';
@@ -30,10 +31,10 @@ export function PlayHub() {
 
   // Online first (live and daily games live together there), then local, then bots.
   const rows: { href: string; title: string; sub: string; icon: React.ReactNode; tint: string; show: boolean; img: string }[] = [
-    { href: '/live', title: 'Play Online', sub: 'Live and daily games · challenge a friend', icon: <Swords size={22} />, tint: RD.green, show: !!authUser, img: 'play-online' },
-    { href: '/tournaments', title: 'Tournaments', sub: 'Join one, follow standings, or create one for your club', icon: <Trophy size={22} />, tint: RD.green, show: !!authUser, img: 'play-daily' },
-    { href: '/play/local', title: 'Play Local', sub: 'Two players, one device', icon: <Play size={22} />, tint: RD.green, show: true, img: 'play-friend' },
-    { href: '/practice', title: 'Play Bots', sub: `${BOTS.length} opponents • ${lowest}–${highest} ELO`, icon: <Bot size={22} />, tint: RD.green, show: true, img: 'play-bot' },
+    { href: '/live', title: 'Play Online', sub: 'Live and daily games · challenge a friend', icon: <ScoutIcon name="play-online" size={36} />, tint: RD.green, show: !!authUser, img: 'play-online' },
+    { href: '/tournaments', title: 'Tournaments', sub: 'Join one, follow standings, or create one for your club', icon: <ScoutIcon name="tournaments" size={36} />, tint: RD.green, show: !!authUser, img: 'play-daily' },
+    { href: '/play/local', title: 'Play Local', sub: 'Two players, one device', icon: <ScoutIcon name="play" size={34} />, tint: RD.green, show: true, img: 'play-friend' },
+    { href: '/practice', title: 'Play Bots', sub: `${BOTS.length} opponents • ${lowest}–${highest} ELO`, icon: <ScoutIcon name="practice-bots" size={36} />, tint: RD.green, show: true, img: 'play-bot' },
   ];
 
   return (
@@ -57,7 +58,7 @@ export function PlayHub() {
             >
               {!photoLook && <img src={siteImg(scene(r.img))} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: '75% center' }} />}
               {!photoLook && <span className="absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(5,10,11,.95) 0%, rgba(5,10,11,.8) 42%, rgba(5,10,11,.1) 100%)' }} />}
-              <span className="relative grid h-12 w-12 shrink-0 place-items-center rounded-[14px]" style={{ background: 'rgba(5,10,11,.55)', color: r.tint, border: `1px solid ${r.tint}55` }}>{r.icon}</span>
+              <span className="relative grid h-12 w-12 shrink-0 place-items-center">{r.icon}</span>
               <span className="relative min-w-0 flex-1">
                 <b className="block text-[16px] font-bold">{r.title}</b>
                 <span className="block text-[12.5px]" style={{ color: RD.muted }}>{r.sub}</span>

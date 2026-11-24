@@ -3,6 +3,7 @@
 // masters it) → Speed round. Mastered motifs come back for review. "Missed in your
 // games", speed rounds and review are Pro. Endgame tactics show on /endgames.
 import { pathEvent } from '@/lib/learnPath';
+import { ScoutIcon } from '@/components/ScoutIcons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useRoute } from 'wouter';
 import { Chess } from 'chess.js';
@@ -118,7 +119,7 @@ export function Tactics() {
     <div className="min-h-screen px-3 pb-[calc(7.5rem+env(safe-area-inset-bottom))] pt-3 md:px-6 md:pt-6" style={{ background: RD.bg, color: RD.text }}>
       <div className="mx-auto max-w-[900px] space-y-5">
         <div>
-          <h1 className="flex items-center gap-2 text-[26px] font-black"><Zap size={24} style={{ color: RD.green }} />Tactics</h1>
+          <h1 className="flex items-center gap-2 text-[26px] font-black"><ScoutIcon name="tactics" size={32} />Tactics</h1>
           <p className="text-[13.5px]" style={{ color: RD.muted }}>The middlegame: learn each pattern, then drill it until you see it instantly. {loaded && `${mastered} of ${total.length} mastered.`}</p>
           <p className="mt-1 text-[12px]" style={{ color: RD.muted }}>
             <Link href="/openings" className="font-bold underline" style={{ color: RD.green }}>Openings</Link> → <b style={{ color: RD.text }}>Tactics</b> → <Link href="/endgames" className="font-bold underline" style={{ color: RD.green }}>Endgames</Link>
@@ -137,7 +138,7 @@ export function Tactics() {
 
         {/* Missed in your games */}
         <Link href="/tactics/missed" className="flex items-center gap-3 rounded-[18px] p-4" style={{ ...card, border: '1px solid rgba(129,182,76,.4)' }}>
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px]" style={{ background: RD.green, color: '#fff' }}><Target size={20} /></span>
+          <ScoutIcon name="opponent-scout" size={44} className="shrink-0" />
           <span className="min-w-0 flex-1">
             <b className="flex items-center gap-1.5 text-[15.5px] font-extrabold">Missed in your games {!pro && <Crown size={14} style={{ color: RD.gold }} />}</b>
             <span className="block text-[12.5px]" style={{ color: RD.muted }}>The tactics you missed in your own reviewed games, sorted by pattern.</span>
@@ -240,7 +241,7 @@ function PuzzleRun({ m, mode, puzzles, onFinish, recordAs }: { m: Motif; mode: '
         {puzzles.map((_, j) => <span key={j} className="h-1.5 flex-1 rounded-full" style={{ background: j < k ? RD.green : j === k ? 'rgba(129,182,76,.5)' : 'rgba(255,255,255,.1)' }} />)}
       </div>
       <TacticPuzzle key={p.id} puzzle={p} mode={mode}
-        onDone={(ok, ms) => { if (ok) setScore((s) => s + 1); if (recordAs !== '') record(recordAs ?? m.id, p.id, ok, ms); }}
+        onDone={(ok, ms) => { if (ok) setScore((s) => s + 1); if (recordAs !== '') record(recordAs ?? m.id, p.id, ok, ms); else if (ok) pathEvent('tactic', m.id); }}
         nextLabel={k + 1 < puzzles.length ? 'Next' : 'Finish'}
         onNext={() => { if (k + 1 < puzzles.length) setK(k + 1); else onFinish(score, puzzles.length); }} />
     </div>

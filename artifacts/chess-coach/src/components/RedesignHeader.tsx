@@ -1,4 +1,5 @@
 import React from 'react';
+import { ScoutIcon } from '@/components/ScoutIcons';
 import { BackLink } from '@/lib/navBack';
 import { Link } from 'wouter';
 import { ArrowLeft } from 'lucide-react';
@@ -8,6 +9,12 @@ import { RD } from '@/lib/redesignTheme';
 // arrow), a bold title and an optional action on the right. Layout hides its
 // own logo header on these screens while the redesign is on, so this also
 // supplies the top safe-area spacing.
+const HEADER_ICON: Record<string, string> = {
+  'Chess Traps': 'chess-traps', 'My Analytics': 'progress', Courses: 'courses', Learn: 'courses', Practice: 'practice-bots',
+  'Openings Trainer': 'openings', Openings: 'openings', Endgames: 'endgames', Tactics: 'tactics', Puzzles: 'puzzles', Tournaments: 'tournaments',
+  Friends: 'friends', Settings: 'settings', Notifications: 'notifications', 'Import Games': 'import-games', 'Your Games': 'recent-games', Games: 'recent-games',
+};
+
 export function RedesignHeader({
   title, icon, backHref, right, dense,
 }: {
@@ -25,6 +32,8 @@ export function RedesignHeader({
           <BackLink fallback={backHref} aria-label="Back" className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ color: RD.green }}>
             <ArrowLeft size={22} />
           </BackLink>
+        ) : HEADER_ICON[title] ? (
+          <ScoutIcon name={HEADER_ICON[title]} size={34} className="shrink-0" />
         ) : icon ? (
           <span className="grid h-9 w-9 shrink-0 place-items-center" style={{ color: RD.green }}>{icon}</span>
         ) : null}

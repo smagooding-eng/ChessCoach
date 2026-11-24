@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ScoutIcon } from '@/components/ScoutIcons';
 import { Link } from 'wouter';
 import { ChevronRight, ChevronDown, Target, BarChart3, Trophy, BookOpen, Lightbulb, Swords, Crosshair, Gamepad2, GraduationCap, Calendar, TrendingUp, TrendingDown, ArrowUp, ArrowDown, Gauge, CheckCircle2 } from 'lucide-react';
 import { useMyCourses } from '@/hooks/use-courses';
@@ -350,9 +351,7 @@ export function AnalysisRedesign() {
     return (
       <Link key={c.id} href={`/courses/${c.id}`} className="flex items-center gap-3 rounded-[14px] px-3 py-3 transition-transform active:scale-[.99]"
         style={{ background: 'rgba(255,255,255,.025)', border: `1px solid ${RD.border}` }}>
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px]" style={{ background: '#81B64C', color: '#FFFFFF' }}>
-          {p >= 100 ? <CheckCircle2 size={18} /> : <GraduationCap size={18} />}
-        </span>
+        {p >= 100 ? <ScoutIcon name="badges" size={38} className="shrink-0" /> : <ScoutIcon name="courses" size={38} className="shrink-0" />}
         <span className="min-w-0 flex-1">
           <b className="line-clamp-1 block text-[14px] font-bold">{c.title}</b>
           <span className="mt-1.5 flex items-center gap-2">
@@ -370,7 +369,7 @@ export function AnalysisRedesign() {
   return (
     <div className="min-h-screen px-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
       <div className="mx-auto grid grid-cols-1 w-full max-w-[760px] gap-3 lg:max-w-[1200px]">
-        <RedesignHeader title="My Analytics" icon={<span className="text-[26px] leading-none">♟</span>} />
+        <RedesignHeader title="My Analytics" icon={<ScoutIcon name="progress" size={32} />} />
 
         <div data-swipe-tabs className="flex gap-0.5 overflow-x-auto rounded-[16px] p-1 [scrollbar-width:none] lg:max-w-[820px] [&::-webkit-scrollbar]:hidden" style={{ background: RD.cardSolid, border: `1px solid ${RD.border}` }}>
           {TABS.map((t) => {
