@@ -22,7 +22,7 @@ import {
   closeTournamentPool, notifyPoolStarted, tryStartBracketGame, isInTournamentPool,
   setTournamentGameHook, loadUserRating,
 } from "./liveServer";
-import { startGame as startDailyGame, setDailyFinishHook, isValidTimeControl as isDailyTc, DAILY_RATING_KEY } from "./correspondence";
+import { startGame as startDailyGame, setDailyFinishHook, isValidTimeControl as isDailyTc, DAILY_RATING_KEY, pliesOf } from "./correspondence";
 
 const SHOW_UP_MS = 10 * 60 * 1000;            // live bracket: time to turn up for a match
 const DAILY_ARENA_STOP_MS = 60 * 60 * 1000;   // daily arena: no new games in the last hour
@@ -406,7 +406,51 @@ export function startTournamentEngine() {
     if (!t) return;
     const result = (g.result === "white" || g.result === "black") ? g.result : "draw";
     if (t.format === "bracket") await onBracketGame(t.id, g.id, result);
-    else await scoreArena(t.id, tg.white_user_id, tg.black_user_id, result);
+    else {
+      await scoreArena(t.id, tg.white_user_id, tg.black_user_id, result);
+      // A daily arena player who lost on time without making a single move is paused, so the
+      // arena stops pairing them into game after game they never play (and stops handing their
+      // opponents a stream of one-move wins). Joining again un-pauses them.
+      const plies = pliesOf(g.pgn ?? "");
+      const noShow = g.termination === "timeout" && (result === "black" ? plies === 0 : result === "white" ? plies <= 1 : false);
+      if (noShow) {
+        const loser = result === "black" ? tg.white_user_id : tg.black_user_id;
+        await db.execute(sql`UPDATE tournament_players SET withdrawn = true WHERE tournament_id = ${t.id} AND user_id = ${loser}`);
+        void notify(loser, `${t.name}: you're paused`, "You ran out of time without making a move, so you won't get new games. Open the tournament and join again to keep playing.", url(t.id));
+      }
+    }
   });
   setInterval(() => { void tick(); }, 5000).unref();
+  void pauseNoShowsOnce();
+}
+
+// Once: in daily arenas running now, pause players whose latest game was lost on time without
+// a move (from before no-shows were paused automatically).
+async function pauseNoShowsOnce() {
+  try {
+    await db.execute(sql`CREATE TABLE IF NOT EXISTS one_time_jobs (name varchar PRIMARY KEY, done_at timestamptz NOT NULL DEFAULT now())`);
+    const claim = rowsOf(await db.execute(sql`INSERT INTO one_time_jobs (name) VALUES ('pause_daily_arena_no_shows_v1') ON CONFLICT DO NOTHING RETURNING name`));
+    if (!claim.length) return;
+    const rows = rowsOf<{ tournament_id: string; white_user_id: string; black_user_id: string; result: string | null; termination: string | null; pgn: string | null }>(await db.execute(sql`
+      SELECT tg.tournament_id, tg.white_user_id, tg.black_user_id, tg.result, tg.termination, cg.pgn
+      FROM tournament_games tg JOIN tournaments t ON t.id = tg.tournament_id JOIN correspondence_games cg ON cg.id = tg.game_id
+      WHERE t.status = 'running' AND t.format = 'arena' AND t.kind = 'daily'
+      ORDER BY tg.started_at DESC`));
+    // each player's latest game in each arena: paused only if that one was a no-show by them
+    const seen = new Set<string>();
+    let paused = 0;
+    for (const r of rows) {
+      const plies = pliesOf(r.pgn ?? "");
+      for (const [me, white] of [[r.white_user_id, true], [r.black_user_id, false]] as const) {
+        const k = `${r.tournament_id}:${me}`;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        const noShow = r.termination === "timeout" && (white ? r.result === "black" && plies === 0 : r.result === "white" && plies <= 1);
+        if (!noShow) continue;
+        await db.execute(sql`UPDATE tournament_players SET withdrawn = true WHERE tournament_id = ${r.tournament_id} AND user_id = ${me} AND NOT withdrawn`);
+        paused++;
+      }
+    }
+    logger.info({ paused }, "[tournaments] paused daily arena no-shows");
+  } catch (err) { logger.warn({ err }, "[tournaments] no-show pause failed"); }
 }
