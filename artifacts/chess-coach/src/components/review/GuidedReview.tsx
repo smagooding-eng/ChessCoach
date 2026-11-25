@@ -195,20 +195,34 @@ function clause(raw: string, minus: boolean): string {
   return minus ? `comes with ${x}` : `gives you ${x}`;
 }
 const joinAnd = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+// "wins a pawn" -> "winning a pawn", "gives you central control" -> "getting central control"
+function gerund(cl: string): string {
+  if (cl.startsWith('gives you ')) return `getting ${cl.slice(10)}`;
+  if (cl.startsWith('sets up ')) return `setting up ${cl.slice(8)}`;
+  const m = cl.match(/^(\w+)(.*)$/);
+  if (!m) return cl;
+  let v = m[1];
+  v = /(ss|sh|ch|x|z)es$/.test(v) ? v.slice(0, -2) : v.endsWith('s') ? v.slice(0, -1) : v;
+  if (v === 'control') v = 'controll';
+  else if (/^[^aeiou]*[aeiou][^aeiouwxy]$/.test(v) && v.length <= 4) v += v.slice(-1); // win -> winn, pin -> pinn, stop -> stopp
+  else if (v.endsWith('e') && !v.endsWith('ee')) v = v.slice(0, -1);
+  return `${v}ing${m[2]}`;
+}
+/** Personal: what you did well and what you didn't see, from the coach's points. */
 function plainTake(pros: string[], cons: string[], cls: string): string | null {
-  const plus = pros.slice(0, 2).map((p) => clause(p, false));
+  const plus = pros.slice(0, 2).map((p) => gerund(clause(p, false)));
   const minus = cons.slice(0, 2).map((c) => clause(c, true));
   if (!plus.length && !minus.length) return null;
   const bad = ['inaccuracy', 'mistake', 'blunder', 'miss', 'missed_win'].includes(cls);
   if (bad) {
-    if (!minus.length) return `It ${joinAnd(plus)}, but there was something better here. Look for the stronger move next time.`;
+    if (!minus.length) return `You had the right idea ${joinAnd(plus)}, but you missed a stronger move here. Take another look at the position.`;
     return plus.length
-      ? `It ${joinAnd(plus)}, but it also ${joinAnd(minus)}. The downside outweighs the gain here.`
-      : `It ${joinAnd(minus)}. That's what makes it a slip.`;
+      ? `${joinAnd(plus).replace(/^./, (c) => c.toUpperCase())} was a fair idea, but you didn't see that this move ${joinAnd(minus)}. That cost you more than it gained.`
+      : `You didn't see that this move ${joinAnd(minus)}. Slow down and check what your opponent can do next.`;
   }
-  if (!minus.length) return `This move ${joinAnd(plus)}, with no real downside. A clean, solid choice.`;
-  if (!plus.length) return `It's fine overall, but it ${joinAnd(minus)}. Keep that in mind on your next move.`;
-  return `This move ${joinAnd(plus)}, but it ${joinAnd(minus)}. Worth it here, just keep that risk in mind on your next move.`;
+  if (!minus.length) return `You did a good job ${joinAnd(plus)}, and it doesn't cost you anything. Nicely played.`;
+  if (!plus.length) return `This works, but you didn't see that it ${joinAnd(minus)}. Keep an eye on that next move.`;
+  return `You did a good job ${joinAnd(plus)}, but you also didn't see that it ${joinAnd(minus)}. Keep an eye on that next move.`;
 }
 
 export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flipped, onFlip, whiteName, blackName, accuracy, result, onExit, onReport, onBack, endExtra, coachPending = false, coachProgress = null, liveEvals = null, status = 'ready', progress, errorText, onRetryReview, canFullAnalysis = true, onUpgrade, canRemix = false }: GuidedReviewProps) {
