@@ -22,6 +22,7 @@ const SIGNED_IN = [
   ['import', '/import'], ['lookup', '/lookup'], ['shop', '/shop'], ['tournaments-in', '/tournaments'], ['learning', '/learning'],
   ['scan-in', '/scan'], ['affiliate', '/affiliate'], ['beginner-in', '/beginner'], ['kids-in', '/kids'],
   ['trail', '/trail'], ['analysis-board-in', '/analysis-board'], ['more-credits', '/credits'],
+  ['tactics', '/tactics'], ['tactic-drill', '/tactics/fork?tab=drill'], ['path', '/path'], ['path-step', '/path/step/L1-puzzles'], ['progress', '/progress'],
 ];
 // SHOT_SIZES="390x844,1280x720" picks the sizes (phones get a phone screen and touch)
 const SIZES = (process.env.SHOT_SIZES || '1280x720,1920x1080').split(',').map((v) => {
