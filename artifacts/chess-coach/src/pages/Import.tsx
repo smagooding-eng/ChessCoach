@@ -1,3 +1,4 @@
+import { ExtensionCard } from '@/components/ExtensionCard';
 import React, { useState, useRef, useEffect } from 'react';
 import { PieceTile } from '@/components/DesignSystem';
 import { useDashboardRedesignFlag } from '@/hooks/use-app-config';
@@ -513,6 +514,7 @@ export function Import() {
       <div className="min-h-screen px-3 md:px-6 md:pt-6 md:pb-12 pb-[calc(7.5rem+env(safe-area-inset-bottom))]" style={{ background: RD.bg, color: RD.text }}>
         <div className="mx-auto w-full max-w-[600px] lg:max-w-[760px]">
           <RedesignHeader title="Import Games" backHref="/games" right={<Link href="/games" aria-label="Your games" className="grid h-9 w-9 place-items-center rounded-full"><History size={20} /></Link>} />
+          <ExtensionCard className="mb-4" />
 
           <section className="rounded-[22px] p-4" style={card}>
             <div className="px-2 pb-4 pt-2 text-center">
@@ -615,6 +617,7 @@ export function Import() {
         </div>
 
         <h1 className="text-2xl md:text-3xl font-black mb-4" style={{ letterSpacing: '-0.02em' }}>Import Games</h1>
+        <ExtensionCard className="mb-4" />
         <p className="text-muted-foreground mb-6 max-w-md mx-auto">
           Fetch your recent games to power deep analysis. Import from Chess.com, Lichess, or both.
         </p>

@@ -75,6 +75,8 @@ export function firstReviewHtml(name: string | null, f: Found, unsubUrl: string)
   const items: { glyph: string; title: string; text: string }[] = [];
   if (f.best) items.push({ glyph: '&#9819;', title: `Your best game: ${f.best.acc}% accuracy`, text: `Against ${escapeHtml(f.best.opp)}. <a href="${EMAIL.site}/games/${f.best.id}" style="color:${EMAIL.green};font-weight:700;">See what you did right &rarr;</a>` });
   if (f.worst) items.push({ glyph: '&#9822;', title: `${f.worst.blunders} blunder${f.worst.blunders > 1 ? 's' : ''} in one game`, text: `Against ${escapeHtml(f.worst.opp)}. <a href="${EMAIL.site}/games/${f.worst.id}" style="color:${EMAIL.green};font-weight:700;">See each one and the better move &rarr;</a>` });
+  // the Chrome extension (desktop Chess.com players)
+  items.push({ glyph: '&#9822;', title: 'Review every Chess.com game in one click', text: `Our free Chrome extension adds "Review in ChessScout" when a game ends on Chess.com. <a href="https://chromewebstore.google.com/detail/hebbonhdppancbikdmclokijiofdfmfj" style="color:${EMAIL.green};font-weight:700;">Add it to Chrome &rarr;</a>` });
   return emailLayout({
     preheader: `We reviewed ${f.reviewed} of your games. Here's what we found.`,
     badge: 'Your reviews are ready',
@@ -147,6 +149,8 @@ export function gamesReviewedHtml(name: string | null, f: Found, reviewedNow: nu
   const items: { glyph: string; title: string; text: string }[] = [];
   if (f.best) items.push({ glyph: '&#9819;', title: `Your best game: ${f.best.acc}% accuracy`, text: `Against ${escapeHtml(f.best.opp)}. <a href="${EMAIL.site}/games/${f.best.id}" style="color:${EMAIL.green};font-weight:700;">See what you did right &rarr;</a>` });
   if (f.worst) items.push({ glyph: '&#9822;', title: `${f.worst.blunders} blunder${f.worst.blunders > 1 ? 's' : ''} in one game`, text: `Against ${escapeHtml(f.worst.opp)}. <a href="${EMAIL.site}/games/${f.worst.id}" style="color:${EMAIL.green};font-weight:700;">See each one and the better move &rarr;</a>` });
+  // the Chrome extension (desktop Chess.com players)
+  items.push({ glyph: '&#9822;', title: 'Review every Chess.com game in one click', text: `Our free Chrome extension adds "Review in ChessScout" when a game ends on Chess.com. <a href="https://chromewebstore.google.com/detail/hebbonhdppancbikdmclokijiofdfmfj" style="color:${EMAIL.green};font-weight:700;">Add it to Chrome &rarr;</a>` });
   const what = reviewedNow === 1 ? 'your latest game' : `your ${reviewedNow} latest games`;
   return emailLayout({
     preheader: `We reviewed ${what}, free. Every move graded.`,
