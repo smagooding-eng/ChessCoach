@@ -168,6 +168,7 @@ function TrailPage({ onBoard }: { onBoard: () => void }) {
 
           {/* beside the trail */}
           <aside className="space-y-3">
+            {next && <button onClick={() => go(next)} className="cs-cta hidden lg:flex"><Play size={17} fill="#fff" /> Continue: {next.title}</button>}
             <div className="flex items-center gap-3 rounded-[18px] p-3.5" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
               <Ring pct={doneIn / l.steps.length} />
               <div>
@@ -213,7 +214,7 @@ function TrailPage({ onBoard }: { onBoard: () => void }) {
       </div>
 
       {next && (
-        <div className="fixed inset-x-0 z-30 px-4" style={{ bottom: 'calc(72px + env(safe-area-inset-bottom))' }}>
+        <div className="fixed inset-x-0 z-30 px-4 lg:hidden" style={{ bottom: 'calc(72px + env(safe-area-inset-bottom))' }}>
           <div className="mx-auto max-w-[520px]">
             <button onClick={() => go(next)} className="cs-cta flex items-center justify-center gap-2 shadow-lg"><Play size={17} fill="#fff" /> Continue: {next.title}</button>
           </div>
