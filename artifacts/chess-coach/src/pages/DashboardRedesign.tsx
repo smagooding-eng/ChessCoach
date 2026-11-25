@@ -264,7 +264,7 @@ export function DashboardRedesign() {
         <PlayAppCard className="lg:col-span-2" />
 
         {/* ── Feature tiles ── */}
-        <div className="grid grid-cols-2 gap-4 lg:self-stretch lg:auto-rows-fr">
+        <div className="grid grid-cols-2 gap-4 lg:order-1 lg:col-span-2 lg:grid-cols-3">
           {TILES.map((t) => (
             <Link
               key={t.label}
@@ -306,7 +306,7 @@ export function DashboardRedesign() {
         </div>
 
         {/* ── Position Explorer ── */}
-        <Link href="/explore" className="flex items-center gap-3 rounded-[18px] p-3.5 transition-transform active:scale-[.98]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+        <Link href="/explore" className="flex items-center gap-3 rounded-[18px] p-3.5 lg:order-4 transition-transform active:scale-[.98]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
           <ScoutIcon name="explorer" size={42} className="shrink-0" />
           <span className="min-w-0 flex-1">
             <b className="block truncate text-[16px] font-extrabold">Position Explorer</b>
@@ -318,7 +318,7 @@ export function DashboardRedesign() {
 
         {/* ── Scout hero ── */}
         <section
-          className={`relative overflow-hidden rounded-[20px] ${photoLook ? '' : 'min-h-[340px]'}`}
+          className={`relative overflow-hidden rounded-[20px] lg:order-2 ${photoLook ? '' : 'min-h-[340px]'}`}
           style={photoLook ? { background: CARD, border: `1px solid ${BORDER}` } : {
             backgroundColor: 'var(--rd-card-solid, #050A0B)',
             border: `1px solid ${BORDER}`,
@@ -372,7 +372,7 @@ export function DashboardRedesign() {
         </section>
 
         {/* ── Recent games ── */}
-        <section className="rounded-[20px]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+        <section className="rounded-[20px] lg:order-3" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
           <div className="flex items-center justify-between px-5 pb-3.5 pt-5">
             <div className="flex items-center gap-3">
               <ScoutIcon name="recent-games" size={36} />
@@ -425,7 +425,7 @@ export function DashboardRedesign() {
         </section>
 
         {/* ── My Analytics: stats, weaknesses and courses now live there ── */}
-        <Link href="/analysis" className="flex items-center gap-3.5 rounded-[20px] p-5 transition-transform active:scale-[.99]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
+        <Link href="/analysis" className="flex items-center gap-3.5 rounded-[20px] p-5 lg:order-5 transition-transform active:scale-[.99]" style={{ background: CARD, border: `1px solid ${BORDER}` }}>
           <ScoutIcon name="progress" size={44} className="shrink-0" />
           <span className="min-w-0 flex-1">
             <b className="block text-[16px] font-extrabold">My Analytics</b>
@@ -439,7 +439,7 @@ export function DashboardRedesign() {
         </Link>
 
         {/* ── Scan a position (photo coach) ── */}
-        <Link href="/scan" className="flex items-center gap-4 overflow-hidden rounded-[20px] p-5" style={{ background: CARD, border: '1px solid rgba(129,182,76,.3)' }}>
+        <Link href="/scan" className="flex items-center gap-4 overflow-hidden rounded-[20px] p-5 lg:order-6" style={{ background: CARD, border: '1px solid rgba(129,182,76,.3)' }}>
           <span className="relative shrink-0">
             <FenThumb fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" size={74} />
             <span className="absolute -bottom-1.5 -right-1.5 grid h-8 w-8 place-items-center rounded-full" style={{ background: `linear-gradient(180deg, ${GREEN}, ${GREEN_DARK})`, color: '#FFFFFF' }}><Camera size={16} /></span>
@@ -455,7 +455,7 @@ export function DashboardRedesign() {
         </Link>
 
         {/* ── Everything else from the classic home ── */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-4 lg:order-7">
           {[
             { label: 'Practice Bots', sub: `${BOTS.length} opponents`, href: '/practice', scout: 'practice-bots', icon: Bot, img: scene('quick-bots') },
             { label: 'Courses', sub: 'Lessons & drills', href: '/courses', scout: 'courses', icon: GraduationCap, img: `${import.meta.env.BASE_URL}assets/courses/course-library.webp` },
@@ -473,8 +473,8 @@ export function DashboardRedesign() {
           ))}
         </div>
 
-        {authUser && <div className="lg:col-span-2"><ReferralCard isPremium={isPremium} compact /></div>}
-        <footer className="flex flex-col items-center justify-center gap-2 pb-2 pt-1 text-xs lg:col-span-2" style={{ color: '#87918E' }}>
+        {authUser && <div className="lg:order-8 lg:col-span-2"><ReferralCard isPremium={isPremium} compact /></div>}
+        <footer className="flex flex-col items-center justify-center gap-2 pb-2 pt-1 text-xs lg:order-9 lg:col-span-2" style={{ color: '#87918E' }}>
           <SocialLinks size={18} label="Follow ChessScout.net" />
           <button onClick={() => setHomeStyle('clean')} className="underline-offset-2 hover:underline">Try the other Home layout</button>
         </footer>

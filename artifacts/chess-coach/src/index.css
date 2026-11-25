@@ -688,3 +688,16 @@ html.cs-photo :not(.cs-photo-backdrop-img):not(.cs-keep-img):is([style*="chesssc
 
 /* Live game chat bubble */
 @keyframes pop { 0% { transform: translate(-50%, -50%) scale(.6); opacity: 0 } 100% { transform: translate(-50%, -50%) scale(1); opacity: 1 } }
+
+/* Desktop split: the main block (a board, usually) fills the left, everything else stacks in a
+   side panel on the right. Phones keep the single column. */
+@media (min-width: 1024px) {
+  .cs-split { display: grid; grid-template-columns: minmax(0, 1fr) 360px; column-gap: 20px; align-items: start; grid-auto-flow: row dense; }
+  .cs-split > * { grid-column: 2; min-width: 0; margin-top: 0 !important; margin-bottom: 12px; }
+  .cs-split > .cs-split-main { grid-column: 1; grid-row: 1 / span 40; }
+  .cs-split-wide { max-width: 1180px !important; }
+}
+@media (min-width: 1024px) {
+  /* in the desktop split the board can use the full height (the side panel takes the rest) */
+  .cs-split-main .cs-board-fit { max-width: min(var(--board-max, 100%), max(320px, calc(100dvh - 200px))) !important; }
+}

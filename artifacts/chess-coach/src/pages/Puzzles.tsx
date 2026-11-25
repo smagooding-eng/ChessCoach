@@ -607,7 +607,7 @@ export function Puzzles() {
           </linearGradient>
         </defs>
       </svg>
-      <div className={redesign ? 'max-w-[640px] lg:max-w-[820px] mx-auto px-3 pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-12' : 'max-w-2xl mx-auto px-4 pt-6'}>
+      <div className={redesign ? 'cs-split-wide max-w-[640px] lg:max-w-[820px] mx-auto px-3 pb-[calc(7.5rem+env(safe-area-inset-bottom))] md:pb-12' : 'max-w-2xl mx-auto px-4 pt-6'}>
         {redesign && (
           <>
             <RedesignHeader
@@ -663,6 +663,7 @@ export function Puzzles() {
         </>
         )}
 
+        <div className={redesign ? 'cs-split' : undefined}>
         {lichessDaily && puzzle?.id !== lichessDaily.id && (
           <button onClick={() => { wantPuzzle.current = lichessDaily.id; void fetchNextPuzzle(); }}
             className="mb-3 flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-left"
@@ -762,7 +763,7 @@ export function Puzzles() {
 
         {(
           <div
-            className={redesign ? 'rounded-[22px] p-4' : ''}
+            className={redesign ? 'cs-split-main rounded-[22px] p-4' : ''}
             style={redesign ? { background: 'var(--cs-card-gradient, #0D1516)', border: '1px solid var(--cs-border, rgba(255,255,255,.08))' } : undefined}
           >
             {redesign && (
@@ -1100,6 +1101,7 @@ export function Puzzles() {
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

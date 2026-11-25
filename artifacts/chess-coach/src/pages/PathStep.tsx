@@ -77,7 +77,7 @@ function LinePlayer({ startFen = START, moves, userColor, notes, intro, drill = 
   const perfect = slips === 0;
 
   return (
-    <div className="space-y-3">
+    <div className="cs-split space-y-3">
       <div className="flex items-center justify-between text-[13px] font-bold">
         <span style={{ color: MUTED }}>{drill ? `Try ${tries} · ${perfect ? 'no mistakes so far' : `${slips} mistake${slips === 1 ? '' : 's'}`}` : ''}</span>
         <span style={{ color: MUTED }}>Move {Math.min(idx + 1, moves.length)} of {moves.length}</span>
@@ -87,8 +87,8 @@ function LinePlayer({ startFen = START, moves, userColor, notes, intro, drill = 
           : <Banner kind="good">{drill ? 'Perfect run! Line learned.' : 'Line complete!'}</Banner>)
         : flash ? <Banner kind={flash.kind}>{flash.text}</Banner>
         : <Banner kind="info">{mine ? `Your move (${userColor === 'w' ? 'White' : 'Black'})` : 'Their move…'}</Banner>}
-      <ChessBoard key={nonce} fen={fen} flipped={userColor === 'b'} practiceMode={mine} expectedMoveSan={expected?.san ?? null} onMovePlayed={onMove}
-        lastMove={last} arrows={mine && expected && show ? [{ from: expected.from, to: expected.to, color: 'rgba(129,182,76,0.85)' }] : undefined} maxWidthOverride="100%" suppressConfirmMoves />
+      <div className="cs-split-main"><ChessBoard key={nonce} fen={fen} flipped={userColor === 'b'} practiceMode={mine} expectedMoveSan={expected?.san ?? null} onMovePlayed={onMove}
+        lastMove={last} arrows={mine && expected && show ? [{ from: expected.from, to: expected.to, color: 'rgba(129,182,76,0.85)' }] : undefined} maxWidthOverride="100%" suppressConfirmMoves /></div>
       {note && <Note>{note}</Note>}
       {!done && (
         <div className="flex gap-2">
@@ -159,14 +159,14 @@ function PathPuzzle({ p, last, onNext }: { p: TacticPuzzleData; last: boolean; o
   const clean = state === 'solved' && wrong === 0 && !helped;
   const toMove = new Chess(fen).turn();
   return (
-    <div className="space-y-3">
+    <div className="cs-split space-y-3">
       {state === 'solved' ? <Banner kind="good">{clean ? 'Solved!' : 'Solved, with help. This one comes back at the end.'}</Banner>
         : state === 'shown' ? <Banner kind="bad">Here's the answer. This one comes back at the end.</Banner>
         : flash ? <Banner kind={flash.kind}>{flash.text}</Banner>
         : <Banner kind="info">{!ready ? 'Watch their move…' : `${me === 'w' ? 'White' : 'Black'} to move: find the best move`}</Banner>}
-      <ChessBoard key={`${p.id}-${nonce}`} fen={fen} flipped={me === 'b'} practiceMode={ready && state === 'play' && toMove === me}
+      <div className="cs-split-main"><ChessBoard key={`${p.id}-${nonce}`} fen={fen} flipped={me === 'b'} practiceMode={ready && state === 'play' && toMove === me}
         expectedMoveSan={expected?.san ?? null} onMovePlayed={onMove} lastMove={lastMv}
-        arrows={hint && expected ? [{ from: expected.from, to: expected.to, color: 'rgba(129,182,76,0.85)' }] : undefined} maxWidthOverride="100%" suppressConfirmMoves />
+        arrows={hint && expected ? [{ from: expected.from, to: expected.to, color: 'rgba(129,182,76,0.85)' }] : undefined} maxWidthOverride="100%" suppressConfirmMoves /></div>
       {state === 'play' ? (
         <div className="flex gap-2">
           {ready && !hint && <button onClick={() => { setHint(true); setHelped(true); }} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-[13.5px] font-bold" style={{ background: CARD2 }}><Lightbulb size={15} /> Hint</button>}
@@ -318,7 +318,7 @@ function FullEngineReview({ pgn, color, title, onDone, doneLabel = 'Done' }: { p
   const best = p && g?.bestMoveSan && !g.isTopMove ? (() => { try { const x = new Chess(p.fen).move(g.bestMoveSan!); return x ? { from: x.from, to: x.to } : null; } catch { return null; } })() : null;
   const arrows = p ? [{ from: p.from, to: p.to, color: p.side === color && g ? `${QCOL[g.quality]}dd` : 'rgba(201,209,211,.7)' }, ...(best ? [{ from: best.from, to: best.to, color: 'rgba(129,182,76,0.95)' }] : [])] : undefined;
   return (
-    <div className="space-y-3">
+    <div className="cs-split space-y-3">
       <div className="grid grid-cols-4 gap-2 text-center">
         {([['Good', count(['best', 'excellent', 'good', 'checkmate']), GREEN], ['Inaccuracies', count(['inaccuracy']), '#F0C95A'], ['Mistakes', count(['mistake']), '#F08A4B'], ['Blunders', count(['blunder', 'missed_win']), '#E8524A']] as const).map(([l, n, c]) => (
           <div key={l} className="rounded-[12px] py-2" style={{ background: CARD, border: `1px solid ${BORDER}` }}><b className="block text-[18px] font-black" style={{ color: c }}>{n}</b><span className="text-[11px]" style={{ color: MUTED }}>{l}</span></div>
@@ -326,7 +326,7 @@ function FullEngineReview({ pgn, color, title, onDone, doneLabel = 'Done' }: { p
       </div>
       {!doneGrading && <div className="space-y-1"><span className="text-[12.5px] font-bold" style={{ color: MUTED }}>The engine is checking {title}… {checked}/{mine.length}</span>
         <div className="h-1.5 overflow-hidden rounded-full" style={{ background: 'rgba(255,255,255,.08)' }}><div className="h-full rounded-full" style={{ width: `${(checked / Math.max(1, mine.length)) * 100}%`, background: GREEN }} /></div></div>}
-      <ChessBoard fen={p ? p.fen : plies[0].fen} flipped={color === 'b'} arrows={arrows} maxWidthOverride="100%" />
+      <div className="cs-split-main"><ChessBoard fen={p ? p.fen : plies[0].fen} flipped={color === 'b'} arrows={arrows} maxWidthOverride="100%" /></div>
       {p ? (
         <div className="rounded-[14px] px-3.5 py-3 text-[14px] leading-snug" style={{ background: CARD, border: `1.5px solid ${p.side === color && g ? QCOL[g.quality] : BORDER}` }}>
           <b>{Math.floor(p.ply / 2) + 1}{p.side === 'w' ? '.' : '…'} {p.san}</b>
@@ -456,7 +456,7 @@ export default function PathStepPage() {
   const next = level.steps.find((x) => !s.done[x.key] && x.key !== step.key);
 
   return (
-    <div className="relative z-10 mx-auto w-full max-w-[560px] px-4 pb-32 pt-3" style={{ color: '#F5F7F6' }}>
+    <div className="cs-split-wide relative z-10 mx-auto w-full max-w-[560px] px-4 pb-32 pt-3" style={{ color: '#F5F7F6' }}>
       <div className="mb-3 flex items-center gap-3">
         <Link href="/path" aria-label="Back to the path" className="grid h-9 w-9 shrink-0 place-items-center rounded-full" style={{ color: GREEN }}><ArrowLeft size={22} /></Link>
         <ScoutIcon name={step.icon} size={34} />

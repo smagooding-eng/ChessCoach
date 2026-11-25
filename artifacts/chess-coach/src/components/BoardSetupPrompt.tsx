@@ -34,10 +34,10 @@ export function BoardSetupPrompt() {
   if (!open || !authUser) return null;
   const done = () => { markSetupSeen(authUser.id); popupClosed('board_setup'); setOpen(false); };
   return (
-    <div className="fixed inset-0 z-[95] flex items-end justify-center" style={{ background: 'rgba(3,6,7,.7)', backdropFilter: 'blur(4px)' }}
+    <div className="fixed inset-0 z-[95] flex items-end justify-center md:items-center" style={{ background: 'rgba(3,6,7,.7)', backdropFilter: 'blur(4px)' }}
       role="dialog" aria-label="Your board and play set-up" onClick={(e) => { if (e.target === e.currentTarget) done(); }}>
       <style>{'@keyframes cssheet{from{transform:translateY(100%)}to{transform:none}}'}</style>
-      <div className="relative w-full max-w-md overflow-y-auto rounded-t-[24px] pb-[env(safe-area-inset-bottom)]"
+      <div className="relative w-full max-w-md overflow-y-auto rounded-t-[24px] md:rounded-[24px] pb-[env(safe-area-inset-bottom)]"
         style={{ maxHeight: '90vh', animation: 'cssheet .32s cubic-bezier(.2,.8,.2,1)' }}>
         <div className="sticky top-0 z-10 flex justify-center pt-2" aria-hidden="true"><span className="h-1 w-10 rounded-full" style={{ background: 'rgba(255,255,255,.18)' }} /></div>
         <button onClick={done} aria-label="Close" className="absolute right-3 top-4 z-10 grid h-8 w-8 place-items-center rounded-full" style={{ background: 'rgba(255,255,255,.06)', color: '#87918E' }}><X size={16} /></button>
