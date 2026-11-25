@@ -226,7 +226,10 @@ export function LichessPlay() {
     if (!user || user.toLowerCase() === 'lichess' || !text.trim()) return;
     const mine = user.toLowerCase() === meRef.current;
     const from: 'w' | 'b' = mine ? colorRef.current : colorRef.current === 'w' ? 'b' : 'w';
-    setChat((c) => [...c.slice(-30), { id: ++chatId.current, from, text: text.slice(0, 140), at }]);
+    const t = text.slice(0, 140);
+    // the same line can arrive twice (sent live and in the earlier-chat load): keep one
+    setChat((c) => (c.some((m) => m.from === from && m.text === t && (at === 0 || m.at === 0 || Math.abs(m.at - at) < 5000)) ? c
+      : [...c.slice(-30), { id: ++chatId.current, from, text: t, at }]));
   };
   useEffect(() => { setChat([]); }, [gameId]);
   // Played from ChessScout: it goes under the ChessScout tab as well as Lichess, however it gets saved.
@@ -517,7 +520,7 @@ export function LichessPlay() {
               // The ChessScout line goes once a game at most (Lichess doesn't like repeated advertising).
               if (/chessscout\.net/i.test(t)) { if (promoSent.current === full.id) return; promoSent.current = full.id; }
               void sendChat(full.id, t);
-            }} disabled={phase !== 'playing' && phase !== 'over'} muted={chatMuted} setMuted={setChatMuted} />
+            }} disabled={phase !== 'playing' && phase !== 'over'} muted={chatMuted} setMuted={setChatMuted} allowText />
             {chat.length > 0 && (
               <div className="max-h-28 space-y-0.5 overflow-y-auto rounded-lg px-2.5 py-1.5 text-[12.5px]" style={{ background: 'rgba(255,255,255,0.04)' }}>
                 {chat.filter((m) => !chatMuted || m.from === myColor).slice(-6).map((m) => (
