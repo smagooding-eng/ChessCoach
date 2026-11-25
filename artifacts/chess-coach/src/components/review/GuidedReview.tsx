@@ -176,6 +176,41 @@ function CoachTeaser({ label, onUpgrade }: { label: string; onUpgrade?: () => vo
 
 type Mode = { kind: 'main' } | { kind: 'best'; step: number } | { kind: 'reply'; step: number } | { kind: 'retry'; state: 'trying' | 'right' | 'wrong' };
 
+// The coach's plus and minus points weighed up in a sentence or two of plain English (Pro
+// coach card). Built from the points themselves, so it says what they add up to rather than
+// repeating the note above the board.
+const VERBS = /^(wins|attacks|threatens|develops|defends|controls|opens|weakens|loses|hangs|blocks|pins|forks|trades|creates|gains|protects|traps|skewers|frees|activates|centralizes|castles|covers|guards|targets|pressures|undermines|allows|gives|drops|misses|ignores|invites|stops|prevents|prepares|supports|improves|exchanges|sacrifices)\b/;
+const LOOSE = /^(\w+(?: \w+)?) (exposed|weakened|weak|undefended|loose|trapped|pinned|hanging|stuck|passive|misplaced|vulnerable|open)$/;
+function clause(raw: string, minus: boolean): string {
+  let x = raw.trim().replace(/[.!]+$/, '');
+  x = x.charAt(0).toLowerCase() + x.slice(1);
+  const loose = x.match(LOOSE);
+  if (loose) return /(safety|structure|position)$/.test(loose[1]) ? `weakens your ${loose[1]}` : `leaves your ${loose[1]} ${loose[2]}`;
+  const pot = x.match(/^(?:potential|possible) (.+)$/);
+  if (pot) return minus ? `could run into a ${pot[1]}` : `sets up a possible ${pot[1]}`;
+  if (VERBS.test(x)) {
+    // "wins pawn" -> "wins a pawn", "attacks rook" -> "attacks the rook"
+    return x.replace(/^(\w+) (pawn|piece|tempo|move)\b/, '$1 a $2').replace(/^(\w+) (rook|queen|king|knight|bishop|center|centre|file|diagonal|square|bishops|knights|rooks)\b/, '$1 the $2');
+  }
+  return minus ? `comes with ${x}` : `gives you ${x}`;
+}
+const joinAnd = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+function plainTake(pros: string[], cons: string[], cls: string): string | null {
+  const plus = pros.slice(0, 2).map((p) => clause(p, false));
+  const minus = cons.slice(0, 2).map((c) => clause(c, true));
+  if (!plus.length && !minus.length) return null;
+  const bad = ['inaccuracy', 'mistake', 'blunder', 'miss', 'missed_win'].includes(cls);
+  if (bad) {
+    if (!minus.length) return `It ${joinAnd(plus)}, but there was something better here. Look for the stronger move next time.`;
+    return plus.length
+      ? `It ${joinAnd(plus)}, but it also ${joinAnd(minus)}. The downside outweighs the gain here.`
+      : `It ${joinAnd(minus)}. That's what makes it a slip.`;
+  }
+  if (!minus.length) return `This move ${joinAnd(plus)}, with no real downside. A clean, solid choice.`;
+  if (!plus.length) return `It's fine overall, but it ${joinAnd(minus)}. Keep that in mind on your next move.`;
+  return `This move ${joinAnd(plus)}, but it ${joinAnd(minus)}. Worth it here, just keep that risk in mind on your next move.`;
+}
+
 export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flipped, onFlip, whiteName, blackName, accuracy, result, onExit, onReport, onBack, endExtra, coachPending = false, coachProgress = null, liveEvals = null, status = 'ready', progress, errorText, onRetryReview, canFullAnalysis = true, onUpgrade, canRemix = false }: GuidedReviewProps) {
   // Remix (admin, for content): a new random board and piece set on every move.
   const [remixOn, setRemixOn] = useState(false);
@@ -488,16 +523,23 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
     // cons go in a card under the board, as before. Free reviews have neither.
     const aiCoached = !!(rev.pros?.length || rev.cons?.length);
     if (aiCoached) {
+      const take = plainTake(rev.pros ?? [], rev.cons ?? [], rev.classification);
       detail = (
         <>
-          <p className="mb-1 text-[11.5px] font-bold uppercase tracking-wide text-[#87918E]">AI coach</p>
+          <p className="mb-1 text-[11.5px] font-bold uppercase tracking-wide text-[#87918E]">Coach</p>
           {t.rest && <p className={P}>{t.rest}</p>}
-          {!!rev.pros?.length && (
-            <ul className={`${t.rest ? 'mt-2' : ''} space-y-0.5`}>{rev.pros.map((x, i) => <li key={i} className={`flex gap-1.5 ${P}`}><span className="text-[#81B64C]">+</span>{x}</li>)}</ul>
-          )}
-          {!!rev.cons?.length && (
-            <ul className="mt-1.5 space-y-0.5">{rev.cons.map((x, i) => <li key={i} className={`flex gap-1.5 ${P}`}><span className="text-[#F0605D]">−</span>{x}</li>)}</ul>
-          )}
+          <div className={`${t.rest ? 'mt-2' : ''} grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-3`}>
+            <div className="min-w-0">
+              {!!rev.pros?.length && (
+                <ul className="space-y-0.5">{rev.pros.map((x, i) => <li key={i} className={`flex gap-1.5 ${P}`}><span className="text-[#81B64C]">+</span>{x}</li>)}</ul>
+              )}
+              {!!rev.cons?.length && (
+                <ul className="mt-1.5 space-y-0.5">{rev.cons.map((x, i) => <li key={i} className={`flex gap-1.5 ${P}`}><span className="text-[#F0605D]">−</span>{x}</li>)}</ul>
+              )}
+            </div>
+            {/* the two sides weighed up in plain English */}
+            {take && <p className={`min-w-0 border-l border-white/15 pl-3 ${P}`}>{take}</p>}
+          </div>
         </>
       );
     }
