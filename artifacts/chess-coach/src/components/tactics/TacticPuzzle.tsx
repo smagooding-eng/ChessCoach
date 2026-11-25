@@ -13,8 +13,10 @@ type Mode = 'guided' | 'drill' | 'speed' | 'kids';
 
 const uciMove = (c: Chess, uci: string) => { try { return c.move({ from: uci.slice(0, 2), to: uci.slice(2, 4), promotion: uci[4] as 'q' | 'r' | 'b' | 'n' | undefined }); } catch { return null; } };
 
-export function TacticPuzzle({ puzzle, mode, onDone, onNext, nextLabel = 'Next' }: {
+export function TacticPuzzle({ puzzle, mode, onDone, onNext, nextLabel = 'Next', wide = false }: {
   puzzle: TacticPuzzleData; mode: Mode;
+  /** desktop: board on the left, the rest in a side panel (only where the page is wide) */
+  wide?: boolean;
   /** Called once: solved or not, and how long it took. */
   onDone: (solved: boolean, timeMs: number) => void;
   /** Shown after the puzzle ends (not in speed rounds, which move on by themselves). */
@@ -98,7 +100,7 @@ export function TacticPuzzle({ puzzle, mode, onDone, onNext, nextLabel = 'Next' 
   const toMove = new Chess(fen).turn();
 
   return (
-    <div className="space-y-2">
+    <div className={`${wide ? 'cs-split ' : ''}space-y-2`}>
       <div className="flex items-center justify-between gap-2 text-[13px] font-bold" style={{ color: PT.text }}>
         <span className="flex items-center gap-2">
           <span className="h-3 w-3 rounded-full" style={{ background: myColor.current === 'w' ? '#F5F5F0' : '#1A1A19', border: '1px solid rgba(255,255,255,.4)' }} />
@@ -108,8 +110,8 @@ export function TacticPuzzle({ puzzle, mode, onDone, onNext, nextLabel = 'Next' 
         </span>
         {mode !== 'speed' && <span style={{ color: PT.muted }}>{puzzle.rating}</span>}
       </div>
-      <ChessBoard key={`${puzzle.id}-${nonce}`} fen={fen} flipped={myColor.current === 'b'} practiceMode={ready && status === 'play' && toMove === myColor.current}
-        expectedMoveSan={expected?.san ?? null} onMovePlayed={(san) => onMove(san)} lastMove={last} arrows={arrow} maxWidthOverride="100%" suppressConfirmMoves />
+      <div className="cs-split-main"><ChessBoard key={`${puzzle.id}-${nonce}`} fen={fen} flipped={myColor.current === 'b'} practiceMode={ready && status === 'play' && toMove === myColor.current}
+        expectedMoveSan={expected?.san ?? null} onMovePlayed={(san) => onMove(san)} lastMove={last} arrows={arrow} maxWidthOverride="100%" suppressConfirmMoves /></div>
       {mode !== 'speed' && (
         <div className="flex flex-wrap items-center gap-2">
           {status === 'play' && mode !== 'guided' && (

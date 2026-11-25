@@ -701,3 +701,4 @@ html.cs-photo :not(.cs-photo-backdrop-img):not(.cs-keep-img):is([style*="chesssc
   /* in the desktop split the board can use the full height (the side panel takes the rest) */
   .cs-split-main .cs-board-fit { max-width: min(var(--board-max, 100%), max(320px, calc(100dvh - 200px))) !important; }
 }
+@media (min-width: 640px) { .cs-cta.cs-cta-fit { width: auto; padding: 0 1.75rem; } }

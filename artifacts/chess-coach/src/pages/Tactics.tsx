@@ -229,11 +229,11 @@ function PuzzleRun({ m, mode, puzzles, onFinish, recordAs }: { m: Motif; mode: '
   const p = puzzles[k];
   if (!p) return null;
   return (
-    <div className="mx-auto max-w-[520px] space-y-2">
+    <div className="mx-auto max-w-[520px] space-y-2 lg:max-w-none">
       <div className="flex items-center gap-1">
         {puzzles.map((_, j) => <span key={j} className="h-1.5 flex-1 rounded-full" style={{ background: j < k ? RD.green : j === k ? 'rgba(129,182,76,.5)' : 'rgba(255,255,255,.1)' }} />)}
       </div>
-      <TacticPuzzle key={p.id} puzzle={p} mode={mode}
+      <TacticPuzzle key={p.id} puzzle={p} mode={mode} wide
         onDone={(ok, ms) => { if (ok) setScore((s) => s + 1); if (recordAs !== '') record(recordAs ?? m.id, p.id, ok, ms); else if (ok) pathEvent('tactic', m.id); }}
         nextLabel={k + 1 < puzzles.length ? 'Next' : 'Finish'}
         onNext={() => { if (k + 1 < puzzles.length) setK(k + 1); else onFinish(score, puzzles.length); }} />
@@ -338,7 +338,7 @@ export function TacticMotif() {
   const TABS: [Tab, string][] = [['learn', 'See it'], ['guided', 'Guided'], ['drill', isDue(p) ? 'Review' : 'Drill'], ['speed', 'Speed']];
   return (
     <div className="min-h-screen px-3 pb-[calc(7.5rem+env(safe-area-inset-bottom))] pt-3 md:px-6 md:pt-6" style={{ background: RD.bg, color: RD.text }}>
-      <div className="mx-auto max-w-[900px] space-y-3">
+      <div className="mx-auto max-w-[900px] space-y-3 lg:max-w-[1180px]">
         <Link href={back} className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[13px] font-bold" style={{ background: 'rgba(255,255,255,.06)' }}><ArrowLeft size={15} />{inEndgames ? 'Endgames' : 'Tactics'}</Link>
         <div className="flex items-start justify-between gap-3">
           <div>

@@ -37,8 +37,8 @@ export function CoachTake({ icon, eyebrow = "Coach's take", headline, detail, ac
   icon: string; eyebrow?: string; headline: string; detail?: string; action?: string; href?: string; onAction?: () => void; board?: React.ReactNode;
 }) {
   const btn = action ? (href
-    ? <Link href={href} className="cs-cta mt-4 inline-flex w-full items-center justify-center gap-1.5 sm:w-auto sm:px-6">{action} <ChevronRight size={17} /></Link>
-    : <button onClick={onAction} className="cs-cta mt-4 inline-flex w-full items-center justify-center gap-1.5 sm:w-auto sm:px-6">{action} <ChevronRight size={17} /></button>) : null;
+    ? <Link href={href} className="cs-cta cs-cta-fit mt-4 inline-flex items-center justify-center gap-1.5">{action} <ChevronRight size={17} /></Link>
+    : <button onClick={onAction} className="cs-cta cs-cta-fit mt-4 inline-flex items-center justify-center gap-1.5">{action} <ChevronRight size={17} /></button>) : null;
   return (
     <section className="rounded-[22px] p-5" style={{ background: `linear-gradient(180deg, ${K.card2}, ${K.card})`, border: `1px solid ${K.line}`, borderTop: `2px solid ${K.gold}` }}>
       <div className="flex items-start gap-4">
