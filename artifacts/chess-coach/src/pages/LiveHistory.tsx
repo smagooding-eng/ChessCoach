@@ -13,13 +13,21 @@ const RED = '#dc4343';
 const TEXT_MUTED = '#9e9b98';
 
 const TC_META: Record<LiveHistoryGame['timeControl'], { label: string; sub: string; icon: React.ComponentType<{ className?: string }> }> = {
-  blitz_5_0:  { label: '5 min',  sub: 'Blitz', icon: Zap },
-  blitz_5_3:  { label: '5 | 3',  sub: 'Blitz', icon: Zap },
+  bullet_1_0: { label: '1 min', sub: 'Bullet', icon: Zap },
+  bullet_2_1: { label: '2 | 1', sub: 'Bullet', icon: Zap },
+  blitz_3_0: { label: '3 min', sub: 'Blitz', icon: Zap },
+  blitz_3_2: { label: '3 | 2', sub: 'Blitz', icon: Zap },
+  blitz_5_0: { label: '5 min', sub: 'Blitz', icon: Zap },
+  blitz_5_3: { label: '5 | 3', sub: 'Blitz', icon: Zap },
   rapid_10_0: { label: '10 min', sub: 'Rapid', icon: Clock },
+  rapid_10_5: { label: '10 | 5', sub: 'Rapid', icon: Clock },
   rapid_15_0: { label: '15 min', sub: 'Rapid', icon: Clock },
+  rapid_15_10: { label: '15 | 10', sub: 'Rapid', icon: Clock },
+  classical_30_0: { label: '30 min', sub: 'Classical', icon: Clock },
+  classical_30_20: { label: '30 | 20', sub: 'Classical', icon: Clock },
 };
 
-const TC_ORDER: LiveHistoryGame['timeControl'][] = ['blitz_5_0', 'blitz_5_3', 'rapid_10_0', 'rapid_15_0'];
+const TC_ORDER: LiveHistoryGame['timeControl'][] = ['bullet_1_0', 'bullet_2_1', 'blitz_3_0', 'blitz_3_2', 'blitz_5_0', 'blitz_5_3', 'rapid_10_0', 'rapid_10_5', 'rapid_15_0', 'rapid_15_10', 'classical_30_0', 'classical_30_20'];
 
 function RatingChart({ points, width = 320, height = 120 }: { points: { rating: number; finishedAt: string }[]; width?: number; height?: number }) {
   if (points.length < 1) return null;
@@ -187,10 +195,18 @@ function FrequentOpponents({ games }: { games: LiveHistoryGame[] }) {
 
   const tcOptions: { id: TcFilter; label: string }[] = [
     { id: 'all', label: 'All' },
+    { id: 'bullet_1_0', label: '1 min' },
+    { id: 'bullet_2_1', label: '2 | 1' },
+    { id: 'blitz_3_0', label: '3 min' },
+    { id: 'blitz_3_2', label: '3 | 2' },
     { id: 'blitz_5_0', label: '5 min' },
     { id: 'blitz_5_3', label: '5 | 3' },
     { id: 'rapid_10_0', label: '10 min' },
+    { id: 'rapid_10_5', label: '10 | 5' },
     { id: 'rapid_15_0', label: '15 min' },
+    { id: 'rapid_15_10', label: '15 | 10' },
+    { id: 'classical_30_0', label: '30 min' },
+    { id: 'classical_30_20', label: '30 | 20' },
   ];
 
   return (
@@ -339,10 +355,18 @@ export function LiveHistory() {
 
   const listTcOptions: { id: TcFilter; label: string }[] = [
     { id: 'all', label: 'All' },
+    { id: 'bullet_1_0', label: '1+0' },
+    { id: 'bullet_2_1', label: '2+1' },
+    { id: 'blitz_3_0', label: '3+0' },
+    { id: 'blitz_3_2', label: '3+2' },
     { id: 'blitz_5_0', label: '5+0' },
     { id: 'blitz_5_3', label: '5+3' },
     { id: 'rapid_10_0', label: '10+0' },
+    { id: 'rapid_10_5', label: '10+5' },
     { id: 'rapid_15_0', label: '15+0' },
+    { id: 'rapid_15_10', label: '15+10' },
+    { id: 'classical_30_0', label: '30+0' },
+    { id: 'classical_30_20', label: '30+20' },
   ];
   const listModeOptions: { id: ModeFilter; label: string }[] = [
     { id: 'all', label: 'All' },
@@ -353,7 +377,7 @@ export function LiveHistory() {
   // Build chronological rating progression per time control (rankedonly + ratingAfter present)
   const seriesByTc = useMemo(() => {
     const out: Record<string, { rating: number; finishedAt: string }[]> = {
-      blitz_5_0: [], blitz_5_3: [], rapid_10_0: [], rapid_15_0: [],
+      bullet_1_0: [], bullet_2_1: [], blitz_3_0: [], blitz_3_2: [], blitz_5_0: [], blitz_5_3: [], rapid_10_0: [], rapid_10_5: [], rapid_15_0: [], rapid_15_10: [], classical_30_0: [], classical_30_20: [],
     };
     // games come back DESC by finishedAt; reverse to get chronological order
     for (const g of [...games].reverse()) {
@@ -365,10 +389,18 @@ export function LiveHistory() {
 
   const summary = useMemo(() => {
     const out: Record<string, { w: number; l: number; d: number }> = {
+      bullet_1_0: { w: 0, l: 0, d: 0 },
+      bullet_2_1: { w: 0, l: 0, d: 0 },
+      blitz_3_0: { w: 0, l: 0, d: 0 },
+      blitz_3_2: { w: 0, l: 0, d: 0 },
       blitz_5_0: { w: 0, l: 0, d: 0 },
       blitz_5_3: { w: 0, l: 0, d: 0 },
       rapid_10_0: { w: 0, l: 0, d: 0 },
+      rapid_10_5: { w: 0, l: 0, d: 0 },
       rapid_15_0: { w: 0, l: 0, d: 0 },
+      rapid_15_10: { w: 0, l: 0, d: 0 },
+      classical_30_0: { w: 0, l: 0, d: 0 },
+      classical_30_20: { w: 0, l: 0, d: 0 },
     };
     for (const g of games) {
       const s = out[g.timeControl];

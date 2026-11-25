@@ -20,20 +20,24 @@ import { eq, and } from 'drizzle-orm';
 import { notifyUser } from './notify';
 import { announceSeek } from './seekBroadcast';
 
-export type TimeControlId = 'blitz_5_0' | 'blitz_5_3' | 'rapid_10_0' | 'rapid_15_0';
+export type TimeControlId = 'bullet_1_0' | 'bullet_2_1' | 'blitz_3_0' | 'blitz_3_2' | 'blitz_5_0' | 'blitz_5_3' | 'rapid_10_0' | 'rapid_10_5' | 'rapid_15_0' | 'rapid_15_10' | 'classical_30_0' | 'classical_30_20';
 export type Mode = 'casual' | 'ranked';
 
 interface TimeControlSpec { id: TimeControlId; initialMs: number; incrementMs: number; label: string; }
+// Every Lichess quick-pairing clock (so a search can be handed to Lichess's matching pool), plus 15+0.
 const TIME_CONTROLS: Record<TimeControlId, TimeControlSpec> = {
-  blitz_5_0:  { id: 'blitz_5_0',  initialMs: 5 * 60 * 1000, incrementMs: 0,        label: '5 min' },
-  blitz_5_3:  { id: 'blitz_5_3',  initialMs: 5 * 60 * 1000, incrementMs: 3 * 1000, label: '5 | 3' },
-  rapid_10_0: { id: 'rapid_10_0', initialMs: 10 * 60 * 1000,incrementMs: 0,        label: '10 min' },
-  // Same live-clock model as the three above (continuous WebSocket
-  // connection, clock ticks the whole game) -- this is NOT the 1/3/7-day
-  // correspondence formats, which need a fundamentally different
-  // turn-based game model (clock only runs on your turn, no persistent
-  // connection expected between moves) and aren't part of this change.
-  rapid_15_0: { id: 'rapid_15_0', initialMs: 15 * 60 * 1000,incrementMs: 0,        label: '15 min' },
+  bullet_1_0: { id: 'bullet_1_0', initialMs: 1 * 60 * 1000, incrementMs: 0 * 1000, label: '1 min' },
+  bullet_2_1: { id: 'bullet_2_1', initialMs: 2 * 60 * 1000, incrementMs: 1 * 1000, label: '2 | 1' },
+  blitz_3_0: { id: 'blitz_3_0', initialMs: 3 * 60 * 1000, incrementMs: 0 * 1000, label: '3 min' },
+  blitz_3_2: { id: 'blitz_3_2', initialMs: 3 * 60 * 1000, incrementMs: 2 * 1000, label: '3 | 2' },
+  blitz_5_0: { id: 'blitz_5_0', initialMs: 5 * 60 * 1000, incrementMs: 0 * 1000, label: '5 min' },
+  blitz_5_3: { id: 'blitz_5_3', initialMs: 5 * 60 * 1000, incrementMs: 3 * 1000, label: '5 | 3' },
+  rapid_10_0: { id: 'rapid_10_0', initialMs: 10 * 60 * 1000, incrementMs: 0 * 1000, label: '10 min' },
+  rapid_10_5: { id: 'rapid_10_5', initialMs: 10 * 60 * 1000, incrementMs: 5 * 1000, label: '10 | 5' },
+  rapid_15_0: { id: 'rapid_15_0', initialMs: 15 * 60 * 1000, incrementMs: 0 * 1000, label: '15 min' },
+  rapid_15_10: { id: 'rapid_15_10', initialMs: 15 * 60 * 1000, incrementMs: 10 * 1000, label: '15 | 10' },
+  classical_30_0: { id: 'classical_30_0', initialMs: 30 * 60 * 1000, incrementMs: 0 * 1000, label: '30 min' },
+  classical_30_20: { id: 'classical_30_20', initialMs: 30 * 60 * 1000, incrementMs: 20 * 1000, label: '30 | 20' },
 };
 
 // No automatic bot: after this long in the queue the client offers a clearly

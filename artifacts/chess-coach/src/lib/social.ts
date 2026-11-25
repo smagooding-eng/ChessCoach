@@ -91,10 +91,18 @@ export function useSocialUnread(): { messages: number; requests: number; total: 
 }
 
 export const LIVE_TCS = [
+  { id: 'bullet_1_0', label: '1 min' },
+  { id: 'bullet_2_1', label: '2 | 1' },
+  { id: 'blitz_3_0', label: '3 min' },
+  { id: 'blitz_3_2', label: '3 | 2' },
   { id: 'blitz_5_0', label: '5 min' },
   { id: 'blitz_5_3', label: '5 | 3' },
   { id: 'rapid_10_0', label: '10 min' },
+  { id: 'rapid_10_5', label: '10 | 5' },
   { id: 'rapid_15_0', label: '15 min' },
+  { id: 'rapid_15_10', label: '15 | 10' },
+  { id: 'classical_30_0', label: '30 min' },
+  { id: 'classical_30_20', label: '30 | 20' },
 ];
 
 export function timeAgo(iso: string): string {
