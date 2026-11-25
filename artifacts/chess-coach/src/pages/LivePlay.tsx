@@ -140,6 +140,14 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
   const handedOff = useRef(false);
   const liSearch = useRef<AbortController | null>(null);
   const [liSearching, setLiSearching] = useState(false);
+  // Rated on Lichess joins its quick-pairing pool (games in seconds); casual waits in the open
+  // lobby, where few people take 10-minute casual games. Each member picks; rated by default.
+  const [liRated, setLiRated] = useState<boolean>(() => { try { return localStorage.getItem('cs_lichess_rated') !== '0'; } catch { return true; } });
+  const pickLiRated = (v: boolean) => {
+    try { localStorage.setItem('cs_lichess_rated', v ? '1' : '0'); } catch { /* */ }
+    liSearch.current?.abort(); liSearch.current = null; setLiSearching(false); handedOff.current = false;
+    setLiRated(v);
+  };
   const statusRef = useRef(live.status); statusRef.current = live.status;
   const stopLichessSearch = () => { liSearch.current?.abort(); liSearch.current = null; setLiSearching(false); };
   const waitedSoFar = live.queuedAt ? now - live.queuedAt : 0;
@@ -160,10 +168,10 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
       live.noteOnLichess();
       navigate(`/lichess?game=${e.game.gameId}&from=live`);
     }, ac.signal).catch(() => {});
-    void lichessSeek({ minutes: m, increment: inc, rated: live.queuedMode === 'ranked' }, ac.signal)
+    void lichessSeek({ minutes: m, increment: inc, rated: liRated || live.queuedMode === 'ranked' }, ac.signal)
       .then((code) => { if (!ac.signal.aborted && code >= 400) setLiSearching(false); })
       .catch(() => { if (!ac.signal.aborted) setLiSearching(false); });
-  }, [live.status, waitedSoFar, lichess, lichessClock]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [live.status, waitedSoFar, lichess, lichessClock, liRated]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => liSearch.current?.abort(), []);
 
   // /live?seek=USER -- tapped "<name> is looking for a game".
@@ -324,6 +332,12 @@ export function LivePlay({ initialTab }: { initialTab?: OnlineTab } = {}) {
               <p className="text-[12px] mt-1" style={{ color: PT.muted }}>
                 {liSearching ? 'Searching ChessScout and Lichess. Your game opens the moment someone is found.' : lichess && !lichessClock ? "Lichess doesn't allow blitz from other apps, so this searches ChessScout only." : "We've let players with notifications on know you're looking."}
               </p>
+              {lichess && lichessClock && live.queuedMode !== 'ranked' && (
+                <div className="mx-auto mt-3 inline-grid grid-cols-2 gap-1 rounded-[12px] p-1 text-[12px] font-bold" style={{ background: 'rgba(255,255,255,.06)' }}>
+                  <button onClick={() => pickLiRated(true)} className="rounded-[9px] px-3 py-1.5" style={liRated ? { background: PT.green, color: '#fff' } : { color: PT.muted }}>Rated on Lichess · fastest</button>
+                  <button onClick={() => pickLiRated(false)} className="rounded-[9px] px-3 py-1.5" style={!liRated ? { background: PT.green, color: '#fff' } : { color: PT.muted }}>Casual · slower</button>
+                </div>
+              )}
             </div>
             <button onClick={() => { trackPlay('cancelled'); live.cancel(); }} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm" style={ghostBtn}>
               <X className="w-4 h-4" /> Cancel
