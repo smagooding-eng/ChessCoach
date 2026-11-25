@@ -47,9 +47,31 @@ jobs:
         run: |
           mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i playwright@1.47.2 >/dev/null
           npx playwright install --with-deps chromium
+      - name: Sign in for this run
+        # A short-lived login for the admin account with the most games, made in the database just
+        # for this run and deleted at the end, so signed-in pages never depend on an expiring token.
+        env: { RK: "${{ secrets.RENDER_API_KEY }}" }
+        run: |
+          [ -n "$RK" ] || { echo "No RENDER_API_KEY: signed-in pages use the saved token."; exit 0; }
+          H=(-H "Authorization: Bearer $RK" -H "Accept: application/json")
+          SID=$(curl -fsS "${H[@]}" "https://api.render.com/v1/services?name=chesscoach-api&limit=1" | jq -r '.[0].service.id')
+          DB=$(curl -fsS "${H[@]}" "https://api.render.com/v1/services/$SID/env-vars?limit=100" | jq -r '.[].envVar | select(.key=="DATABASE_URL") | .value')
+          if [ -z "$DB" ]; then
+            for G in $(curl -fsS "${H[@]}" "https://api.render.com/v1/env-groups?limit=100" | jq -r --arg s "$SID" '.[] | (.envGroup // .) | select([.serviceLinks[]?.id] | index($s)) | .id'); do
+              DB=$(curl -fsS "${H[@]}" "https://api.render.com/v1/env-groups/$G" | jq -r '.envVars[]? | select(.key=="DATABASE_URL") | .value'); [ -n "$DB" ] && break
+            done
+          fi
+          [ -n "$DB" ] || { echo "Couldn't find the database address."; exit 0; }
+          echo "::add-mask::$DB"
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+          T=$(openssl rand -hex 32); echo "::add-mask::$T"
+          # the session is a copy of the admin's own user row (same fields the app stores at sign-in)
+          psql "$DB" -qtA -v ON_ERROR_STOP=1 -c "INSERT INTO sessions (sid, sess, expire) SELECT '$T', json_build_object('user', (to_jsonb(json_build_object('id', u.id, 'firstName', u.first_name, 'lastName', u.last_name, 'profileImageUrl', u.profile_image_url, 'chesscomUsername', u.chesscom_username, 'lichessUsername', u.lichess_username, 'scoutUsername', u.scout_username, 'isAdmin', true, 'inviteCode', u.invite_code, 'emailVerified', true)) || jsonb_build_object('email', u.email))), now() + interval '2 hours' FROM users u WHERE u.is_admin = true ORDER BY (SELECT count(*) FROM games g WHERE g.user_id = u.id) DESC LIMIT 1" >/dev/null
+          { echo "DESKTOP_SHOT_TOKEN=$T"; echo "SHOT_DB=$DB"; } >> "$GITHUB_ENV"
+          echo "Signed in for this run."
       - name: Take screenshots
         env:
-          DESKTOP_SHOT_TOKEN: ${{ secrets.DESKTOP_SHOT_TOKEN }}
+          DESKTOP_SHOT_TOKEN: ${{ env.DESKTOP_SHOT_TOKEN || secrets.DESKTOP_SHOT_TOKEN }}
           SIGNED_IN_ONLY: ${{ github.event.inputs.signed_in_only }}
           ONLY_PAGES: ${{ github.event.inputs.only_pages }}
           SITE: ${{ github.event.inputs.site || 'https://chessscout.net' }}
@@ -61,6 +83,10 @@ jobs:
             cp scripts/desktop-shots.mjs /tmp/pw/desktop-shots.mjs
             cd /tmp/pw && OUT=/tmp/shots node desktop-shots.mjs
           fi
+      - name: Sign out
+        if: always()
+        run: |
+          [ -n "$SHOT_DB" ] && [ -n "$DESKTOP_SHOT_TOKEN" ] && psql "$SHOT_DB" -qtA -c "DELETE FROM sessions WHERE sid = '$DESKTOP_SHOT_TOKEN'" >/dev/null && echo "Signed out." || true
       - name: Encrypt and push
         run: |
           cd /tmp
