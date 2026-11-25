@@ -54,7 +54,7 @@ export function SeekGoneCard({ seek, kind, onClose, reason, onPlayNow }: { seek:
         // one screen now), and "any clock" (Play anyone) or a missing one is 10 minutes.
         body: JSON.stringify(((): Record<string, string> => {
           const daily = seek.tc.startsWith('corr_');
-          const tc = daily || ['blitz_5_0', 'blitz_5_3', 'rapid_10_0', 'rapid_15_0'].includes(seek.tc) ? seek.tc : 'rapid_10_0';
+          const tc = daily || ['bullet_1_0', 'bullet_2_1', 'blitz_3_0', 'blitz_3_2', 'blitz_5_0', 'blitz_5_3', 'rapid_10_0', 'rapid_10_5', 'rapid_15_0', 'rapid_15_10', 'classical_30_0', 'classical_30_20'].includes(seek.tc) ? seek.tc : 'rapid_10_0';
           return { kind: daily ? 'daily' : kind === 'daily' && !seek.tc ? 'daily' : 'live', timeControl: kind === 'daily' && !seek.tc ? 'corr_1d' : tc, mode: seek.mode, targetUserId: seek.seekerId };
         })()),
       });

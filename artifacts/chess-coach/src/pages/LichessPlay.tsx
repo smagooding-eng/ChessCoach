@@ -306,7 +306,9 @@ export function LichessPlay() {
   // (the game opens straight on the board, whichever finds someone first).
   const newGame = () => {
     const mins = full?.clock ? Math.round(full.clock.initial / 60000) : 10;
-    const tc = mins >= 15 ? 'rapid_15_0' : 'rapid_10_0';
+    const inc = full?.clock ? Math.round(full.clock.increment / 1000) : 0;
+    const same: Record<string, string> = { '10+0': 'rapid_10_0', '10+5': 'rapid_10_5', '15+0': 'rapid_15_0', '15+10': 'rapid_15_10', '30+0': 'classical_30_0', '30+20': 'classical_30_20' };
+    const tc = same[`${mins}+${inc}`] ?? (mins >= 15 ? 'rapid_15_0' : 'rapid_10_0');
     navigate(`/live?play=${tc}&mode=${full?.rated ? 'ranked' : 'casual'}`);
   };
 

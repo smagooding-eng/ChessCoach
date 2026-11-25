@@ -22,10 +22,18 @@ import { useSocialUnread } from '@/lib/social';
 import { useChallengeInbox, ChallengesPanel, OpenLinksCard, createOpenLink } from '@/components/play/OpenChallenges';
 
 const TC_OPTIONS = [
-  { id: 'blitz_5_0',  label: '5 min',  sub: 'Blitz', icon: Zap },
-  { id: 'blitz_5_3',  label: '5 | 3',  sub: 'Blitz', icon: Zap },
+  { id: 'bullet_1_0', label: '1 min', sub: 'Bullet', icon: Zap },
+  { id: 'bullet_2_1', label: '2 | 1', sub: 'Bullet', icon: Zap },
+  { id: 'blitz_3_0', label: '3 min', sub: 'Blitz', icon: Zap },
+  { id: 'blitz_3_2', label: '3 | 2', sub: 'Blitz', icon: Zap },
+  { id: 'blitz_5_0', label: '5 min', sub: 'Blitz', icon: Zap },
+  { id: 'blitz_5_3', label: '5 | 3', sub: 'Blitz', icon: Zap },
   { id: 'rapid_10_0', label: '10 min', sub: 'Rapid', icon: Clock },
+  { id: 'rapid_10_5', label: '10 | 5', sub: 'Rapid', icon: Clock },
   { id: 'rapid_15_0', label: '15 min', sub: 'Rapid', icon: Clock },
+  { id: 'rapid_15_10', label: '15 | 10', sub: 'Rapid', icon: Clock },
+  { id: 'classical_30_0', label: '30 min', sub: 'Classical', icon: Clock },
+  { id: 'classical_30_20', label: '30 | 20', sub: 'Classical', icon: Clock },
 ];
 const DAILY_OPTIONS = [
   { id: 'corr_1d', label: '1 day' }, { id: 'corr_3d', label: '3 days' }, { id: 'corr_7d', label: '7 days' },
@@ -35,7 +43,8 @@ type Hosted = { code: string; url: string; label: string };
 
 // Nobody on ChessScout: the clocks Lichess lets apps play (10 minutes and up), and
 // how long to look here first before handing over to a real Lichess game.
-const LICHESS_CLOCK: Record<string, string> = { rapid_10_0: '10+0', rapid_15_0: '15+0', any: '10+0' };
+// (Lichess lets outside apps play 10 minutes and up; these match its quick-pairing pools, except 15+0)
+const LICHESS_CLOCK: Record<string, string> = { rapid_10_0: '10+0', rapid_10_5: '10+5', rapid_15_0: '15+0', rapid_15_10: '15+10', classical_30_0: '30+0', classical_30_20: '30+20', any: '10+0' };
 // With Lichess connected (10 and 15 min only: Lichess doesn't allow outside apps to play blitz) the
 // app searches ChessScout and Lichess together from the start; a bot comes only after 90 s.
 // Without Lichess, a bot comes after 30 s (45 s when other ChessScout players are on Play).
