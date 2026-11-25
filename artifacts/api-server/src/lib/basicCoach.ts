@@ -680,7 +680,8 @@ export function basicExplanation(i: BasicCoachInput): string {
 /**
  * Saved engine-only reviews: rewrite each move's explanation with the free
  * coach when the review is read, so games reviewed before it existed get the
- * same plain-language text. AI-coached reviews are returned untouched.
+ * same plain-language text. AI-coached reviews get the Pro coach card's points
+ * and take instead (their explanation is kept).
  */
 /**
  * Saved reviews: mark the opening moves that are in the opening book as
@@ -705,7 +706,7 @@ export function markBookMoves(moves: unknown): unknown {
 }
 
 export function refreshBasicReview(moves: unknown, aiCoach: boolean, openingName: string | null = null): unknown {
-  if (aiCoach || !Array.isArray(moves)) return moves;
+  if (!Array.isArray(moves)) return moves;
   type M = { fen?: string; san?: string; color?: "white" | "black"; classification?: string; evalAfterCp?: number; betterMove?: string | null; explanation?: string; pros?: string[]; cons?: string[]; moveIndex?: number; bestLineSan?: string[]; replyLineSan?: string[] };
   const all = moves as M[];
   const GOOD = new Set(["best", "brilliant", "great", "excellent", "checkmate"]);
@@ -719,7 +720,7 @@ export function refreshBasicReview(moves: unknown, aiCoach: boolean, openingName
       const prev = all[i - 1];
       const next = all[i + 1];
       const replySan = next ? (next.classification && GOOD.has(next.classification) ? next.san ?? null : clean(next.betterMove)) : null;
-      const text = basicExplanation({
+      const input: BasicCoachInput = {
         fenBefore: m.fen, fenAfter: c.fen(), san: m.san, classification: m.classification, playerColor: m.color,
         moveIndex: typeof m.moveIndex === "number" ? m.moveIndex : i,
         cpBefore: i === 0 ? 20 : typeof prev?.evalAfterCp === "number" ? prev.evalAfterCp : m.evalAfterCp,
@@ -727,7 +728,16 @@ export function refreshBasicReview(moves: unknown, aiCoach: boolean, openingName
         prevClassification: prev?.classification ?? null,
         prevSan: prev?.san ?? null,
         bestLine: m.bestLineSan ?? null, replyLine: m.replyLineSan ?? null, openingName,
-      });
+      };
+      // Pro (AI-coached) reviews keep the coach's explanation; the card's points and
+      // take are worked out from the position, so they're specific and never generic.
+      if (aiCoach) {
+        const notes = proCoachNotes(input);
+        if (!notes) return m;
+        const own = notes.pros.length > 0 || notes.cons.length > 0;
+        return { ...m, ...(own ? { pros: notes.pros, cons: notes.cons } : {}), ...(notes.take ? { coachTake: notes.take } : {}) };
+      }
+      const text = basicExplanation(input);
       return text ? { ...m, explanation: text, pros: [], cons: [] } : m;
     } catch { return m; }
   });
@@ -758,4 +768,214 @@ export function contentTags(fenBefore: string, san: string, color: "white" | "bl
   if (VAL[m.piece] >= 3 && hanging(c, me).some((h) => h.sq === m.to) && (!m.captured || VAL[m.captured] < VAL[m.piece])) out.add("sacrifice");
   if (nonPawnMaterial(c) <= 14) out.add("endgame");
   return [...out];
+}
+
+// ── Pro coach card ───────────────────────────────────────────────────────
+// The points beside the board and a short take that talks to the player:
+// what this move actually did (with squares), what they didn't see, what it
+// costs, the better move and why, and one habit to take away. All read off
+// the board and the engine's lines, so nothing generic and nothing made up.
+export interface ProCoachNotes { pros: string[]; cons: string[]; take: string }
+
+const capFirst = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const lcFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+const noStop = (s: string) => s.trim().replace(/[.!]+$/, "");
+const andList = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
+const TAG_VERB: Record<string, string> = { taking: "takes", winning: "wins", recapturing: "recaptures", forking: "forks", pinning: "pins", skewering: "skewers", getting: "gets", protecting: "protects" };
+function tagVerb(t: string): string {
+  if (t === "with check") return "gives check";
+  if (t === "with a discovered check") return "gives a discovered check";
+  const w = t.split(" ")[0];
+  return TAG_VERB[w] ? `${TAG_VERB[w]}${t.slice(w.length)}` : t;
+}
+/** "the bishop on c8" -> "your bishop on c8" / "their pawn on e4", read off the board. */
+function personal(s: string, c: Chess, me: Color): string {
+  return s.replace(/\bthe (pawn|knight|bishop|rook|queen|king) on ([a-h][1-8])\b/g, (all, _p: string, at: string) => {
+    const p = c.get(at as Square);
+    if (!p) return all;
+    return p.color === me ? all.replace(/^the/, "your") : all.replace(/^the/, "their");
+  });
+}
+
+/** What a move does, as short third-person phrases ("opens the diagonal for your bishop on c8"). */
+function moveDoes(fenBefore: string, san: string, me: Color, moveIndex: number, prevSan?: string | null): string[] {
+  const r = apply(fenBefore, san);
+  const before = load(fenBefore);
+  if (!r || !before) return [];
+  const { c, m } = r;
+  if (c.isCheckmate()) return ["is checkmate"];
+  const opening = moveIndex < 20;
+  const endgame = nonPawnMaterial(c) <= 14;
+  const out: string[] = [];
+  const add = (raw: string) => {
+    const x = raw.split(":")[0].replace(/, gaining time$/, "").trim();
+    const k = x.split(" ").slice(0, 3).join(" ");
+    const sqs = x.match(/[a-h][1-8]/g) ?? [];
+    if (out.some((o) => o.split(" ").slice(0, 3).join(" ") === k || sqs.some((q) => o.includes(q)))) return;
+    out.push(x);
+  };
+  for (const t of motifs(fenBefore, san, me, prevSan).tags.slice(0, 2)) add(tagVerb(t));
+  if (m.flags.includes("k") || m.flags.includes("q")) add("castles your king to safety");
+  if (m.promotion) add(`promotes to a ${NAME[m.promotion]}`);
+  if (!m.captured) {
+    for (const s of quietIdeas(before, c, m, me, opening, endgame, fenBefore + san)) {
+      if (/^(This|Its|The|An?)\b/.test(s) || !/^[A-Z][a-z]+s\b/.test(s)) continue;
+      add(lcFirst(noStop(s)).replace(/ with the pawn$/, ""));
+    }
+  }
+  // A pawn that hits an enemy pawn: a central break.
+  if (m.piece === "p" && !m.captured) {
+    const dir = me === "w" ? 1 : -1, f = FILES.indexOf(m.to[0]), r0 = parseInt(m.to[1]) - 1 + dir;
+    for (const df of [-1, 1]) {
+      if (f + df < 0 || f + df > 7 || r0 < 0 || r0 > 7) continue;
+      const p = c.get(sq(f + df, r0));
+      if (p && p.color !== me && p.type === "p" && "cdef".includes(sq(f + df, r0)[0])) { add(`challenges the pawn on ${sq(f + df, r0)}`); break; }
+    }
+    if (opening && ["d4", "e4", "d5", "e5"].includes(m.to)) add("fights for the center");
+  }
+  if (opening && (m.piece === "n" || m.piece === "b") && rel(m.from, me) === 1 && !out.some((o) => o.startsWith("develops"))) add(`develops the ${NAME[m.piece]}`);
+  return out.slice(0, 3).map((x) => personal(x, c, me));
+}
+
+/** What a move costs, as short third-person phrases, plus the habit that would have caught it. */
+function moveCosts(i: BasicCoachInput, me: Color): { costs: string[]; lesson: string | null } {
+  const them = other(me);
+  const pov = (cp: number) => (me === "w" ? cp : -cp);
+  const played = apply(i.fenBefore, i.san);
+  const before = load(i.fenBefore);
+  if (!played || !before) return { costs: [], lesson: null };
+  const { c: after, m } = played;
+  const opening = i.moveIndex < 20;
+  const costs: string[] = [];
+  let lesson: string | null = null;
+  const reply = apply(i.fenAfter, i.replySan);
+  if (pov(i.cpAfter) <= -9000 && pov(i.cpBefore) > -9000) {
+    costs.push(i.replySan ? `allows a forced checkmate, starting with ${i.replySan}` : "allows a forced checkmate");
+    lesson = "Before every move, check what checks your opponent has.";
+  }
+  const hung = hanging(after, me).filter((h) => VAL[h.type] >= 3 && (h.sq === m.to || !hanging(before, me).some((x) => x.sq === h.sq)));
+  const tradeEven = m.captured && VAL[m.captured] >= VAL[m.piece];
+  const lost = hung.find((h) => !(h.sq === m.to && tradeEven));
+  if (!costs.length && lost) {
+    costs.push(`leaves your ${NAME[lost.type]} on ${lost.sq} unprotected${reply?.m.captured && reply.m.to === lost.sq ? `, and ${i.replySan} wins it` : ""}`);
+    lesson = "Before you let go of a piece, ask whether it's defended.";
+  }
+  if (!costs.length && reply && i.replySan) {
+    const tac = motifs(i.fenAfter, i.replySan, them).tags.find((t) => /fork|pin|skewer|discovered/.test(t));
+    if (tac) { costs.push(`allows ${i.replySan}, ${tac}`); lesson = "Before each move, look at every check, capture and attack your opponent would have."; }
+  }
+  if (i.replyLine && i.replyLine.length >= 2) {
+    const lo = lineOutcome(i.fenAfter, i.replyLine, me);
+    const net = netWords(lo.got, lo.lost);
+    if (net && net.value <= -1 && !costs.some((x) => x.includes("checkmate"))) {
+      costs.push(`after ${fmtLine(i.fenAfter, i.replyLine, lo.show)}, you're ${net.text} down`);
+      lesson ??= "Look at your opponent's best reply before you move, not after.";
+    }
+  }
+  if (opening && m.piece === "q" && !m.captured && i.moveIndex < 14) { costs.push("brings your queen out early, where it can be chased around"); lesson ??= "Develop knights and bishops before the queen."; }
+  if (opening && m.piece === "k" && !(m.flags.includes("k") || m.flags.includes("q")) && /[KQkq]/.test(i.fenBefore.split(" ")[2])) { costs.push("gives up your right to castle"); lesson ??= "Keep the option to castle until your king is safe."; }
+  if (m.piece === "p" && ["f", "g", "h"].includes(m.from[0]) && pieces(before).some((p) => p.color === me && p.type === "k" && ["g", "h"].includes(p.square[0])) && rel(kingOf(before, me).square, me) === 1) { costs.push("loosens the pawns in front of your castled king"); lesson ??= "Leave the pawns in front of your king alone unless you have a reason."; }
+  for (const w of weaknesses(before, after, m, me, opening)) {
+    costs.push(lcFirst(noStop(w))
+      .replace(/^this leaves/, "leaves you with")
+      .replace(/^a knight on the edge of the board controls fewer squares/, "puts your knight on the edge, where it controls fewer squares")
+      .replace(/^edge pawn moves in the opening don't help development or the center/, "spends a move on the edge instead of the center"));
+  }
+  return { costs: costs.slice(0, 2).map((x) => personal(x, after, me)), lesson };
+}
+
+/** "opens the diagonal" -> "open the diagonal" (for "you played d6 to ..."). */
+function toInf(phrase: string): string {
+  const [w, ...rest] = phrase.split(" ");
+  let v = w;
+  if (w === "goes") v = "go";
+  else if (w === "is") v = "be";
+  else if (/(ch|sh|ss|x)es$/.test(w)) v = w.slice(0, -2);
+  else if (/[^aeiou]ies$/.test(w)) v = `${w.slice(0, -3)}y`;
+  else if (w.endsWith("s")) v = w.slice(0, -1);
+  return [v, ...rest].join(" ");
+}
+const pawnsWorth = (cp: number) => { const p = Math.round(Math.abs(cp) / 100); return p <= 1 ? "about a pawn's worth" : `about ${p} pawns' worth`; };
+
+export function proCoachNotes(i: BasicCoachInput): ProCoachNotes | null {
+  const me: Color = i.playerColor === "white" ? "w" : "b";
+  const pov = (cp: number) => (me === "w" ? cp : -cp);
+  const played = apply(i.fenBefore, i.san);
+  if (!played) return null;
+  const after = played.c;
+  if (after.isCheckmate()) return { pros: ["Checkmate."], cons: [], take: `Checkmate with ${i.san}. Well played.` };
+  const bad = ["inaccuracy", "mistake", "blunder", "missed_win"].includes(i.classification);
+  const book = i.inBook || i.classification === "book";
+  const top = ["best", "great", "brilliant", "excellent"].includes(i.classification);
+  const best = i.bestMoveSan && i.bestMoveSan !== i.san ? i.bestMoveSan.split(/\s+[—–-]\s+/)[0].trim() : null;
+  const does = moveDoes(i.fenBefore, i.san, me, i.moveIndex, i.prevSan);
+  const { costs, lesson: costLesson } = book || top ? { costs: [] as string[], lesson: null } : moveCosts(i, me);
+
+  // The better move: what it does, or what its line wins.
+  let bestWhy: string | null = null;
+  let lesson = costLesson;
+  if (best && (bad || i.classification === "good")) {
+    const line = i.bestLine?.length && i.bestLine[0] === best ? i.bestLine : null;
+    const lo = line ? lineOutcome(i.fenBefore, line, me) : null;
+    const net = lo ? netWords(lo.got, lo.lost) : null;
+    if (lo?.mateBy === me) { bestWhy = `leads to checkmate (${fmtLine(i.fenBefore, line!, lo.plies)})`; lesson = "When the enemy king is exposed, look at every check first."; }
+    else if (net && net.value >= 1 && lo && lo.plies >= 2) { bestWhy = `wins ${net.text} (${fmtLine(i.fenBefore, line!, lo.show)})`; lesson ??= "Scan for captures and checks first; there was material to win here."; }
+    else {
+      const bd = moveDoes(i.fenBefore, best, me, i.moveIndex, i.prevSan);
+      if (bd.length) bestWhy = andList(bd.slice(0, 2));
+      if (bd.some((x) => /challenges the pawn|fights for the center/.test(x))) lesson ??= "When a pawn can strike the center, that's usually the move.";
+    }
+  }
+
+  // The opponent's best reply, when it's a threat worth knowing about.
+  let watch: string | null = null;
+  if (!bad && i.replySan) {
+    const rd = moveDoes(i.fenAfter, i.replySan, other(me), i.moveIndex + 1).filter((x) => /fork|pin|skewer|wins|attacks|goes after|kicks|piles|double attack|check/.test(x));
+    if (rd.length) watch = `Watch for ${i.replySan}: it ${rd[0].replace(/\byour\b/g, "§").replace(/\btheir\b/g, "your").replace(/§/g, "their")}.`;
+  }
+  const mainLine = (book || top) && i.replyLine && i.replyLine.length >= 2 ? fmtLine(i.fenAfter, i.replyLine, 3) : null;
+
+  // The points beside the take.
+  const pros = does.slice(0, 2).map((x) => `${capFirst(x)}.`);
+  const cons: string[] = costs.map((x) => `${capFirst(x)}.`);
+  if (best && bad) cons.push(bestWhy ? `Missed ${best}, which ${bestWhy}.` : `Missed ${best}.`);
+  else if (best && i.classification === "good" && bestWhy) cons.push(`${best} was a little sharper: it ${bestWhy}.`);
+  if (!pros.length && !cons.length) {
+    if (top) pros.push(i.classification === "excellent" ? "As good as the engine's choice." : "The engine's top choice.");
+    else if (book) pros.push("Main-line opening theory.");
+  }
+
+  // The take: talks to the player, says what they did well and what they didn't see.
+  const did = does.length ? `you played ${i.san} to ${andList(does.slice(0, 2).map(toInf))}` : null;
+  const swing = Math.max(0, pov(i.cpBefore) - pov(i.cpAfter));
+  const s: string[] = [];
+  if (book) {
+    const name = i.openingName && i.moveIndex === 4 ? ` This is the ${i.openingName.replace(/^The\s+/i, "")}.` : "";
+    s.push(did ? `Good opening play: ${did}.${name}` : `You're following opening theory.${name}`);
+    if (mainLine) s.push(`The main line goes on ${mainLine}.`);
+  } else if (bad) {
+    if (pov(i.cpBefore) >= 9000 && best) s.push(`You had a forced checkmate here and didn't see it: ${best} ${bestWhy ?? "starts it"}.`);
+    else {
+      if (did && costs.length) s.push(`${capFirst(did)}, but you didn't see that it also ${costs[0]}.`);
+      else if (did && i.classification === "inaccuracy") s.push(`${capFirst(did)}, which makes sense.`);
+      else if (did) s.push(`${capFirst(did)}, but it costs you ${pawnsWorth(swing)}.`);
+      else if (costs.length) s.push(`You didn't see that ${i.san} ${costs[0]}.`);
+      else s.push(`${i.san} costs you ${pawnsWorth(swing)}.`);
+      if (best) s.push(`${did && !costs.length && i.classification === "inaccuracy" ? "But " : ""}${best} was the move${bestWhy ? `: it ${bestWhy}` : ""}.`);
+      if (costs[1] && !s.join(" ").includes(costs[1])) s.push(`On top of that, it ${costs[1]}.`);
+    }
+    if (lesson) s.push(lesson);
+  } else if (i.classification === "good") {
+    s.push(did ? `Good job: ${did}.` : "A solid, safe move.");
+    if (costs.length) s.push(`The one thing you didn't see: it ${costs[0]}.`);
+    else if (best && bestWhy) s.push(`${best} was a touch sharper, though: it ${bestWhy}.`);
+    if (watch && s.length < 3) s.push(watch);
+  } else {
+    const praise = i.classification === "brilliant" ? "Brilliant!" : i.classification === "great" ? "Great find." : i.classification === "best" ? "Exactly right." : "Strong move.";
+    s.push(did ? `${praise} ${capFirst(did)}.` : `${praise} That's what the engine would play.`);
+    if (watch) s.push(watch);
+    else if (mainLine) s.push(`From here the main line is ${mainLine}.`);
+  }
+  const take = s.join(" ").replace(/\s+/g, " ").trim();
+  return { pros: pros.slice(0, 2), cons: cons.slice(0, 2), take };
 }

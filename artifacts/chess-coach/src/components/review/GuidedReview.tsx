@@ -24,6 +24,8 @@ export interface GuidedReviewMove {
   /** The engine's expected continuation after this move (both sides). */
   replyLineSan?: string[];
   pros?: string[]; cons?: string[];
+  /** Pro: the coach's take on this move, worked out from the position (server). */
+  coachTake?: string;
 }
 interface PlyMove { san: string; fen: string; from?: string | null; to?: string | null; fenBefore?: string | null }
 
@@ -535,9 +537,9 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
     );
     // AI-coached reviews (Pro): the coach's full explanation and its pros and
     // cons go in a card under the board, as before. Free reviews have neither.
-    const aiCoached = !!(rev.pros?.length || rev.cons?.length);
+    const aiCoached = !!(rev.pros?.length || rev.cons?.length || rev.coachTake);
     if (aiCoached) {
-      const take = plainTake(rev.pros ?? [], rev.cons ?? [], rev.classification);
+      const take = rev.coachTake || plainTake(rev.pros ?? [], rev.cons ?? [], rev.classification);
       detail = (
         <>
           <p className="mb-1 text-[11.5px] font-bold uppercase tracking-wide text-[#87918E]">Coach</p>
