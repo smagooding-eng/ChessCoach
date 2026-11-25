@@ -1473,7 +1473,7 @@ function handleDrawDecline(ws: WebSocket, userId: string, gameId: string) {
 
 // ── Quick messages: emojis and a few friendly phrases (nothing typed, so
 // there's nothing to moderate). Bots don't answer.
-export const LIVE_CHAT = ['👋', '👍', '😅', '😮', '🔥', '😂', '🤝', '🙏', '😬', '🤯', '♟️', '💪', 'Good luck!', 'Have fun!', 'Nice move!', 'Oops!', 'Thanks!', 'Good game!', 'Rematch?', "I'm playing on chessscout.net, you could too!"];
+export const LIVE_CHAT = ["👋", "👍", "😅", "😮", "🔥", "😂", "🤝", "🙏", "😬", "🤯", "♟️", "💪", "😎", "🤔", "😭", "👀", "💀", "🥲", "😤", "🙌", "❤️", "⏰", "🍀", "🫡", "Hi!", "Good luck!", "Have fun!", "Nice move!", "Wow!", "Well played!", "Oops!", "My bad", "Sorry, lag", "Thanks!", "Good game!", "Thanks for the game!", "Rematch?", "One more?", "Draw?", "Brb", "ChessScout is a free chess app: game reviews, puzzles and a coach", "I'm playing on chessscout.net, you could too!"];
 const lastChatAt = new Map<string, number>();
 function handleChat(userId: string, gameId: string, text: string) {
   const g = games.get(gameId);
