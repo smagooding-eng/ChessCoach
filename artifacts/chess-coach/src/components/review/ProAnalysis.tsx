@@ -32,6 +32,9 @@ export type ProReviewMove = {
   engineAvailable?: boolean;
   evalAfterCp?: number;
   bestLineSan?: string[];
+  /** Pro: the coach's take on the move, and what went wrong on a mistake (server). */
+  coachTake?: string;
+  coachThemes?: string[];
 };
 
 export type ProKeyMistake = { moveIndex: number; move: string; whatWentWrong: string; whatYouShouldHaveDone: string; tip: string };
@@ -208,6 +211,240 @@ function EvalGraph({ reviewMoves, ply, maxPly, onPick, flipped }: { reviewMoves:
         <circle key={p.ply} cx={x(p.ply)} cy={yOf(p.y)} r="3.6" fill={CLS[p.m!.classification].color} stroke="#0D1516" strokeWidth="1.2" vectorEffect="non-scaling-stroke" />
       ))}
     </svg>
+  );
+}
+
+// ── Deeper report (Pro) ─────────────────────────────────────────────────────
+// Everything here is worked out from the review itself: engine evals, move
+// grades, the coach's themes for each mistake, and the clock when the game has one.
+const THEME: Record<string, { label: string; why: string; href: string; cta: string }> = {
+  hanging: { label: 'Leaving pieces unprotected', why: 'A piece was left where it could be taken.', href: '/tactics/hanging', cta: 'Drill hanging pieces' },
+  fork: { label: 'Walking into forks', why: 'One enemy piece could hit two of yours at once.', href: '/tactics/fork', cta: 'Drill forks' },
+  pin: { label: 'Walking into pins', why: 'A piece got stuck in front of something more valuable.', href: '/tactics/pin', cta: 'Drill pins' },
+  skewer: { label: 'Walking into skewers', why: 'A valuable piece was attacked with another behind it.', href: '/tactics/skewer', cta: 'Drill skewers' },
+  discovered: { label: 'Missing discovered attacks', why: 'A piece moved out of the way and revealed an attack.', href: '/tactics/discovered', cta: 'Drill discovered attacks' },
+  'mate-threat': { label: 'Missing mate threats', why: "The opponent's checks weren't checked.", href: '/tactics/back-rank', cta: 'Drill mating patterns' },
+  'missed-tactic': { label: 'Missing winning tactics', why: 'There was material to win and it went unplayed.', href: '/tactics/missed', cta: 'Replay your missed tactics' },
+  'missed-mate': { label: 'Missing checkmates', why: 'A forced mate was on the board.', href: '/tactics/missed', cta: 'Replay your missed tactics' },
+  opening: { label: 'Opening principles', why: 'Slow or off-plan moves before the pieces were out.', href: '/openings', cta: 'Train your openings' },
+  'king-safety': { label: 'King safety', why: 'Moves that left the king easier to attack.', href: '/tactics/greek-gift', cta: 'Drill king attacks' },
+  structure: { label: 'Pawn structure', why: 'Doubled or isolated pawns that became targets.', href: '/endgames', cta: 'Practice endgames' },
+  reply: { label: "Not checking the opponent's reply", why: 'The best answer to the move cost material.', href: '/puzzles', cta: 'Do some puzzles' },
+};
+const GOODISH = new Set<Classification>(['best', 'great', 'brilliant', 'excellent']);
+const fmtSecs = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}m ${Math.round(s % 60)}s` : `${Math.round(s)}s`);
+
+function DeepReport({ reviewMoves, moves, me, game, onGo, moveNo }: {
+  reviewMoves: ProReviewMove[]; moves: GameMove[]; me: 'w' | 'b';
+  game: ProAnalysisProps['game']; onGo: (ply: number) => void; moveNo: (idx: number) => string;
+}) {
+  const myColor = me === 'w' ? 'white' : 'black';
+  const byIdx = useMemo(() => new Map(reviewMoves.map((m) => [m.moveIndex, m])), [reviewMoves]);
+  const mine = reviewMoves.filter((m) => m.color === myColor);
+  const myWin = (cp: number) => (me === 'w' ? winPct(cp) : 100 - winPct(cp));
+  const evalBefore = (idx: number) => { for (let k = idx - 1; k >= 0; k--) { const r = byIdx.get(k); if (typeof r?.evalAfterCp === 'number') return r.evalAfterCp; } return 20; };
+  const who = (m: ProReviewMove) => (m.color === myColor ? 'You' : 'Opponent');
+  const note = (m: ProReviewMove) => m.coachTake || m.explanation;
+
+  // Where it was decided: the bad move with the biggest swing in your winning chances.
+  const decisive = useMemo(() => {
+    let best: { m: ProReviewMove; from: number; to: number } | null = null;
+    for (const m of reviewMoves) {
+      if (!BAD.has(m.classification) || typeof m.evalAfterCp !== 'number') continue;
+      const from = myWin(evalBefore(m.moveIndex)), to = myWin(m.evalAfterCp);
+      if (!best || Math.abs(to - from) > Math.abs(best.to - best.from)) best = { m, from, to };
+    }
+    return best && Math.abs(best.to - best.from) >= 10 ? best : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviewMoves, me]);
+  // Your best and worst moments in winning chances.
+  const peak = useMemo(() => {
+    let hi: { idx: number; v: number } | null = null;
+    for (const m of reviewMoves) if (typeof m.evalAfterCp === 'number') { const v = myWin(m.evalAfterCp); if (!hi || v > hi.v) hi = { idx: m.moveIndex, v }; }
+    return hi;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviewMoves, me]);
+  const slipped = peak && peak.v >= 80 && game.result !== 'win';
+
+  // Patterns in your mistakes.
+  const patterns = useMemo(() => {
+    const map = new Map<string, ProReviewMove[]>();
+    for (const m of mine) {
+      if (!BAD.has(m.classification)) continue;
+      const th = (m.coachThemes ?? []).filter((t) => THEME[t]);
+      for (const t of th.length ? th.slice(0, 1) : ['other']) map.set(t, [...(map.get(t) ?? []), m]);
+    }
+    return [...map.entries()].sort((a, b) => b[1].length - a[1].length);
+  }, [mine]);
+
+  // Opening: how long you stayed in book, and your first move out of it.
+  const myBook = mine.filter((m) => m.classification === 'book').length;
+  const firstOut = mine.find((m) => m.classification !== 'book');
+
+  // Chances you missed: the opponent slipped and your next move didn't punish it.
+  const chances = reviewMoves.filter((m) => m.color !== myColor && ['mistake', 'blunder', 'missed_win'].includes(m.classification));
+  const missed = chances.filter((m) => { const r = byIdx.get(m.moveIndex + 1); return r && !GOODISH.has(r.classification); });
+
+  // Clock: from the clock left after each of your moves.
+  const clock = useMemo(() => {
+    const own = moves.map((mv, i) => ({ i, c: mv.clockSeconds })).filter((x) => (x.i % 2 === 0) === (me === 'w') && typeof x.c === 'number') as { i: number; c: number }[];
+    if (own.length < 6) return null;
+    const spent = own.slice(1).map((x, k) => ({ i: x.i, s: Math.max(0, own[k].c - x.c) }));
+    const avg = spent.reduce((a, b) => a + b.s, 0) / spent.length;
+    const longest = spent.reduce((a, b) => (b.s > a.s ? b : a), spent[0]);
+    const bad = mine.filter((m) => BAD.has(m.classification) && m.classification !== 'inaccuracy');
+    const clockAt = (i: number) => moves[i]?.clockSeconds;
+    const low = bad.filter((m) => { const c = clockAt(m.moveIndex); return typeof c === 'number' && c < 60; }).length;
+    const rushed = bad.filter((m) => { const x = spent.find((s) => s.i === m.moveIndex); return x && x.s <= 3; }).length;
+    return { avg, longest, bad: bad.length, low, rushed };
+  }, [moves, mine, me]);
+
+  // Your best moments.
+  const shines = mine.filter((m) => ['brilliant', 'great'].includes(m.classification)).concat(
+    mine.filter((m) => m.classification === 'best' && (() => { const p = byIdx.get(m.moveIndex - 1); return !!p && ['mistake', 'blunder', 'missed_win'].includes(p.classification); })()),
+  ).slice(0, 3);
+
+  const Jump = ({ idx, children }: { idx: number; children: React.ReactNode }) => (
+    <button onClick={() => onGo(idx + 1)} className="inline-flex items-center gap-1 rounded-[9px] px-2 py-1 text-[12.5px] font-extrabold" style={{ background: RD.cardLight, color: RD.text, border: `1px solid ${RD.border}` }}>{children}</button>
+  );
+
+  return (
+    <>
+      {(decisive || slipped) && (
+        <div className="rounded-[20px] p-4" style={card}>
+          <SectionTitle>Where the game was decided</SectionTitle>
+          {decisive && (
+            <>
+              <button onClick={() => onGo(decisive.m.moveIndex + 1)} className="flex w-full items-center gap-3 text-left">
+                <Glyph c={decisive.m.classification} size={30} />
+                <span className="min-w-0 flex-1">
+                  <b className="text-[16px] font-black" style={{ color: RD.text }}>{moveNo(decisive.m.moveIndex)} {decisive.m.san}</b>
+                  <span className="ml-2 text-[12px] font-bold" style={{ color: CLS[decisive.m.classification].color }}>{CLS[decisive.m.classification].label} · {who(decisive.m)}</span>
+                </span>
+                <ChevronRight className="h-4 w-4 shrink-0" style={{ color: RD.muted }} />
+              </button>
+              <div className="mt-3 flex items-center gap-2 text-[13px] font-bold" style={{ color: RD.muted }}>
+                <span>Your winning chances</span>
+                <span className="tabular-nums" style={{ color: RD.text }}>{Math.round(decisive.from)}%</span>
+                <span>→</span>
+                <span className="tabular-nums" style={{ color: decisive.to > decisive.from ? RD.green : '#FF7A80' }}>{Math.round(decisive.to)}%</span>
+              </div>
+              {note(decisive.m) && <p className="mt-2 text-[14px] leading-relaxed" style={{ color: soft }}>{note(decisive.m)}</p>}
+            </>
+          )}
+          {slipped && peak && (
+            <p className="mt-3 text-[13.5px] leading-snug" style={{ color: soft }}>
+              You were winning after <b style={{ color: RD.text }}>{moveNo(peak.idx)} {moves[peak.idx]?.san}</b> ({Math.round(peak.v)}% winning chances) but {game.result === 'loss' ? 'went on to lose' : "didn't convert it"}. Turning a winning position into a win is a skill of its own.
+            </p>
+          )}
+        </div>
+      )}
+
+      {patterns.length > 0 && (
+        <div className="rounded-[20px] p-4" style={card}>
+          <SectionTitle right={<span className="text-[11.5px] font-bold" style={{ color: RD.muted }}>{mine.filter((m) => BAD.has(m.classification)).length} slips</span>}>Your mistake patterns</SectionTitle>
+          <div className="space-y-3">
+            {patterns.map(([t, ms], k) => {
+              const th = THEME[t];
+              return (
+                <div key={t} className="rounded-[14px] p-3" style={{ background: RD.cardLight }}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[14.5px] font-extrabold" style={{ color: RD.text }}>{th?.label ?? 'Other slips'}</span>
+                    <span className="ml-auto rounded-full px-2 py-0.5 text-[12px] font-black tabular-nums" style={{ background: 'rgba(255,255,255,.08)', color: RD.text }}>×{ms.length}</span>
+                  </div>
+                  <p className="mt-1 text-[13px] leading-snug" style={{ color: RD.muted }}>{th?.why ?? 'Moves that gave away ground without one clear pattern.'}</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {ms.map((m) => <Jump key={m.moveIndex} idx={m.moveIndex}><Glyph c={m.classification} size={16} />{moveNo(m.moveIndex)} {m.san}</Jump>)}
+                  </div>
+                  {th && k < 2 && (
+                    <a href={th.href} className="mt-2.5 inline-flex items-center gap-1 text-[13px] font-extrabold" style={{ color: RD.green }}>{th.cta} <ChevronRight className="h-3.5 w-3.5" /></a>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {(myBook > 0 || firstOut) && (
+        <div className="rounded-[20px] p-4" style={card}>
+          <SectionTitle>Your opening</SectionTitle>
+          <p className="text-[14px] leading-relaxed" style={{ color: soft }}>
+            {myBook > 0
+              ? <>You followed opening theory for <b style={{ color: RD.text }}>{myBook} move{myBook === 1 ? '' : 's'}</b>{game.opening ? <> of the {game.opening}</> : null}.</>
+              : <>You left opening theory on your first move.</>}
+            {firstOut && <> Your first move of your own was <b style={{ color: RD.text }}>{moveNo(firstOut.moveIndex)} {firstOut.san}</b>, graded <b style={{ color: CLS[firstOut.classification].color }}>{CLS[firstOut.classification].label.toLowerCase()}</b>.</>}
+          </p>
+          {firstOut && BAD.has(firstOut.classification) && note(firstOut) && <p className="mt-2 text-[13.5px] leading-snug" style={{ color: RD.muted }}>{note(firstOut)}</p>}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {firstOut && <Jump idx={firstOut.moveIndex}>See it on the board</Jump>}
+            <a href={game.eco ? `/openings/${game.eco}` : '/openings'} className="inline-flex items-center gap-1 rounded-[9px] px-2 py-1 text-[12.5px] font-extrabold" style={{ color: RD.green }}>Study this opening <ChevronRight className="h-3.5 w-3.5" /></a>
+          </div>
+        </div>
+      )}
+
+      {chances.length > 0 && (
+        <div className="rounded-[20px] p-4" style={card}>
+          <SectionTitle right={<span className="text-[11.5px] font-bold tabular-nums" style={{ color: RD.muted }}>{chances.length - missed.length} of {chances.length} punished</span>}>Your opponent's mistakes</SectionTitle>
+          {missed.length === 0
+            ? <p className="text-[14px] leading-relaxed" style={{ color: soft }}>Every time your opponent slipped, you found a strong reply. That's how games are won.</p>
+            : (
+              <div className="space-y-2.5">
+                <p className="text-[13.5px] leading-snug" style={{ color: RD.muted }}>These were chances to take over the game:</p>
+                {missed.map((m) => {
+                  const r = byIdx.get(m.moveIndex + 1)!;
+                  const better = (r.betterMove ?? '').split(/\s+[—–-]\s+/)[0];
+                  return (
+                    <button key={m.moveIndex} onClick={() => onGo(m.moveIndex + 2)} className="flex w-full items-center gap-3 rounded-[13px] px-3 py-2.5 text-left" style={{ background: RD.cardLight }}>
+                      <Glyph c={m.classification} size={22} />
+                      <span className="min-w-0 flex-1 text-[13.5px] leading-snug" style={{ color: RD.text }}>
+                        After <b>{moveNo(m.moveIndex)} {m.san}</b> you played <b>{r.san}</b>{better && better !== r.san ? <>; <span style={{ color: RD.green }}>{better}</span> was the punishment</> : null}.
+                      </span>
+                      <ChevronRight className="h-4 w-4 shrink-0" style={{ color: RD.muted }} />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+        </div>
+      )}
+
+      {clock && (
+        <div className="rounded-[20px] p-4" style={card}>
+          <SectionTitle>Your clock</SectionTitle>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-[14px] px-3 py-2.5" style={{ background: RD.cardLight }}>
+              <p className="text-[10.5px] font-bold uppercase tracking-wider" style={{ color: RD.muted }}>Average per move</p>
+              <p className="text-[19px] font-black tabular-nums" style={{ color: RD.text }}>{fmtSecs(clock.avg)}</p>
+            </div>
+            <button onClick={() => onGo(clock.longest.i + 1)} className="rounded-[14px] px-3 py-2.5 text-left" style={{ background: RD.cardLight }}>
+              <p className="text-[10.5px] font-bold uppercase tracking-wider" style={{ color: RD.muted }}>Longest think</p>
+              <p className="text-[19px] font-black tabular-nums" style={{ color: RD.text }}>{fmtSecs(clock.longest.s)} <span className="text-[13px] font-bold" style={{ color: RD.muted }}>on {moveNo(clock.longest.i)} {moves[clock.longest.i]?.san}</span></p>
+            </button>
+          </div>
+          {clock.bad > 0 && (
+            <p className="mt-3 text-[13.5px] leading-snug" style={{ color: soft }}>
+              {clock.low > 0 ? `${clock.low} of your ${clock.bad} mistakes came with under a minute left. ` : `None of your ${clock.bad} mistakes came in time trouble. `}
+              {clock.rushed > 0 ? `${clock.rushed} ${clock.rushed === 1 ? 'was' : 'were'} played in 3 seconds or less: slowing down on those moves would have helped.` : 'You took your time on the moves that went wrong, so it was the idea, not the clock.'}
+            </p>
+          )}
+        </div>
+      )}
+
+      {shines.length > 0 && (
+        <div className="rounded-[20px] p-4" style={card}>
+          <SectionTitle>Your best moments</SectionTitle>
+          <div className="space-y-2.5">
+            {shines.map((m) => (
+              <button key={m.moveIndex} onClick={() => onGo(m.moveIndex + 1)} className="block w-full rounded-[13px] px-3 py-2.5 text-left" style={{ background: RD.cardLight }}>
+                <span className="flex items-center gap-2"><Glyph c={m.classification} size={20} /><b className="text-[14px]" style={{ color: RD.text }}>{moveNo(m.moveIndex)} {m.san}</b><span className="text-[12px] font-bold" style={{ color: CLS[m.classification].color }}>{CLS[m.classification].label}</span></span>
+                {note(m) && <span className="mt-1 block text-[13px] leading-snug" style={{ color: soft }}>{note(m)}</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -388,7 +625,7 @@ export function ProAnalysis(props: ProAnalysisProps) {
 
           {/* Phases */}
           <div className="rounded-[20px] p-4" style={card}>
-            <SectionTitle>How each phase went</SectionTitle>
+            <SectionTitle right={<span className="text-[11.5px]" style={{ color: RD.muted }}>Accuracy: you vs opponent</span>}>How each phase went</SectionTitle>
             <div className="grid grid-cols-3 gap-2">
               {PHASES.map(ph => {
                 const g = phaseGrade(you.moves, ph.from, ph.to);
@@ -399,6 +636,12 @@ export function ProAnalysis(props: ProAnalysisProps) {
                     {g ? <Glyph c={g} size={30} /> : <span className="grid h-[30px] place-items-center" style={{ color: RD.muted }}>—</span>}
                     <span className="text-[13px] font-extrabold" style={{ color: g ? CLS[g].color : RD.muted }}>{g ? PHASE_WORD[g] : 'Not reached'}</span>
                     {o && <span className="text-[10.5px]" style={{ color: RD.muted }}>Opp: {PHASE_WORD[o]}</span>}
+                    {(() => {
+                      const ym = you.moves.filter(m => m.moveIndex >= ph.from && m.moveIndex < ph.to);
+                      const om = opp.moves.filter(m => m.moveIndex >= ph.from && m.moveIndex < ph.to);
+                      if (!ym.length) return null;
+                      return <span className="mt-1 text-[11px] font-bold tabular-nums" style={{ color: RD.text }}>{fallbackAccuracy(ym).toFixed(0)}%{om.length ? <span style={{ color: RD.muted }}> vs {fallbackAccuracy(om).toFixed(0)}%</span> : null}</span>;
+                    })()}
                   </div>
                 );
               })}
@@ -480,6 +723,8 @@ export function ProAnalysis(props: ProAnalysisProps) {
               </div>
             );
           })()}
+
+          <DeepReport reviewMoves={reviewMoves} moves={moves} me={me} game={game} onGo={goBoard} moveNo={moveNo} />
 
           {/* Turning points */}
           {turning.length > 0 && (
