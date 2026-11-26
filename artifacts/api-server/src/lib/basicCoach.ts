@@ -736,7 +736,7 @@ export function refreshBasicReview(moves: unknown, aiCoach: boolean, openingName
         const notes = proCoachNotes(input, viewer);
         if (!notes) return m;
         const own = notes.pros.length > 0 || notes.cons.length > 0;
-        return { ...m, ...(own ? { pros: notes.pros, cons: notes.cons } : {}), ...(notes.take ? { coachTake: notes.take } : {}) };
+        return { ...m, ...(own ? { pros: notes.pros, cons: notes.cons } : {}), ...(notes.take ? { coachTake: notes.take } : {}), coachThemes: notes.themes };
       }
       const text = basicExplanation(input);
       return text ? { ...m, explanation: text, pros: [], cons: [] } : m;
@@ -776,7 +776,9 @@ export function contentTags(fenBefore: string, san: string, color: "white" | "bl
 // what this move actually did (with squares), what they didn't see, what it
 // costs, the better move and why, and one habit to take away. All read off
 // the board and the engine's lines, so nothing generic and nothing made up.
-export interface ProCoachNotes { pros: string[]; cons: string[]; take: string }
+/** themes: what went wrong on a bad move, for the report's patterns (hanging, fork, pin, skewer,
+ *  discovered, mate-threat, missed-tactic, missed-mate, opening, king-safety, structure, reply). */
+export interface ProCoachNotes { pros: string[]; cons: string[]; take: string; themes: string[] }
 
 const capFirst = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const lcFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
@@ -846,20 +848,22 @@ function moveDoes(fenBefore: string, san: string, me: Color, moveIndex: number, 
 }
 
 /** What a move costs, as short third-person phrases, plus the habit that would have caught it. */
-function moveCosts(i: BasicCoachInput, me: Color): { costs: string[]; lesson: string | null } {
+function moveCosts(i: BasicCoachInput, me: Color): { costs: string[]; lesson: string | null; themes: string[] } {
   const them = other(me);
   const pov = (cp: number) => (me === "w" ? cp : -cp);
   const played = apply(i.fenBefore, i.san);
   const before = load(i.fenBefore);
-  if (!played || !before) return { costs: [], lesson: null };
+  if (!played || !before) return { costs: [], lesson: null, themes: [] };
   const { c: after, m } = played;
   const opening = i.moveIndex < 20;
   const costs: string[] = [];
+  const themes: string[] = [];
   let lesson: string | null = null;
   const reply = apply(i.fenAfter, i.replySan);
   if (pov(i.cpAfter) <= -9000 && pov(i.cpBefore) > -9000) {
     costs.push(i.replySan ? `allows a forced checkmate, starting with ${i.replySan}` : "allows a forced checkmate");
     lesson = "Before every move, check what checks your opponent has.";
+    themes.push("mate-threat");
   }
   const hung = hanging(after, me).filter((h) => VAL[h.type] >= 3 && (h.sq === m.to || !hanging(before, me).some((x) => x.sq === h.sq)));
   const tradeEven = m.captured && VAL[m.captured] >= VAL[m.piece];
@@ -867,10 +871,14 @@ function moveCosts(i: BasicCoachInput, me: Color): { costs: string[]; lesson: st
   if (!costs.length && lost) {
     costs.push(`leaves your ${NAME[lost.type]} on ${lost.sq} unprotected${reply?.m.captured && reply.m.to === lost.sq ? `, and ${i.replySan} wins it` : ""}`);
     lesson = "Before you let go of a piece, ask whether it's defended.";
+    themes.push("hanging");
   }
   if (!costs.length && reply && i.replySan) {
     const tac = motifs(i.fenAfter, i.replySan, them).tags.find((t) => /fork|pin|skewer|discovered/.test(t));
-    if (tac) { costs.push(`allows ${i.replySan}, ${tac}`); lesson = "Before each move, look at every check, capture and attack your opponent would have."; }
+    if (tac) {
+      costs.push(`allows ${i.replySan}, ${tac}`); lesson = "Before each move, look at every check, capture and attack your opponent would have.";
+      themes.push(tac.startsWith("fork") ? "fork" : tac.startsWith("pin") ? "pin" : tac.startsWith("skewer") ? "skewer" : "discovered");
+    }
   }
   if (i.replyLine && i.replyLine.length >= 2) {
     const lo = lineOutcome(i.fenAfter, i.replyLine, me);
@@ -878,18 +886,20 @@ function moveCosts(i: BasicCoachInput, me: Color): { costs: string[]; lesson: st
     if (net && net.value <= -1 && !costs.some((x) => x.includes("checkmate"))) {
       costs.push(`after ${fmtLine(i.fenAfter, i.replyLine, lo.show)}, you're ${net.text} down`);
       lesson ??= "Look at your opponent's best reply before you move, not after.";
+      if (!themes.length) themes.push("reply");
     }
   }
-  if (opening && m.piece === "q" && !m.captured && i.moveIndex < 14) { costs.push("brings your queen out early, where it can be chased around"); lesson ??= "Develop knights and bishops before the queen."; }
-  if (opening && m.piece === "k" && !(m.flags.includes("k") || m.flags.includes("q")) && /[KQkq]/.test(i.fenBefore.split(" ")[2])) { costs.push("gives up your right to castle"); lesson ??= "Keep the option to castle until your king is safe."; }
-  if (m.piece === "p" && ["f", "g", "h"].includes(m.from[0]) && pieces(before).some((p) => p.color === me && p.type === "k" && ["g", "h"].includes(p.square[0])) && rel(kingOf(before, me).square, me) === 1) { costs.push("loosens the pawns in front of your castled king"); lesson ??= "Leave the pawns in front of your king alone unless you have a reason."; }
+  if (opening && m.piece === "q" && !m.captured && i.moveIndex < 14) { costs.push("brings your queen out early, where it can be chased around"); lesson ??= "Develop knights and bishops before the queen."; themes.push("opening"); }
+  if (opening && m.piece === "k" && !(m.flags.includes("k") || m.flags.includes("q")) && /[KQkq]/.test(i.fenBefore.split(" ")[2])) { costs.push("gives up your right to castle"); lesson ??= "Keep the option to castle until your king is safe."; themes.push("king-safety"); }
+  if (m.piece === "p" && ["f", "g", "h"].includes(m.from[0]) && pieces(before).some((p) => p.color === me && p.type === "k" && ["g", "h"].includes(p.square[0])) && rel(kingOf(before, me).square, me) === 1) { costs.push("loosens the pawns in front of your castled king"); lesson ??= "Leave the pawns in front of your king alone unless you have a reason."; themes.push("king-safety"); }
   for (const w of weaknesses(before, after, m, me, opening)) {
+    themes.push(/pawn/.test(w) && !/[Ee]dge pawn/.test(w) ? "structure" : "opening");
     costs.push(lcFirst(noStop(w))
       .replace(/^this leaves/, "leaves you with")
       .replace(/^a knight on the edge of the board controls fewer squares/, "puts your knight on the edge, where it controls fewer squares")
       .replace(/^edge pawn moves in the opening don't help development or the center/, "spends a move on the edge instead of the center"));
   }
-  return { costs: costs.slice(0, 2).map((x) => personal(x, after, me)), lesson };
+  return { costs: costs.slice(0, 2).map((x) => personal(x, after, me)), lesson, themes: [...new Set(themes)] };
 }
 
 /** "opens the diagonal" -> "open the diagonal" (for "you played d6 to ..."). */
@@ -922,13 +932,13 @@ export function proCoachNotes(i: BasicCoachInput, viewer?: "white" | "black"): P
   const played = apply(i.fenBefore, i.san);
   if (!played) return null;
   const after = played.c;
-  if (after.isCheckmate()) return { pros: ["Checkmate."], cons: [], take: `Checkmate with ${i.san}. Well played.` };
+  if (after.isCheckmate()) return { pros: ["Checkmate."], cons: [], take: `Checkmate with ${i.san}. Well played.`, themes: [] };
   const bad = ["inaccuracy", "mistake", "blunder", "missed_win"].includes(i.classification);
   const book = i.inBook || i.classification === "book";
   const top = ["best", "great", "brilliant", "excellent"].includes(i.classification);
   const best = i.bestMoveSan && i.bestMoveSan !== i.san ? i.bestMoveSan.split(/\s+[—–-]\s+/)[0].trim() : null;
   const does = moveDoes(i.fenBefore, i.san, me, i.moveIndex, i.prevSan);
-  const { costs, lesson: costLesson } = book || top ? { costs: [] as string[], lesson: null } : moveCosts(i, me);
+  const { costs, lesson: costLesson, themes } = book || top ? { costs: [] as string[], lesson: null, themes: [] as string[] } : moveCosts(i, me);
 
   // The better move: what it does, or what its line wins.
   let bestWhy: string | null = null;
@@ -937,12 +947,14 @@ export function proCoachNotes(i: BasicCoachInput, viewer?: "white" | "black"): P
     const line = i.bestLine?.length && i.bestLine[0] === best ? i.bestLine : null;
     const lo = line ? lineOutcome(i.fenBefore, line, me) : null;
     const net = lo ? netWords(lo.got, lo.lost) : null;
+    if (bad && lo?.mateBy === me) themes.push("missed-mate");
+    else if (bad && net && net.value >= 1 && lo && lo.plies >= 2) themes.push("missed-tactic");
     if (lo?.mateBy === me) { bestWhy = `leads to checkmate (${fmtLine(i.fenBefore, line!, lo.plies)})`; lesson = "When the enemy king is exposed, look at every check first."; }
     else if (net && net.value >= 1 && lo && lo.plies >= 2) { bestWhy = `wins ${net.text} (${fmtLine(i.fenBefore, line!, lo.show)})`; lesson ??= "Scan for captures and checks first; there was material to win here."; }
     else {
       const bd = moveDoes(i.fenBefore, best, me, i.moveIndex, i.prevSan);
       if (bd.length) bestWhy = andList(bd.slice(0, 2));
-      if (bd.some((x) => /challenges the pawn|fights for the center/.test(x))) lesson ??= "When a pawn can strike the center, that's usually the move.";
+      if (bd.some((x) => /challenges the pawn|fights for the center/.test(x))) { lesson ??= "When a pawn can strike the center, that's usually the move."; if (bad && i.moveIndex < 24) themes.push("opening"); }
     }
   }
 
@@ -1006,5 +1018,5 @@ export function proCoachNotes(i: BasicCoachInput, viewer?: "white" | "black"): P
     P = P.map((x) => thirdPerson(x, side, opp));
     C = C.map((x) => thirdPerson(x, side, opp));
   }
-  return { pros: P, cons: C, take };
+  return { pros: P, cons: C, take, themes: bad ? [...new Set(themes)] : [] };
 }
