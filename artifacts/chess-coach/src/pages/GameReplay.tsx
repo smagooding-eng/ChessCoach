@@ -37,7 +37,7 @@ import { MistakeFixView } from '@/components/MistakeFixView';
 import { GuidedReview } from '@/components/review/GuidedReview';
 import { PathReviewBar } from '@/components/PathReviewBar';
 import { pathReviewFor } from '@/lib/learnPath';
-import { ProAnalysis } from '@/components/review/ProAnalysis';
+import { ProAnalysis, proReportSaved } from '@/components/review/ProAnalysis';
 import { AnimatePresence, motion } from 'framer-motion';
 import { NEUTRAL_CHIP } from '@/lib/redesignTheme';
 
@@ -654,7 +654,7 @@ export function GameReplay() {
   // Redesign only: Analysis / Key Moments / Report. Classic shows everything
   // in one stack exactly as before (the wrappers below are display:contents).
   const { enabled: redesign } = useDashboardRedesignFlag();
-  const [gtab, setGtab] = useState<'analysis' | 'moments' | 'report'>('analysis');
+  const [gtab, setGtab] = useState<'analysis' | 'moments' | 'report'>(() => (typeof window !== 'undefined' && proReportSaved(window.location.pathname) ? 'report' : 'analysis'));
   // Lifted from MistakeFixView so the existing move-navigation buttons
   // below can drive stepping through the engine's suggested
   // continuation while that tab is active, instead of a separate
@@ -679,8 +679,10 @@ export function GameReplay() {
   // analysis view.
   // Every game opens in the step-by-step review (Pro included); Full analysis
   // is only for this visit, when chosen.
-  const [guided, setGuided] = useState(true);
-  useEffect(() => { setGuided(true); }, [id]);
+  // Coming back from a link in the Pro report: open the report again (it restores its place).
+  const backToReport = () => proReportSaved(typeof window !== 'undefined' ? window.location.pathname : '') !== null;
+  const [guided, setGuided] = useState(() => !backToReport());
+  useEffect(() => { const back = backToReport(); setGuided(!back); if (back) setGtab('report'); }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
   // Phones: the coach card under the move buttons stretches down to the bottom
   // bar, using the space that used to hold the opening name and a back link.
   const gridRef = useRef<HTMLDivElement | null>(null);

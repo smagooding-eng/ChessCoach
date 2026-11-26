@@ -214,6 +214,24 @@ function EvalGraph({ reviewMoves, ply, maxPly, onPick, flipped }: { reviewMoves:
   );
 }
 
+// ── Coming back to the report ───────────────────────────────────────────────
+// Leaving the report through a link (a drill, the opening page) saves where you
+// were; the game page opens the report again and this puts you back in place.
+type ReportPlace = { ply: number; y: number; panel: number; at: number };
+const placeKey = (path: string) => `cs_pro_report:${path}`;
+export function proReportSaved(path: string): ReportPlace | null {
+  try {
+    const raw = sessionStorage.getItem(placeKey(path));
+    if (!raw) return null;
+    const v = JSON.parse(raw) as ReportPlace;
+    return Date.now() - v.at < 30 * 60 * 1000 ? v : null;
+  } catch { return null; }
+}
+function saveReportPlace(ply: number, panel: HTMLElement | null) {
+  try { sessionStorage.setItem(placeKey(window.location.pathname), JSON.stringify({ ply, y: window.scrollY, panel: panel?.scrollTop ?? 0, at: Date.now() })); } catch { /* private mode */ }
+}
+function clearReportPlace() { try { sessionStorage.removeItem(placeKey(window.location.pathname)); } catch { /* ignore */ } }
+
 // ── Deeper report (Pro) ─────────────────────────────────────────────────────
 // Everything here is worked out from the review itself: engine evals, move
 // grades, the coach's themes for each mistake, and the clock when the game has one.
@@ -234,9 +252,9 @@ const THEME: Record<string, { label: string; why: string; href: string; cta: str
 const GOODISH = new Set<Classification>(['best', 'great', 'brilliant', 'excellent']);
 const fmtSecs = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}m ${Math.round(s % 60)}s` : `${Math.round(s)}s`);
 
-function DeepReport({ reviewMoves, moves, me, game, onGo, moveNo }: {
+function DeepReport({ reviewMoves, moves, me, game, onGo, moveNo, onLeave }: {
   reviewMoves: ProReviewMove[]; moves: GameMove[]; me: 'w' | 'b';
-  game: ProAnalysisProps['game']; onGo: (ply: number) => void; moveNo: (idx: number) => string;
+  game: ProAnalysisProps['game']; onGo: (ply: number) => void; moveNo: (idx: number) => string; onLeave: () => void;
 }) {
   const myColor = me === 'w' ? 'white' : 'black';
   const byIdx = useMemo(() => new Map(reviewMoves.map((m) => [m.moveIndex, m])), [reviewMoves]);
@@ -357,7 +375,7 @@ function DeepReport({ reviewMoves, moves, me, game, onGo, moveNo }: {
                     {ms.map((m) => <Jump key={m.moveIndex} idx={m.moveIndex}><Glyph c={m.classification} size={16} />{moveNo(m.moveIndex)} {m.san}</Jump>)}
                   </div>
                   {th && k < 2 && (
-                    <a href={th.href} className="mt-2.5 inline-flex items-center gap-1 text-[13px] font-extrabold" style={{ color: RD.green }}>{th.cta} <ChevronRight className="h-3.5 w-3.5" /></a>
+                    <a onClick={onLeave} href={th.href} className="mt-2.5 inline-flex items-center gap-1 text-[13px] font-extrabold" style={{ color: RD.green }}>{th.cta} <ChevronRight className="h-3.5 w-3.5" /></a>
                   )}
                 </div>
               );
@@ -378,7 +396,7 @@ function DeepReport({ reviewMoves, moves, me, game, onGo, moveNo }: {
           {firstOut && BAD.has(firstOut.classification) && note(firstOut) && <p className="mt-2 text-[13.5px] leading-snug" style={{ color: RD.muted }}>{note(firstOut)}</p>}
           <div className="mt-3 flex flex-wrap gap-2">
             {firstOut && <Jump idx={firstOut.moveIndex}>See it on the board</Jump>}
-            <a href={game.eco ? `/openings/${game.eco}` : '/openings'} className="inline-flex items-center gap-1 rounded-[9px] px-2 py-1 text-[12.5px] font-extrabold" style={{ color: RD.green }}>Study this opening <ChevronRight className="h-3.5 w-3.5" /></a>
+            <a onClick={onLeave} href={game.eco ? `/openings/${game.eco}` : '/openings'} className="inline-flex items-center gap-1 rounded-[9px] px-2 py-1 text-[12.5px] font-extrabold" style={{ color: RD.green }}>Study this opening <ChevronRight className="h-3.5 w-3.5" /></a>
           </div>
         </div>
       )}
@@ -479,8 +497,45 @@ export function ProAnalysis(props: ProAnalysisProps) {
   }, [isPlaying, ply, maxPly, setPly]);
 
   const topRef = useRef<HTMLDivElement | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  // Where the report was scrolled to when you jumped to the board (Back returns there).
+  const reportY = useRef<number | null>(null);
+  useEffect(() => {
+    const onPop = () => {
+      if (reportY.current === null) return;
+      const y = reportY.current;
+      reportY.current = null;
+      setTab('report');
+      requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, y)));
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+  // Back from a link the report opened: same move, same place in the report.
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current || reviewMoves.length === 0) return;
+    restored.current = true;
+    const saved = proReportSaved(window.location.pathname);
+    if (!saved) return;
+    clearReportPlace();
+    setTab('report');
+    setPly(saved.ply);
+    let tries = 0;
+    const go = () => {
+      window.scrollTo(0, saved.y);
+      if (panelRef.current) panelRef.current.scrollTop = saved.panel;
+      if (++tries < 6 && Math.abs(window.scrollY - saved.y) > 4) setTimeout(go, 120);
+    };
+    requestAnimationFrame(go);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviewMoves.length]);
   const goBoard = (p: number) => {
     setIsPlaying(false);
+    if (tab === 'report' && !wide) {
+      reportY.current = window.scrollY;
+      try { window.history.pushState({ ...(window.history.state ?? {}), csProBoard: true }, ''); } catch { /* ignore */ }
+    }
     setPly(Math.max(0, Math.min(maxPly, p)));
     setTab('board');
     requestAnimationFrame(() => topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
@@ -724,7 +779,7 @@ export function ProAnalysis(props: ProAnalysisProps) {
             );
           })()}
 
-          <DeepReport reviewMoves={reviewMoves} moves={moves} me={me} game={game} onGo={goBoard} moveNo={moveNo} />
+          <DeepReport reviewMoves={reviewMoves} moves={moves} me={me} game={game} onGo={goBoard} moveNo={moveNo} onLeave={() => saveReportPlace(ply, panelRef.current)} />
 
           {/* Turning points */}
           {turning.length > 0 && (
@@ -888,7 +943,7 @@ export function ProAnalysis(props: ProAnalysisProps) {
   );
 
   const tabBtn = (id: 'report' | 'board', label: string) => (
-    <button onClick={() => setTab(id)} className="flex-1 rounded-[12px] py-2.5 text-[14px] font-extrabold transition-colors"
+    <button onClick={() => { if (id === 'report' && reportY.current !== null) window.history.back(); else setTab(id); }} className="flex-1 rounded-[12px] py-2.5 text-[14px] font-extrabold transition-colors"
       style={tab === id ? { background: RD.green, color: '#fff' } : { color: RD.muted }}>{label}</button>
   );
 
@@ -904,7 +959,7 @@ export function ProAnalysis(props: ProAnalysisProps) {
       {wide ? (
         <div className="grid grid-cols-[minmax(0,1fr)_420px] gap-5">
           <div className="mx-auto w-full max-w-[700px]">{board}</div>
-          <div className="sticky top-3 max-h-[calc(100vh-1.5rem)] overflow-y-auto pr-1 hide-scrollbar">{report}</div>
+          <div ref={panelRef} className="sticky top-3 max-h-[calc(100vh-1.5rem)] overflow-y-auto pr-1 hide-scrollbar">{report}</div>
         </div>
       ) : (
         <>
