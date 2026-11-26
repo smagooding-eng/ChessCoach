@@ -705,7 +705,7 @@ export function markBookMoves(moves: unknown): unknown {
   });
 }
 
-export function refreshBasicReview(moves: unknown, aiCoach: boolean, openingName: string | null = null): unknown {
+export function refreshBasicReview(moves: unknown, aiCoach: boolean, openingName: string | null = null, viewer?: "white" | "black"): unknown {
   if (!Array.isArray(moves)) return moves;
   type M = { fen?: string; san?: string; color?: "white" | "black"; classification?: string; evalAfterCp?: number; betterMove?: string | null; explanation?: string; pros?: string[]; cons?: string[]; moveIndex?: number; bestLineSan?: string[]; replyLineSan?: string[] };
   const all = moves as M[];
@@ -733,7 +733,7 @@ export function refreshBasicReview(moves: unknown, aiCoach: boolean, openingName
       // Pro (AI-coached) reviews keep the coach's explanation; the card's points and
       // take are worked out from the position, so they're specific and never generic.
       if (aiCoach) {
-        const notes = proCoachNotes(input);
+        const notes = proCoachNotes(input, viewer);
         if (!notes) return m;
         const own = notes.pros.length > 0 || notes.cons.length > 0;
         return { ...m, ...(own ? { pros: notes.pros, cons: notes.cons } : {}), ...(notes.take ? { coachTake: notes.take } : {}) };
@@ -905,7 +905,18 @@ function toInf(phrase: string): string {
 }
 const pawnsWorth = (cp: number) => { const p = Math.round(Math.abs(cp) / 100); return p <= 1 ? "about a pawn's worth" : `about ${p} pawns' worth`; };
 
-export function proCoachNotes(i: BasicCoachInput): ProCoachNotes | null {
+/** The take for a move the reader didn't play: name the side instead of "you". */
+function thirdPerson(t: string, side: string, opp: string): string {
+  return t
+    .replace(/\b[Yy]ou're\b/g, `${side} is`)
+    .replace(/\b[Yy]ou (played|didn't|had|missed)\b/g, `${side} $1`)
+    .replace(/\byour\b/g, "the").replace(/\bYour\b/g, "The")
+    .replace(/\btheir\b/g, `${opp}'s`)
+    .replace(/^Good job:/, "Good move:");
+}
+
+/** viewer: the side the review is for. Their moves say "you"; the other side's are named. */
+export function proCoachNotes(i: BasicCoachInput, viewer?: "white" | "black"): ProCoachNotes | null {
   const me: Color = i.playerColor === "white" ? "w" : "b";
   const pov = (cp: number) => (me === "w" ? cp : -cp);
   const played = apply(i.fenBefore, i.san);
@@ -964,18 +975,18 @@ export function proCoachNotes(i: BasicCoachInput): ProCoachNotes | null {
   } else if (bad) {
     if (pov(i.cpBefore) >= 9000 && best) s.push(`You had a forced checkmate here and didn't see it: ${best} ${bestWhy ?? "starts it"}.`);
     else {
-      if (did && costs.length) s.push(`${capFirst(did)}, but you didn't see that it also ${costs[0]}.`);
+      if (did && costs.length) s.push(/^after /.test(costs[0]) ? `${capFirst(did)}, but you didn't see the reply: ${costs[0]}.` : `${capFirst(did)}, but you didn't see that it also ${costs[0]}.`);
       else if (did && i.classification === "inaccuracy") s.push(`${capFirst(did)}, which makes sense.`);
       else if (did) s.push(`${capFirst(did)}, but it costs you ${pawnsWorth(swing)}.`);
-      else if (costs.length) s.push(`You didn't see that ${i.san} ${costs[0]}.`);
+      else if (costs.length) s.push(/^after /.test(costs[0]) ? `You didn't see the reply to ${i.san}: ${costs[0]}.` : `You didn't see that ${i.san} ${costs[0]}.`);
       else s.push(`${i.san} costs you ${pawnsWorth(swing)}.`);
       if (best) s.push(`${did && !costs.length && i.classification === "inaccuracy" ? "But " : ""}${best} was the move${bestWhy ? `: it ${bestWhy}` : ""}.`);
-      if (costs[1] && !s.join(" ").includes(costs[1])) s.push(`On top of that, it ${costs[1]}.`);
+      if (costs[1] && !s.join(" ").includes(costs[1])) s.push(/^after /.test(costs[1]) ? `On top of that, ${costs[1]}.` : `On top of that, it ${costs[1]}.`);
     }
     if (lesson) s.push(lesson);
   } else if (i.classification === "good") {
     s.push(did ? `Good job: ${did}.` : "A solid, safe move.");
-    if (costs.length) s.push(`The one thing you didn't see: it ${costs[0]}.`);
+    if (costs.length) s.push(/^after /.test(costs[0]) ? `The one thing you didn't see: ${costs[0]}.` : `The one thing you didn't see: it ${costs[0]}.`);
     else if (best && bestWhy) s.push(`${best} was a touch sharper, though: it ${bestWhy}.`);
     if (watch && s.length < 3) s.push(watch);
   } else {
@@ -984,6 +995,16 @@ export function proCoachNotes(i: BasicCoachInput): ProCoachNotes | null {
     if (watch) s.push(watch);
     else if (mainLine) s.push(`From here the main line is ${mainLine}.`);
   }
-  const take = s.join(" ").replace(/\s+/g, " ").trim();
-  return { pros: pros.slice(0, 2), cons: cons.slice(0, 2), take };
+  let take = s.join(" ").replace(/\s+/g, " ").trim();
+  let P = pros.slice(0, 2), C = cons.slice(0, 2);
+  if (viewer !== i.playerColor) {
+    // Someone else's move (the opponent, or a game the reader isn't in): no "you".
+    const side = me === "w" ? "White" : "Black", opp = me === "w" ? "Black" : "White";
+    const s2 = s.filter((x) => x !== lesson && x !== watch);
+    if (viewer && bad && i.replySan) s2.push(`You can punish it with ${i.replySan}.`);
+    take = thirdPerson(s2.join(" ").replace(/\s+/g, " ").trim(), side, opp).replace(/\bYou can punish\b/, "You can punish");
+    P = P.map((x) => thirdPerson(x, side, opp));
+    C = C.map((x) => thirdPerson(x, side, opp));
+  }
+  return { pros: P, cons: C, take };
 }
