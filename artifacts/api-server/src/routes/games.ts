@@ -837,14 +837,14 @@ router.get("/games/review-status/:jobId", async (req, res): Promise<void> => {
 
   if (job.status === "done") {
     const gameId = parseInt(job.targetUsername ?? "0", 10);
-    const [game] = await db.select({ reviewData: gamesTable.reviewData, opening: gamesTable.opening }).from(gamesTable).where(eq(gamesTable.id, gameId));
+    const [game] = await db.select().from(gamesTable).where(eq(gamesTable.id, gameId));
     if (game?.reviewData) {
       const cached = game.reviewData as Record<string, unknown>;
       const moves = cached.moves ?? cached;
       const gameSummary = cached.gameSummary ?? null;
       const whiteAccuracy = cached.whiteAccuracy ?? null;
       const blackAccuracy = cached.blackAccuracy ?? null;
-      res.json({ status: "done", reviewData: { moves: refreshBasicReview(markBookMoves(moves), aiFlag(cached), (game as { opening?: string | null }).opening ?? null), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: aiFlag(cached) } });
+      res.json({ status: "done", reviewData: { moves: refreshBasicReview(markBookMoves(moves), aiFlag(cached), game.opening ?? null, aiFlag(cached) ? await coachSideFor(game) : undefined), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: aiFlag(cached) } });
       return;
     }
   }
@@ -2110,7 +2110,7 @@ router.post("/games/:id/coach-gaps", requireAuth, async (req, res): Promise<void
     res.json({
       filled,
       reviewData: filled > 0 ? {
-        moves: refreshBasicReview(markBookMoves(moves), true, game.opening ?? null),
+        moves: refreshBasicReview(markBookMoves(moves), true, game.opening ?? null, await coachSideFor(game)),
         gameSummary: rd.gameSummary ?? null, whiteAccuracy: rd.whiteAccuracy ?? null, blackAccuracy: rd.blackAccuracy ?? null, aiCoach: true,
       } : undefined,
     });
@@ -2159,6 +2159,7 @@ async function runReviewJob(gameId: number, jobId: string, log: Logger, engineOn
       db.execute(sql`UPDATE background_jobs SET result = COALESCE(result, '{}'::jsonb) || ${JSON.stringify({ interim })}::jsonb
         WHERE id = ${jobId}`).catch(() => {});
     };
+    const coachSide = await coachSideFor(game);
     const reviewResult = await reviewFullGame({
       moves,
       opening: game.opening,
@@ -2183,13 +2184,13 @@ async function runReviewJob(gameId: number, jobId: string, log: Logger, engineOn
       onCoachProgress: (r) => {
         if (!engineBasic) return;
         const covered = new Set(r.covered);
-        const merged = refreshBasicReview(markBookMoves(r.moves), true, game.opening ?? null) as unknown[];
+        const merged = refreshBasicReview(markBookMoves(r.moves), true, game.opening ?? null, coachSide) as unknown[];
         writeInterim(engineBasic.map((m, i) => (covered.has(i) && merged[i] ? merged[i] : m)), covered.size);
       },
       userId: game.userId ?? undefined,
       // bot games and Learn Path reviews: engine only
       aiCoach: engineOnly || game.platform === "bot" ? false : await aiCoachForOwner(game.userId),
-      coachSide: await coachSideFor(game),
+      coachSide,
     });
 
     await saveReview(gameId, reviewResult);
@@ -2311,7 +2312,7 @@ router.get("/games/:id/review", async (req, res): Promise<void> => {
   }
 
   const [game] = await db
-    .select({ reviewData: gamesTable.reviewData, opening: gamesTable.opening })
+    .select()
     .from(gamesTable)
     .where(eq(gamesTable.id, params.data.id));
 
@@ -2332,7 +2333,7 @@ router.get("/games/:id/review", async (req, res): Promise<void> => {
         return rest;
       });
     }
-    res.json({ status: "done", reviewData: { moves: refreshBasicReview(markBookMoves(moves), aiFlag(cached), (game as { opening?: string | null }).opening ?? null), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: aiFlag(cached) } });
+    res.json({ status: "done", reviewData: { moves: refreshBasicReview(markBookMoves(moves), aiFlag(cached), game.opening ?? null, aiFlag(cached) ? await coachSideFor(game) : undefined), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: aiFlag(cached) } });
     return;
   }
 
@@ -2389,7 +2390,7 @@ router.post("/games/:id/review", async (req, res): Promise<void> => {
         return rest;
       });
     }
-    res.json({ status: "done", reviewData: { moves: refreshBasicReview(markBookMoves(moves), aiFlag(cached), (game as { opening?: string | null }).opening ?? null), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: aiFlag(cached) } });
+    res.json({ status: "done", reviewData: { moves: refreshBasicReview(markBookMoves(moves), aiFlag(cached), game.opening ?? null, aiFlag(cached) ? await coachSideFor(game) : undefined), gameSummary, whiteAccuracy, blackAccuracy, aiCoach: aiFlag(cached) } });
     return;
   }
 
