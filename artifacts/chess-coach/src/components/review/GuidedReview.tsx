@@ -178,55 +178,6 @@ function CoachTeaser({ label, onUpgrade }: { label: string; onUpgrade?: () => vo
 
 type Mode = { kind: 'main' } | { kind: 'best'; step: number } | { kind: 'reply'; step: number } | { kind: 'retry'; state: 'trying' | 'right' | 'wrong' };
 
-// The coach's plus and minus points weighed up in a sentence or two of plain English (Pro
-// coach card). Built from the points themselves, so it says what they add up to rather than
-// repeating the note above the board.
-const VERBS = /^(wins|attacks|threatens|develops|defends|controls|opens|weakens|loses|hangs|blocks|pins|forks|trades|creates|gains|protects|traps|skewers|frees|activates|centralizes|castles|covers|guards|targets|pressures|undermines|allows|gives|drops|misses|ignores|invites|stops|prevents|prepares|supports|improves|exchanges|sacrifices)\b/;
-const LOOSE = /^(\w+(?: \w+)?) (exposed|weakened|weak|undefended|loose|trapped|pinned|hanging|stuck|passive|misplaced|vulnerable|open)$/;
-function clause(raw: string, minus: boolean): string {
-  let x = raw.trim().replace(/[.!]+$/, '');
-  x = x.charAt(0).toLowerCase() + x.slice(1);
-  const loose = x.match(LOOSE);
-  if (loose) return /(safety|structure|position)$/.test(loose[1]) ? `weakens your ${loose[1]}` : `leaves your ${loose[1]} ${loose[2]}`;
-  const pot = x.match(/^(?:potential|possible) (.+)$/);
-  if (pot) return minus ? `could run into a ${pot[1]}` : `sets up a possible ${pot[1]}`;
-  if (VERBS.test(x)) {
-    // "wins pawn" -> "wins a pawn", "attacks rook" -> "attacks the rook"
-    return x.replace(/^(\w+) (pawn|piece|tempo|move)\b/, '$1 a $2').replace(/^(\w+) (rook|queen|king|knight|bishop|center|centre|file|diagonal|square|bishops|knights|rooks)\b/, '$1 the $2');
-  }
-  return minus ? `comes with ${x}` : `gives you ${x}`;
-}
-const joinAnd = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
-// "wins a pawn" -> "winning a pawn", "gives you central control" -> "getting central control"
-function gerund(cl: string): string {
-  if (cl.startsWith('gives you ')) return `getting ${cl.slice(10)}`;
-  if (cl.startsWith('sets up ')) return `setting up ${cl.slice(8)}`;
-  const m = cl.match(/^(\w+)(.*)$/);
-  if (!m) return cl;
-  let v = m[1];
-  v = /(ss|sh|ch|x|z)es$/.test(v) ? v.slice(0, -2) : v.endsWith('s') ? v.slice(0, -1) : v;
-  if (v === 'control') v = 'controll';
-  else if (/^[^aeiou]*[aeiou][^aeiouwxy]$/.test(v) && v.length <= 4) v += v.slice(-1); // win -> winn, pin -> pinn, stop -> stopp
-  else if (v.endsWith('e') && !v.endsWith('ee')) v = v.slice(0, -1);
-  return `${v}ing${m[2]}`;
-}
-/** Personal: what you did well and what you didn't see, from the coach's points. */
-function plainTake(pros: string[], cons: string[], cls: string): string | null {
-  const plus = pros.slice(0, 2).map((p) => gerund(clause(p, false)));
-  const minus = cons.slice(0, 2).map((c) => clause(c, true));
-  if (!plus.length && !minus.length) return null;
-  const bad = ['inaccuracy', 'mistake', 'blunder', 'miss', 'missed_win'].includes(cls);
-  if (bad) {
-    if (!minus.length) return `You had the right idea ${joinAnd(plus)}, but you missed a stronger move here. Take another look at the position.`;
-    return plus.length
-      ? `${joinAnd(plus).replace(/^./, (c) => c.toUpperCase())} was a fair idea, but you didn't see that this move ${joinAnd(minus)}. That cost you more than it gained.`
-      : `You didn't see that this move ${joinAnd(minus)}. Slow down and check what your opponent can do next.`;
-  }
-  if (!minus.length) return `You did a good job ${joinAnd(plus)}, and it doesn't cost you anything. Nicely played.`;
-  if (!plus.length) return `This works, but you didn't see that it ${joinAnd(minus)}. Keep an eye on that next move.`;
-  return `You did a good job ${joinAnd(plus)}, but you also didn't see that it ${joinAnd(minus)}. Keep an eye on that next move.`;
-}
-
 export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flipped, onFlip, whiteName, blackName, accuracy, result, onExit, onReport, onBack, endExtra, coachPending = false, coachProgress = null, liveEvals = null, status = 'ready', progress, errorText, onRetryReview, canFullAnalysis = true, onUpgrade, canRemix = false }: GuidedReviewProps) {
   // Remix (admin, for content): a new random board and piece set on every move.
   const [remixOn, setRemixOn] = useState(false);
@@ -539,7 +490,7 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
     // cons go in a card under the board, as before. Free reviews have neither.
     const aiCoached = !!(rev.pros?.length || rev.cons?.length || rev.coachTake);
     if (aiCoached) {
-      const take = rev.coachTake || plainTake(rev.pros ?? [], rev.cons ?? [], rev.classification);
+      const take = rev.coachTake || null;
       detail = (
         <>
           <p className="mb-1 text-[11.5px] font-bold uppercase tracking-wide text-[#87918E]">Coach</p>
