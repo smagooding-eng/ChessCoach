@@ -2183,7 +2183,7 @@ async function runReviewJob(gameId: number, jobId: string, log: Logger): Promise
       onCoachProgress: (r) => {
         if (!engineBasic) return;
         const covered = new Set(r.covered);
-        const merged = markBookMoves(r.moves) as unknown[];
+        const merged = refreshBasicReview(markBookMoves(r.moves), true, game.opening ?? null) as unknown[];
         writeInterim(engineBasic.map((m, i) => (covered.has(i) && merged[i] ? merged[i] : m)), covered.size);
       },
       userId: game.userId ?? undefined,

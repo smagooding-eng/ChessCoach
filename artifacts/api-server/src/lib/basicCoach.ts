@@ -713,7 +713,8 @@ export function refreshBasicReview(moves: unknown, aiCoach: boolean, openingName
   const clean = (s?: string | null) => (s ? s.split(/\s+[—–-]\s+/)[0].trim() : null);
   return all.map((m, i) => {
     try {
-      if (!m || !m.fen || !m.san || typeof m.evalAfterCp !== "number" || !m.color || !m.classification) return m;
+      if (!m || !m.fen || !m.san || !m.color || !m.classification) return m;
+      if (typeof m.evalAfterCp !== "number" && !aiCoach) return m;
       const c = new Chess(m.fen);
       const r = c.move(m.san);
       if (!r) return m;
@@ -723,8 +724,8 @@ export function refreshBasicReview(moves: unknown, aiCoach: boolean, openingName
       const input: BasicCoachInput = {
         fenBefore: m.fen, fenAfter: c.fen(), san: m.san, classification: m.classification, playerColor: m.color,
         moveIndex: typeof m.moveIndex === "number" ? m.moveIndex : i,
-        cpBefore: i === 0 ? 20 : typeof prev?.evalAfterCp === "number" ? prev.evalAfterCp : m.evalAfterCp,
-        cpAfter: m.evalAfterCp, bestMoveSan: clean(m.betterMove), replySan, inBook: m.classification === "book",
+        cpBefore: i === 0 ? 20 : typeof prev?.evalAfterCp === "number" ? prev.evalAfterCp : m.evalAfterCp ?? 0,
+        cpAfter: m.evalAfterCp ?? 0, bestMoveSan: clean(m.betterMove), replySan, inBook: m.classification === "book",
         prevClassification: prev?.classification ?? null,
         prevSan: prev?.san ?? null,
         bestLine: m.bestLineSan ?? null, replyLine: m.replyLineSan ?? null, openingName,
@@ -820,7 +821,14 @@ function moveDoes(fenBefore: string, san: string, me: Color, moveIndex: number, 
   if (!m.captured) {
     for (const s of quietIdeas(before, c, m, me, opening, endgame, fenBefore + san)) {
       if (/^(This|Its|The|An?)\b/.test(s) || !/^[A-Z][a-z]+s\b/.test(s)) continue;
-      add(lcFirst(noStop(s)).replace(/ with the pawn$/, ""));
+      if (/^Doubles up/.test(s)) {
+        // only when nothing stands between the two pieces on the file
+        const mates = pieces(c).filter((p) => p.color === me && (p.type === "r" || p.type === "q") && p.square[0] === m.to[0]).map((p) => parseInt(p.square[1])).sort();
+        let clear = mates.length >= 2;
+        for (let r = mates[0] + 1; clear && r < mates[mates.length - 1]; r++) if (c.get(`${m.to[0]}${r}` as Square)) clear = false;
+        if (!clear) continue;
+      }
+      add(lcFirst(noStop(s)).replace(/ with the pawn$/, "").replace(/^kicks (the (?:pawn) on)/, "challenges $1"));
     }
   }
   // A pawn that hits an enemy pawn: a central break.
