@@ -1,0 +1,54 @@
+name: Database read (for analysis)
+
+# Runs one read-only query from scripts/dig/ against the live database and
+# saves the result encrypted (claude-shots key) to the claude-dig branch.
+# Nothing is written to the database: the session is read-only.
+
+on:
+  workflow_dispatch:
+    inputs:
+      query:
+        description: 'Query file in scripts/dig (without .sql)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  dig:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the query
+        env: { RK: "${{ secrets.RENDER_API_KEY }}" }
+        run: |
+          Q="scripts/dig/${{ github.event.inputs.query }}.sql"
+          case "${{ github.event.inputs.query }}" in *[!a-z0-9-]*) echo "Bad name"; exit 1;; esac
+          [ -f "$Q" ] || { echo "No $Q"; exit 1; }
+          H=(-H "Authorization: Bearer $RK" -H "Accept: application/json")
+          SID=$(curl -fsS "${H[@]}" "https://api.render.com/v1/services?name=chesscoach-api&limit=1" | jq -r '.[0].service.id')
+          DB=$(curl -fsS "${H[@]}" "https://api.render.com/v1/services/$SID/env-vars?limit=100" | jq -r '.[].envVar | select(.key=="DATABASE_URL") | .value')
+          if [ -z "$DB" ]; then
+            for G in $(curl -fsS "${H[@]}" "https://api.render.com/v1/env-groups?limit=100" | jq -r --arg s "$SID" '.[] | (.envGroup // .) | select([.serviceLinks[]?.id] | index($s)) | .id'); do
+              DB=$(curl -fsS "${H[@]}" "https://api.render.com/v1/env-groups/$G" | jq -r '.envVars[]? | select(.key=="DATABASE_URL") | .value'); [ -n "$DB" ] && break
+            done
+          fi
+          [ -n "$DB" ] || { echo "Couldn't find the database address."; exit 1; }
+          echo "::add-mask::$DB"
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+          mkdir -p /tmp/out
+          PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=120000' psql "$DB" -v ON_ERROR_STOP=1 -At -f "$Q" > /tmp/out/result.jsonl
+          wc -l /tmp/out/result.jsonl
+      - name: Encrypt and push
+        run: |
+          cd /tmp
+          tar czf r.tgz -C /tmp/out .
+          openssl rand -hex 32 > k.txt
+          openssl enc -aes-256-cbc -pbkdf2 -salt -in r.tgz -out r.tgz.enc -pass file:k.txt
+          openssl pkeyutl -encrypt -pubin -inkey "$GITHUB_WORKSPACE/scripts/claude-shots.pub.pem" -in k.txt -out k.enc
+          rm k.txt
+          mkdir push && cp r.tgz.enc k.enc push/
+          cd push && git init -q && git checkout -q -b claude-dig
+          git config user.name "db-dig-bot" && git config user.email "db-dig-bot@users.noreply.github.com"
+          git add . && git commit -q -m "Query result (encrypted)"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" claude-dig
