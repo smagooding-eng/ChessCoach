@@ -1,5 +1,7 @@
 import { markValueMoment } from '@/lib/valueMoment';
 import { startTrial } from '@/lib/startTrial';
+import { trackFunnelEvent } from '@/lib/funnelTracking';
+import { apiFetch } from '@/lib/api';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Chess } from 'chess.js';
@@ -210,8 +212,26 @@ export function decidingMove(reviewMoves: GuidedReviewMove[], mySide: 'w' | 'b' 
   return best && Math.abs(best.to - best.from) >= 8 ? best : null;
 }
 
-function FirstReviewNext({ onDaily, onPlay, onHome }: { onDaily: () => void; onPlay: () => void; onHome: () => void }) {
+function FirstReviewNext({ onDaily, onPlay, onHome, offerTrial }: { onDaily: () => void; onPlay: () => void; onHome: () => void; offerTrial?: boolean }) {
   const { permission, isSubscribed, subscribe, loading } = usePushNotifications();
+  // Free accounts that can still take the trial: the offer, inline (not a popup).
+  const [eligible, setEligible] = useState(false);
+  const [trialBusy, setTrialBusy] = useState(false);
+  const [trialErr, setTrialErr] = useState('');
+  useEffect(() => {
+    if (!offerTrial) return;
+    let off = false;
+    void apiFetch('/api/stripe/trial-offer', { credentials: 'include' }).then((r) => (r.ok ? r.json() : null)).then((d) => {
+      if (!off && d?.eligible) { setEligible(true); trackFunnelEvent('trial_card_shown'); }
+    }).catch(() => {});
+    return () => { off = true; };
+  }, [offerTrial]);
+  const tryPro = async () => {
+    trackFunnelEvent('trial_card_clicked');
+    setTrialBusy(true); setTrialErr('');
+    const e = await startTrial('coach');
+    if (e) { setTrialErr(e); setTrialBusy(false); }
+  };
   const notifyOn = permission === 'granted' && isSubscribed;
   const canAsk = !notifyOn && permission !== 'denied' && permission !== 'unsupported';
   const row = 'flex w-full items-center gap-3 rounded-[13px] px-3 py-2.5 text-left';
@@ -234,6 +254,20 @@ function FirstReviewNext({ onDaily, onPlay, onHome }: { onDaily: () => void; onP
           <ChevronRight size={18} className="shrink-0" style={{ color: '#C9CFCD' }} />
         </button>
       </div>
+      {eligible && (
+        <div className="mt-3 rounded-[13px] px-3 py-3" style={{ background: '#1D2628', border: '1px solid rgba(232,180,71,.35)' }}>
+          <div className="flex items-center gap-2">
+            <span className="shrink-0 rounded-md px-1.5 py-0.5 text-[10.5px] font-black uppercase tracking-wide" style={{ background: '#E8B447', color: '#1C1C1C' }}>Pro</span>
+            <span className="text-[14px] font-extrabold text-white">Your coach on every move</span>
+          </div>
+          <p className="mt-1 text-[12.5px] leading-snug" style={{ color: '#AEB6B3' }}>What you did well and what you missed, in plain English, on every game; your weak spots across all your games; courses built from your own mistakes.</p>
+          <button onClick={() => void tryPro()} disabled={trialBusy} className="mt-2.5 w-full rounded-xl py-2.5 text-[13.5px] font-extrabold disabled:opacity-60" style={{ background: GREEN, color: '#06110A' }}>
+            {trialBusy ? 'Opening…' : 'Try Pro free for 3 days'}
+          </button>
+          <p className="mt-1.5 text-center text-[11px]" style={{ color: '#87918E' }}>Cancel any time before it ends and you pay nothing.</p>
+          {trialErr && <p className="mt-1 text-[11.5px] font-bold text-[#FF7A80]">{trialErr}</p>}
+        </div>
+      )}
       <div className="mt-3 rounded-[13px] px-3 py-2.5" style={{ background: 'rgba(255,255,255,.04)' }}>
         <p className="text-[12.5px] leading-snug" style={{ color: '#C9CFCD' }}>
           Your other games are being reviewed now, and your report (strengths, weak spots, what to train) builds from them.
@@ -791,7 +825,7 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
           </div>
         )}
         {firstReview && status === 'ready' && mode.kind === 'main' && ((decisive && (ply === decisive.ply || seenDecisive)) || atEnd) && (
-          <FirstReviewNext onDaily={() => navigateTo('/daily-three')} onPlay={() => navigateTo('/play')} onHome={() => navigateTo('/')} />
+          <FirstReviewNext offerTrial={!canFullAnalysis} onDaily={() => navigateTo('/daily-three')} onPlay={() => navigateTo('/play')} onHome={() => navigateTo('/')} />
         )}
         {/* End of game summary */}
         {atEnd && (

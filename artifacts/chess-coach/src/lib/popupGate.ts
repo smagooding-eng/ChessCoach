@@ -22,8 +22,8 @@ export function isNewMember(user: { id?: string; joinedAt?: string | null } | nu
 }
 
 /** May this popup open now? Claims the visit's one popup when it says yes. */
-export function claimPopup(name: PopupName, user: { id?: string; joinedAt?: string | null } | null | undefined): boolean {
-  if (isNewMember(user)) return false;
+export function claimPopup(name: PopupName, user: { id?: string; joinedAt?: string | null } | null | undefined, opts: { allowNew?: boolean } = {}): boolean {
+  if (isNewMember(user) && !opts.allowNew) return false;
   try {
     const taken = sessionStorage.getItem(VISIT_KEY);
     if (taken && taken !== name) return false;
