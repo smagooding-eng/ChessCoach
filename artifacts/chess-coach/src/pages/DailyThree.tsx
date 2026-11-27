@@ -7,7 +7,7 @@ import { Link } from 'wouter';
 import { ArrowLeft, Bell, Check, ChevronRight } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { ScoutIcon } from '@/components/ScoutIcons';
-import { PuzzleSet } from '@/pages/PathStep';
+import { PuzzleSet } from '@/components/puzzles/PuzzleRun';
 import type { TacticPuzzleData } from '@/components/tactics/TacticPuzzle';
 import { usePushNotifications } from '@/hooks/use-push-notifications';
 
