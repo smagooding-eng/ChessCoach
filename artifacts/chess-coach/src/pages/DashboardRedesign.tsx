@@ -1,6 +1,7 @@
 import { SocialLinks } from '@/components/SocialLinks';
 import { MaintenanceBanner } from '@/components/MaintenanceNotice';
 import { ExtensionCard } from '@/components/ExtensionCard';
+import { TodaysThreeCard } from '@/components/TodaysThreeCard';
 import React, { useEffect, useRef, useState } from 'react';
 import { autoImportLinkedAccounts } from '@/lib/autoImport';
 import { Link, useLocation } from 'wouter';
@@ -257,6 +258,9 @@ export function DashboardRedesign() {
             <ChevronRight size={16} className="shrink-0" style={{ color: MUTED }} />
           </Link>
         </div>
+
+        {/* ── Today's 3 puzzles from your games (hidden until there are games) ── */}
+        <TodaysThreeCard className="lg:col-span-2" card={CARD} border={BORDER} muted={MUTED} />
 
         {/* ── Your live / daily games (hidden when none) ── */}
         <ChallengeInbox className="lg:col-span-2" />

@@ -181,7 +181,8 @@ function PathPuzzle({ p, last, onNext }: { p: TacticPuzzleData; last: boolean; o
 }
 
 /** A fixed set of puzzles; one missed (or solved with help) comes back at the end. */
-function PuzzleSet({ puzzles, onDone }: { puzzles: TacticPuzzleData[]; onDone: () => void }) {
+export function PuzzleSet({ puzzles, onDone, onResult }: { puzzles: TacticPuzzleData[]; onDone: () => void; /** Each puzzle the first time it's finished: solved cleanly or not. */ onResult?: (p: TacticPuzzleData, clean: boolean) => void }) {
+  const reported = useRef(new Set<number>());
   const [queue, setQueue] = useState(puzzles);
   const [solved, setSolved] = useState(0);
   const [round, setRound] = useState(0);
@@ -195,6 +196,7 @@ function PuzzleSet({ puzzles, onDone }: { puzzles: TacticPuzzleData[]; onDone: (
       </div>
       <PathPuzzle key={`${p.id}-${round}`} p={p} last={queue.length === 1}
         onNext={(clean) => {
+          if (!reported.current.has(p.id)) { reported.current.add(p.id); onResult?.(p, clean); }
           setRound((r) => r + 1);
           if (clean) { const left = queue.slice(1); setSolved((n) => n + 1); setQueue(left); if (!left.length) onDone(); }
           else setQueue([...queue.slice(1), queue[0]]);

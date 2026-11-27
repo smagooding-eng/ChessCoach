@@ -1456,8 +1456,8 @@ async function notifyReviewed(userId: string, n: number, coach: boolean) {
   await notifyUser(userId, {
     kind: "review",
     title: n === 1 ? "Your game is reviewed" : `All ${n} games reviewed`,
-    body: coach ? "Your coach has gone through every game. See what to work on." : "Every move checked by Stockfish. See your mistakes and best moves.",
-    url: "/games",
+    body: coach ? "Your coach has gone through every game. See what to work on." : "Your report is ready: your strengths, weak spots and what to train first.",
+    url: "/analysis",
   }).catch(() => {});
 }
 

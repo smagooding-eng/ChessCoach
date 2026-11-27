@@ -1217,6 +1217,8 @@ export function GameReplay() {
         result={game.result ?? null}
         onExit={() => { setGtab('analysis'); setGuided(false); }}
         onReport={openReport}
+        firstReview={typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('first') === '1'}
+        mySide={mySide}
         onBack={() => { if (canGoBack()) window.history.back(); else navigate('/games'); }}
         endExtra={authUser && reviewMoves.length > 0 && [authUser.chesscomUsername, authUser.lichessUsername].filter(Boolean).map((n) => String(n).toLowerCase()).some((n) => n === (game.whiteUsername ?? '').toLowerCase() || n === (game.blackUsername ?? '').toLowerCase()) ? <StayInTouchCard /> : null}
       /></>

@@ -239,6 +239,7 @@ const ShopPage = lazyRetry(() => import("@/pages/Shop").then(m => ({ default: m.
 const SolvedPuzzles = lazyRetry(() => import("@/pages/SolvedPuzzles"));
 const LastGame = lazyRetry(() => import("@/pages/LastGame"));
 const PuzzleHub = lazyRetry(() => import("@/pages/PuzzleHub"));
+const DailyThree = lazyRetry(() => import("@/pages/DailyThree"));
 const ProgressPage = lazyRetry(() => import("@/pages/Progress"));
 const ReportCard = lazyRetry(() => import("@/pages/ReportCard"));
 const FieldNotes = lazyRetry(() => import("@/pages/FieldNotes"));
@@ -427,6 +428,7 @@ const PShop          = () => <ProtectedRoute component={ShopPage} />;
 const PSolvedPuzzles = () => <ProtectedRoute component={SolvedPuzzles} />;
 const PLastGame = () => <ProtectedRoute component={LastGame} />;
 const PPuzzleHub = () => <ProtectedRoute component={PuzzleHub} />;
+const PDailyThree = () => <ProtectedRoute component={DailyThree} />;
 const PProgress = () => <ProtectedRoute component={ProgressPage} />;
 const PReportCard = () => <ProtectedRoute component={ReportCard} />;
 const PFieldNotes = () => <ProtectedRoute component={FieldNotes} />;
@@ -749,6 +751,7 @@ function Router() {
       <Route path="/shop"             component={PShop} />
       <Route path="/puzzles/solved"   component={PSolvedPuzzles} />
       <Route path="/puzzles/hub"      component={PPuzzleHub} />
+      <Route path="/daily-three"      component={PDailyThree} />
       <Route path="/progress"         component={PProgress} />
       <Route path="/report-card"      component={PReportCard} />
       <Route path="/field-notes"      component={PFieldNotes} />
