@@ -60,6 +60,7 @@ import { requirePremium } from "../middlewares/authMiddleware";
 import { db } from "@workspace/db";
 import { botKind } from "../lib/botDetect";
 import { sql } from "drizzle-orm";
+import dailyThreeRouter from "./dailyThree";
 
 const router: IRouter = Router();
 
@@ -193,5 +194,6 @@ router.use(coursesRouter);
 router.use(opponentsRouter);
 router.use("/tts", requirePremium);
 router.use(ttsRouter);
+router.use(dailyThreeRouter);
 
 export default router;

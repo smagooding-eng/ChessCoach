@@ -32,6 +32,12 @@ export function startGrowthScheduler() {
 
   // Push reminders once a day at 18:00 UTC (2pm New York, 11am California,
   // 7pm London) so nobody's phone buzzes in the middle of the night.
+  // Today's 3: one reminder a day, in each member's usual hour.
+  cron.schedule('5 * * * *', async () => {
+    const { sendDailyThreeReminders } = await import('../routes/dailyThree');
+    await sendDailyThreeReminders();
+  });
+
   cron.schedule('0 18 * * *', async () => {
     logger.info('[growth] Push drip check');
     await runPushDrips();
