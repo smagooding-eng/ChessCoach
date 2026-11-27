@@ -9,6 +9,7 @@ import { apiFetch } from '@/lib/api';
 import { PuzzleSet } from '@/components/puzzles/PuzzleRun';
 import type { TacticPuzzleData } from '@/components/tactics/TacticPuzzle';
 import { usePushNotifications } from '@/hooks/use-push-notifications';
+import { markValueMoment } from '@/lib/valueMoment';
 
 const MUTED = '#8F9997', GREEN = '#81B64C', CARD = '#182123', CARD2 = '#212B2D', BORDER = 'rgba(255,255,255,.07)';
 type DP = TacticPuzzleData & { fromYourGame: boolean; gameId: number | null; opponent: string | null };
@@ -53,6 +54,7 @@ export default function DailyThreePage() {
     const r = await apiFetch('/api/daily-three/done', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ day: today(), solved: solved.current }) }).catch(() => null);
     const d = r?.ok ? await r.json().catch(() => null) as { streak?: number } | null : null;
     setFinished({ streak: d?.streak ?? (data?.streak ?? 0) + 1, solved: solved.current });
+    markValueMoment('puzzles');
   };
 
   const own = data?.puzzles.filter((p) => p.fromYourGame).length ?? 0;

@@ -13,7 +13,7 @@ import { STUDIO_FRAME } from '@/lib/studioFrame';
 // v2: the first version kept the offer hidden for 3 seconds behind its animation, so
 // nearly everyone closed it unseen; members who didn't start get the fixed one once.
 const SEEN = (uid: string) => `cs_trial_promo_v2:${uid}`;
-const EVERY_MS = 3 * 24 * 60 * 60_000; // every few days, only after a review or a finished game
+const EVERY_MS = 20 * 60 * 60_000; // at most once a day, only after a review, a finished game or today's puzzles
 /** Shown in the last couple of minutes (the notifications nudge waits its turn). */
 export const PROMO_OPEN_KEY = 'cs_promo_open_at';
 // Places it would get in the way (sign-up, checkout, the free review page, the studio)
@@ -53,7 +53,8 @@ export function TrialPromo() {
     if (!moment) return;
     const path = pathRef.current;
     if (!authUser || !isSubscriptionLoaded || isPremium || open) return;
-    if (isNewMember(authUser as never)) return; // not in their first days
+    // In their first days only after a finished review (they've just seen what it does).
+    if (isNewMember(authUser as never) && moment.kind !== 'review') return;
     if (STUDIO_FRAME || window.self !== window.top || SKIP.test(path)) return;
     let seen = false;
     try { const at = Number(localStorage.getItem(SEEN(authUser.id)) || 0); seen = !!at && Date.now() - at < EVERY_MS; } catch { /* storage off */ }
@@ -64,7 +65,7 @@ export function TrialPromo() {
         const r = await apiFetch('/api/stripe/trial-offer', { credentials: 'include' });
         const d = r.ok ? await r.json() : null;
         if (gone || !d?.eligible || document.visibilityState !== 'visible') return;
-        if (!claimPopup('pro_offer', authUser as never)) return;
+        if (!claimPopup('pro_offer', authUser as never, { allowNew: moment.kind === 'review' })) return;
         setDays(Number(d.days) || 3);
         try { localStorage.setItem(SEEN(authUser.id), String(Date.now())); localStorage.setItem(PROMO_OPEN_KEY, String(Date.now())); } catch { /* storage off */ }
         setOpen(true);

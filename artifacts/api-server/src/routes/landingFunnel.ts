@@ -94,6 +94,7 @@ const VALID_EVENTS = new Set([
   "engaged_10s",
   // in-app popups: shown and closed, to see what they do to new members
   "popup_shown_pro_offer", "popup_closed_pro_offer", "popup_shown_board_setup", "popup_closed_board_setup",
+  "trial_card_shown", "trial_card_clicked",
   "popup_shown_review_alerts", "popup_closed_review_alerts",
   ...CHECKOUT_EVENTS,
   ...SECTION_IDS.map((s) => `viewed_${s}`),
