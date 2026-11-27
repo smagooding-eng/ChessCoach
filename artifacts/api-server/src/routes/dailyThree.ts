@@ -11,6 +11,8 @@ import { logger } from "../lib/logger";
 const router: IRouter = Router();
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 type Row = Record<string, unknown>;
+/** A list of ids as one Postgres array value (a JS array in sql`` would become a list of values). */
+const intArr = (xs: number[]) => sql`${`{${xs.filter((x) => Number.isInteger(x)).join(",")}}`}::int[]`;
 const rowsOf = (r: unknown): Row[] => (Array.isArray(r) ? r : ((r as { rows?: Row[] })?.rows ?? [])) as Row[];
 
 let ready: Promise<unknown> | null = null;
@@ -52,7 +54,7 @@ async function ownUnsolved(userId: string, limit: number, exclude: number[]): Pr
     FROM puzzles p JOIN games g ON g.id = p.game_id
     WHERE g.user_id = ${userId} AND p.source = 'game' AND NOT p.archived
       AND NOT EXISTS (SELECT 1 FROM puzzle_attempts a WHERE a.user_id = ${userId} AND a.puzzle_id = p.id AND a.solved)
-      ${exclude.length ? sql`AND p.id <> ALL(${exclude}::int[])` : sql``}
+      ${exclude.length ? sql`AND p.id <> ALL(${intArr(exclude)})` : sql``}
     ORDER BY g.played_at DESC NULLS LAST, p.id
     LIMIT ${limit}`));
 }
@@ -63,7 +65,7 @@ async function byIds(ids: number[]): Promise<Row[]> {
     SELECT p.id, p.fen, p.moves, p.rating, p.themes, p.game_id, p.source,
       EXISTS (SELECT 1 FROM puzzle_setup_fixed f WHERE f.puzzle_id = p.id) AS setup,
       CASE WHEN lower(g.white_username) = lower(g.username) THEN g.black_username ELSE g.white_username END AS opponent
-    FROM puzzles p LEFT JOIN games g ON g.id = p.game_id WHERE p.id = ANY(${ids}::int[])`));
+    FROM puzzles p LEFT JOIN games g ON g.id = p.game_id WHERE p.id = ANY(${intArr(ids)})`));
   const by = new Map(rows.map((r) => [Number(r.id), r]));
   return ids.map((id) => by.get(id)).filter((r): r is Row => !!r);
 }
@@ -98,12 +100,12 @@ router.get("/daily-three", requireAuth, async (req: Request, res: Response) => {
         const extra = rowsOf(await db.execute(sql`
           SELECT p.id FROM puzzles p WHERE p.source <> 'game' AND NOT p.archived AND p.rating BETWEEN ${lvl - 250} AND ${lvl + 150}
             AND NOT EXISTS (SELECT 1 FROM puzzle_attempts a WHERE a.user_id = ${userId} AND a.puzzle_id = p.id)
-            ${ids.length ? sql`AND p.id <> ALL(${ids}::int[])` : sql``}
-          ORDER BY md5(p.id::text || ${day} || ${userId}) LIMIT ${3 - ids.length}`));
+            ${ids.length ? sql`AND p.id <> ALL(${intArr(ids)})` : sql``}
+          ORDER BY md5(p.id::text || ${day}::text || ${userId}::text) LIMIT ${3 - ids.length}`));
         ids = [...ids, ...extra.map((r) => Number(r.id))];
       }
       if (ids.length >= 3 || req.query.fill !== "0") {
-        await db.execute(sql`INSERT INTO daily_three (user_id, day, puzzle_ids) VALUES (${userId}, ${day}::date, ${ids}::int[])
+        await db.execute(sql`INSERT INTO daily_three (user_id, day, puzzle_ids) VALUES (${userId}, ${day}::date, ${intArr(ids)})
           ON CONFLICT (user_id, day) DO UPDATE SET puzzle_ids = EXCLUDED.puzzle_ids WHERE daily_three.done_at IS NULL`);
       }
     }
