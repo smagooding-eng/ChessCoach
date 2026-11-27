@@ -4,7 +4,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion';
 import { Chess } from 'chess.js';
 import { useHoldRepeat } from '@/hooks/use-hold-repeat';
-import { ArrowLeft, ChevronLeft, ChevronRight, FlipVertical2, ListTree, Star, RotateCcw, X, Sparkles } from 'lucide-react';
+import { ArrowLeft, Bell, ChevronLeft, ChevronRight, FlipVertical2, ListTree, Star, RotateCcw, X, Sparkles } from 'lucide-react';
+import { usePushNotifications } from '@/hooks/use-push-notifications';
+import { useLocation } from 'wouter';
 import { MaterialStrip } from '@/components/GameStatusStrip';
 import { ChessBoard, type MoveQuality } from '@/components/ChessBoard';
 import { normalizeFen } from '@/lib/utils';
@@ -129,6 +131,10 @@ export interface GuidedReviewProps {
   onBack: () => void;
   /** Shown under the end-of-game summary (e.g. the stay-in-touch offer). */
   endExtra?: React.ReactNode;
+  /** The member's first review after signing up: open at the deciding move, then "what's next". */
+  firstReview?: boolean;
+  /** Which side the member played (for the deciding move). */
+  mySide?: 'w' | 'b' | null;
   /** The engine review is showing; the AI coach's notes are still being written. */
   coachPending?: boolean;
   /** How far the coach's notes have got (moves covered so far, of all). */
@@ -178,7 +184,73 @@ function CoachTeaser({ label, onUpgrade }: { label: string; onUpgrade?: () => vo
 
 type Mode = { kind: 'main' } | { kind: 'best'; step: number } | { kind: 'reply'; step: number } | { kind: 'retry'; state: 'trying' | 'right' | 'wrong' };
 
-export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flipped, onFlip, whiteName, blackName, accuracy, result, onExit, onReport, onBack, endExtra, coachPending = false, coachProgress = null, liveEvals = null, status = 'ready', progress, errorText, onRetryReview, canFullAnalysis = true, onUpgrade, canRemix = false }: GuidedReviewProps) {
+// ── First review after signing up ──────────────────────────────────────────
+// The review opens at the move that decided the game (the biggest swing in the
+// member's winning chances), and a "what's next" card offers today's puzzles from
+// their own mistakes, a live game, and a heads-up when the full report is ready.
+const winFor = (cp: number, side: 'w' | 'b') => {
+  const w = Math.abs(cp) >= 9000 ? (cp > 0 ? 100 : 0) : 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1);
+  return side === 'w' ? w : 100 - w;
+};
+export function decidingMove(reviewMoves: GuidedReviewMove[], mySide: 'w' | 'b' | null): { ply: number; from: number; to: number; mine: boolean } | null {
+  const side = mySide ?? 'w';
+  const myColor = side === 'w' ? 'white' : 'black';
+  const sorted = [...reviewMoves].sort((a, b) => a.moveIndex - b.moveIndex);
+  let prev = 20, best: { ply: number; from: number; to: number; mine: boolean; score: number } | null = null;
+  for (const m of sorted) {
+    if (typeof m.evalAfterCp !== 'number') continue;
+    const from = winFor(prev, side), to = winFor(m.evalAfterCp, side);
+    prev = m.evalAfterCp;
+    if (!['inaccuracy', 'mistake', 'blunder', 'missed_win'].includes(m.classification)) continue;
+    const mine = !mySide || m.color === myColor;
+    // the member's own slips first: that's what they can fix
+    const score = Math.abs(to - from) * (mine ? 1.5 : 1);
+    if (!best || score > best.score) best = { ply: m.moveIndex + 1, from, to, mine, score };
+  }
+  return best && Math.abs(best.to - best.from) >= 8 ? best : null;
+}
+
+function FirstReviewNext({ onDaily, onPlay, onHome }: { onDaily: () => void; onPlay: () => void; onHome: () => void }) {
+  const { permission, isSubscribed, subscribe, loading } = usePushNotifications();
+  const notifyOn = permission === 'granted' && isSubscribed;
+  const canAsk = !notifyOn && permission !== 'denied' && permission !== 'unsupported';
+  const row = 'flex w-full items-center gap-3 rounded-[13px] px-3 py-2.5 text-left';
+  return (
+    <div className="mx-3 mt-2 rounded-[16px] p-3.5" style={{ background: '#162022', border: '1px solid rgba(255,255,255,.08)' }}>
+      <p className="text-[15px] font-extrabold text-white">What's next</p>
+      <div className="mt-2.5 space-y-2">
+        <button onClick={onDaily} className={row} style={{ background: 'rgba(129,182,76,.14)', border: '1px solid rgba(129,182,76,.35)' }}>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[14px] font-extrabold text-white">Fix it: today's 3 puzzles</span>
+            <span className="block text-[12px] leading-snug" style={{ color: '#AEB6B3' }}>Positions from your own games where the better move was there. New ones every day.</span>
+          </span>
+          <ChevronRight size={18} className="shrink-0" style={{ color: GREEN }} />
+        </button>
+        <button onClick={onPlay} className={row} style={{ background: 'rgba(255,255,255,.06)' }}>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[14px] font-extrabold text-white">Play a game now</span>
+            <span className="block text-[12px] leading-snug" style={{ color: '#AEB6B3' }}>Find a live opponent here or on Lichess, and it's reviewed when you're done.</span>
+          </span>
+          <ChevronRight size={18} className="shrink-0" style={{ color: '#C9CFCD' }} />
+        </button>
+      </div>
+      <div className="mt-3 rounded-[13px] px-3 py-2.5" style={{ background: 'rgba(255,255,255,.04)' }}>
+        <p className="text-[12.5px] leading-snug" style={{ color: '#C9CFCD' }}>
+          Your other games are being reviewed now, and your report (strengths, weak spots, what to train) builds from them.
+          {notifyOn ? ' We’ll let you know when it’s ready.' : canAsk ? ' Turn on notifications and we’ll tell you when it’s ready.' : ''}
+        </p>
+        {canAsk && (
+          <button onClick={() => { void subscribe(); }} disabled={loading} className="mt-2 flex items-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-extrabold text-white disabled:opacity-60" style={{ background: 'linear-gradient(180deg,#81B64C,#5F8F36)' }}>
+            <Bell size={14} /> Turn on notifications
+          </button>
+        )}
+      </div>
+      <button onClick={onHome} className="mt-2.5 text-[12.5px] font-bold underline" style={{ color: '#87918E' }}>Go to my dashboard</button>
+    </div>
+  );
+}
+
+export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flipped, onFlip, whiteName, blackName, accuracy, result, onExit, onReport, onBack, endExtra, coachPending = false, coachProgress = null, liveEvals = null, status = 'ready', progress, errorText, onRetryReview, canFullAnalysis = true, onUpgrade, canRemix = false, firstReview = false, mySide = null }: GuidedReviewProps) {
   // Remix (admin, for content): a new random board and piece set on every move.
   const [remixOn, setRemixOn] = useState(false);
   const remixLooks = useRef(new Map<number, BoardLook>());
@@ -187,6 +259,17 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
   const openReport = canFullAnalysis ? (onReport ?? onExit) : (onUpgrade ?? onExit);
   const max = moves.length;
   const [mode, setMode] = useState<Mode>({ kind: 'main' });
+  const [, navigateTo] = useLocation();
+  // First review: jump to the deciding move once the review is in.
+  const [decisive, setDecisive] = useState<{ ply: number; from: number; to: number; mine: boolean } | null>(null);
+  const decisiveDone = useRef(false);
+  useEffect(() => {
+    if (!firstReview || decisiveDone.current || status !== 'ready' || reviewMoves.length === 0) return;
+    decisiveDone.current = true;
+    const d = decidingMove(reviewMoves, mySide);
+    if (d) { setDecisive(d); setPly(d.ply); }
+  }, [firstReview, status, reviewMoves, mySide, setPly]);
+  const [seenDecisive, setSeenDecisive] = useState(false);
   // Stepping onto the last move (checkmate or the final position): the Pro report opens by itself
   // a few seconds later. Going back to an earlier move first cancels it.
   const lastPly = useRef(ply);
@@ -693,6 +776,23 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
           );
         })()}
 
+        {/* First review: the deciding move, then what's next */}
+        {decisive && ply === decisive.ply && mode.kind === 'main' && (
+          <div className="mx-3 mt-2 rounded-[16px] p-3.5" style={{ background: '#162022', border: '1px solid rgba(255,255,255,.08)' }}>
+            <p className="text-[15px] font-extrabold text-white">{decisive.mine ? 'This is the move that decided your game' : 'This is where the game turned'}</p>
+            <p className="mt-1 text-[13px]" style={{ color: '#AEB6B3' }}>
+              Your winning chances: <b className="tabular-nums text-white">{Math.round(decisive.from)}%</b> → <b className="tabular-nums" style={{ color: decisive.to < decisive.from ? '#FF7A80' : GREEN }}>{Math.round(decisive.to)}%</b>
+            </p>
+            {canRetry && decisive.mine && (
+              <button onClick={() => { setSeenDecisive(true); setMode({ kind: 'retry', state: 'trying' }); }} className="mt-2.5 flex items-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-extrabold text-white" style={{ background: 'linear-gradient(180deg,#81B64C,#5F8F36)' }}>
+                <RotateCcw size={14} /> Find the better move
+              </button>
+            )}
+          </div>
+        )}
+        {firstReview && status === 'ready' && mode.kind === 'main' && ((decisive && (ply === decisive.ply || seenDecisive)) || atEnd) && (
+          <FirstReviewNext onDaily={() => navigateTo('/daily-three')} onPlay={() => navigateTo('/play')} onHome={() => navigateTo('/')} />
+        )}
         {/* End of game summary */}
         {atEnd && (
           <div className="mx-3 mt-2 rounded-[16px] p-3" style={{ background: '#162022', border: '1px solid rgba(255,255,255,.08)' }}>

@@ -11,7 +11,7 @@ import { trackImportJob } from '@/components/ImportStatusWatcher';
 export async function startOnboardingImport(
   username: string,
   platform: 'chesscom' | 'lichess',
-  cb: { onReady?: () => void; onError?: (message: string) => void } = {},
+  cb: { onReady?: () => void; onError?: (message: string) => void; onReviewJob?: (jobId: string) => void } = {},
 ): Promise<void> {
   const importRes = await apiFetch('/api/games/import-bg', {
     method: 'POST',
@@ -45,6 +45,7 @@ export async function startOnboardingImport(
       }
       const reviewData = await reviewRes.json().catch(() => null) as { jobId?: string } | null;
       if (reviewData?.jobId) trackBackgroundJob('gamesReview', reviewData.jobId);
+      if (reviewData?.jobId) cb.onReviewJob?.(reviewData.jobId);
       cb.onReady?.();
     } catch (err) {
       cb.onError?.(err instanceof Error ? err.message : 'Something went wrong importing your games.');

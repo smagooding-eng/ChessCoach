@@ -5,7 +5,9 @@ import { useLocation } from 'wouter';
 import { apiFetch } from '@/lib/api';
 import { startOnboardingImport } from '@/lib/onboardingImport';
 import { trackFunnelEvent } from '@/lib/funnelTracking';
-import { Check } from 'lucide-react';
+import { Bell, Check, ChevronRight, Puzzle as PuzzleIcon } from 'lucide-react';
+import { usePushNotifications } from '@/hooks/use-push-notifications';
+import { EXTENSION_URL } from '@/lib/extension';
 import { RD } from '@/lib/redesignTheme';
 
 const LOGO = `${import.meta.env.BASE_URL}images/logo.svg`;
@@ -48,6 +50,26 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
   // anything of theirs. They get it later, when they open a game lobby ("Before you play").
   const [setupDone, setSetupDone] = useState(true);
   const { authUser } = useUser();
+  // The full review of their games (runs on the server): followed here to show progress.
+  const [reviewJob, setReviewJob] = useState<string | null>(null);
+  const [review, setReview] = useState<{ done: number; total: number; finished: boolean } | null>(null);
+  useEffect(() => {
+    if (!reviewJob) return;
+    let stop = false;
+    const tick = async () => {
+      const r = await apiFetch(`/api/games/review-all-status/${reviewJob}`, { credentials: 'include' }).catch(() => null);
+      const d = r?.ok ? await r.json().catch(() => null) as { status?: string; reviewedSoFar?: number; total?: number } | null : null;
+      if (stop) return;
+      if (d) setReview({ done: Number(d.reviewedSoFar ?? 0), total: Number(d.total ?? 0), finished: d.status === 'done' || d.status === 'completed' });
+      if (!d || (d.status !== 'done' && d.status !== 'completed' && d.status !== 'error')) setTimeout(tick, 3000);
+    };
+    void tick();
+    return () => { stop = true; };
+  }, [reviewJob]);
+  const push = usePushNotifications();
+  const notifyOn = push.permission === 'granted' && push.isSubscribed;
+  const canAsk = !notifyOn && push.permission !== 'denied' && push.permission !== 'unsupported';
+  const desktop = typeof window !== 'undefined' && window.matchMedia?.('(pointer: fine)').matches && !/Android|iPhone|iPad/i.test(navigator.userAgent);
 
   const submitUsername = async () => {
     const trimmed = usernameInput.trim();
@@ -91,6 +113,7 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
     };
     startOnboardingImport(username, platform, {
       onReady: () => { if (mounted.current) setStatus('ready'); },
+      onReviewJob: (id) => { if (mounted.current) setReviewJob(id); },
       onError: fail,
     }).catch((err) => fail(err instanceof Error ? err.message : 'Something went wrong importing your games.'));
   }, [status, username, platform]);
@@ -116,7 +139,7 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
     if (!latest) return finish();
     trackFunnelEvent('onboarding_finished');
     onDone();
-    navigate(`/games/${latest.id}?review=1`, { replace: true } as never);
+    navigate(`/games/${latest.id}?review=1&first=1`, { replace: true } as never);
   };
 
   if (status === 'need-username') {
@@ -188,43 +211,66 @@ export function OnboardingStartModal({ username: initialUsername, platform: init
     );
   }
 
+  // "Your coach is getting to work": what's happening with their games, the one
+  // ask that matters (notifications, so the report brings them back), and their
+  // last game's deciding move as the first thing to look at.
+  const step = (state: 'done' | 'now' | 'wait', title: string, detail: string) => (
+    <div className="flex items-start gap-3 text-left">
+      <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full" style={{ background: state === 'done' ? '#81B64C' : 'rgba(255,255,255,.08)' }}>
+        {state === 'done' ? <Check size={14} strokeWidth={3} color="#fff" />
+          : state === 'now' ? <span className="h-3.5 w-3.5 rounded-full border-2 animate-spin" style={{ borderColor: '#81B64C transparent #81B64C #81B64C' }} />
+          : <span className="h-1.5 w-1.5 rounded-full" style={{ background: TEXT_MUTED }} />}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[14px] font-extrabold" style={{ color: state === 'wait' ? TEXT_MUTED : TEXT_LIGHT }}>{title}</span>
+        <span className="block text-[12.5px] leading-snug" style={{ color: TEXT_MUTED }}>{detail}</span>
+      </span>
+    </div>
+  );
+  const imported = status === 'ready';
+  const reviewed = !!review?.finished;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(6px)' }}>
-      <div className="w-full max-w-md rounded-[22px] p-6 md:p-8 space-y-5 text-center"
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto px-4 py-6" style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(6px)' }}>
+      <div className="w-full max-w-md rounded-[22px] p-6 md:p-7 space-y-5"
         style={{ background: BG_CARD, border: `1px solid ${BORDER}`, boxShadow: '0 24px 60px rgba(0,0,0,0.6)' }}>
-        {status === 'ready' ? (
-          <div className="mx-auto grid h-14 w-14 place-items-center rounded-[16px]" style={{ background: '#81B64C', color: '#FFFFFF' }}><Check size={30} strokeWidth={3} /></div>
-        ) : (
-          <div className="mx-auto grid h-14 w-14 place-items-center rounded-[16px]" style={{ background: '#81B64C' }}>
-            <div className="h-7 w-7 rounded-full border-[3px] animate-spin" style={{ borderColor: '#FFFFFF transparent #FFFFFF #FFFFFF' }} />
-          </div>
-        )}
-        <div>
-          <h2 className="text-xl font-black mb-2" style={{ color: TEXT_LIGHT }}>
-            {status === 'ready' ? (latest ? 'Your last game is ready' : "You're all set!") : 'Bringing in your games'}
-          </h2>
-          <p className="text-sm leading-relaxed" style={{ color: TEXT_MUTED }}>
-            {status === 'ready'
-              ? latest
-                ? `See your game against ${latest.opp} move by move: every mistake marked, and the better move shown. The rest of your games are being reviewed too.`
-                : 'Your games are in and being reviewed now.'
-              : 'Pulling in your recent games. Usually under a minute.'}
-          </p>
+        <div className="text-center">
+          <h2 className="text-xl font-black" style={{ color: TEXT_LIGHT }}>Your coach is getting to work</h2>
+          <p className="mt-1 text-[13px]" style={{ color: TEXT_MUTED }}>This keeps going if you leave this screen.</p>
+        </div>
+        <div className="space-y-3.5">
+          {step(imported ? 'done' : 'now', imported ? 'Your games are in' : 'Bringing in your games', imported ? `Your recent ${platform === 'chesscom' ? 'Chess.com' : 'Lichess'} games, ready to review.` : 'Usually under a minute.')}
+          {step(reviewed ? 'done' : imported ? 'now' : 'wait', 'Reviewing every game',
+            review && review.total > 0 ? (reviewed ? `All ${review.total} reviewed.` : `${review.done} of ${review.total} done. Every move checked by the engine.`) : 'Every move checked by the engine.')}
+          {step(reviewed ? 'done' : 'wait', 'Building your report', 'Your strengths, your weak spots, and what to train first.')}
         </div>
 
-        {status === 'ready' && latest ? (
-          <>
-            <button onClick={reviewLatest} className="w-full py-3.5 rounded-[14px] font-extrabold text-[15px]" style={BTN}>
-              Review my last game
+        {canAsk && (
+          <div className="rounded-[16px] p-3.5" style={{ background: 'rgba(129,182,76,.10)', border: '1px solid rgba(129,182,76,.3)' }}>
+            <p className="text-[14px] font-extrabold" style={{ color: TEXT_LIGHT }}>Get told when your report is ready</p>
+            <p className="mt-0.5 text-[12.5px] leading-snug" style={{ color: TEXT_MUTED }}>Reviewing all your games takes a little while. We'll notify you when it's done, and each time a new game of yours is reviewed.</p>
+            <button onClick={() => { void push.subscribe(); }} disabled={push.loading} className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded-[12px] py-2.5 text-[14px] font-extrabold disabled:opacity-60" style={BTN}>
+              <Bell size={15} /> Turn on notifications
             </button>
-            <button onClick={finish} className="w-full text-[13px] font-bold underline" style={{ color: TEXT_MUTED }}>Go to my dashboard instead</button>
-          </>
-        ) : (
-          <button onClick={finish} className="w-full py-3.5 rounded-[14px] font-extrabold text-[15px]" style={BTN}>
-            Go to my dashboard
-          </button>
+          </div>
         )}
-        <p className="text-[11px]" style={{ color: TEXT_MUTED }}>Your games keep importing in the background.</p>
+        {notifyOn && (
+          <p className="flex items-center gap-2 text-[13px] font-bold" style={{ color: '#95C45A' }}><Check size={15} strokeWidth={3} /> We'll let you know when your report is ready.</p>
+        )}
+        {desktop && platform === 'chesscom' && (
+          <a href={EXTENSION_URL} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 rounded-[14px] px-3.5 py-3" style={{ background: 'rgba(255,255,255,.05)', border: `1px solid ${BORDER}` }}>
+            <PuzzleIcon size={18} style={{ color: '#81B64C' }} className="shrink-0" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13.5px] font-extrabold" style={{ color: TEXT_LIGHT }}>Add the Chrome extension</span>
+              <span className="block text-[12px] leading-snug" style={{ color: TEXT_MUTED }}>Review each Chess.com game right where you play it.</span>
+            </span>
+            <ChevronRight size={16} style={{ color: TEXT_MUTED }} />
+          </a>
+        )}
+
+        <button onClick={reviewLatest} disabled={!imported || !latest} className="w-full py-3.5 rounded-[14px] font-extrabold text-[15px] disabled:opacity-60" style={BTN}>
+          {imported && latest ? 'See the move that decided your last game' : 'Getting your last game\u2026'}
+        </button>
+        <button onClick={finish} className="block w-full text-center text-[13px] font-bold underline" style={{ color: TEXT_MUTED }}>Go to my dashboard instead</button>
       </div>
     </div>
   );

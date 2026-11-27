@@ -232,6 +232,7 @@ const Profile = lazyRetry(() => import("@/pages/Profile").then(m => ({ default: 
 const Puzzles = lazyRetry(() => import("@/pages/Puzzles").then(m => ({ default: m.Puzzles })));
 const ShopPage = lazyRetry(() => import("@/pages/Shop").then(m => ({ default: m.ShopPage })));
 const SolvedPuzzles = lazyRetry(() => import("@/pages/SolvedPuzzles"));
+const DailyThree = lazyRetry(() => import("@/pages/DailyThree"));
 const ScanPosition = lazyRetry(() => import("@/pages/ScanPosition").then(m => ({ default: m.ScanPosition })));
 const Explorer = lazyRetry(() => import("@/pages/Explorer").then(m => ({ default: m.Explorer })));
 const Admin = lazyRetry(() => import("@/pages/Admin").then(m => ({ default: m.Admin })));
@@ -408,6 +409,7 @@ const PProfile       = () => <ProtectedRoute component={Profile} />;
 const PPuzzles       = () => <ProtectedRoute component={Puzzles} />;
 const PShop          = () => <ProtectedRoute component={ShopPage} />;
 const PSolvedPuzzles = () => <ProtectedRoute component={SolvedPuzzles} />;
+const PDailyThree = () => <ProtectedRoute component={DailyThree} />;
 const PScanPosition  = () => <ProtectedRoute component={ScanPosition} />;
 const PExplorer      = () => <ProtectedRoute component={Explorer} />;
 const PAdmin         = () => <ProtectedRoute component={Admin} />;
@@ -716,6 +718,7 @@ function Router() {
       <Route path="/puzzles"          component={PPuzzles} />
       <Route path="/shop"             component={PShop} />
       <Route path="/puzzles/solved"   component={PSolvedPuzzles} />
+      <Route path="/daily-three"      component={PDailyThree} />
       <Route path="/scan"             component={PScanPosition} />
       <Route path="/explore"          component={PExplorer} />
       <Route path="/admin/studio"     component={PContentStudio} />
