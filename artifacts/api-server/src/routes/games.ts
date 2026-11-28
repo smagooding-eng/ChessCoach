@@ -1962,8 +1962,9 @@ async function startHistoryBackfill(): Promise<void> {
 // How often to look for new games: mid-session, around lately, this month, away.
 const QUICK_HOT_MS = 2 * 60_000, QUICK_WARM_MS = 5 * 60_000, QUICK_COLD_MS = 60 * 60_000, QUICK_AWAY_MS = 6 * 3600_000;
 // Push: as soon as a new game is reviewed (then quiet for QUICK_GAP_MS). Email (no push):
-// once no new game has come in for 10 minutes, at most once a day.
-const QUICK_QUIET_MS = 0, QUICK_GAP_MS = 3 * 3600_000, QUICK_EMAIL_QUIET_MS = 10 * 60_000, QUICK_EMAIL_GAP_DAYS = 0.95;
+// once no new game has come in for 10 minutes, at most every 3 days (daily emails got
+// opened 7% of the time: fewer, with the actual move in the subject).
+const QUICK_QUIET_MS = 0, QUICK_GAP_MS = 3 * 3600_000, QUICK_EMAIL_QUIET_MS = 10 * 60_000, QUICK_EMAIL_GAP_DAYS = 2.95;
 const QUICK_UA = "ChessScout.net/1.0 (+https://chessscout.net)";
 let quickRunning = false;
 let quickPauseUntil = 0;
