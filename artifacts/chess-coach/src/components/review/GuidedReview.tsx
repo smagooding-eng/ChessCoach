@@ -157,10 +157,16 @@ export interface GuidedReviewProps {
 }
 
 /** Free reviews: the coach's card on a costly move, locked, with the trial one tap away. */
+const trialTrack = (event: 'card_shown' | 'card_start') => {
+  void apiFetch('/api/trial/track', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event }) }).catch(() => {});
+};
+let teaserCounted = false; // once per visit is enough: the admin panel counts members
 function CoachTeaser({ label, onUpgrade }: { label: string; onUpgrade?: () => void }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  useEffect(() => { if (!teaserCounted) { teaserCounted = true; trialTrack('card_shown'); } }, []);
   const go = async () => {
+    trialTrack('card_start');
     setBusy(true); setErr('');
     const e = await startTrial('coach');
     if (e) { setErr(e); setBusy(false); }
@@ -222,12 +228,13 @@ function FirstReviewNext({ onDaily, onPlay, onHome, offerTrial }: { onDaily: () 
     if (!offerTrial) return;
     let off = false;
     void apiFetch('/api/stripe/trial-offer', { credentials: 'include' }).then((r) => (r.ok ? r.json() : null)).then((d) => {
-      if (!off && d?.eligible) { setEligible(true); trackFunnelEvent('trial_card_shown'); }
+      if (!off && d?.eligible) { setEligible(true); trackFunnelEvent('trial_card_shown'); trialTrack('card_shown'); }
     }).catch(() => {});
     return () => { off = true; };
   }, [offerTrial]);
   const tryPro = async () => {
     trackFunnelEvent('trial_card_clicked');
+    trialTrack('card_start');
     setTrialBusy(true); setTrialErr('');
     const e = await startTrial('coach');
     if (e) { setTrialErr(e); setTrialBusy(false); }

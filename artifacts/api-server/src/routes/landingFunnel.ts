@@ -80,7 +80,7 @@ function deviceOf(ua: string): Device {
 }
 
 const VALID_EVENTS = new Set([
-  "landing_view", "mia_started", "mia_skipped", "signup_clicked", "signup_completed",
+  "landing_view", "mia_started", "mia_skipped", "onboarding_finished", "signup_clicked", "signup_completed",
   "signup_form_submitted", "signup_error", "opponent_scout_clicked",
   "google_oauth_clicked", "google_signup_completed", "google_signup_error", "google_login_completed",
   "guest_game_started", "guest_game_finished",
