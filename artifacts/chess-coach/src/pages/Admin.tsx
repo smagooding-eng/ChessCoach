@@ -3313,6 +3313,7 @@ function LandingFunnelPanel() {
 type TrialStats = {
   path?: { saw: number; tapped: number; closedOnly: number; neither: number; tappedThenCheckout: number; checkoutPeople: number; checkoutFailed: number } | null;
   promo: { shown: number; start: number; dismiss: number; closeMedianSecs?: number | null; closedUnder4s?: number };
+  inReview?: { shown: number; start: number; checkout: number };
   checkout: { total: number; promo: number; subscription: number; pricing: number; email: number; coach?: number };
   trials: { started: number; inTrial: number; cancelling: number; paid: number; paidCancelling: number; paymentFailed: number; ended: number };
   recent: { email: string | null; status: string; startedAt: string; trialEnd: string | null; outcome: string }[];
@@ -3463,6 +3464,17 @@ function TrialStatsPanel() {
                 </div>
               );
             })()}
+            {data.inReview && (
+              <div>
+                <p className="mb-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">The offer inside reviews</p>
+                <p className="mb-2 text-[11.5px] text-muted-foreground">The locked coach card on a mistake and the first review's "What's next" (not a popup). Members, counted once.</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <Stat label="Saw it" value={data.inReview.shown} />
+                  <Stat label="Tapped Start" value={data.inReview.start} />
+                  <Stat label="Checkout opened" value={data.inReview.checkout} />
+                </div>
+              </div>
+            )}
             <div>
               <p className="mb-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">Where trial checkouts were opened</p>
               <p className="mb-2 text-[11.5px] text-muted-foreground">Members; one member can open it from more than one place.</p>

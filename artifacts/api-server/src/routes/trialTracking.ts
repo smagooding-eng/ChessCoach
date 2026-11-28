@@ -33,12 +33,14 @@ export async function logTrialEvent(userId: string, event: string, source?: stri
 }
 
 // From the promo itself
-const PROMO_EVENTS = new Set(['shown', 'start', 'dismiss', 'checkout_failed']);
+// card_shown / card_start: the offer inside reviews (the locked coach card on a mistake,
+// and the first review's 'What's next'), kept apart from the popup's numbers.
+const PROMO_EVENTS = new Set(['shown', 'start', 'dismiss', 'checkout_failed', 'card_shown', 'card_start']);
 router.post('/trial/track', async (req: Request, res: Response) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: 'Not authenticated' }); return; }
   const event = String(req.body?.event ?? '');
   if (!PROMO_EVENTS.has(event)) { res.status(400).json({ error: 'Unknown event' }); return; }
-  await logTrialEvent(req.user.id, event, 'promo');
+  await logTrialEvent(req.user.id, event, event.startsWith('card_') ? 'coach' : 'promo');
   res.json({ ok: true });
 });
 
@@ -132,6 +134,7 @@ router.get('/admin/trial-stats', requireAdmin, async (req: Request, res: Respons
         tappedThenCheckout: path.checkout_after, checkoutPeople: path.checkout_any, checkoutFailed: path.failed } : null,
       promo: { shown: count('shown'), start: count('start'), dismiss: count('dismiss'),
         closeMedianSecs: close?.median != null ? Math.round(close.median * 10) / 10 : null, closedUnder4s: close?.quick ?? 0 },
+      inReview: { shown: count('card_shown'), start: count('card_start'), checkout: count('checkout', 'coach') },
       checkout: { total: count('checkout'), promo: count('checkout', 'promo'), subscription: count('checkout', 'subscription'), pricing: count('checkout', 'pricing'), email: count('checkout', 'email'), coach: count('checkout', 'coach') },
       trials: { started, inTrial: by('in_trial'), cancelling: by('cancelling'), paid: by('paid') + by('paid_cancelling'), paidCancelling: by('paid_cancelling'), paymentFailed: by('payment_failed'), ended: by('ended') },
       recent: trials.sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, 25),
