@@ -218,7 +218,22 @@ export function decidingMove(reviewMoves: GuidedReviewMove[], mySide: 'w' | 'b' 
   return best && Math.abs(best.to - best.from) >= 8 ? best : null;
 }
 
-function FirstReviewNext({ onDaily, onPlay, onHome, offerTrial }: { onDaily: () => void; onPlay: () => void; onHome: () => void; offerTrial?: boolean }) {
+/** On the deciding move: "want this for every game?" (only when notifications are off). */
+function EveryGameAsk() {
+  const { permission, isSubscribed, subscribe, loading } = usePushNotifications();
+  if ((permission === 'granted' && isSubscribed) || permission === 'denied' || permission === 'unsupported') return null;
+  return (
+    <div className="mt-3 border-t pt-3" style={{ borderColor: 'rgba(255,255,255,.08)' }}>
+      <p className="text-[13.5px] font-extrabold text-white">Want this for every game?</p>
+      <p className="mt-0.5 text-[12.5px] leading-snug" style={{ color: '#AEB6B3' }}>Play on Chess.com or Lichess and we'll tell you which move mattered, the same day.</p>
+      <button onClick={() => { void subscribe(); }} disabled={loading} className="mt-2 flex items-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-extrabold text-white disabled:opacity-60" style={{ background: '#2A3436', border: '1px solid rgba(255,255,255,.12)' }}>
+        <Bell size={14} /> Turn on notifications
+      </button>
+    </div>
+  );
+}
+
+function FirstReviewNext({ onDaily, onPlay, onHome, offerTrial, askedAbove }: { onDaily: () => void; onPlay: () => void; onHome: () => void; offerTrial?: boolean; /** the deciding-move card just above already asks for notifications */ askedAbove?: boolean }) {
   const { permission, isSubscribed, subscribe, loading } = usePushNotifications();
   // Free accounts that can still take the trial: the offer, inline (not a popup).
   const [eligible, setEligible] = useState(false);
@@ -240,7 +255,7 @@ function FirstReviewNext({ onDaily, onPlay, onHome, offerTrial }: { onDaily: () 
     if (e) { setTrialErr(e); setTrialBusy(false); }
   };
   const notifyOn = permission === 'granted' && isSubscribed;
-  const canAsk = !notifyOn && permission !== 'denied' && permission !== 'unsupported';
+  const canAsk = !askedAbove && !notifyOn && permission !== 'denied' && permission !== 'unsupported';
   const row = 'flex w-full items-center gap-3 rounded-[13px] px-3 py-2.5 text-left';
   return (
     <div className="mx-3 mt-2 rounded-[16px] p-3.5" style={{ background: '#162022', border: '1px solid rgba(255,255,255,.08)' }}>
@@ -829,10 +844,11 @@ export function GuidedReview({ moves, startFen, reviewMoves, ply, setPly, flippe
                 <RotateCcw size={14} /> Find the better move
               </button>
             )}
+            <EveryGameAsk />
           </div>
         )}
         {firstReview && status === 'ready' && mode.kind === 'main' && ((decisive && (ply === decisive.ply || seenDecisive)) || atEnd) && (
-          <FirstReviewNext offerTrial={!canFullAnalysis} onDaily={() => navigateTo('/daily-three')} onPlay={() => navigateTo('/play')} onHome={() => navigateTo('/')} />
+          <FirstReviewNext askedAbove={!!decisive && ply === decisive.ply} offerTrial={!canFullAnalysis} onDaily={() => navigateTo('/daily-three')} onPlay={() => navigateTo('/play')} onHome={() => navigateTo('/')} />
         )}
         {/* End of game summary */}
         {atEnd && (
